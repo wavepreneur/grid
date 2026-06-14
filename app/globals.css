@@ -1,8 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #030712;
+  --foreground: #f8fafc;
+  --grid-accent: #2ee9da;
+  --grid-accent-soft: rgba(46, 233, 218, 0.12);
+  --grid-border: rgba(46, 233, 218, 0.18);
+  --grid-muted: #94a3b8;
+  --grid-panel: rgba(8, 15, 30, 0.88);
 }
 
 @theme inline {
@@ -12,15 +17,44 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+.grid-bg {
+  background:
+    radial-gradient(circle at top, rgba(46, 233, 218, 0.12), transparent 35%),
+    linear-gradient(180deg, #020617 0%, #030712 100%);
+}
+
+.grid-panel {
+  border: 1px solid var(--grid-border);
+  background: var(--grid-panel);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.02) inset,
+    0 20px 60px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+}
+
+.grid-button {
+  border: 1px solid rgba(46, 233, 218, 0.35);
+  background: linear-gradient(180deg, rgba(46, 233, 218, 0.18), rgba(46, 233, 218, 0.08));
+  color: white;
+}
+
+.grid-button:hover:not(:disabled) {
+  border-color: rgba(46, 233, 218, 0.65);
+  background: linear-gradient(180deg, rgba(46, 233, 218, 0.28), rgba(46, 233, 218, 0.12));
+}
+
+.grid-input {
+  border: 1px solid var(--grid-border);
+  background: rgba(2, 6, 23, 0.8);
+}
+
+.grid-input:focus {
+  border-color: rgba(46, 233, 218, 0.55);
+  box-shadow: 0 0 0 3px rgba(46, 233, 218, 0.12);
 }
