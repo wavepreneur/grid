@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { initializeTeamGameState } from "@/app/actions/game";
 import {
   DEFAULT_LOBBY_AUTO_START_SECONDS,
 } from "@/lib/grid/constants";
@@ -64,21 +65,29 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
   const supabase = createAdminClient();
   const { data: team } = await supabase
     .from("teams")
-    .select("id, status, lobby_auto_start_at")
+    .select("id, status, lobby_auto_start_at, captain_player_id")
     .eq("id", teamId)
     .single();
 
   if (!team || team.status !== "lobby" || !team.lobby_auto_start_at) return;
   if (new Date(team.lobby_auto_start_at).getTime() > Date.now()) return;
+  if (!team.captain_player_id) return;
 
-  await supabase
+  const startedAt = new Date().toISOString();
+  const { data: updated } = await supabase
     .from("teams")
     .update({
       status: "playing",
-      started_at: new Date().toISOString(),
+      started_at: startedAt,
     })
     .eq("id", teamId)
-    .eq("status", "lobby");
+    .eq("status", "lobby")
+    .select("id")
+    .maybeSingle();
+
+  if (updated) {
+    await initializeTeamGameState(teamId, team.captain_player_id);
+  }
 }
 
 export async function createEvent(input: {
@@ -434,6 +443,8 @@ export async function startGameManually(input: {
     if (error) {
       return { success: false, error: error.message };
     }
+
+    await initializeTeamGameState(team.id, player.id);
 
     await supabase
       .from("events")

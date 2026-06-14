@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   getLobbySnapshot,
   startGameManually,
@@ -14,7 +15,7 @@ import {
   GridError,
   GridStat,
 } from "@/components/grid/grid-shell";
-import { LOBBY_POLL_INTERVAL_MS } from "@/lib/grid/constants";
+import { useTeamSync } from "@/lib/hooks/use-team-sync";
 import { buildTeamInviteUrl } from "@/lib/grid/codes";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
 
@@ -43,6 +44,7 @@ export function LobbyRoom({
   initialSnapshot,
   playerSession,
 }: LobbyRoomProps) {
+  const router = useRouter();
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(
@@ -55,30 +57,63 @@ export function LobbyRoom({
     return buildTeamInviteUrl(window.location.origin, inviteCode, joinCode);
   }, [inviteCode, joinCode]);
 
-  useEffect(() => {
-    async function refreshLobby() {
-      const result = await getLobbySnapshot({
-        inviteCode,
-        joinCode,
-        sessionId: playerSession.sessionId,
-      });
+  const refreshLobby = useCallback(async () => {
+    const result = await getLobbySnapshot({
+      inviteCode,
+      joinCode,
+      sessionId: playerSession.sessionId,
+    });
 
-      if (result.success) {
-        setSnapshot(result.data);
-        setCountdown(formatCountdown(result.data.lobby_auto_start_at));
-      }
+    if (result.success) {
+      setSnapshot(result.data);
+      setCountdown(formatCountdown(result.data.lobby_auto_start_at));
     }
+  }, [inviteCode, joinCode, playerSession.sessionId]);
 
-    const pollId = window.setInterval(refreshLobby, LOBBY_POLL_INTERVAL_MS);
+  const handleTeamStatusChange = useCallback(
+    (status: string) => {
+      if (status === "playing") {
+        router.push(`/play/${inviteCode}/${joinCode}`);
+        return;
+      }
+
+      void refreshLobby();
+    },
+    [inviteCode, joinCode, refreshLobby, router],
+  );
+
+  const handlePlayersChange = useCallback((players: LobbySnapshot["players"]) => {
+    setSnapshot((current) => ({
+      ...current,
+      players,
+      active_player_count: players.length,
+    }));
+  }, []);
+
+  const { isConnected, error: realtimeError } = useTeamSync({
+    sessionId: playerSession.sessionId,
+    teamId: playerSession.teamId,
+    enabled: snapshot.team_status === "lobby",
+    onTeamStatusChange: handleTeamStatusChange,
+    onPlayersChange: handlePlayersChange,
+  });
+
+  useEffect(() => {
+    if (snapshot.team_status !== "lobby") return;
+
     const countdownId = window.setInterval(() => {
       setCountdown(formatCountdown(snapshot.lobby_auto_start_at));
     }, 1000);
 
+    const autoStartCheckId = window.setInterval(() => {
+      void refreshLobby();
+    }, 5000);
+
     return () => {
-      window.clearInterval(pollId);
       window.clearInterval(countdownId);
+      window.clearInterval(autoStartCheckId);
     };
-  }, [inviteCode, joinCode, playerSession.sessionId, snapshot.lobby_auto_start_at]);
+  }, [refreshLobby, snapshot.lobby_auto_start_at, snapshot.team_status]);
 
   function handleStartGame() {
     setError(null);
@@ -95,20 +130,11 @@ export function LobbyRoom({
         return;
       }
 
-      const refreshed = await getLobbySnapshot({
-        inviteCode,
-        joinCode,
-        sessionId: playerSession.sessionId,
-      });
-
-      if (refreshed.success) {
-        setSnapshot(refreshed.data);
-      }
+      router.push(`/play/${inviteCode}/${joinCode}`);
     });
   }
 
   const isCaptain = playerSession.isCaptain;
-  const isPlaying = snapshot.team_status === "playing";
   const isLobby = snapshot.team_status === "lobby";
 
   return (
@@ -120,18 +146,15 @@ export function LobbyRoom({
           value={`${snapshot.active_player_count} / ${snapshot.max_size}`}
         />
         <GridStat label="Abteilung" value={snapshot.department ?? "—"} />
-        <GridStat label="Region" value={snapshot.region ?? "—"} />
+        <GridStat
+          label="Realtime"
+          value={isConnected ? "Live verbunden" : "Verbinde…"}
+        />
       </div>
 
       {isLobby ? (
         <div className="rounded-xl border border-[var(--grid-accent)]/30 bg-[var(--grid-accent)]/10 px-4 py-3 text-sm text-[var(--grid-accent)]">
           Auto-Start in {countdown} — oder Captain startet manuell.
-        </div>
-      ) : null}
-
-      {isPlaying ? (
-        <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-300">
-          Spiel gestartet. Phase 2 (Realtime Game Engine) baut hier auf.
         </div>
       ) : null}
 
@@ -184,6 +207,7 @@ export function LobbyRoom({
         </p>
       ) : null}
 
+      {realtimeError ? <GridError message={realtimeError} /> : null}
       {error ? <GridError message={error} /> : null}
     </div>
   );
