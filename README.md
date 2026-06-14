@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Grid
 
-## Getting Started
+Next.js App mit Supabase-Backend, deployed auf Vercel.
 
-First, run the development server:
+## Stack
+
+- [Next.js](https://nextjs.org) (App Router)
+- [Supabase](https://supabase.com) (Projekt: GridOS)
+- [Vercel](https://vercel.com)
+- GitHub: `wavepreneur/grid`
+
+## Lokale Entwicklung
+
+1. Abhängigkeiten installieren:
+
+```bash
+npm install
+```
+
+2. Umgebungsvariablen anlegen:
+
+```bash
+cp .env.local.example .env.local
+```
+
+Trage deine Supabase-Werte aus dem [Supabase Dashboard](https://supabase.com/dashboard/project/pqkktqnnghldzcudzaph/settings/api) ein.
+
+3. Dev-Server starten:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Die App läuft unter [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Supabase CLI
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Das Projekt ist mit Supabase GridOS verknüpft:
 
-## Learn More
+```bash
+supabase status
+supabase db pull
+supabase migration new my_change
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Deployment (Vercel)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Repository auf GitHub pushen
+2. In Vercel: **Add New Project** → GitHub Repo `grid` importieren
+3. Environment Variables setzen:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+4. Deploy starten
