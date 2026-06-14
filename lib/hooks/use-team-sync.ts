@@ -78,17 +78,21 @@ export function useTeamSync({
         return;
       }
 
+      const { accessToken } = tokenResult.data;
+
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         {
           global: {
             headers: {
-              Authorization: `Bearer ${tokenResult.data.accessToken}`,
+              Authorization: `Bearer ${accessToken}`,
             },
           },
         },
       );
+
+      await supabase.realtime.setAuth(accessToken);
 
       clientRef.current = supabase;
 
