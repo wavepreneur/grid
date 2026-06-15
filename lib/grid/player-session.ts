@@ -8,6 +8,8 @@ export function savePlayerSession(session: PlayerSession): void {
 }
 
 export function loadPlayerSession(): PlayerSession | null {
+  if (typeof window === "undefined") return null;
+
   const raw = localStorage.getItem(GRID_PLAYER_SESSION_KEY);
   if (!raw) return null;
 

@@ -6,6 +6,7 @@ import { getGameState } from "@/app/actions/game";
 import { GameRoom } from "@/components/game/game-room";
 import { GridError } from "@/components/grid/grid-shell";
 import { loadPlayerSessionForTeam } from "@/lib/grid/player-session";
+import type { PlayerSession } from "@/lib/grid/types";
 
 type GameGateProps = {
   inviteCode: string;
@@ -17,21 +18,24 @@ export function GameGate({ inviteCode, joinCode, teamName }: GameGateProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [session, setSession] = useState<PlayerSession | null>(null);
   const [initialState, setInitialState] = useState<Awaited<
     ReturnType<typeof getGameState>
   > | null>(null);
-  const session = loadPlayerSessionForTeam(inviteCode, joinCode);
 
   useEffect(() => {
-    if (!session) {
+    const playerSession = loadPlayerSessionForTeam(inviteCode, joinCode);
+    if (!playerSession) {
       router.replace(`/join/${inviteCode}?team=${joinCode}`);
       return;
     }
 
+    setSession(playerSession);
+
     getGameState({
       inviteCode,
       joinCode,
-      sessionId: session.sessionId,
+      sessionId: playerSession.sessionId,
     }).then((result) => {
       if (!result.success) {
         setError(result.error);
@@ -46,7 +50,7 @@ export function GameGate({ inviteCode, joinCode, teamName }: GameGateProps) {
       setInitialState(result);
       setReady(true);
     });
-  }, [inviteCode, joinCode, router, session]);
+  }, [inviteCode, joinCode, router]);
 
   if (error) {
     return <GridError message={error} />;

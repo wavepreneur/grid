@@ -6,7 +6,7 @@ import { getLobbySnapshot } from "@/app/actions/lobby";
 import { LobbyRoom } from "@/components/lobby/lobby-room";
 import { GridError } from "@/components/grid/grid-shell";
 import { loadPlayerSessionForTeam } from "@/lib/grid/player-session";
-import type { LobbySnapshot } from "@/lib/grid/types";
+import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
 
 type LobbyGateProps = {
   inviteCode: string;
@@ -16,19 +16,22 @@ type LobbyGateProps = {
 export function LobbyGate({ inviteCode, joinCode }: LobbyGateProps) {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState<LobbySnapshot | null>(null);
+  const [session, setSession] = useState<PlayerSession | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const session = loadPlayerSessionForTeam(inviteCode, joinCode);
-    if (!session) {
+    const playerSession = loadPlayerSessionForTeam(inviteCode, joinCode);
+    if (!playerSession) {
       router.replace(`/join/${inviteCode}?team=${joinCode}`);
       return;
     }
 
+    setSession(playerSession);
+
     getLobbySnapshot({
       inviteCode,
       joinCode,
-      sessionId: session.sessionId,
+      sessionId: playerSession.sessionId,
     }).then((result) => {
       if (!result.success) {
         setError(result.error);
@@ -38,8 +41,6 @@ export function LobbyGate({ inviteCode, joinCode }: LobbyGateProps) {
       setSnapshot(result.data);
     });
   }, [inviteCode, joinCode, router]);
-
-  const session = loadPlayerSessionForTeam(inviteCode, joinCode);
 
   if (error) {
     return <GridError message={error} />;
