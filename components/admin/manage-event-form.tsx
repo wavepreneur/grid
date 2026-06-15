@@ -99,16 +99,16 @@ export function ManageEventForm() {
               <span className="text-[var(--grid-accent)]">{event.status}</span>
             </p>
             <p className="mt-2 break-all">
-              Link:{" "}
+              Spieler:{" "}
               <Link
-                href={`/join/${event.inviteCode}`}
+                href={`/e/${event.inviteCode}`}
                 className="text-[var(--grid-accent)] underline-offset-2 hover:underline"
               >
-                /join/{event.inviteCode}
+                /e/{event.inviteCode}
               </Link>
             </p>
             <p className="mt-2 break-all">
-              Event Cockpit:{" "}
+              Cockpit:{" "}
               <Link
                 href={`/cockpit/${event.inviteCode}`}
                 className="text-emerald-300 underline-offset-2 hover:underline"

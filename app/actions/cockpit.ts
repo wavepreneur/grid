@@ -5,6 +5,7 @@ import { loadResolvedEventContent } from "@/lib/grid/content-loader";
 import { parseTeamGameState } from "@/lib/grid/game-state";
 import { setTeamNavigator } from "@/lib/grid/team-session";
 import { writeAuditLog } from "@/lib/grid/audit-log";
+import { bumpEventContentRevision } from "@/lib/grid/content-revision";
 import { getEventByInviteCode } from "@/lib/grid/session-auth";
 import { normalizeCode } from "@/lib/grid/codes";
 import type { LevelDefinition } from "@/lib/grid/level-types";
@@ -224,6 +225,8 @@ async function mergeRouteOverrideLevel(
   if (error) {
     return { success: false, error: error.message };
   }
+
+  await bumpEventContentRevision(event.id);
 
   return {
     success: true,

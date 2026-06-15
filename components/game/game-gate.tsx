@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getEventContent } from "@/app/actions/content";
+import { getEventContent, getEventContentRevision } from "@/app/actions/content";
 import { getGameState } from "@/app/actions/game";
 import { GameRoom } from "@/components/game/game-room";
+import { IdentityBar } from "@/components/player/identity-bar";
 import { GridError } from "@/components/grid/grid-shell";
 import { cacheEventContent } from "@/lib/grid/offline-content";
+import { eventTeamJoinPath } from "@/lib/grid/event-routes";
 import {
   abandonTeamSession,
   resolveTeamSession,
@@ -19,17 +21,29 @@ type GameGateProps = {
   inviteCode: string;
   joinCode: string;
   teamName: string;
+  eventTitle?: string;
 };
 
-export function GameGate({ inviteCode, joinCode, teamName }: GameGateProps) {
+export function GameGate({
+  inviteCode,
+  joinCode,
+  teamName,
+  eventTitle = "Mission",
+}: GameGateProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<PlayerSession | null>(null);
   const [eventContent, setEventContent] = useState<ResolvedEventContent | null>(null);
+  const [contentRevision, setContentRevision] = useState(1);
   const [initialState, setInitialState] = useState<Awaited<
     ReturnType<typeof getGameState>
   > | null>(null);
+  const contentRevisionRef = useRef(1);
+
+  useEffect(() => {
+    contentRevisionRef.current = contentRevision;
+  }, [contentRevision]);
 
   useEffect(() => {
     Promise.all([
@@ -38,7 +52,7 @@ export function GameGate({ inviteCode, joinCode, teamName }: GameGateProps) {
     ]).then(async ([resolved, contentResult]) => {
       if (!resolved) {
         abandonTeamSession();
-        router.replace(`/join/${inviteCode}?team=${joinCode}`);
+        router.replace(eventTeamJoinPath(inviteCode, joinCode));
         return;
       }
 
@@ -62,7 +76,7 @@ export function GameGate({ inviteCode, joinCode, teamName }: GameGateProps) {
 
       if (!gameResult.success) {
         abandonTeamSession();
-        router.replace(`/join/${inviteCode}?team=${joinCode}`);
+        router.replace(eventTeamJoinPath(inviteCode, joinCode));
         return;
       }
 
@@ -76,10 +90,37 @@ export function GameGate({ inviteCode, joinCode, teamName }: GameGateProps) {
       cacheEventContent(contentResult.data.eventId, freshContent);
       setSession(syncedSession);
       setEventContent(freshContent);
+      setContentRevision(contentResult.data.contentRevision);
       setInitialState(gameResult);
       setReady(true);
     });
   }, [inviteCode, joinCode, router]);
+
+  useEffect(() => {
+    if (!ready) return;
+
+    const interval = window.setInterval(async () => {
+      const revisionResult = await getEventContentRevision(inviteCode);
+      if (!revisionResult.success) return;
+      if (revisionResult.data.contentRevision <= contentRevisionRef.current) return;
+
+      const contentResult = await getEventContent(inviteCode);
+      if (!contentResult.success) return;
+
+      const freshContent: ResolvedEventContent = {
+        templateSlug: contentResult.data.templateSlug,
+        templateName: contentResult.data.templateName,
+        city: contentResult.data.city,
+        levels: contentResult.data.levels,
+      };
+
+      cacheEventContent(contentResult.data.eventId, freshContent);
+      setEventContent(freshContent);
+      setContentRevision(contentResult.data.contentRevision);
+    }, 12_000);
+
+    return () => window.clearInterval(interval);
+  }, [inviteCode, ready]);
 
   if (error) {
     return <GridError message={error} />;
@@ -92,13 +133,17 @@ export function GameGate({ inviteCode, joinCode, teamName }: GameGateProps) {
   }
 
   return (
-    <GameRoom
-      inviteCode={inviteCode}
-      joinCode={joinCode}
-      playerSession={session}
-      initialState={initialState.data}
-      eventContent={eventContent}
-      teamName={teamName}
-    />
+    <div className="flex flex-col gap-5">
+      <IdentityBar inviteCode={inviteCode} joinCode={joinCode} session={session} />
+      <GameRoom
+        inviteCode={inviteCode}
+        joinCode={joinCode}
+        playerSession={session}
+        initialState={initialState.data}
+        eventContent={eventContent}
+        teamName={teamName}
+        eventTitle={eventTitle}
+      />
+    </div>
   );
 }

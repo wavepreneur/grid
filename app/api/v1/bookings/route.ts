@@ -126,8 +126,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       event_id: event.id,
       invite_code: event.invite_code,
-      join_url: `/join/${event.invite_code}`,
+      join_url: `/e/${event.invite_code}`,
       cockpit_url: `/cockpit/${event.invite_code}`,
+      show_url: `/cockpit/${event.invite_code}/show`,
       teams,
     });
   } catch (error) {

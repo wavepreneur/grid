@@ -18,6 +18,7 @@ import {
   GridLabel,
   GridStat,
 } from "@/components/grid/grid-shell";
+import { cockpitShowPath, eventLobbyPath, eventPath } from "@/lib/grid/event-routes";
 
 type EventCockpitProps = {
   inviteCode: string;
@@ -180,13 +181,15 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
 
       <div className="rounded-xl border border-[var(--grid-accent)]/20 bg-[var(--grid-accent)]/5 p-4 text-sm text-[var(--grid-muted)]">
         <p>
-          Operator-Link für dieses Event:{" "}
-          <span className="break-all text-white">/cockpit/{snapshot.invite_code}</span>
+          Spieler-Einstieg:{" "}
+          <Link href={eventPath(snapshot.invite_code)} className="text-[var(--grid-accent)] hover:underline">
+            /e/{snapshot.invite_code}
+          </Link>
         </p>
         <p className="mt-2">
-          Spieler-Link:{" "}
-          <Link href={`/join/${snapshot.invite_code}`} className="text-[var(--grid-accent)] hover:underline">
-            /join/{snapshot.invite_code}
+          Live-Ranking (Beamer):{" "}
+          <Link href={cockpitShowPath(snapshot.invite_code)} className="text-emerald-300 hover:underline">
+            /cockpit/{snapshot.invite_code}/show
           </Link>
         </p>
       </div>
@@ -222,7 +225,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link
-                    href={`/join/${inviteCode}/lobby/${team.join_code}?manage=1`}
+                    href={eventLobbyPath(inviteCode, team.join_code, { manage: true })}
                     className="text-xs text-emerald-300 underline-offset-2 hover:underline"
                   >
                     Team verwalten

@@ -16,12 +16,13 @@ import {
   CopyInviteLink,
   QrInviteImage,
 } from "@/components/grid/copy-invite-link";
-import { SessionBanner } from "@/components/lobby/session-banner";
+import { IdentityBar } from "@/components/player/identity-bar";
 import {
   GridButton,
   GridError,
   GridStat,
 } from "@/components/grid/grid-shell";
+import { eventPlayPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
 import { useTeamSync } from "@/lib/hooks/use-team-sync";
 import { buildTeamInviteUrl } from "@/lib/grid/codes";
 import { NAVIGATOR_OFFLINE_MS } from "@/lib/grid/constants";
@@ -110,7 +111,7 @@ export function LobbyRoom({
   const handleTeamStatusChange = useCallback(
     (status: string) => {
       if (status === "playing") {
-        router.push(`/play/${inviteCode}/${joinCode}`);
+        router.push(eventPlayPath(inviteCode, joinCode));
         return;
       }
 
@@ -167,7 +168,7 @@ export function LobbyRoom({
         return;
       }
 
-      router.push(`/play/${inviteCode}/${joinCode}`);
+      router.push(eventPlayPath(inviteCode, joinCode));
     });
   }
 
@@ -187,7 +188,7 @@ export function LobbyRoom({
       }
 
       clearPlayerSession();
-      router.replace(`/join/${inviteCode}?team=${joinCode}`);
+      router.replace(eventTeamJoinPath(inviteCode, joinCode));
     });
   }
 
@@ -286,22 +287,18 @@ export function LobbyRoom({
 
   return (
     <div className="flex flex-col gap-6">
-      <SessionBanner
+      <IdentityBar
         inviteCode={inviteCode}
         joinCode={joinCode}
         session={session}
-        manageHref={
-          isPlaying && !manageMode
-            ? `/join/${inviteCode}/lobby/${joinCode}?manage=1`
-            : undefined
-        }
+        showManageTeam={!manageMode}
       />
 
       {manageMode && isPlaying ? (
         <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
           Spiel läuft — hier Rollen verwalten (Captain, Team Lead GPS).{" "}
           <a
-            href={`/play/${inviteCode}/${joinCode}`}
+            href={eventPlayPath(inviteCode, joinCode)}
             className="underline underline-offset-2"
           >
             Zurück zum Spiel

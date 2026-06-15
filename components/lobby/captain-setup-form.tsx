@@ -17,6 +17,7 @@ import {
   DEPARTMENT_OPTIONS,
   REGION_OPTIONS,
 } from "@/lib/grid/constants";
+import { eventLobbyPath } from "@/lib/grid/event-routes";
 import { savePlayerSession } from "@/lib/grid/player-session";
 
 type CaptainSetupFormProps = {
@@ -53,7 +54,7 @@ export function CaptainSetupForm({ inviteCode, joinCode }: CaptainSetupFormProps
       }
 
       savePlayerSession(result.data);
-      router.push(`/join/${inviteCode}/lobby/${result.data.joinCode}`);
+      router.push(eventLobbyPath(inviteCode, result.data.joinCode));
     });
   }
 

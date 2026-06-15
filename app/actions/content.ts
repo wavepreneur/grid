@@ -6,6 +6,7 @@ import { getEventByInviteCode } from "@/lib/grid/session-auth";
 import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 import type { ResolvedEventContent } from "@/lib/grid/level-types";
 import type { ActionResult, GridEvent } from "@/lib/grid/types";
+import { bumpEventContentRevision, getEventContentRevisionByInviteCode } from "@/lib/grid/content-revision";
 import { normalizeCode } from "@/lib/grid/codes";
 
 export type EventAdminDetails = {
@@ -51,7 +52,7 @@ export async function getEventAdminDetails(
 
 export async function getEventContent(
   inviteCode: string,
-): Promise<ActionResult<ResolvedEventContent & { eventId: string }>> {
+): Promise<ActionResult<ResolvedEventContent & { eventId: string; contentRevision: number }>> {
   try {
     const event = await getEventByInviteCode(normalizeCode(inviteCode));
     if (!event) {
@@ -66,13 +67,36 @@ export async function getEventContent(
       routeOverride: event.route_override,
     });
 
+    const contentRevision =
+      typeof (event as { content_revision?: number }).content_revision === "number"
+        ? (event as { content_revision: number }).content_revision
+        : 1;
+
     return {
       success: true,
       data: {
         ...resolved,
         eventId: event.id,
+        contentRevision,
       },
     };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
+
+export async function getEventContentRevision(
+  inviteCode: string,
+): Promise<ActionResult<{ contentRevision: number }>> {
+  try {
+    const revision = await getEventContentRevisionByInviteCode(normalizeCode(inviteCode));
+    if (revision === null) {
+      return { success: false, error: "Event nicht gefunden." };
+    }
+    return { success: true, data: { contentRevision: revision } };
   } catch (error) {
     return {
       success: false,
@@ -108,6 +132,8 @@ export async function updateEventRouteOverride(input: {
     if (error) {
       return { success: false, error: error.message };
     }
+
+    await bumpEventContentRevision(event.id);
 
     return {
       success: true,
@@ -188,6 +214,8 @@ export async function applyGpsTestOverride(input: {
       return { success: false, error: error.message };
     }
 
+    await bumpEventContentRevision(event.id);
+
     return {
       success: true,
       data: {
@@ -243,6 +271,8 @@ export async function updateEventCity(input: {
     if (error) {
       return { success: false, error: error.message };
     }
+
+    await bumpEventContentRevision(event.id);
 
     return { success: true, data: { citySlug } };
   } catch (error) {

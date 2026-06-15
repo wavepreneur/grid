@@ -11,8 +11,9 @@ export default function AdminDevPage() {
           </p>
           <h1 className="text-3xl font-semibold tracking-tight text-white">Admin</h1>
           <p className="text-sm leading-7 text-[var(--grid-muted)]">
-            Temporärer Admin-Flow bis B2B-Auth existiert. Events erstellen oder bestehende per
-            Invite-Code verwalten.
+            Nur für Entwickler. Event-Leiter nutzen das{" "}
+            <strong className="text-emerald-300">Operator-Cockpit</strong> unter{" "}
+            <code>/cockpit/INVITECODE</code> — ohne JSON, ohne Support.
           </p>
         </header>
 

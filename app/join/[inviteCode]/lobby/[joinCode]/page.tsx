@@ -1,44 +1,13 @@
-import { notFound } from "next/navigation";
-import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
-import { GridShell } from "@/components/grid/grid-shell";
-import { LobbyGate } from "@/components/lobby/lobby-gate";
+import { redirect } from "next/navigation";
 
-type LobbyPageProps = {
+type LobbyRedirectProps = {
   params: Promise<{ inviteCode: string; joinCode: string }>;
   searchParams: Promise<{ manage?: string }>;
 };
 
-export default async function LobbyPage({ params, searchParams }: LobbyPageProps) {
+export default async function LobbyRedirect({ params, searchParams }: LobbyRedirectProps) {
   const { inviteCode, joinCode } = await params;
   const { manage } = await searchParams;
-  const normalizedInviteCode = inviteCode.toUpperCase();
-  const normalizedJoinCode = joinCode.toUpperCase();
-  const manageMode = manage === "1" || manage === "true";
-
-  const eventResult = await getEventInvite(normalizedInviteCode);
-  if (!eventResult.success) {
-    notFound();
-  }
-
-  const teamResult = await resolveTeamJoinCode({
-    inviteCode: normalizedInviteCode,
-    joinCode: normalizedJoinCode,
-  });
-
-  if (!teamResult.success) {
-    notFound();
-  }
-
-  return (
-    <GridShell
-      title="Team-Lobby"
-      description={`${eventResult.data.title} · Team ${teamResult.data.teamName}`}
-    >
-      <LobbyGate
-        inviteCode={normalizedInviteCode}
-        joinCode={normalizedJoinCode}
-        manageMode={manageMode}
-      />
-    </GridShell>
-  );
+  const query = manage ? `?manage=${manage}` : "";
+  redirect(`/e/${inviteCode.toUpperCase()}/lobby/${joinCode.toUpperCase()}${query}`);
 }

@@ -10,6 +10,8 @@ import {
   GridInput,
   GridLabel,
 } from "@/components/grid/grid-shell";
+import { buildEventInviteUrl } from "@/lib/grid/codes";
+import { cockpitPath, eventPath } from "@/lib/grid/event-routes";
 
 export function CreateEventForm() {
   const router = useRouter();
@@ -69,12 +71,20 @@ export function CreateEventForm() {
           <div className="rounded-xl border border-[var(--grid-accent)]/30 bg-[var(--grid-accent)]/10 p-4 text-sm text-[var(--grid-accent)]">
             <p className="font-medium">Event erstellt.</p>
             <p className="mt-2 break-all">
-              Einladungslink: {`${window.location.origin}/join/${createdInviteCode}`}
+              Spieler-Link:{" "}
+              {typeof window !== "undefined"
+                ? buildEventInviteUrl(window.location.origin, createdInviteCode)
+                : `/e/${createdInviteCode}`}
+            </p>
+            <p className="mt-2 break-all">
+              Cockpit: {typeof window !== "undefined"
+                ? `${window.location.origin}${cockpitPath(createdInviteCode)}`
+                : cockpitPath(createdInviteCode)}
             </p>
             <GridButton
               type="button"
               className="mt-4"
-              onClick={() => router.push(`/join/${createdInviteCode}`)}
+              onClick={() => router.push(eventPath(createdInviteCode))}
             >
               Zum Event
             </GridButton>

@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getLobbySnapshot } from "@/app/actions/lobby";
 import { LobbyRoom } from "@/components/lobby/lobby-room";
-import { SessionBanner } from "@/components/lobby/session-banner";
+import { IdentityBar } from "@/components/player/identity-bar";
 import { GridError } from "@/components/grid/grid-shell";
+import { eventPlayPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
 import {
   abandonTeamSession,
   resolveTeamSession,
@@ -28,7 +29,7 @@ export function LobbyGate({ inviteCode, joinCode, manageMode = false }: LobbyGat
     resolveTeamSession(inviteCode, joinCode).then((resolved) => {
       if (!resolved) {
         abandonTeamSession();
-        router.replace(`/join/${inviteCode}?team=${joinCode}`);
+        router.replace(eventTeamJoinPath(inviteCode, joinCode));
         return;
       }
 
@@ -39,7 +40,7 @@ export function LobbyGate({ inviteCode, joinCode, manageMode = false }: LobbyGat
         resolved.session.teamStatus === "finished";
 
       if (isPlaying && !manageMode) {
-        router.replace(`/play/${inviteCode}/${joinCode}`);
+        router.replace(eventPlayPath(inviteCode, joinCode));
         return;
       }
 
@@ -71,7 +72,7 @@ export function LobbyGate({ inviteCode, joinCode, manageMode = false }: LobbyGat
   if (!snapshot) {
     return (
       <div className="flex flex-col gap-4">
-        <SessionBanner inviteCode={inviteCode} joinCode={joinCode} session={session} />
+        <IdentityBar inviteCode={inviteCode} joinCode={joinCode} session={session} />
         <p className="text-sm text-[var(--grid-muted)]">Team-Daten werden geladen…</p>
       </div>
     );

@@ -7,11 +7,12 @@ import {
 } from "@/app/actions/game";
 import { LevelPanel } from "@/components/game/level-panel";
 import { SyncModal } from "@/components/game/sync-modal";
-import { SessionBanner } from "@/components/lobby/session-banner";
+import Link from "next/link";
 import {
   GridError,
   GridStat,
 } from "@/components/grid/grid-shell";
+import { cockpitShowPath } from "@/lib/grid/event-routes";
 import { useTeamSync } from "@/lib/hooks/use-team-sync";
 import { cacheTeamState } from "@/lib/grid/offline-state";
 import type { TeamGameState, TeamRealtimeState } from "@/lib/grid/game-state";
@@ -25,6 +26,7 @@ type GameRoomProps = {
   initialState: TeamRealtimeState;
   eventContent: ResolvedEventContent;
   teamName: string;
+  eventTitle?: string;
 };
 
 export function GameRoom({
@@ -34,6 +36,7 @@ export function GameRoom({
   initialState,
   eventContent,
   teamName,
+  eventTitle = "Mission",
 }: GameRoomProps) {
   const [teamState, setTeamState] = useState(initialState);
   const [error, setError] = useState<string | null>(null);
@@ -127,12 +130,6 @@ export function GameRoom({
   return (
     <>
       <div className="flex flex-col gap-6">
-      <SessionBanner
-        inviteCode={inviteCode}
-        joinCode={joinCode}
-        session={playerSession}
-        manageHref={`/join/${inviteCode}/lobby/${joinCode}?manage=1`}
-      />
       <div className="grid grid-cols-2 gap-3">
         <GridStat label="Team" value={teamName} />
         <GridStat
@@ -152,8 +149,22 @@ export function GameRoom({
         </div>
 
         {isFinished ? (
-          <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-4 text-sm text-emerald-300">
-            Mission abgeschlossen — alle {eventContent.levels.length} Level geschafft!
+          <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-6 text-sm text-emerald-100">
+            <p className="text-lg font-semibold text-emerald-200">
+              Mission abgeschlossen!
+            </p>
+            <p className="mt-2">
+              {teamName} · {eventContent.levels.length} Level ·{" "}
+              <span className="font-semibold text-white">
+                {teamState.gameState.score ?? 0} Punkte
+              </span>
+            </p>
+            <Link
+              href={cockpitShowPath(inviteCode)}
+              className="mt-4 inline-block text-[var(--grid-accent)] underline-offset-2 hover:underline"
+            >
+              Live-Ranking für {eventTitle} ansehen →
+            </Link>
           </div>
         ) : currentLevelDefinition ? (
           <LevelPanel

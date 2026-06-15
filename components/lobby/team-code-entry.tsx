@@ -7,7 +7,7 @@ import {
   GridInput,
   GridLabel,
 } from "@/components/grid/grid-shell";
-import { normalizeCode } from "@/lib/grid/codes";
+import { eventTeamJoinPath } from "@/lib/grid/event-routes";
 
 type TeamCodeEntryProps = {
   inviteCode: string;
@@ -19,9 +19,9 @@ export function TeamCodeEntry({ inviteCode }: TeamCodeEntryProps) {
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalized = normalizeCode(joinCode);
-    if (!normalized) return;
-    router.push(`/join/${inviteCode}?team=${normalized}`);
+    const normalized = joinCode.trim().toUpperCase();
+    if (normalized.length < 4) return;
+    router.push(eventTeamJoinPath(inviteCode, normalized));
   }
 
   return (

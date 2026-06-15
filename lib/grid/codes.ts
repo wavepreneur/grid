@@ -21,7 +21,12 @@ export function buildTeamInviteUrl(
   joinCode: string,
 ): string {
   const base = origin.replace(/\/$/, "");
-  return `${base}/join/${inviteCode}?team=${joinCode}`;
+  return `${base}/e/${normalizeCode(inviteCode)}/team/${normalizeCode(joinCode)}`;
+}
+
+export function buildEventInviteUrl(origin: string, inviteCode: string): string {
+  const base = origin.replace(/\/$/, "");
+  return `${base}/e/${normalizeCode(inviteCode)}`;
 }
 
 export function normalizeCode(value: string): string {
