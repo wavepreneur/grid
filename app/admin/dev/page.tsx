@@ -1,14 +1,34 @@
 import { CreateEventForm } from "@/components/admin/create-event-form";
-import { GridShell } from "@/components/grid/grid-shell";
+import { ManageEventForm } from "@/components/admin/manage-event-form";
 
 export default function AdminDevPage() {
   return (
-    <GridShell
-      eyebrow="GRID / DEV"
-      title="Event erstellen"
-      description="Temporärer Admin-Flow bis B2B-Auth existiert. Events nutzen das Template default-exitmania (10 Level)."
-    >
-      <CreateEventForm />
-    </GridShell>
+    <div className="grid-bg min-h-screen px-4 py-10">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-10">
+        <header className="flex flex-col gap-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--grid-accent)]">
+            GRID / DEV
+          </p>
+          <h1 className="text-3xl font-semibold tracking-tight text-white">Admin</h1>
+          <p className="text-sm leading-7 text-[var(--grid-muted)]">
+            Temporärer Admin-Flow bis B2B-Auth existiert. Events erstellen oder bestehende per
+            Invite-Code verwalten.
+          </p>
+        </header>
+
+        <section className="grid-panel p-8 sm:p-10">
+          <h2 className="mb-6 text-xl font-semibold text-white">Event erstellen</h2>
+          <CreateEventForm />
+        </section>
+
+        <section className="grid-panel p-8 sm:p-10">
+          <h2 className="mb-2 text-xl font-semibold text-white">Event verwalten</h2>
+          <p className="mb-6 text-sm leading-7 text-[var(--grid-muted)]">
+            Invite-Code eingeben, GPS-Testmodus aktivieren oder Level per JSON überschreiben.
+          </p>
+          <ManageEventForm />
+        </section>
+      </div>
+    </div>
   );
 }

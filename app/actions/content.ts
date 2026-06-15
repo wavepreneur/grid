@@ -5,8 +5,49 @@ import { loadResolvedEventContent } from "@/lib/grid/content-loader";
 import { getEventByInviteCode } from "@/lib/grid/session-auth";
 import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 import type { ResolvedEventContent } from "@/lib/grid/level-types";
-import type { ActionResult } from "@/lib/grid/types";
+import type { ActionResult, GridEvent } from "@/lib/grid/types";
 import { normalizeCode } from "@/lib/grid/codes";
+
+export type EventAdminDetails = {
+  inviteCode: string;
+  title: string;
+  status: GridEvent["status"];
+  routeOverrideJson: string;
+};
+
+function formatRouteOverride(value: unknown): string {
+  if (!value || (typeof value === "object" && Object.keys(value as object).length === 0)) {
+    return "{}";
+  }
+  return JSON.stringify(value, null, 2);
+}
+
+export async function getEventAdminDetails(
+  inviteCode: string,
+): Promise<ActionResult<EventAdminDetails>> {
+  try {
+    const normalized = normalizeCode(inviteCode);
+    const event = await getEventByInviteCode(normalized);
+    if (!event) {
+      return { success: false, error: "Event nicht gefunden." };
+    }
+
+    return {
+      success: true,
+      data: {
+        inviteCode: event.invite_code,
+        title: event.title,
+        status: event.status,
+        routeOverrideJson: formatRouteOverride(event.route_override),
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
 
 export async function getEventContent(
   inviteCode: string,
@@ -43,7 +84,7 @@ export async function getEventContent(
 export async function updateEventRouteOverride(input: {
   inviteCode: string;
   routeOverrideJson: string;
-}): Promise<ActionResult<{ inviteCode: string }>> {
+}): Promise<ActionResult<{ inviteCode: string; routeOverrideJson: string }>> {
   try {
     const inviteCode = normalizeCode(input.inviteCode);
     const event = await getEventByInviteCode(inviteCode);
@@ -68,7 +109,93 @@ export async function updateEventRouteOverride(input: {
       return { success: false, error: error.message };
     }
 
-    return { success: true, data: { inviteCode: event.invite_code } };
+    return {
+      success: true,
+      data: {
+        inviteCode: event.invite_code,
+        routeOverrideJson: formatRouteOverride(parsed),
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
+
+export async function applyGpsTestOverride(input: {
+  inviteCode: string;
+  radiusMeters?: number;
+  lat?: number;
+  lng?: number;
+}): Promise<ActionResult<{ inviteCode: string; routeOverrideJson: string; gpsLevels: number[] }>> {
+  try {
+    const inviteCode = normalizeCode(input.inviteCode);
+    const event = await getEventByInviteCode(inviteCode);
+    if (!event) {
+      return { success: false, error: "Event nicht gefunden." };
+    }
+
+    const radiusMeters = input.radiusMeters ?? 50_000;
+    const lat = input.lat ?? 52.516275;
+    const lng = input.lng ?? 13.377704;
+
+    const content = await loadResolvedEventContent({
+      eventId: event.id,
+      organizationId: event.organization_id,
+      cityId: event.city_id,
+      contentConfig: event.content_config,
+      routeOverride: event.route_override,
+    });
+
+    const gpsLevels = content.levels.filter((level) => level.type === "gps");
+    if (gpsLevels.length === 0) {
+      return { success: false, error: "Keine GPS-Level in dieser Route gefunden." };
+    }
+
+    const existingOverride =
+      event.route_override && typeof event.route_override === "object"
+        ? (event.route_override as Record<string, unknown>)
+        : {};
+    const existingLevels =
+      existingOverride.levels && typeof existingOverride.levels === "object"
+        ? { ...(existingOverride.levels as Record<string, unknown>) }
+        : {};
+
+    for (const level of gpsLevels) {
+      existingLevels[String(level.level)] = {
+        ...(typeof existingLevels[String(level.level)] === "object"
+          ? (existingLevels[String(level.level)] as Record<string, unknown>)
+          : {}),
+        type: "gps",
+        location: { lat, lng, radius_meters: radiusMeters },
+      };
+    }
+
+    const mergedOverride = {
+      ...existingOverride,
+      levels: existingLevels,
+    };
+
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from("events")
+      .update({ route_override: mergedOverride })
+      .eq("id", event.id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      data: {
+        inviteCode: event.invite_code,
+        routeOverrideJson: formatRouteOverride(mergedOverride),
+        gpsLevels: gpsLevels.map((level) => level.level),
+      },
+    };
   } catch (error) {
     return {
       success: false,

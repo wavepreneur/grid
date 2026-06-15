@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { updateEventRouteOverride } from "@/app/actions/content";
 import {
   GridButton,
@@ -11,32 +11,28 @@ import {
 const EXAMPLE_OVERRIDE = `{
   "levels": {
     "2": {
-      "title": "Custom Firmencampus",
-      "type": "gps",
-      "location": { "lat": 52.520008, "lng": 13.404954, "radius_meters": 100 }
-    },
-    "3": {
-      "title": "Bonus: Unternehmens-Quiz",
-      "type": "quiz",
-      "description": "Was ist eure Firmenfarbe?",
-      "options": [
-        { "id": "a", "label": "Blau" },
-        { "id": "b", "label": "Grün" }
-      ],
-      "correct_option_id": "a"
+      "location": { "lat": 52.516275, "lng": 13.377704, "radius_meters": 50000 }
     }
   }
 }`;
 
 type RouteOverrideEditorProps = {
   inviteCode: string;
+  initialJson?: string;
 };
 
-export function RouteOverrideEditor({ inviteCode }: RouteOverrideEditorProps) {
-  const [json, setJson] = useState("");
+export function RouteOverrideEditor({
+  inviteCode,
+  initialJson = "{}",
+}: RouteOverrideEditorProps) {
+  const [json, setJson] = useState(initialJson);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setJson(initialJson);
+  }, [initialJson, inviteCode]);
 
   function handleSave() {
     setError(null);
@@ -53,6 +49,7 @@ export function RouteOverrideEditor({ inviteCode }: RouteOverrideEditorProps) {
         return;
       }
 
+      setJson(result.data.routeOverrideJson);
       setMessage("Route-Override gespeichert. Gilt für alle Teams dieses Events.");
     });
   }
@@ -60,10 +57,11 @@ export function RouteOverrideEditor({ inviteCode }: RouteOverrideEditorProps) {
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-[var(--grid-border)] bg-black/20 p-4">
       <div>
-        <p className="text-sm font-medium text-white">Custom-Route (Phase 3)</p>
+        <p className="text-sm font-medium text-white">Route-Override</p>
         <p className="mt-1 text-xs leading-6 text-[var(--grid-muted)]">
-          Überschreibt einzelne Level des Standard-Templates via{" "}
+          Überschreibt einzelne Level via{" "}
           <code className="text-[var(--grid-accent)]">events.route_override</code>.
+          Event: <span className="text-white">{inviteCode}</span>
         </p>
       </div>
 
@@ -73,7 +71,7 @@ export function RouteOverrideEditor({ inviteCode }: RouteOverrideEditorProps) {
           value={json}
           onChange={(event) => setJson(event.target.value)}
           placeholder={EXAMPLE_OVERRIDE}
-          rows={12}
+          rows={14}
           className="grid-input mt-2 w-full resize-y font-mono text-xs leading-6"
         />
       </div>
