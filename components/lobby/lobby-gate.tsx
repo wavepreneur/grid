@@ -38,6 +38,14 @@ export function LobbyGate({ inviteCode, joinCode }: LobbyGateProps) {
         return;
       }
 
+      if (
+        result.data.team_status === "playing" ||
+        result.data.team_status === "finished"
+      ) {
+        router.replace(`/play/${inviteCode}/${joinCode}`);
+        return;
+      }
+
       setSnapshot(result.data);
     });
   }, [inviteCode, joinCode, router]);

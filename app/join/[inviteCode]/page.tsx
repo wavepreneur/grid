@@ -46,13 +46,14 @@ export default async function JoinPage({ params, searchParams }: JoinPageProps) 
 
     return (
       <GridShell
-        title="Lobby beitreten"
+        title={teamResult.data.teamStatus === "playing" ? "Spiel beitreten" : "Lobby beitreten"}
         description={`Event: ${event.title}`}
       >
         <MemberJoinForm
           inviteCode={normalizedInviteCode}
           joinCode={teamResult.data.joinCode}
           teamName={teamResult.data.teamName}
+          teamStatus={teamResult.data.teamStatus}
         />
       </GridShell>
     );

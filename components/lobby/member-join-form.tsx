@@ -10,21 +10,36 @@ import {
   GridLabel,
 } from "@/components/grid/grid-shell";
 import { savePlayerSession } from "@/lib/grid/player-session";
+import type { GridTeamStatus } from "@/lib/grid/types";
 
 type MemberJoinFormProps = {
   inviteCode: string;
   joinCode: string;
   teamName: string;
+  teamStatus: GridTeamStatus;
 };
+
+function joinDestination(
+  inviteCode: string,
+  joinCode: string,
+  teamStatus: GridTeamStatus,
+): string {
+  if (teamStatus === "playing" || teamStatus === "finished") {
+    return `/play/${inviteCode}/${joinCode}`;
+  }
+  return `/join/${inviteCode}/lobby/${joinCode}`;
+}
 
 export function MemberJoinForm({
   inviteCode,
   joinCode,
   teamName,
+  teamStatus,
 }: MemberJoinFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const isMidGame = teamStatus === "playing" || teamStatus === "finished";
 
   function handleSubmit(formData: FormData) {
     setError(null);
@@ -42,7 +57,13 @@ export function MemberJoinForm({
       }
 
       savePlayerSession(result.data);
-      router.push(`/join/${inviteCode}/lobby/${joinCode}`);
+      router.push(
+        joinDestination(
+          inviteCode,
+          joinCode,
+          result.data.teamStatus ?? teamStatus,
+        ),
+      );
     });
   }
 
@@ -50,6 +71,12 @@ export function MemberJoinForm({
     <form action={handleSubmit} className="flex flex-col gap-5">
       <div className="rounded-xl border border-[var(--grid-border)] bg-black/20 px-4 py-3 text-sm text-[var(--grid-muted)]">
         Du trittst Team <span className="text-white">{teamName}</span> bei.
+        {isMidGame ? (
+          <p className="mt-2 text-[var(--grid-accent)]">
+            Das Spiel läuft bereits — du wirst direkt zum aktuellen Stand deines Teams
+            weitergeleitet.
+          </p>
+        ) : null}
       </div>
 
       <div>
@@ -66,7 +93,11 @@ export function MemberJoinForm({
       {error ? <GridError message={error} /> : null}
 
       <GridButton type="submit" disabled={isPending}>
-        {isPending ? "Beitritt läuft…" : "Lobby beitreten"}
+        {isPending
+          ? "Beitritt läuft…"
+          : isMidGame
+            ? "Spiel beitreten"
+            : "Lobby beitreten"}
       </GridButton>
     </form>
   );

@@ -86,6 +86,7 @@ export type PlayerSession = {
   joinCode: string;
   inviteCode: string;
   isCaptain: boolean;
+  teamStatus?: GridTeamStatus;
 };
 
 export type ActionResult<T> =

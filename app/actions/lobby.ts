@@ -20,6 +20,7 @@ import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 import type {
   ActionResult,
   GridEvent,
+  GridTeamStatus,
   LobbySnapshot,
   PlayerRole,
   PlayerSession,
@@ -319,8 +320,8 @@ export async function joinTeamAsPlayer(input: {
     if (!team) {
       return { success: false, error: "Team-Code ungültig oder gehört nicht zu diesem Event." };
     }
-    if (team.status !== "lobby" && team.status !== "setup") {
-      return { success: false, error: "Dieses Team nimmt keine neuen Spieler mehr auf." };
+    if (team.status === "finished" || team.status === "disbanded") {
+      return { success: false, error: "Dieses Team ist nicht mehr aktiv." };
     }
 
     const supabase = createAdminClient();
@@ -352,6 +353,22 @@ export async function joinTeamAsPlayer(input: {
       await supabase.from("teams").update({ status: "lobby" }).eq("id", team.id);
     }
 
+    if (team.status === "playing") {
+      await writeAuditLog({
+        organizationId: event.organization_id,
+        eventId: event.id,
+        teamId: team.id,
+        playerId: player.id,
+        action: "player_joined_mid_game",
+        payload: {
+          display_name: displayName,
+          current_level: team.current_level,
+        },
+      });
+    }
+
+    const teamStatus = team.status === "setup" ? "lobby" : team.status;
+
     return {
       success: true,
       data: {
@@ -361,6 +378,7 @@ export async function joinTeamAsPlayer(input: {
         joinCode: team.join_code,
         inviteCode: event.invite_code,
         isCaptain: false,
+        teamStatus,
       },
     };
   } catch (error) {
@@ -502,7 +520,7 @@ export async function startGameManually(input: {
 export async function resolveTeamJoinCode(input: {
   inviteCode: string;
   joinCode: string;
-}): Promise<ActionResult<{ joinCode: string; teamName: string }>> {
+}): Promise<ActionResult<{ joinCode: string; teamName: string; teamStatus: GridTeamStatus }>> {
   try {
     const event = await getEventByInviteCode(input.inviteCode);
     if (!event) {
@@ -516,7 +534,11 @@ export async function resolveTeamJoinCode(input: {
 
     return {
       success: true,
-      data: { joinCode: team.join_code, teamName: team.name },
+      data: {
+        joinCode: team.join_code,
+        teamName: team.name,
+        teamStatus: team.status,
+      },
     };
   } catch (error) {
     return {
