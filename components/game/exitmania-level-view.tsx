@@ -110,7 +110,7 @@ export function ExitmaniaLevelView({
           </div>
 
           <div className="lg:hidden">
-            <ContentTileGrid {...tileGridProps} />
+            <ContentTileGrid {...tileGridProps} layout="inline" />
           </div>
 
           <LevelSolvePanel
@@ -123,8 +123,8 @@ export function ExitmaniaLevelView({
           />
         </section>
 
-        <aside className="hidden lg:block">
-          <ContentTileGrid {...tileGridProps} />
+        <aside className="hidden lg:sticky lg:top-4 lg:block lg:self-start">
+          <ContentTileGrid {...tileGridProps} layout="sidebar" />
         </aside>
       </div>
 
