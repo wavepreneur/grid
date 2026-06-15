@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { getLobbySnapshot } from "@/app/actions/lobby";
 import { LobbyRoom } from "@/components/lobby/lobby-room";
 import { GridError } from "@/components/grid/grid-shell";
-import { loadPlayerSessionForTeam } from "@/lib/grid/player-session";
+import {
+  abandonTeamSession,
+  resolveTeamSession,
+} from "@/lib/grid/session-recovery";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
 
 type LobbyGateProps = {
@@ -20,33 +23,35 @@ export function LobbyGate({ inviteCode, joinCode }: LobbyGateProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const playerSession = loadPlayerSessionForTeam(inviteCode, joinCode);
-    if (!playerSession) {
-      router.replace(`/join/${inviteCode}?team=${joinCode}`);
-      return;
-    }
-
-    setSession(playerSession);
-
-    getLobbySnapshot({
-      inviteCode,
-      joinCode,
-      sessionId: playerSession.sessionId,
-    }).then((result) => {
-      if (!result.success) {
-        setError(result.error);
+    resolveTeamSession(inviteCode, joinCode).then((resolved) => {
+      if (!resolved) {
+        abandonTeamSession();
+        router.replace(`/join/${inviteCode}?team=${joinCode}`);
         return;
       }
 
+      setSession(resolved.session);
+
       if (
-        result.data.team_status === "playing" ||
-        result.data.team_status === "finished"
+        resolved.session.teamStatus === "playing" ||
+        resolved.session.teamStatus === "finished"
       ) {
         router.replace(`/play/${inviteCode}/${joinCode}`);
         return;
       }
 
-      setSnapshot(result.data);
+      getLobbySnapshot({
+        inviteCode,
+        joinCode,
+        sessionId: resolved.session.sessionId,
+      }).then((result) => {
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
+
+        setSnapshot(result.data);
+      });
     });
   }, [inviteCode, joinCode, router]);
 

@@ -19,6 +19,30 @@ import type { PlayerRole, SolveLevelPayload } from "@/lib/grid/level-types";
 import { assertPlayerSession } from "@/lib/grid/session-auth";
 import type { ActionResult } from "@/lib/grid/types";
 
+function buildRealtimeState(
+  team: {
+    id: string;
+    status: string;
+    current_level: number;
+    game_state: unknown;
+    started_at: string | null;
+    lobby_auto_start_at: string | null;
+    navigator_player_id?: string | null;
+  },
+  player: { id: string; is_captain: boolean },
+): TeamRealtimeState {
+  return {
+    teamId: team.id,
+    status: team.status,
+    currentLevel: team.current_level,
+    gameState: parseTeamGameState(team.game_state),
+    startedAt: team.started_at,
+    lobbyAutoStartAt: team.lobby_auto_start_at,
+    isCaptain: player.is_captain,
+    isNavigator: team.navigator_player_id === player.id,
+  };
+}
+
 async function insertSyncEvent(input: {
   teamId: string;
   eventType: string;
@@ -50,18 +74,9 @@ export async function getGameState(input: {
       .update({ last_seen_at: new Date().toISOString() })
       .eq("id", player.id);
 
-    const gameState = parseTeamGameState(team.game_state);
-
     return {
       success: true,
-      data: {
-        teamId: team.id,
-        status: team.status,
-        currentLevel: team.current_level,
-        gameState,
-        startedAt: team.started_at,
-        lobbyAutoStartAt: team.lobby_auto_start_at,
-      },
+      data: buildRealtimeState(team, player),
     };
   } catch (error) {
     return {
@@ -113,6 +128,7 @@ export async function solveCurrentLevel(input: {
     const playerRole = (player.role ?? "solver") as PlayerRole;
     const validation = validateLevelSolution(levelDefinition, input.payload ?? {}, {
       isCaptain: player.is_captain,
+      isNavigator: team.navigator_player_id === player.id,
       playerRole,
     });
 
@@ -175,7 +191,9 @@ export async function solveCurrentLevel(input: {
       })
       .eq("id", team.id)
       .eq("status", "playing")
-      .select("id, status, current_level, game_state, started_at, lobby_auto_start_at")
+      .select(
+        "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
+      )
       .single();
 
     if (error || !updatedTeam) {
@@ -211,14 +229,7 @@ export async function solveCurrentLevel(input: {
 
     return {
       success: true,
-      data: {
-        teamId: updatedTeam.id,
-        status: updatedTeam.status,
-        currentLevel: updatedTeam.current_level,
-        gameState: parseTeamGameState(updatedTeam.game_state),
-        startedAt: updatedTeam.started_at,
-        lobbyAutoStartAt: updatedTeam.lobby_auto_start_at,
-      },
+      data: buildRealtimeState(updatedTeam, player),
     };
   } catch (error) {
     return {
@@ -334,7 +345,7 @@ export async function dismissSyncModal(input: {
   modalId: string;
 }): Promise<ActionResult<TeamRealtimeState>> {
   try {
-    const { team } = await assertPlayerSession(input);
+    const { team, player } = await assertPlayerSession(input);
     const gameState = parseTeamGameState(team.game_state);
 
     if (!gameState.modal || gameState.modal.id !== input.modalId) {
@@ -356,7 +367,9 @@ export async function dismissSyncModal(input: {
       .from("teams")
       .update({ game_state: nextGameState })
       .eq("id", team.id)
-      .select("id, status, current_level, game_state, started_at, lobby_auto_start_at")
+      .select(
+        "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
+      )
       .single();
 
     if (error || !updatedTeam) {
@@ -365,14 +378,7 @@ export async function dismissSyncModal(input: {
 
     return {
       success: true,
-      data: {
-        teamId: updatedTeam.id,
-        status: updatedTeam.status,
-        currentLevel: updatedTeam.current_level,
-        gameState: parseTeamGameState(updatedTeam.game_state),
-        startedAt: updatedTeam.started_at,
-        lobbyAutoStartAt: updatedTeam.lobby_auto_start_at,
-      },
+      data: buildRealtimeState(updatedTeam, player),
     };
   } catch (error) {
     return {

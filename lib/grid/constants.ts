@@ -11,6 +11,9 @@ export const DEFAULT_LOBBY_AUTO_START_SECONDS = 180;
  */
 export const ANALYTICS_TABLE = "audit_logs" as const;
 
+/** Navigator considered offline after this idle period (self-healing takeover). */
+export const NAVIGATOR_OFFLINE_MS = 3 * 60 * 1000;
+
 export const DEPARTMENT_OPTIONS = [
   "Engineering",
   "Product",

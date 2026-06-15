@@ -117,15 +117,25 @@ export function GameRoom({
     });
   }
 
+  const roleLabel = playerSession.isCaptain
+    ? "Captain"
+    : playerSession.isNavigator
+      ? "Team Lead (GPS)"
+      : "Mitspieler";
+
   return (
     <>
       <div className="flex flex-col gap-6">
-        <div className="grid grid-cols-2 gap-3">
-          <GridStat label="Team" value={teamName} />
-          <GridStat
-            label="Level"
-            value={`${Math.min(activeLevel, eventContent.levels.length)} / ${eventContent.levels.length}`}
-          />
+      <div className="grid grid-cols-2 gap-3">
+        <GridStat label="Team" value={teamName} />
+        <GridStat
+          label="Du bist"
+          value={roleLabel}
+        />
+        <GridStat
+          label="Level"
+          value={`${Math.min(activeLevel, eventContent.levels.length)} / ${eventContent.levels.length}`}
+        />
           <GridStat label="Route" value={eventContent.templateName} />
           <GridStat label="Punkte" value={String(teamState.gameState.score ?? 0)} />
           <GridStat
@@ -143,7 +153,9 @@ export function GameRoom({
             level={currentLevelDefinition}
             disabled={levelState?.status !== "active" || Boolean(modal)}
             isPending={isPending}
-            isCaptain={playerSession.isCaptain}
+            isNavigator={
+              playerSession.isNavigator || Boolean(teamState.isNavigator)
+            }
             onSubmit={handleSolveLevel}
           />
         ) : (

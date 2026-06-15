@@ -12,6 +12,7 @@ import type {
 
 export type LevelValidationContext = {
   isCaptain: boolean;
+  isNavigator: boolean;
   playerRole: PlayerRole;
 };
 
@@ -34,10 +35,10 @@ export function validateLevelSolution(
     if (!level.location) {
       return { ok: false, error: "GPS-Level ohne Koordinaten konfiguriert." };
     }
-    if (context && !context.isCaptain) {
+    if (context && !context.isNavigator) {
       return {
         ok: false,
-        error: "GPS-Checkpoints können nur vom Captain-Gerät bestätigt werden.",
+        error: "GPS-Checkpoints können nur vom Team-Lead-Gerät (GPS) bestätigt werden.",
       };
     }
     if (!payload.geolocation) {

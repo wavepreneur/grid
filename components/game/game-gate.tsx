@@ -6,8 +6,12 @@ import { getEventContent } from "@/app/actions/content";
 import { getGameState } from "@/app/actions/game";
 import { GameRoom } from "@/components/game/game-room";
 import { GridError } from "@/components/grid/grid-shell";
-import { cacheEventContent, loadCachedEventContent } from "@/lib/grid/offline-content";
-import { loadPlayerSessionForTeam } from "@/lib/grid/player-session";
+import { cacheEventContent } from "@/lib/grid/offline-content";
+import {
+  abandonTeamSession,
+  resolveTeamSession,
+} from "@/lib/grid/session-recovery";
+import { teamEntryPath } from "@/lib/grid/team-routes";
 import type { ResolvedEventContent } from "@/lib/grid/level-types";
 import type { PlayerSession } from "@/lib/grid/types";
 
@@ -28,24 +32,13 @@ export function GameGate({ inviteCode, joinCode, teamName }: GameGateProps) {
   > | null>(null);
 
   useEffect(() => {
-    const playerSession = loadPlayerSessionForTeam(inviteCode, joinCode);
-    if (!playerSession) {
-      router.replace(`/join/${inviteCode}?team=${joinCode}`);
-      return;
-    }
-
-    setSession(playerSession);
-
     Promise.all([
-      getGameState({
-        inviteCode,
-        joinCode,
-        sessionId: playerSession.sessionId,
-      }),
+      resolveTeamSession(inviteCode, joinCode),
       getEventContent(inviteCode),
-    ]).then(([gameResult, contentResult]) => {
-      if (!gameResult.success) {
-        setError(gameResult.error);
+    ]).then(async ([resolved, contentResult]) => {
+      if (!resolved) {
+        abandonTeamSession();
+        router.replace(`/join/${inviteCode}?team=${joinCode}`);
         return;
       }
 
@@ -54,21 +47,35 @@ export function GameGate({ inviteCode, joinCode, teamName }: GameGateProps) {
         return;
       }
 
-      if (gameResult.data.status === "lobby") {
-        router.replace(`/join/${inviteCode}/lobby/${joinCode}`);
+      const syncedSession = resolved.session;
+
+      if (syncedSession.teamStatus === "lobby" || syncedSession.teamStatus === "setup") {
+        router.replace(teamEntryPath(inviteCode, joinCode, syncedSession.teamStatus ?? "lobby"));
         return;
       }
 
-      const cached = loadCachedEventContent(contentResult.data.eventId);
-      const content = cached ?? {
+      const gameResult = await getGameState({
+        inviteCode,
+        joinCode,
+        sessionId: syncedSession.sessionId,
+      });
+
+      if (!gameResult.success) {
+        abandonTeamSession();
+        router.replace(`/join/${inviteCode}?team=${joinCode}`);
+        return;
+      }
+
+      const freshContent: ResolvedEventContent = {
         templateSlug: contentResult.data.templateSlug,
         templateName: contentResult.data.templateName,
         city: contentResult.data.city,
         levels: contentResult.data.levels,
       };
 
-      cacheEventContent(contentResult.data.eventId, content);
-      setEventContent(content);
+      cacheEventContent(contentResult.data.eventId, freshContent);
+      setSession(syncedSession);
+      setEventContent(freshContent);
       setInitialState(gameResult);
       setReady(true);
     });

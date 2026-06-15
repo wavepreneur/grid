@@ -122,6 +122,7 @@ export function useTeamSync({
               gameState,
               startedAt: row.started_at,
               lobbyAutoStartAt: row.lobby_auto_start_at,
+              isCaptain: cached?.isCaptain,
             };
 
             cacheTeamState(nextState);

@@ -43,6 +43,7 @@ export type GridTeam = {
   lobby_auto_start_at: string | null;
   started_at: string | null;
   captain_player_id: string | null;
+  navigator_player_id: string | null;
 };
 
 export type GridPlayer = {
@@ -59,8 +60,10 @@ export type LobbyPlayer = {
   id: string;
   display_name: string;
   is_captain: boolean;
+  is_navigator?: boolean;
   role?: PlayerRole;
   joined_at: string;
+  last_seen_at?: string;
 };
 
 export type LobbySnapshot = {
@@ -75,6 +78,7 @@ export type LobbySnapshot = {
   lobby_opened_at: string | null;
   lobby_auto_start_at: string | null;
   captain_player_id: string | null;
+  navigator_player_id: string | null;
   active_player_count: number;
   players: LobbyPlayer[];
 };
@@ -82,13 +86,20 @@ export type LobbySnapshot = {
 export type PlayerSession = {
   playerId: string;
   sessionId: string;
+  displayName: string;
   teamId: string;
   joinCode: string;
   inviteCode: string;
   isCaptain: boolean;
+  isNavigator: boolean;
   teamStatus?: GridTeamStatus;
 };
 
 export type ActionResult<T> =
   | { success: true; data: T }
-  | { success: false; error: string };
+  | {
+      success: false;
+      error: string;
+      code?: string;
+      meta?: Record<string, unknown>;
+    };

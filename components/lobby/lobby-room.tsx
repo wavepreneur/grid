@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  assignPlayerRole,
+  claimTeamNavigator,
   getLobbySnapshot,
   handoverSession,
+  removePlayerFromLobby,
   startGameManually,
   transferCaptain,
+  transferTeamNavigator,
+  verifyTeamSession,
 } from "@/app/actions/lobby";
 import {
   CopyInviteLink,
@@ -20,8 +23,9 @@ import {
 } from "@/components/grid/grid-shell";
 import { useTeamSync } from "@/lib/hooks/use-team-sync";
 import { buildTeamInviteUrl } from "@/lib/grid/codes";
-import { clearPlayerSession } from "@/lib/grid/player-session";
-import type { LobbySnapshot, PlayerRole, PlayerSession } from "@/lib/grid/types";
+import { NAVIGATOR_OFFLINE_MS } from "@/lib/grid/constants";
+import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
+import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
 
 type LobbyRoomProps = {
   inviteCode: string;
@@ -42,6 +46,18 @@ function formatCountdown(targetIso: string | null): string {
   return `${minutes}:${seconds}`;
 }
 
+function isNavigatorOffline(
+  snapshot: LobbySnapshot,
+  navigatorPlayerId: string | null,
+): boolean {
+  if (!navigatorPlayerId) return true;
+
+  const navigator = snapshot.players.find((player) => player.id === navigatorPlayerId);
+  if (!navigator?.last_seen_at) return true;
+
+  return Date.now() - new Date(navigator.last_seen_at).getTime() >= NAVIGATOR_OFFLINE_MS;
+}
+
 export function LobbyRoom({
   inviteCode,
   joinCode,
@@ -50,6 +66,7 @@ export function LobbyRoom({
 }: LobbyRoomProps) {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const [session, setSession] = useState(playerSession);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(
     formatCountdown(initialSnapshot.lobby_auto_start_at),
@@ -65,14 +82,27 @@ export function LobbyRoom({
     const result = await getLobbySnapshot({
       inviteCode,
       joinCode,
-      sessionId: playerSession.sessionId,
+      sessionId: session.sessionId,
     });
 
     if (result.success) {
       setSnapshot(result.data);
       setCountdown(formatCountdown(result.data.lobby_auto_start_at));
     }
-  }, [inviteCode, joinCode, playerSession.sessionId]);
+  }, [inviteCode, joinCode, session.sessionId]);
+
+  async function syncSessionFromServer() {
+    const verified = await verifyTeamSession({
+      inviteCode,
+      joinCode,
+      sessionId: session.sessionId,
+    });
+
+    if (verified.success) {
+      savePlayerSession(verified.data.session);
+      setSession(verified.data.session);
+    }
+  }
 
   const handleTeamStatusChange = useCallback(
     (status: string) => {
@@ -95,8 +125,8 @@ export function LobbyRoom({
   }, []);
 
   const { isConnected, error: realtimeError } = useTeamSync({
-    sessionId: playerSession.sessionId,
-    teamId: playerSession.teamId,
+    sessionId: session.sessionId,
+    teamId: session.teamId,
     enabled: snapshot.team_status === "lobby",
     onTeamStatusChange: handleTeamStatusChange,
     onPlayersChange: handlePlayersChange,
@@ -126,7 +156,7 @@ export function LobbyRoom({
       const result = await startGameManually({
         inviteCode,
         joinCode,
-        sessionId: playerSession.sessionId,
+        sessionId: session.sessionId,
       });
 
       if (!result.success) {
@@ -145,7 +175,7 @@ export function LobbyRoom({
       const result = await handoverSession({
         inviteCode,
         joinCode,
-        sessionId: playerSession.sessionId,
+        sessionId: session.sessionId,
       });
 
       if (!result.success) {
@@ -165,7 +195,7 @@ export function LobbyRoom({
       const result = await transferCaptain({
         inviteCode,
         joinCode,
-        sessionId: playerSession.sessionId,
+        sessionId: session.sessionId,
         targetPlayerId,
       });
 
@@ -175,19 +205,40 @@ export function LobbyRoom({
       }
 
       await refreshLobby();
+      await syncSessionFromServer();
     });
   }
 
-  function handleAssignRole(targetPlayerId: string, role: Exclude<PlayerRole, "captain">) {
+  function handleTransferNavigator(targetPlayerId: string) {
     setError(null);
 
     startTransition(async () => {
-      const result = await assignPlayerRole({
+      const result = await transferTeamNavigator({
         inviteCode,
         joinCode,
-        sessionId: playerSession.sessionId,
+        sessionId: session.sessionId,
         targetPlayerId,
-        role,
+      });
+
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+
+      await refreshLobby();
+      await syncSessionFromServer();
+    });
+  }
+
+  function handleRemovePlayer(targetPlayerId: string) {
+    setError(null);
+
+    startTransition(async () => {
+      const result = await removePlayerFromLobby({
+        inviteCode,
+        joinCode,
+        sessionId: session.sessionId,
+        targetPlayerId,
       });
 
       if (!result.success) {
@@ -199,8 +250,34 @@ export function LobbyRoom({
     });
   }
 
-  const isCaptain = playerSession.isCaptain;
+  function handleClaimNavigator() {
+    setError(null);
+
+    startTransition(async () => {
+      const result = await claimTeamNavigator({
+        inviteCode,
+        joinCode,
+        sessionId: session.sessionId,
+      });
+
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+
+      await refreshLobby();
+      await syncSessionFromServer();
+    });
+  }
+
+  const isCaptain = session.isCaptain;
   const isLobby = snapshot.team_status === "lobby";
+  const navigatorOffline = isNavigatorOffline(snapshot, snapshot.navigator_player_id);
+  const canClaimNavigator =
+    isLobby &&
+    !session.isNavigator &&
+    navigatorOffline &&
+    snapshot.active_player_count > 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -223,6 +300,20 @@ export function LobbyRoom({
         </div>
       ) : null}
 
+      {canClaimNavigator ? (
+        <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+          <p>Team Lead (GPS) ist offline oder nicht gesetzt.</p>
+          <GridButton
+            type="button"
+            className="mt-3"
+            disabled={isPending}
+            onClick={handleClaimNavigator}
+          >
+            {isPending ? "Übernehme…" : "Team Lead (GPS) übernehmen"}
+          </GridButton>
+        </div>
+      ) : null}
+
       <div>
         <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-[var(--grid-muted)]">
           Lobby
@@ -235,10 +326,8 @@ export function LobbyRoom({
             >
               <div>
                 <span className="text-white">{player.display_name}</span>
-                {player.role && player.role !== "captain" ? (
-                  <span className="ml-2 text-xs text-[var(--grid-muted)]">
-                    ({player.role})
-                  </span>
+                {player.id === session.playerId ? (
+                  <span className="ml-2 text-xs text-[var(--grid-muted)]">(Du)</span>
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -247,7 +336,12 @@ export function LobbyRoom({
                     Captain
                   </span>
                 ) : null}
-                {isCaptain && isLobby && !player.is_captain && player.id !== playerSession.playerId ? (
+                {player.is_navigator ? (
+                  <span className="text-xs uppercase tracking-[0.16em] text-emerald-300">
+                    Team Lead (GPS)
+                  </span>
+                ) : null}
+                {isCaptain && isLobby && !player.is_captain && player.id !== session.playerId ? (
                   <>
                     <button
                       type="button"
@@ -257,19 +351,24 @@ export function LobbyRoom({
                     >
                       Captain übertragen
                     </button>
-                    <select
-                      className="rounded-lg border border-[var(--grid-border)] bg-black/40 px-2 py-1 text-xs text-white"
-                      defaultValue={player.role ?? "solver"}
-                      onChange={(event) =>
-                        handleAssignRole(
-                          player.id,
-                          event.target.value as Exclude<PlayerRole, "captain">,
-                        )
-                      }
+                    {!player.is_navigator ? (
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => handleTransferNavigator(player.id)}
+                        className="text-xs text-emerald-300 underline-offset-2 hover:underline"
+                      >
+                        Team Lead (GPS)
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleRemovePlayer(player.id)}
+                      className="text-xs text-red-300 underline-offset-2 hover:underline"
                     >
-                      <option value="solver">Solver</option>
-                      <option value="navigator">Navigator</option>
-                    </select>
+                      Entfernen
+                    </button>
                   </>
                 ) : null}
               </div>

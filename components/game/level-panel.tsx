@@ -14,7 +14,7 @@ type LevelPanelProps = {
   level: LevelDefinition;
   disabled: boolean;
   isPending: boolean;
-  isCaptain: boolean;
+  isNavigator: boolean;
   onSubmit: (payload: {
     answer?: string;
     selectedOptionId?: string;
@@ -26,12 +26,12 @@ export function LevelPanel({
   level,
   disabled,
   isPending,
-  isCaptain,
+  isNavigator,
   onSubmit,
 }: LevelPanelProps) {
   const [answer, setAnswer] = useState("");
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
-  const gpsEnabled = level.type === "gps" && Boolean(level.location) && isCaptain;
+  const gpsEnabled = level.type === "gps" && Boolean(level.location) && isNavigator;
   const { sample, error: gpsError, isLoading: gpsLoading } = useGeolocation(gpsEnabled);
 
   const distance =
@@ -69,7 +69,7 @@ export function LevelPanel({
         </p>
         {level.type === "gps" ? (
           <span className="text-xs text-[var(--grid-accent)]">
-            {isCaptain ? "GPS · Captain-Gerät" : "Nur Captain-GPS"}
+            {isNavigator ? "GPS · Team Lead" : "Nur Team Lead (GPS)"}
           </span>
         ) : (
           <span className="text-xs text-[var(--grid-muted)]">Kein GPS nötig</span>
@@ -81,19 +81,11 @@ export function LevelPanel({
         {level.description}
       </p>
 
-      {level.type === "gps" && level.location ? (
+      {level.type === "gps" && level.location && isNavigator ? (
         <div className="mt-4 rounded-xl border border-[var(--grid-border)] bg-black/30 px-4 py-3 text-sm text-[var(--grid-muted)]">
-          {!isCaptain ? (
-            <p>
-              Der Captain bestätigt diesen Checkpoint am Zielort. Ihr könnt parallel
-              Rätsel auf eurem Gerät lösen.
-            </p>
-          ) : null}
-          {isCaptain && gpsLoading ? (
-            <p>GPS-Position wird ermittelt…</p>
-          ) : null}
-          {isCaptain && gpsError ? <p className="text-red-300">{gpsError}</p> : null}
-          {isCaptain && sample ? (
+          {gpsLoading ? <p>GPS-Position wird ermittelt…</p> : null}
+          {gpsError ? <p className="text-red-300">{gpsError}</p> : null}
+          {sample ? (
             <>
               <p>
                 Entfernung zum Checkpoint:{" "}
@@ -110,8 +102,17 @@ export function LevelPanel({
                 )}
               </p>
             </>
+          ) : !gpsLoading && !gpsError ? (
+            <p>Warte auf GPS-Signal… Standortfreigabe im Browser erlauben.</p>
           ) : null}
         </div>
+      ) : null}
+
+      {level.type === "gps" && !isNavigator ? (
+        <p className="mt-4 rounded-xl border border-[var(--grid-border)] bg-black/30 px-4 py-3 text-sm text-[var(--grid-muted)]">
+          Der Team Lead (GPS) bestätigt diesen Checkpoint am Zielort. Ihr könnt parallel Rätsel
+          auf eurem Gerät lösen — GPS-Checkpoints schließt nur das Team-Lead-Gerät ab.
+        </p>
       ) : null}
 
       {level.type === "digital" ? (
@@ -146,20 +147,22 @@ export function LevelPanel({
         </div>
       ) : null}
 
-      <GridButton
-        type="button"
-        className="mt-6"
-        disabled={
-          disabled ||
-          isPending ||
-          (level.type === "gps" && (!isCaptain || !withinRadius)) ||
-          (level.type === "digital" && !answer.trim()) ||
-          (level.type === "quiz" && !selectedOptionId)
-        }
-        onClick={handleSubmit}
-      >
-        {isPending ? "Sende…" : "Level abschließen"}
-      </GridButton>
+      {level.type === "gps" && !isNavigator ? null : (
+        <GridButton
+          type="button"
+          className="mt-6"
+          disabled={
+            disabled ||
+            isPending ||
+            (level.type === "gps" && (!isNavigator || !withinRadius)) ||
+            (level.type === "digital" && !answer.trim()) ||
+            (level.type === "quiz" && !selectedOptionId)
+          }
+          onClick={handleSubmit}
+        >
+          {isPending ? "Sende…" : "Level abschließen"}
+        </GridButton>
+      )}
     </div>
   );
 }

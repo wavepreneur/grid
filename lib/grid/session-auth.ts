@@ -58,7 +58,9 @@ export async function assertPlayerSession(input: {
 
   const player = await getPlayerBySessionId(input.sessionId);
   if (!player || player.team_id !== team.id) {
-    throw new Error("Session ungültig.");
+    throw new Error(
+      "Deine Session ist abgelaufen. Tritt mit deinem Spielernamen erneut bei.",
+    );
   }
 
   return { event, team, player };

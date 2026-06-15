@@ -54,6 +54,8 @@ export type TeamRealtimeState = {
   gameState: TeamGameState;
   startedAt: string | null;
   lobbyAutoStartAt: string | null;
+  isCaptain?: boolean;
+  isNavigator?: boolean;
 };
 
 export function createInitialGameState(

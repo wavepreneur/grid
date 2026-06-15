@@ -4,19 +4,20 @@ import {
   GridLink,
   GridShell,
 } from "@/components/grid/grid-shell";
-import { MemberJoinForm } from "@/components/lobby/member-join-form";
+import { TeamEntryGate } from "@/components/lobby/team-entry-gate";
 import { TeamCodeEntry } from "@/components/lobby/team-code-entry";
 import Link from "next/link";
 
 type JoinPageProps = {
   params: Promise<{ inviteCode: string }>;
-  searchParams: Promise<{ team?: string }>;
+  searchParams: Promise<{ team?: string; name?: string }>;
 };
 
 export default async function JoinPage({ params, searchParams }: JoinPageProps) {
   const { inviteCode } = await params;
-  const { team } = await searchParams;
+  const { team, name } = await searchParams;
   const normalizedInviteCode = inviteCode.toUpperCase();
+  const defaultDisplayName = name?.trim() ?? "";
 
   const eventResult = await getEventInvite(normalizedInviteCode);
   if (!eventResult.success) {
@@ -49,11 +50,12 @@ export default async function JoinPage({ params, searchParams }: JoinPageProps) 
         title={teamResult.data.teamStatus === "playing" ? "Spiel beitreten" : "Lobby beitreten"}
         description={`Event: ${event.title}`}
       >
-        <MemberJoinForm
+        <TeamEntryGate
           inviteCode={normalizedInviteCode}
           joinCode={teamResult.data.joinCode}
           teamName={teamResult.data.teamName}
           teamStatus={teamResult.data.teamStatus}
+          defaultDisplayName={defaultDisplayName}
         />
       </GridShell>
     );

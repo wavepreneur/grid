@@ -1,10 +1,23 @@
 "use client";
 
 import { GRID_PLAYER_SESSION_KEY } from "@/lib/grid/constants";
+import {
+  clearStoredTeamSession,
+  loadStoredPlayerIdForCodes,
+  loadStoredPlayerIdForTeam,
+  persistPlayerSession,
+} from "@/lib/grid/session-storage";
 import type { PlayerSession } from "@/lib/grid/types";
 
+export {
+  persistPlayerSession,
+  loadStoredPlayerIdForTeam,
+  loadStoredPlayerIdForCodes,
+  clearStoredTeamSession,
+} from "@/lib/grid/session-storage";
+
 export function savePlayerSession(session: PlayerSession): void {
-  localStorage.setItem(GRID_PLAYER_SESSION_KEY, JSON.stringify(session));
+  persistPlayerSession(session);
 }
 
 export function loadPlayerSession(): PlayerSession | null {
@@ -21,6 +34,10 @@ export function loadPlayerSession(): PlayerSession | null {
 }
 
 export function clearPlayerSession(): void {
+  const session = loadPlayerSession();
+  if (session?.teamId) {
+    clearStoredTeamSession(session.teamId, session.inviteCode, session.joinCode);
+  }
   localStorage.removeItem(GRID_PLAYER_SESSION_KEY);
 }
 
@@ -39,4 +56,24 @@ export function loadPlayerSessionForTeam(
   }
 
   return session;
+}
+
+export function loadPlayerIdForTeam(
+  inviteCode: string,
+  joinCode: string,
+  teamId?: string,
+): string | null {
+  const session = loadPlayerSessionForTeam(inviteCode, joinCode);
+  if (session?.playerId) {
+    return session.playerId;
+  }
+
+  const fromCodes = loadStoredPlayerIdForCodes(inviteCode, joinCode);
+  if (fromCodes) return fromCodes;
+
+  if (teamId) {
+    return loadStoredPlayerIdForTeam(teamId);
+  }
+
+  return null;
 }
