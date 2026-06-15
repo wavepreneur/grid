@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createEvent } from "@/app/actions/lobby";
+import { RouteOverrideEditor } from "@/components/admin/route-override-editor";
 import {
   GridButton,
   GridError,
@@ -64,18 +65,22 @@ export function CreateEventForm() {
       </form>
 
       {createdInviteCode ? (
-        <div className="rounded-xl border border-[var(--grid-accent)]/30 bg-[var(--grid-accent)]/10 p-4 text-sm text-[var(--grid-accent)]">
-          <p className="font-medium">Event erstellt.</p>
-          <p className="mt-2 break-all">
-            Einladungslink: {`${window.location.origin}/join/${createdInviteCode}`}
-          </p>
-          <GridButton
-            type="button"
-            className="mt-4"
-            onClick={() => router.push(`/join/${createdInviteCode}`)}
-          >
-            Zum Event
-          </GridButton>
+        <div className="flex flex-col gap-4">
+          <div className="rounded-xl border border-[var(--grid-accent)]/30 bg-[var(--grid-accent)]/10 p-4 text-sm text-[var(--grid-accent)]">
+            <p className="font-medium">Event erstellt.</p>
+            <p className="mt-2 break-all">
+              Einladungslink: {`${window.location.origin}/join/${createdInviteCode}`}
+            </p>
+            <GridButton
+              type="button"
+              className="mt-4"
+              onClick={() => router.push(`/join/${createdInviteCode}`)}
+            >
+              Zum Event
+            </GridButton>
+          </div>
+
+          <RouteOverrideEditor inviteCode={createdInviteCode} />
         </div>
       ) : null}
     </div>

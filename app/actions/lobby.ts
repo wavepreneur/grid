@@ -26,7 +26,7 @@ async function getEventByInviteCode(
   const { data, error } = await supabase
     .from("events")
     .select(
-      "id, title, organization_name, invite_code, status, max_teams, max_players_per_team, lobby_auto_start_seconds",
+      "id, title, organization_name, invite_code, status, max_teams, max_players_per_team, lobby_auto_start_seconds, content_config, route_override",
     )
     .eq("invite_code", normalizeCode(inviteCode))
     .maybeSingle();
@@ -65,7 +65,7 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
   const supabase = createAdminClient();
   const { data: team } = await supabase
     .from("teams")
-    .select("id, status, lobby_auto_start_at, captain_player_id")
+    .select("id, status, lobby_auto_start_at, captain_player_id, event_id")
     .eq("id", teamId)
     .single();
 
@@ -86,7 +86,21 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
     .maybeSingle();
 
   if (updated) {
-    await initializeTeamGameState(teamId, team.captain_player_id);
+    const { data: event } = await supabase
+      .from("events")
+      .select("id, content_config, route_override")
+      .eq("id", team.event_id)
+      .single();
+
+    if (event) {
+      await initializeTeamGameState(
+        teamId,
+        team.captain_player_id,
+        event.id,
+        event.content_config,
+        event.route_override,
+      );
+    }
   }
 }
 
@@ -110,6 +124,7 @@ export async function createEvent(input: {
         organization_name: input.organizationName?.trim() || null,
         invite_code: inviteCode,
         status: "lobby",
+        content_config: { template_slug: "default-exitmania" },
       })
       .select(
         "id, title, organization_name, invite_code, status, max_teams, max_players_per_team, lobby_auto_start_seconds",
@@ -444,7 +459,13 @@ export async function startGameManually(input: {
       return { success: false, error: error.message };
     }
 
-    await initializeTeamGameState(team.id, player.id);
+    await initializeTeamGameState(
+      team.id,
+      player.id,
+      event.id,
+      event.content_config,
+      event.route_override,
+    );
 
     await supabase
       .from("events")

@@ -1,5 +1,7 @@
-/** Phase 2 demo uses 3 levels. Phase 3 expands to 10 with content layer. */
-export const PHASE2_DEMO_LEVELS = 3;
+import { EXITMANIA_TOTAL_LEVELS } from "@/lib/grid/level-types";
+
+/** @deprecated Use EXITMANIA_TOTAL_LEVELS */
+export const PHASE2_DEMO_LEVELS = EXITMANIA_TOTAL_LEVELS;
 
 export type GameLevelStatus = "locked" | "active" | "completed";
 
@@ -53,7 +55,7 @@ export type TeamRealtimeState = {
 };
 
 export function createInitialGameState(
-  totalLevels = PHASE2_DEMO_LEVELS,
+  totalLevels = EXITMANIA_TOTAL_LEVELS,
 ): TeamGameState {
   const levels: TeamGameState["levels"] = {};
 
@@ -79,7 +81,7 @@ export function parseTeamGameState(value: unknown): TeamGameState {
   const candidate = value as Partial<TeamGameState>;
   return {
     version: candidate.version ?? 1,
-    total_levels: candidate.total_levels ?? PHASE2_DEMO_LEVELS,
+    total_levels: candidate.total_levels ?? EXITMANIA_TOTAL_LEVELS,
     modal: candidate.modal ?? null,
     levels: candidate.levels ?? createInitialGameState().levels,
   };

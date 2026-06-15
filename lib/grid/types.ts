@@ -21,6 +21,8 @@ export type GridEvent = {
   max_teams: number | null;
   max_players_per_team: number;
   lobby_auto_start_seconds: number;
+  content_config?: Record<string, unknown> | null;
+  route_override?: Record<string, unknown> | null;
 };
 
 export type GridTeam = {

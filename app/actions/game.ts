@@ -5,10 +5,16 @@ import {
   buildLevelCompletedModal,
   createInitialGameState,
   parseTeamGameState,
-  PHASE2_DEMO_LEVELS,
   type TeamGameState,
   type TeamRealtimeState,
 } from "@/lib/grid/game-state";
+import {
+  getLevelDefinition,
+  loadResolvedEventContent,
+  validateLevelSolution,
+} from "@/lib/grid/level-validation";
+import { EXITMANIA_TOTAL_LEVELS } from "@/lib/grid/level-types";
+import type { SolveLevelPayload } from "@/lib/grid/level-types";
 import { assertPlayerSession } from "@/lib/grid/session-auth";
 import type { ActionResult } from "@/lib/grid/types";
 
@@ -68,9 +74,10 @@ export async function solveCurrentLevel(input: {
   inviteCode: string;
   joinCode: string;
   sessionId: string;
+  payload?: SolveLevelPayload;
 }): Promise<ActionResult<TeamRealtimeState>> {
   try {
-    const { team, player } = await assertPlayerSession(input);
+    const { event, team, player } = await assertPlayerSession(input);
 
     if (team.status !== "playing") {
       return { success: false, error: "Das Spiel läuft noch nicht." };
@@ -89,16 +96,33 @@ export async function solveCurrentLevel(input: {
       return { success: false, error: "Bitte zuerst die Synchronisations-Meldung schließen." };
     }
 
+    const content = await loadResolvedEventContent(
+      event.id,
+      event.content_config,
+      event.route_override,
+    );
+    const levelDefinition = getLevelDefinition(content, currentLevel);
+
+    if (!levelDefinition) {
+      return { success: false, error: "Level-Inhalt nicht gefunden." };
+    }
+
+    const validation = validateLevelSolution(levelDefinition, input.payload ?? {});
+    if (!validation.ok) {
+      return { success: false, error: validation.error };
+    }
+
     const solvedBy = Array.from(
       new Set([...(levelState.completed_by ?? []), player.display_name]),
     );
 
     const nextLevel = currentLevel + 1;
-    const isFinished = nextLevel > gameState.total_levels;
+    const isFinished = nextLevel > content.levels.length;
 
     const nextGameState: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
+      total_levels: content.levels.length,
       modal: buildLevelCompletedModal({
         level: currentLevel,
         solvedBy,
@@ -146,6 +170,7 @@ export async function solveCurrentLevel(input: {
       payload: {
         solved_by: solvedBy,
         next_level: isFinished ? null : nextLevel,
+        level_type: levelDefinition.type,
       },
     });
 
@@ -223,10 +248,18 @@ export async function dismissSyncModal(input: {
   }
 }
 
-export async function initializeTeamGameState(teamId: string, actorPlayerId: string) {
-  const supabase = createAdminClient();
-  const initialState = createInitialGameState(PHASE2_DEMO_LEVELS);
+export async function initializeTeamGameState(
+  teamId: string,
+  actorPlayerId: string,
+  eventId: string,
+  contentConfig: unknown,
+  routeOverride: unknown,
+) {
+  const content = await loadResolvedEventContent(eventId, contentConfig, routeOverride);
+  const totalLevels = content.levels.length || EXITMANIA_TOTAL_LEVELS;
+  const initialState = createInitialGameState(totalLevels);
 
+  const supabase = createAdminClient();
   await supabase
     .from("teams")
     .update({
@@ -240,6 +273,9 @@ export async function initializeTeamGameState(teamId: string, actorPlayerId: str
     eventType: "game_started",
     level: 1,
     actorPlayerId,
-    payload: { total_levels: PHASE2_DEMO_LEVELS },
+    payload: {
+      total_levels: totalLevels,
+      template_slug: content.templateSlug,
+    },
   });
 }

@@ -6,7 +6,7 @@ export default function AdminDevPage() {
     <GridShell
       eyebrow="GRID / DEV"
       title="Event erstellen"
-      description="Temporärer Admin-Flow bis B2B-Auth existiert. Erzeugt ein Event mit globalem invite_code."
+      description="Temporärer Admin-Flow bis B2B-Auth existiert. Events nutzen das Template default-exitmania (10 Level)."
     >
       <CreateEventForm />
     </GridShell>

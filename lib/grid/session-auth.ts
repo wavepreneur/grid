@@ -6,7 +6,7 @@ export async function getEventByInviteCode(inviteCode: string) {
   const { data, error } = await supabase
     .from("events")
     .select(
-      "id, title, organization_name, invite_code, status, max_teams, max_players_per_team, lobby_auto_start_seconds",
+      "id, title, organization_name, invite_code, status, max_teams, max_players_per_team, lobby_auto_start_seconds, content_config, route_override",
     )
     .eq("invite_code", normalizeCode(inviteCode))
     .maybeSingle();
