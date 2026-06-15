@@ -18,6 +18,72 @@ type ContentTileGridProps = {
   layout?: "inline" | "sidebar";
 };
 
+type TileCardProps = {
+  tile: LevelContentTile;
+  label: string;
+  purchased?: PurchasedTileHint;
+  hintCost: number;
+  disabled: boolean;
+  isPending: boolean;
+  onOpen: (tile: LevelContentTile) => void;
+  onHintClick: (tile: LevelContentTile, event: React.MouseEvent) => void;
+};
+
+function TileCard({
+  tile,
+  label,
+  purchased,
+  hintCost,
+  disabled,
+  isPending,
+  onOpen,
+  onHintClick,
+}: TileCardProps) {
+  const hasHint = Boolean(tile.hint);
+
+  return (
+    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--grid-border)] bg-[var(--grid-accent-soft)]/40">
+      {purchased ? (
+        <span
+          className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400/20 text-xs font-bold text-emerald-300 ring-1 ring-emerald-400/30"
+          aria-hidden
+        >
+          ✓
+        </span>
+      ) : null}
+
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onOpen(tile)}
+        className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-3 px-3 py-4 transition hover:bg-[var(--grid-accent)]/10 active:bg-[var(--grid-accent)]/15 disabled:opacity-50"
+      >
+        <span className="text-4xl leading-none text-[var(--grid-accent)]" aria-hidden>
+          {tileTypeIcon(tile.type)}
+        </span>
+        <span className="text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
+          {label}
+        </span>
+      </button>
+
+      {hasHint ? (
+        <button
+          type="button"
+          disabled={disabled || isPending}
+          onClick={(event) => onHintClick(tile, event)}
+          className={`border-t border-[var(--grid-border)] px-2 py-2.5 text-center text-[10px] font-medium uppercase tracking-[0.1em] transition disabled:opacity-50 ${
+            purchased
+              ? "bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/15"
+              : "bg-black/20 text-[var(--grid-muted)] hover:bg-black/30 hover:text-white"
+          }`}
+        >
+          {purchased ? "Tipp ansehen" : `Tipp · ${hintCost}P`}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function ContentTileGrid({
   tiles,
   purchasedHints,
@@ -30,6 +96,7 @@ export function ContentTileGrid({
 }: ContentTileGridProps) {
   const [confirmTile, setConfirmTile] = useState<LevelContentTile | null>(null);
   const [viewHintTile, setViewHintTile] = useState<LevelContentTile | null>(null);
+  const isSidebar = layout === "sidebar";
 
   useEffect(() => {
     if (!confirmTile) return;
@@ -40,8 +107,6 @@ export function ContentTileGrid({
   }, [confirmTile, purchasedHints]);
 
   if (tiles.length === 0) return null;
-
-  const isSidebar = layout === "sidebar";
 
   function handleHintClick(tile: LevelContentTile, event: React.MouseEvent) {
     event.stopPropagation();
@@ -57,75 +122,69 @@ export function ContentTileGrid({
     onPurchaseHint(confirmTile.id);
   }
 
+  const showSwipeHint = !isSidebar && tiles.length > 1;
+
   return (
     <>
-      <div className={isSidebar ? "flex min-h-0 flex-col" : ""}>
-        <p className="mb-3 shrink-0 text-xs font-medium uppercase tracking-[0.18em] text-[var(--grid-muted)]">
-          Hinweise & Medien
-        </p>
+      <div className={isSidebar ? "flex min-h-0 flex-col" : "min-w-0 w-full"}>
+        <div className="mb-3 flex shrink-0 items-end justify-between gap-2">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--grid-muted)]">
+            Hinweise & Medien
+          </p>
+          {showSwipeHint ? (
+            <p className="text-[10px] text-[var(--grid-muted)] sm:hidden">Wischen</p>
+          ) : null}
+        </div>
 
-        <ul
-          className={
-            isSidebar
-              ? "grid max-h-[min(70vh,calc(100dvh-11rem))] grid-cols-2 gap-3 overflow-y-auto overscroll-contain pr-1"
-              : "flex gap-3 overflow-x-auto overscroll-x-contain pb-2 snap-x snap-mandatory"
-          }
-        >
-          {tiles.map((tile) => {
-            const label = tile.label ?? tileTypeLabel(tile.type);
-            const purchased = purchasedHints[tile.id];
-            const hintCost = tile.hint?.point_cost ?? HINT_POINT_COST;
-            const hasHint = Boolean(tile.hint);
-
-            return (
-              <li
-                key={tile.id}
-                className={
-                  isSidebar
-                    ? "min-w-0"
-                    : "w-44 shrink-0 snap-start sm:w-48"
-                }
-              >
-                <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--grid-border)] bg-[var(--grid-accent-soft)]/40">
-                  {purchased ? (
-                    <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400/20 text-xs font-bold text-emerald-300 ring-1 ring-emerald-400/30">
-                      ✓
-                    </span>
-                  ) : null}
-
-                  <button
-                    type="button"
+        {isSidebar ? (
+          <ul className="grid max-h-[min(70vh,calc(100dvh-11rem))] grid-cols-2 gap-3 overflow-y-auto overscroll-contain pr-1">
+            {tiles.map((tile) => {
+              const label = tile.label ?? tileTypeLabel(tile.type);
+              return (
+                <li key={tile.id} className="min-w-0">
+                  <TileCard
+                    tile={tile}
+                    label={label}
+                    purchased={purchasedHints[tile.id]}
+                    hintCost={tile.hint?.point_cost ?? HINT_POINT_COST}
                     disabled={disabled}
-                    onClick={() => onOpen(tile)}
-                    className="flex flex-1 flex-col items-center justify-center gap-3 px-3 pb-3 pt-5 transition hover:bg-[var(--grid-accent)]/10 disabled:opacity-50 aspect-square"
+                    isPending={isPending}
+                    onOpen={onOpen}
+                    onHintClick={handleHintClick}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="game-panel-bleed">
+            <ul
+              className="tile-slider"
+              aria-label="Hinweise und Medien"
+            >
+              {tiles.map((tile) => {
+                const label = tile.label ?? tileTypeLabel(tile.type);
+                return (
+                  <li
+                    key={tile.id}
+                    className="w-[42vw] max-w-[11rem] min-w-[9.5rem] shrink-0 snap-start sm:w-44 sm:max-w-[12rem]"
                   >
-                    <span className="text-3xl leading-none text-[var(--grid-accent)] sm:text-4xl">
-                      {tileTypeIcon(tile.type)}
-                    </span>
-                    <span className="text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
-                      {label}
-                    </span>
-                  </button>
-
-                  {hasHint ? (
-                    <button
-                      type="button"
-                      disabled={disabled || isPending}
-                      onClick={(event) => handleHintClick(tile, event)}
-                      className={`border-t border-[var(--grid-border)] px-2 py-2 text-center text-[10px] font-medium uppercase tracking-[0.1em] transition disabled:opacity-50 ${
-                        purchased
-                          ? "bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/15"
-                          : "bg-black/20 text-[var(--grid-muted)] hover:bg-black/30 hover:text-white"
-                      }`}
-                    >
-                      {purchased ? "Tipp ansehen" : `Tipp · ${hintCost}P`}
-                    </button>
-                  ) : null}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                    <TileCard
+                      tile={tile}
+                      label={label}
+                      purchased={purchasedHints[tile.id]}
+                      hintCost={tile.hint?.point_cost ?? HINT_POINT_COST}
+                      disabled={disabled}
+                      isPending={isPending}
+                      onOpen={onOpen}
+                      onHintClick={handleHintClick}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </div>
 
       <TileHintModal
@@ -144,9 +203,7 @@ export function ContentTileGrid({
         open={Boolean(viewHintTile)}
         mode="view"
         label={viewHintTile ? (viewHintTile.label ?? tileTypeLabel(viewHintTile.type)) : ""}
-        hintText={
-          viewHintTile ? purchasedHints[viewHintTile.id]?.text : undefined
-        }
+        hintText={viewHintTile ? purchasedHints[viewHintTile.id]?.text : undefined}
         hintCost={viewHintTile?.hint?.point_cost ?? HINT_POINT_COST}
         score={score}
         onClose={() => setViewHintTile(null)}

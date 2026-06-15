@@ -8,6 +8,13 @@
   --grid-border: rgba(46, 233, 218, 0.18);
   --grid-muted: #94a3b8;
   --grid-panel: rgba(8, 15, 30, 0.88);
+  --game-panel-px: 1rem;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --game-panel-px: 1.5rem;
+  }
 }
 
 @theme inline {
@@ -57,4 +64,27 @@ body {
 .grid-input:focus {
   border-color: rgba(46, 233, 218, 0.55);
   box-shadow: 0 0 0 3px rgba(46, 233, 218, 0.12);
+}
+
+.tile-slider {
+  display: flex;
+  width: 100%;
+  gap: 0.75rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 0.25rem var(--game-panel-px) 0.5rem;
+}
+
+.tile-slider::-webkit-scrollbar {
+  display: none;
+}
+
+.game-panel-bleed {
+  margin-inline: calc(-1 * var(--game-panel-px));
+  min-width: 0;
 }

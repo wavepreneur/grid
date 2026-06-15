@@ -9,17 +9,19 @@ type GameShellProps = {
 export function GameShell({ title, description, children }: GameShellProps) {
   return (
     <div className="grid-bg min-h-screen px-3 py-6 sm:px-4 sm:py-8">
-      <main className="mx-auto w-full max-w-6xl">
-        <header className="mb-6 flex flex-col gap-2 px-1 sm:mb-8">
+      <main className="mx-auto w-full max-w-6xl min-w-0">
+        <header className="mb-5 flex flex-col gap-2 px-1 sm:mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--grid-accent)]">
             GRID Mission
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{title}</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-white sm:text-3xl">{title}</h1>
           {description ? (
-            <p className="text-sm leading-7 text-[var(--grid-muted)]">{description}</p>
+            <p className="text-sm leading-6 text-[var(--grid-muted)] sm:leading-7">{description}</p>
           ) : null}
         </header>
-        <div className="grid-panel rounded-2xl p-4 sm:p-6 lg:p-8">{children}</div>
+        <div className="grid-panel min-w-0 overflow-x-clip rounded-2xl p-4 sm:p-6 lg:p-8">
+          {children}
+        </div>
       </main>
     </div>
   );

@@ -80,19 +80,19 @@ export function ExitmaniaLevelView({
         />
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-8">
-        <section className="flex flex-col gap-5">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-8">
+        <section className="flex min-w-0 flex-col gap-5">
           {!isGpsLevel && level.hero_image_url ? (
             <div className="overflow-hidden rounded-2xl border border-[var(--grid-border)] bg-black/20">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={level.hero_image_url}
                 alt=""
-                className="aspect-[16/9] w-full object-cover sm:aspect-[2/1]"
+                className="aspect-[16/10] max-h-52 w-full object-cover sm:aspect-[2/1] sm:max-h-none"
               />
             </div>
           ) : !isGpsLevel ? (
-            <div className="flex aspect-[16/9] items-center justify-center rounded-2xl border border-[var(--grid-border)] bg-gradient-to-br from-[var(--grid-accent)]/20 to-black/40 sm:aspect-[2/1]">
+            <div className="flex aspect-[16/10] max-h-52 items-center justify-center rounded-2xl border border-[var(--grid-border)] bg-gradient-to-br from-[var(--grid-accent)]/20 to-black/40 sm:aspect-[2/1] sm:max-h-none">
               <span className="text-xs uppercase tracking-[0.25em] text-[var(--grid-muted)]">
                 Level {level.level}
               </span>
@@ -109,7 +109,7 @@ export function ExitmaniaLevelView({
             </p>
           </div>
 
-          <div className="lg:hidden">
+          <div className="min-w-0 w-full lg:hidden">
             <ContentTileGrid {...tileGridProps} layout="inline" />
           </div>
 

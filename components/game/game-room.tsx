@@ -161,7 +161,7 @@ export function GameRoom({
 
   return (
     <>
-      <div className="flex flex-col gap-5 sm:gap-6">
+      <div className="flex min-w-0 flex-col gap-5 sm:gap-6">
         <IdentityBar
           inviteCode={inviteCode}
           joinCode={joinCode}
