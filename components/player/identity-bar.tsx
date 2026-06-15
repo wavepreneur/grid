@@ -1,12 +1,15 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { getPlayerResumeToken } from "@/app/actions/lobby";
 import { abandonTeamSession } from "@/lib/grid/session-recovery";
 import {
   eventLobbyPath,
   eventPath,
   eventTeamJoinPath,
 } from "@/lib/grid/event-routes";
+import { buildPlayUrlWithResume } from "@/lib/grid/play-url";
 import type { PlayerSession } from "@/lib/grid/types";
 
 type IdentityBarProps = {
@@ -15,6 +18,7 @@ type IdentityBarProps = {
   session: PlayerSession;
   showManageTeam?: boolean;
   showEventHome?: boolean;
+  showCopyPlayLink?: boolean;
 };
 
 function roleLabel(session: PlayerSession): string {
@@ -29,8 +33,11 @@ export function IdentityBar({
   session,
   showManageTeam = true,
   showEventHome = true,
+  showCopyPlayLink = false,
 }: IdentityBarProps) {
   const router = useRouter();
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
+  const [, startCopyTransition] = useTransition();
 
   function handleSwitchPlayer() {
     abandonTeamSession();
@@ -39,6 +46,32 @@ export function IdentityBar({
 
   function handleManageTeam() {
     router.push(eventLobbyPath(inviteCode, joinCode, { manage: true }));
+  }
+
+  function handleCopyPlayLink() {
+    startCopyTransition(async () => {
+      const result = await getPlayerResumeToken({
+        inviteCode,
+        joinCode,
+        sessionId: session.sessionId,
+      });
+
+      if (!result.success) {
+        setCopyState("error");
+        return;
+      }
+
+      const path = buildPlayUrlWithResume(inviteCode, joinCode, result.data.resumeToken);
+      const url = `${window.location.origin}${path}`;
+
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopyState("copied");
+        window.setTimeout(() => setCopyState("idle"), 2500);
+      } catch {
+        setCopyState("error");
+      }
+    });
   }
 
   return (
@@ -52,6 +85,19 @@ export function IdentityBar({
           </span>
         </p>
         <div className="flex flex-wrap gap-3 text-xs">
+          {showCopyPlayLink ? (
+            <button
+              type="button"
+              onClick={handleCopyPlayLink}
+              className="text-emerald-300 underline-offset-2 hover:underline"
+            >
+              {copyState === "copied"
+                ? "Link kopiert"
+                : copyState === "error"
+                  ? "Kopieren fehlgeschlagen"
+                  : "Spieler-Link kopieren"}
+            </button>
+          ) : null}
           {showManageTeam ? (
             <button
               type="button"

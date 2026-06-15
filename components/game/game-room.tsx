@@ -12,6 +12,7 @@ import { GameHud } from "@/components/game/game-hud";
 import { LevelPanel } from "@/components/game/level-panel";
 import { SyncModal } from "@/components/game/sync-modal";
 import { IdentityBar } from "@/components/player/identity-bar";
+import { SessionHandoffScreen } from "@/components/player/session-handoff-screen";
 import { GridError } from "@/components/grid/grid-shell";
 import { cockpitShowPath } from "@/lib/grid/event-routes";
 import { useTeamSync } from "@/lib/hooks/use-team-sync";
@@ -45,6 +46,7 @@ export function GameRoom({
 }: GameRoomProps) {
   const [teamState, setTeamState] = useState(initialState);
   const [error, setError] = useState<string | null>(null);
+  const [sessionSuperseded, setSessionSuperseded] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isHintPending, startHintTransition] = useTransition();
 
@@ -67,9 +69,11 @@ export function GameRoom({
   const { isConnected, error: realtimeError } = useTeamSync({
     sessionId: playerSession.sessionId,
     teamId: playerSession.teamId,
-    enabled: true,
+    playerId: playerSession.playerId,
+    enabled: !sessionSuperseded,
     onGameStateChange: handleStateUpdate,
     onTeamStatusChange: handleTeamStatusChange,
+    onSessionSuperseded: () => setSessionSuperseded(true),
   });
 
   const activeLevel = teamState.currentLevel;
@@ -162,9 +166,19 @@ export function GameRoom({
           inviteCode={inviteCode}
           joinCode={joinCode}
           session={playerSession}
+          showCopyPlayLink
         />
 
-        <GameHud
+        {sessionSuperseded ? (
+          <SessionHandoffScreen
+            inviteCode={inviteCode}
+            joinCode={joinCode}
+            playerId={playerSession.playerId}
+            displayName={playerSession.displayName}
+          />
+        ) : (
+          <>
+            <GameHud
           inviteCode={inviteCode}
           teamName={teamName}
           eventTitle={eventTitle}
@@ -225,9 +239,11 @@ export function GameRoom({
 
         {realtimeError ? <GridError message={realtimeError} /> : null}
         {error ? <GridError message={error} /> : null}
+          </>
+        )}
       </div>
 
-      {modal ? (
+      {modal && !sessionSuperseded ? (
         <SyncModal modal={modal} onDismiss={handleDismissModal} isPending={isPending} />
       ) : null}
     </>

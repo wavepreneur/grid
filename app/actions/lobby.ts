@@ -18,6 +18,10 @@ import {
   getDefaultOrganizationId,
 } from "@/lib/grid/organizations";
 import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
+import {
+  signPlayerResumeToken,
+  verifyPlayerResumeToken,
+} from "@/lib/grid/resume-token";
 import { SESSION_ACTIVE } from "@/lib/grid/session-codes";
 import {
   buildPlayerSession,
@@ -435,6 +439,123 @@ export async function verifyTeamSession(input: {
       data: {
         session: buildSessionForTeam(player, team, event.invite_code),
         path: teamEntryPath(event.invite_code, team.join_code, team.status),
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
+
+export async function getPlayerResumeToken(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+}): Promise<ActionResult<{ resumeToken: string }>> {
+  try {
+    const event = await getEventByInviteCode(normalizeCode(input.inviteCode));
+    if (!event) {
+      return { success: false, error: "Event nicht gefunden." };
+    }
+
+    const team = await getTeamByJoinCode(normalizeCode(input.joinCode), event.id);
+    if (!team) {
+      return { success: false, error: "Team nicht gefunden." };
+    }
+
+    const player = await getPlayerBySessionId(input.sessionId);
+    if (!player || player.team_id !== team.id) {
+      return { success: false, error: "Session ungültig." };
+    }
+
+    const resumeToken = await signPlayerResumeToken({
+      playerId: player.id,
+      teamId: team.id,
+      inviteCode: event.invite_code,
+      joinCode: team.join_code,
+    });
+
+    return { success: true, data: { resumeToken } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
+
+export async function claimPlayerSession(input: {
+  inviteCode: string;
+  joinCode: string;
+  resumeToken: string;
+}): Promise<ActionResult<{ session: PlayerSession; path: string; resumeToken: string }>> {
+  try {
+    const payload = await verifyPlayerResumeToken(input.resumeToken);
+    if (!payload) {
+      return { success: false, error: "Spieler-Link ungültig oder abgelaufen." };
+    }
+
+    const inviteCode = normalizeCode(input.inviteCode);
+    const joinCode = normalizeCode(input.joinCode);
+
+    if (
+      normalizeCode(payload.inviteCode) !== inviteCode ||
+      normalizeCode(payload.joinCode) !== joinCode
+    ) {
+      return { success: false, error: "Spieler-Link passt nicht zu diesem Team." };
+    }
+
+    const event = await getEventByInviteCode(inviteCode);
+    if (!event) {
+      return { success: false, error: "Event nicht gefunden." };
+    }
+
+    const team = await getTeamByJoinCode(joinCode, event.id);
+    if (!team) {
+      return { success: false, error: "Team nicht gefunden." };
+    }
+
+    if (team.id !== payload.teamId) {
+      return { success: false, error: "Spieler-Link passt nicht zu diesem Team." };
+    }
+
+    const player = await findActivePlayerById(team.id, payload.playerId);
+    if (!player) {
+      return { success: false, error: "Spieler nicht mehr im Team aktiv." };
+    }
+
+    const sessionId = await rotatePlayerSession(player.id);
+
+    await writeAuditLog({
+      organizationId: event.organization_id,
+      eventId: event.id,
+      teamId: team.id,
+      playerId: player.id,
+      action: "session_handoff",
+      payload: { display_name: player.display_name },
+    });
+
+    const session = buildSessionForTeam(
+      { ...player, session_id: sessionId },
+      team,
+      event.invite_code,
+    );
+
+    const resumeToken = await signPlayerResumeToken({
+      playerId: player.id,
+      teamId: team.id,
+      inviteCode: event.invite_code,
+      joinCode: team.join_code,
+    });
+
+    return {
+      success: true,
+      data: {
+        session,
+        path: teamEntryPath(event.invite_code, team.join_code, team.status),
+        resumeToken,
       },
     };
   } catch (error) {

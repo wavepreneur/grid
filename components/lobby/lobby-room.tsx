@@ -17,6 +17,7 @@ import {
   QrInviteImage,
 } from "@/components/grid/copy-invite-link";
 import { IdentityBar } from "@/components/player/identity-bar";
+import { SessionHandoffScreen } from "@/components/player/session-handoff-screen";
 import {
   GridButton,
   GridError,
@@ -71,6 +72,7 @@ export function LobbyRoom({
   const router = useRouter();
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [session, setSession] = useState(playerSession);
+  const [sessionSuperseded, setSessionSuperseded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(
     formatCountdown(initialSnapshot.lobby_auto_start_at),
@@ -131,9 +133,11 @@ export function LobbyRoom({
   const { isConnected, error: realtimeError } = useTeamSync({
     sessionId: session.sessionId,
     teamId: session.teamId,
-    enabled: snapshot.team_status === "lobby" || manageMode,
+    playerId: session.playerId,
+    enabled: !sessionSuperseded && (snapshot.team_status === "lobby" || manageMode),
     onTeamStatusChange: handleTeamStatusChange,
     onPlayersChange: handlePlayersChange,
+    onSessionSuperseded: () => setSessionSuperseded(true),
   });
 
   useEffect(() => {
@@ -294,6 +298,15 @@ export function LobbyRoom({
         showManageTeam={!manageMode}
       />
 
+      {sessionSuperseded ? (
+        <SessionHandoffScreen
+          inviteCode={inviteCode}
+          joinCode={joinCode}
+          playerId={session.playerId}
+          displayName={session.displayName}
+        />
+      ) : (
+        <>
       {manageMode && isPlaying ? (
         <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
           Spiel läuft — hier Rollen verwalten (Captain, Team Lead GPS).{" "}
@@ -442,6 +455,8 @@ export function LobbyRoom({
 
       {realtimeError ? <GridError message={realtimeError} /> : null}
       {error ? <GridError message={error} /> : null}
+        </>
+      )}
     </div>
   );
 }

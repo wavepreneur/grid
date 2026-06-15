@@ -14,11 +14,13 @@ import type { LobbyPlayer } from "@/lib/grid/types";
 type UseTeamSyncOptions = {
   sessionId: string;
   teamId: string;
+  playerId?: string;
   enabled?: boolean;
   onTeamStatusChange?: (status: string) => void;
   onGameStateChange?: (gameState: TeamGameState, currentLevel: number) => void;
   onSyncEvent?: (event: TeamSyncEvent) => void;
   onPlayersChange?: (players: LobbyPlayer[]) => void;
+  onSessionSuperseded?: () => void;
 };
 
 type TeamRow = {
@@ -36,16 +38,19 @@ type PlayerRow = {
   is_captain: boolean;
   joined_at: string;
   left_at: string | null;
+  session_id?: string;
 };
 
 export function useTeamSync({
   sessionId,
   teamId,
+  playerId,
   enabled = true,
   onTeamStatusChange,
   onGameStateChange,
   onSyncEvent,
   onPlayersChange,
+  onSessionSuperseded,
 }: UseTeamSyncOptions) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,11 +61,13 @@ export function useTeamSync({
   const onGameStateChangeRef = useRef(onGameStateChange);
   const onSyncEventRef = useRef(onSyncEvent);
   const onPlayersChangeRef = useRef(onPlayersChange);
+  const onSessionSupersededRef = useRef(onSessionSuperseded);
 
   onTeamStatusChangeRef.current = onTeamStatusChange;
   onGameStateChangeRef.current = onGameStateChange;
   onSyncEventRef.current = onSyncEvent;
   onPlayersChangeRef.current = onPlayersChange;
+  onSessionSupersededRef.current = onSessionSuperseded;
 
   useEffect(() => {
     if (!enabled) return;
@@ -102,9 +109,7 @@ export function useTeamSync({
         onTeamStatusChangeRef.current?.(cached.status);
       }
 
-      const channel = supabase
-        .channel(`team-sync:${teamId}`)
-        .on(
+      let channelBuilder = supabase.channel(`team-sync:${teamId}`).on(
           "postgres_changes",
           {
             event: "UPDATE",
@@ -129,7 +134,27 @@ export function useTeamSync({
             onTeamStatusChangeRef.current?.(row.status);
             onGameStateChangeRef.current?.(gameState, row.current_level);
           },
-        )
+        );
+
+      if (playerId) {
+        channelBuilder = channelBuilder.on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "players",
+            filter: `id=eq.${playerId}`,
+          },
+          (payload) => {
+            const row = payload.new as PlayerRow;
+            if (row.session_id && row.session_id !== sessionId) {
+              onSessionSupersededRef.current?.();
+            }
+          },
+        );
+      }
+
+      const channel = channelBuilder
         .on(
           "postgres_changes",
           {
@@ -192,7 +217,7 @@ export function useTeamSync({
       channelRef.current = null;
       clientRef.current = null;
     };
-  }, [enabled, sessionId, teamId]);
+  }, [enabled, playerId, sessionId, teamId]);
 
   return { isConnected, error };
 }
