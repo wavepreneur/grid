@@ -1,4 +1,4 @@
-import { EXITMANIA_TOTAL_LEVELS } from "@/lib/grid/level-types";
+import { EXITMANIA_TOTAL_LEVELS, DEFAULT_STARTING_SCORE } from "@/lib/grid/level-types";
 
 /** @deprecated Use EXITMANIA_TOTAL_LEVELS */
 export const PHASE2_DEMO_LEVELS = EXITMANIA_TOTAL_LEVELS;
@@ -17,6 +17,8 @@ export type GameModalState = {
 export type TeamGameState = {
   version: number;
   total_levels: number;
+  score: number;
+  hints_used: Record<string, number>;
   modal: GameModalState | null;
   levels: Record<
     string,
@@ -68,6 +70,8 @@ export function createInitialGameState(
   return {
     version: 1,
     total_levels: totalLevels,
+    score: DEFAULT_STARTING_SCORE,
+    hints_used: {},
     modal: null,
     levels,
   };
@@ -82,6 +86,8 @@ export function parseTeamGameState(value: unknown): TeamGameState {
   return {
     version: candidate.version ?? 1,
     total_levels: candidate.total_levels ?? EXITMANIA_TOTAL_LEVELS,
+    score: candidate.score ?? DEFAULT_STARTING_SCORE,
+    hints_used: candidate.hints_used ?? {},
     modal: candidate.modal ?? null,
     levels: candidate.levels ?? createInitialGameState().levels,
   };

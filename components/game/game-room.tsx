@@ -127,6 +127,7 @@ export function GameRoom({
             value={`${Math.min(activeLevel, eventContent.levels.length)} / ${eventContent.levels.length}`}
           />
           <GridStat label="Route" value={eventContent.templateName} />
+          <GridStat label="Punkte" value={String(teamState.gameState.score ?? 0)} />
           <GridStat
             label="Realtime"
             value={isConnected ? "Live verbunden" : "Verbinde…"}
@@ -142,6 +143,7 @@ export function GameRoom({
             level={currentLevelDefinition}
             disabled={levelState?.status !== "active" || Boolean(modal)}
             isPending={isPending}
+            isCaptain={playerSession.isCaptain}
             onSubmit={handleSolveLevel}
           />
         ) : (

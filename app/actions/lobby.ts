@@ -11,10 +11,17 @@ import {
   isValidDisplayName,
   normalizeCode,
 } from "@/lib/grid/codes";
+import { writeAuditLog } from "@/lib/grid/audit-log";
+import {
+  getCityIdBySlug,
+  getDefaultOrganizationId,
+} from "@/lib/grid/organizations";
+import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 import type {
   ActionResult,
   GridEvent,
   LobbySnapshot,
+  PlayerRole,
   PlayerSession,
 } from "@/lib/grid/types";
 import { randomUUID } from "crypto";
@@ -26,7 +33,7 @@ async function getEventByInviteCode(
   const { data, error } = await supabase
     .from("events")
     .select(
-      "id, title, organization_name, invite_code, status, max_teams, max_players_per_team, lobby_auto_start_seconds, content_config, route_override",
+      "id, title, organization_id, organization_name, city_id, invite_code, status, max_teams, max_players_per_team, lobby_auto_start_seconds, content_config, route_override, booking_reference",
     )
     .eq("invite_code", normalizeCode(inviteCode))
     .maybeSingle();
@@ -88,7 +95,7 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
   if (updated) {
     const { data: event } = await supabase
       .from("events")
-      .select("id, content_config, route_override")
+      .select("id, organization_id, city_id, content_config, route_override")
       .eq("id", team.event_id)
       .single();
 
@@ -97,6 +104,8 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
         teamId,
         team.captain_player_id,
         event.id,
+        event.organization_id,
+        event.city_id,
         event.content_config,
         event.route_override,
       );
@@ -116,18 +125,22 @@ export async function createEvent(input: {
 
     const supabase = createAdminClient();
     const inviteCode = generateInviteCode();
+    const organizationId = await getDefaultOrganizationId();
+    const cityId = await getCityIdBySlug(organizationId, DEFAULT_CITY_SLUG);
 
     const { data, error } = await supabase
       .from("events")
       .insert({
         title,
+        organization_id: organizationId,
+        city_id: cityId,
         organization_name: input.organizationName?.trim() || null,
         invite_code: inviteCode,
         status: "lobby",
-        content_config: { template_slug: "default-exitmania" },
+        content_config: { city_slug: DEFAULT_CITY_SLUG },
       })
       .select(
-        "id, title, organization_name, invite_code, status, max_teams, max_players_per_team, lobby_auto_start_seconds",
+        "id, title, organization_id, organization_name, city_id, invite_code, status, max_teams, max_players_per_team, lobby_auto_start_seconds, booking_reference",
       )
       .single();
 
@@ -244,6 +257,7 @@ export async function createTeamAsCaptain(input: {
         session_id: sessionId,
         display_name: displayName,
         is_captain: true,
+        role: "captain",
       })
       .select("id")
       .single();
@@ -319,6 +333,7 @@ export async function joinTeamAsPlayer(input: {
         session_id: sessionId,
         display_name: displayName,
         is_captain: false,
+        role: "solver",
       })
       .select("id")
       .single();
@@ -463,6 +478,8 @@ export async function startGameManually(input: {
       team.id,
       player.id,
       event.id,
+      event.organization_id,
+      event.city_id,
       event.content_config,
       event.route_override,
     );
@@ -501,6 +518,335 @@ export async function resolveTeamJoinCode(input: {
       success: true,
       data: { joinCode: team.join_code, teamName: team.name },
     };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
+
+export async function setupPrebookedTeamAsCaptain(input: {
+  inviteCode: string;
+  joinCode: string;
+  teamName: string;
+  maxSize: number;
+  department: string;
+  region: string;
+  displayName: string;
+}): Promise<ActionResult<PlayerSession>> {
+  try {
+    const inviteCode = normalizeCode(input.inviteCode);
+    const joinCode = normalizeCode(input.joinCode);
+    const teamName = input.teamName.trim();
+    const department = input.department.trim();
+    const region = input.region.trim();
+    const displayName = input.displayName.trim();
+
+    if (teamName.length < 2) {
+      return { success: false, error: "Teamname ist zu kurz." };
+    }
+    if (input.maxSize < 1 || input.maxSize > 8) {
+      return { success: false, error: "Teamgröße muss zwischen 1 und 8 liegen." };
+    }
+    if (!department || !region) {
+      return { success: false, error: "Abteilung und Region sind Pflichtfelder." };
+    }
+    if (!isValidDisplayName(displayName)) {
+      return {
+        success: false,
+        error: "Spielername muss zwischen 2 und 32 Zeichen haben.",
+      };
+    }
+
+    const event = await getEventByInviteCode(inviteCode);
+    if (!event) {
+      return { success: false, error: "Event nicht gefunden." };
+    }
+
+    const team = await getTeamByJoinCode(joinCode, event.id);
+    if (!team) {
+      return { success: false, error: "Team-Code ungültig." };
+    }
+    if (team.status !== "setup") {
+      return { success: false, error: "Dieses Team wurde bereits konfiguriert." };
+    }
+    if (team.captain_player_id) {
+      return { success: false, error: "Dieses Team hat bereits einen Captain." };
+    }
+    if (input.maxSize > event.max_players_per_team) {
+      return {
+        success: false,
+        error: `Maximal ${event.max_players_per_team} Spieler pro Team erlaubt.`,
+      };
+    }
+
+    const supabase = createAdminClient();
+    const sessionId = randomUUID();
+    const autoStartSeconds =
+      event.lobby_auto_start_seconds || DEFAULT_LOBBY_AUTO_START_SECONDS;
+    const lobbyOpenedAt = new Date();
+    const lobbyAutoStartAt = new Date(
+      lobbyOpenedAt.getTime() + autoStartSeconds * 1000,
+    );
+
+    const { data: player, error: playerError } = await supabase
+      .from("players")
+      .insert({
+        team_id: team.id,
+        session_id: sessionId,
+        display_name: displayName,
+        is_captain: true,
+        role: "captain",
+      })
+      .select("id")
+      .single();
+
+    if (playerError || !player) {
+      return {
+        success: false,
+        error: playerError?.message ?? "Captain konnte nicht erstellt werden.",
+      };
+    }
+
+    const { error: teamError } = await supabase
+      .from("teams")
+      .update({
+        name: teamName,
+        max_size: input.maxSize,
+        department,
+        region,
+        status: "lobby",
+        lobby_opened_at: lobbyOpenedAt.toISOString(),
+        lobby_auto_start_at: lobbyAutoStartAt.toISOString(),
+      })
+      .eq("id", team.id)
+      .eq("status", "setup");
+
+    if (teamError) {
+      await supabase.from("players").delete().eq("id", player.id);
+      return { success: false, error: teamError.message };
+    }
+
+    await writeAuditLog({
+      organizationId: event.organization_id,
+      eventId: event.id,
+      teamId: team.id,
+      playerId: player.id,
+      action: "captain_claimed_prebooked_team",
+      payload: { join_code: joinCode, team_name: teamName },
+    });
+
+    return {
+      success: true,
+      data: {
+        playerId: player.id,
+        sessionId,
+        teamId: team.id,
+        joinCode: team.join_code,
+        inviteCode: event.invite_code,
+        isCaptain: true,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
+
+export async function handoverSession(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+}): Promise<ActionResult<{ left: true }>> {
+  try {
+    const event = await getEventByInviteCode(normalizeCode(input.inviteCode));
+    if (!event) {
+      return { success: false, error: "Event nicht gefunden." };
+    }
+
+    const team = await getTeamByJoinCode(normalizeCode(input.joinCode), event.id);
+    if (!team) {
+      return { success: false, error: "Team nicht gefunden." };
+    }
+
+    const player = await getPlayerBySessionId(input.sessionId);
+    if (!player || player.team_id !== team.id) {
+      return { success: false, error: "Session ungültig." };
+    }
+
+    if (player.is_captain && team.status === "lobby") {
+      return {
+        success: false,
+        error: "Captain muss die Rolle zuerst übertragen, bevor das Gerät freigegeben wird.",
+      };
+    }
+
+    const supabase = createAdminClient();
+    const leftAt = new Date().toISOString();
+
+    const { error } = await supabase
+      .from("players")
+      .update({
+        left_at: leftAt,
+        is_captain: false,
+        role: "solver",
+      })
+      .eq("id", player.id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    await writeAuditLog({
+      organizationId: event.organization_id,
+      eventId: event.id,
+      teamId: team.id,
+      playerId: player.id,
+      action: "session_handover",
+      payload: { display_name: player.display_name },
+    });
+
+    return { success: true, data: { left: true } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
+
+export async function transferCaptain(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  targetPlayerId: string;
+}): Promise<ActionResult<{ newCaptainId: string }>> {
+  try {
+    const event = await getEventByInviteCode(normalizeCode(input.inviteCode));
+    if (!event) {
+      return { success: false, error: "Event nicht gefunden." };
+    }
+
+    const team = await getTeamByJoinCode(normalizeCode(input.joinCode), event.id);
+    if (!team) {
+      return { success: false, error: "Team nicht gefunden." };
+    }
+
+    const captain = await getPlayerBySessionId(input.sessionId);
+    if (!captain || captain.team_id !== team.id || !captain.is_captain) {
+      return { success: false, error: "Nur der Captain kann die Rolle übertragen." };
+    }
+
+    const supabase = createAdminClient();
+    const { data: target, error: targetError } = await supabase
+      .from("players")
+      .select("id, display_name, team_id, left_at")
+      .eq("id", input.targetPlayerId)
+      .maybeSingle();
+
+    if (targetError || !target || target.team_id !== team.id || target.left_at) {
+      return { success: false, error: "Zielspieler nicht gefunden oder inaktiv." };
+    }
+
+    await supabase
+      .from("players")
+      .update({ is_captain: false, role: "solver" })
+      .eq("id", captain.id);
+
+    const { error: promoteError } = await supabase
+      .from("players")
+      .update({ is_captain: true, role: "captain" })
+      .eq("id", target.id);
+
+    if (promoteError) {
+      await supabase
+        .from("players")
+        .update({ is_captain: true, role: "captain" })
+        .eq("id", captain.id);
+      return { success: false, error: promoteError.message };
+    }
+
+    await writeAuditLog({
+      organizationId: event.organization_id,
+      eventId: event.id,
+      teamId: team.id,
+      playerId: captain.id,
+      action: "captain_transferred",
+      payload: {
+        from_player_id: captain.id,
+        to_player_id: target.id,
+        to_display_name: target.display_name,
+      },
+    });
+
+    return { success: true, data: { newCaptainId: target.id } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
+
+export async function assignPlayerRole(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  targetPlayerId: string;
+  role: Exclude<PlayerRole, "captain">;
+}): Promise<ActionResult<{ playerId: string; role: PlayerRole }>> {
+  try {
+    const event = await getEventByInviteCode(normalizeCode(input.inviteCode));
+    if (!event) {
+      return { success: false, error: "Event nicht gefunden." };
+    }
+
+    const team = await getTeamByJoinCode(normalizeCode(input.joinCode), event.id);
+    if (!team) {
+      return { success: false, error: "Team nicht gefunden." };
+    }
+
+    const captain = await getPlayerBySessionId(input.sessionId);
+    if (!captain || captain.team_id !== team.id || !captain.is_captain) {
+      return { success: false, error: "Nur der Captain kann Rollen zuweisen." };
+    }
+
+    const supabase = createAdminClient();
+    const { data: target, error: targetError } = await supabase
+      .from("players")
+      .select("id, is_captain, left_at, team_id")
+      .eq("id", input.targetPlayerId)
+      .maybeSingle();
+
+    if (targetError || !target || target.team_id !== team.id || target.left_at) {
+      return { success: false, error: "Spieler nicht gefunden." };
+    }
+    if (target.is_captain) {
+      return { success: false, error: "Captain-Rolle kann nur per Transfer geändert werden." };
+    }
+
+    const { error } = await supabase
+      .from("players")
+      .update({ role: input.role })
+      .eq("id", target.id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    await writeAuditLog({
+      organizationId: event.organization_id,
+      eventId: event.id,
+      teamId: team.id,
+      playerId: captain.id,
+      action: "player_role_assigned",
+      payload: { target_player_id: target.id, role: input.role },
+    });
+
+    return { success: true, data: { playerId: target.id, role: input.role } };
   } catch (error) {
     return {
       success: false,

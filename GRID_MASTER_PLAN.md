@@ -1,56 +1,117 @@
-# GRID - The Enterprise Experience OS (Phase 1: Exitmania MVP)
+# GRID - Enterprise Experience OS (Architecture & Roadmap)
 
-## 1. Vision & Produkt-Positionierung
-GRID ist eine Zero-Ops-Infrastruktur-Plattform (SaaS), die interaktive Gruppen-Erlebnisse für Unternehmen global skaliert und messbar macht. 
-Als Proof of Concept und erste "App" auf GRID läuft das Produkt **Exitmania** (Self-guided Teambuilding & Escape Games für bis zu 10.000+ Teilnehmer gleichzeitig).
-
-Das System muss zwei Szenarien fehlerfrei bedienen:
-1. **Outdoor-Events (Exitmania Standard):** GPS-basiertes Gameplay in 1900+ Städten weltweit.
-2. **Custom- & Corporate-Events:** Unternehmen können Routenpunkte flexibel selbst verlegen (z. B. um das eigene Firmengelände) und eigene Multiple-Choice-Quizfragen als Bonusaufgaben einbetten.
+## 0. Meta-Rules für Cursor (KI-Instruktionen)
+Als KI-Assistent (Cursor) bist du der Lead-Architekt dieses Projekts. Der Nutzer wird iterativ Features anfordern. Deine Aufgabe ist es, diese Features strikt nach den folgenden architektonischen Leitplanken zu implementieren. 
+*   **Baue niemals isolierten Code:** Jeder Feature-Code muss die Multi-Tenancy- und API-First-Prinzipien respektieren.
+*   **Phasen-Disziplin:** Weist der Nutzer dich an, ein Feature aus Phase 3 zu bauen, während Phase 1 nicht stabil ist, warne ihn und schlage vor, zuerst das Fundament zu beenden.
 
 ---
 
-## 2. Der Tech-Stack
-* **Framework:** Next.js (App Router, React)
-* **Backend & Datenbank:** Supabase (PostgreSQL)
-* **Realtime-Layer:** Supabase Realtime (WebSockets) für sofortigen State-Sync zwischen den Devices
-* **Hosting:** Vercel
-* **Styling:** Tailwind CSS (Cyberpunk/High-Tech-Look: Dunkler Hintergrund, neon-türkise Akzente gemäß Datei `screencapture-exitmania-grid-2026-04-21-17_39_21.jpg`)
+## 1. Core Architecture (Non-Negotiables)
+
+### 1.1 Mandantenfähigkeit (Multi-Tenancy)
+*   **Regel:** Jede Tabelle in Supabase (außer globalen Wörterbüchern) MUSS eine `organization_id` haben.
+*   **Sicherheit:** Row Level Security (RLS) in Supabase muss so konfiguriert sein, dass `organization_id` A niemals Daten von `organization_id` B lesen/schreiben kann (strikte Trennung zwischen Exitmania und zukünftigen B2B-Kunden).
+
+### 1.2 API-First & Content Decoupling (Die JSON-Engine)
+*   **Regel:** GRID ist die Engine, nicht das Spiel. Ein Spiel-Level wird als strukturiertes JSON-Objekt geladen.
+*   Das Frontend fungiert als "Player" (wie ein Videoplayer), der die JSON-Befehle interpretiert (z.B. zeige Video X von Cloudflare, zeige Iframe Y, fordere GPS-Check Z). 
+*   **Ziel:** Die Dokumentation muss später öffentlich machbar sein, damit Third-Party-Entwickler Content für GRID bauen können.
+
+### 1.3 UI-Theming (White-Label)
+*   Die UI/UX muss über globale CSS-Variablen/Tailwind-Config pro `organization_id` (oder Event) umschaltbar sein (Exitmania-UI vs. Corporate-Kunden-UI).
 
 ---
 
-## 3. Die 4 MVP-Kernfeatures (Streng sequenzieller Bauplan)
+## 2. Die Feature-Roadmap & Logik-Anforderungen
 
-Cursor MUSS den Entwickler blockieren oder aktiv warnen, wenn an Phase N gearbeitet wird, bevor Phase N-1 vollständig und stabil implementiert ist.
+### Phase 1: B2B Booking, Zero-Auth & Team Setup
+*   **Booking-Webhook:** Wenn ein externes System (z.B. Exitmania.com) ein Spiel bucht (z.B. "20 Personen, 5 Teams"), generiert GRID per API das Event und 5 eindeutige Team-Codes (oder Magic Links).
+*   **Frictionless Onboarding (Klick & Play):** 
+    *   Spieler klicken auf den Link -> vergeben Usernamen -> sind im Spiel. KEIN zwingender Supabase-Auth (Passwort/Email) für Endkunden.
+    *   **Resilience:** Session-State wird im `localStorage` gespeichert. Wenn der Browser schließt, ist der Spieler beim erneuten Öffnen sofort wieder im Spiel.
+    *   **Account-Handover:** Option implementieren: "Gerät übergeben/Spieler wechseln" (Session-Token wird invalidiert, Platz im Team wird frei für neuen User).
+*   **Rollen-System & Captain:**
+    *   Der Captain (Team-Leader) verwaltet das Team und weist Rollen zu (einige Aufgaben im JSON-Content können `role_specific` sein).
+    *   Der Captain-Status kann jederzeit an ein anderes Teammitglied übertragen werden.
 
-### Phase 1: Zero-Auth Lobby & Team-Setup
-* **Ziel:** Maximal barrierefreier Einstieg für non-tech User. Keine Passwörter, keine E-Mail-Verifikation für Spieler.
-* **Ablauf:** 
-  1. Admin erstellt Event -> System generiert globalen Einladungs-Link/QR-Code.
-  2. Der erste Klicker (Captain) bestimmt Teamgröße (1-8 Personen), vergibt den Teamnamen und wählt die Abteilungs-/Länder-Zugehörigkeit aus (Metadaten-Auswahl).
-  3. Weitere Mitglieder klicken auf den Link, vergeben einen Usernamen und landen in der Echtzeit-Lobby.
-  4. Spiel startet manuell durch den Captain oder automatisch nach 3 Minuten.
+### Phase 2: Die Game-Engine & Multi-Device Sync
+*   **Realtime-Sync:** Nutze Supabase Realtime (WebSockets). Wenn Spieler A "Lösen" drückt, erscheint bei Spieler B-E sofort ein Modal (Erfolg/Fehler/Tipp gekauft).
+*   **Device & GPS Logik (Der Workaround):**
+    *   Desktop-Geräte dürfen teilnehmen, haben aber kein GPS (Rolle: Rätsel-Löser).
+    *   Für die GPS-Validierung einer Station (Geofencing) reicht es, wenn **nur das Gerät des Captains** am Ort ist. Dies löst das Problem fehlender Browser-Berechtigungen bei 80% der Teammitglieder.
+*   **Game Mechanics:**
+    *   **Medien:** Integration von Videos/Audios/Bildern via Cloudflare, HTML/Iframes.
+    *   **Points & Economy:** Dynamisches Punktesystem (Abzüge bei Fehlern/Tipps).
+    *   **Time-Decay:** Countdown-basierte Punktevergabe (schneller lösen = mehr Punkte).
+    *   **Hints:** Bis zu 5 Tipps kaufbar pro Aufgabe (kostet Punkte).
+*   **Live Highscore:** Einblendbar über das UI, zieht Echtzeit-Rankings innerhalb des aktuellen Events (durch Admin deaktivierbar).
 
-### Phase 2: Die Realtime State-Engine & Sync
-* **Ziel:** Alle Geräte im Team sind zu jeder Millisekunde synchron.
-* **Ablauf:** 
-  * Lösen Spieler A und B auf der Straße oder am Desktop ein Rätsel, wird das Event an Supabase gesendet.
-  * Per Supabase Realtime ploppt bei Spielern C bis H sofort ein Modal auf ("Rätsel gelöst!") und die App springt für alle synchron in das nächste Level.
+### Phase 3: Die skalierbare Content- & CMS-Architektur (1900+ Städte)
+*   **Die Datenbank-Trennung (EXTREM WICHTIG):**
+    Um Spiele für 5000 Städte zu skalieren, OHNE Daten zu duplizieren, muss Cursor folgendes relationale Schema bauen:
+    *   Table `global_levels`: Enthält die universelle Story, das Rätsel, das Video (Einmal gespeichert, gilt für alle Städte).
+    *   Table `local_waypoints`: Enthält nur Stadt, GPS-Koordinate, Radius und den lokalen Einleitungstext ("Sucht die rote Tür am Alex").
+    *   Das CMS fügt diese beim Spielstart als Joined-View zusammen. Ändert der Admin einen Tipp im `global_level`, ist er sofort für alle 5000 Städte live.
+*   **Trigger-System (Event-basiert):**
+    Aufgaben öffnen sich nicht nur sequenziell, sondern basierend auf Triggern:
+    *   `time_trigger`: "10 Minuten nach Event-Start".
+    *   `distance_trigger`: "100 Meter nach Abschluss von Level 3".
+    *   `logic_trigger`: "Nachdem Level 1 gelöst wurde".
 
-### Phase 3: Der flexible Location- & Content-Layer (Exitmania Engine)
-* **Ziel:** Das 10-Level-Spiel muss Standard-Routen, selbst verlegte GPS-Punkte und Custom-Unternehmens-Quizzes (Multiple Choice) dynamisch laden können.
-* **Ablauf:** 
-  * Jedes Level basiert auf einer JSON-Struktur (GPS-Koordinate, Inhalt, Typ).
-  * Wenn ein Admin im Dashboard eigene Routenpunkte setzt oder Fragen hochlädt, überschreibt das System die Standard-Exitmania-Werte für dieses spezifische Event.
-  * Das System gleicht via Geofencing (GPS-Toleranzradius im Browser) ab, ob das Team am richtigen Punkt steht. Ist das Event rein digital oder eine Bonusfrage, wird das GPS-Tracking für dieses Level ignoriert.
-
-### Phase 4: Minimalistisches Data-Logging (Vorbereitung für HR-Insights)
-* **Ziel:** Daten so sammeln, dass später tiefgehende Organisationsanalysen (ONA) möglich sind, ohne den Datenschutz (DSGVO) zu verletzen.
-* **Ablauf:** Bei jeder Interaktion (Klick, Fehlversuch, gelöstes Rätsel, Hilfe angefordert) loggt das System anonymisiert in Supabase: `timestamp`, `user_id`, `team_id`, `event_type`, `metadata` (Abteilung/Region). Keine Speicherung von Klarnamen oder präzisen Bewegungsprofilen nach Event-Ende.
+### Phase 4: Admin Control & Deep Analytics
+*   **Remote Admin Actions (Echtzeit-Eingriffe):**
+    *   Admin kann per Dashboard live in ein laufendes Event eingreifen via WebSockets.
+    *   Funktionen: GPS-Zwang global oder für einzelne Teams deaktivieren, Geofence-Radius temporär vergrößern, GPS-Koordinaten eines Events im Notfall überschreiben.
+*   **Deep Tracking (Data Engine):**
+    *   Alle Aktionen werden als Stream in eine `audit_logs` Tabelle geschrieben (JSONB-Payload).
+    *   Zu tracken sind: Dauer pro Aufgabe, Klick-Raten, genutzte Rollen, GPS-Bewegungen, Tipp-Nutzung, Account-Wechsel.
+    *   Ziel: Spätere ONA (Organizational Network Analysis) für HR-Dashboards.
 
 ---
 
-## 4. Richtlinien für Cursor als Co-Pilot / Architektur-Guide
-* **Nicht blind coden:** Wenn der Nutzer ein Feature anfordert, das die Stabilität gefährdet oder die Komplexität im MVP unnötig erhöht, schlage eine einfachere, elegantere Lösung vor.
-* **Privacy by Design:** Achte bei jedem Datenbank-Schema darauf, dass die Datenstruktur strikt anonymisiert bleibt, damit das Produkt vor jedem Enterprise-Betriebsrat besteht.
-* **Offline-Resilienz:** Da das Spiel in Funklöchern funktionieren muss, leite den Entwickler an, kritische Spielzustände im `LocalStorage` zu puffern.
+## 3. Implementierungsstand (Codebase)
+
+| Bereich | Status | Hinweise |
+|---|---|---|
+| Multi-Tenancy | ✅ Basis | `organizations`, `organization_id` auf `events`/`teams`, Default-Tenant `exitmania` |
+| Phase 1 Booking | ✅ API | `POST /api/v1/bookings` mit Header `x-grid-api-key` → Env `GRID_BOOKING_API_KEY` |
+| Phase 1 Handover | ✅ | `handoverSession` in Lobby, Captain muss vorher Rolle übertragen |
+| Phase 1 Captain-Transfer | ✅ | `transferCaptain`, Rollen via `assignPlayerRole` |
+| Phase 2 Realtime | ✅ | `team_sync_events`, `useTeamSync` |
+| Phase 2 Captain-GPS | ✅ | GPS-Check nur auf Captain-Gerät |
+| Phase 2 Punkte/Tipps | 🟡 Basis | `score` + `hints_used` in `game_state`, `purchaseHint` Server Action |
+| Phase 2 Medien/Highscore | ⬜ Offen | Schema-Felder vorhanden, UI/Player fehlt |
+| Phase 3 Content | ✅ Schema | `global_levels` + `local_waypoints`, Legacy-Fallback `route_templates` |
+| Phase 4 Audit | 🟡 Basis | `audit_logs` + `writeAuditLog`, kein Admin-Dashboard |
+| White-Label | 🟡 Basis | `organizations.theme_config`, CSS-Injection noch minimal |
+
+### Migration ausführen
+
+```bash
+# Supabase SQL Editor oder CLI
+supabase db push
+```
+
+Neue Migration: `supabase/migrations/20260615120000_architecture_foundation.sql`
+
+### Booking-API Beispiel
+
+```bash
+curl -X POST https://gridos.vercel.app/api/v1/bookings \
+  -H "Content-Type: application/json" \
+  -H "x-grid-api-key: $GRID_BOOKING_API_KEY" \
+  -d '{
+    "title": "Acme Corp Teambuilding",
+    "team_count": 5,
+    "players_per_team": 4,
+    "city_slug": "berlin",
+    "booking_reference": "exitmania-order-12345"
+  }'
+```
+
+Captain-Flow für vorgebuchte Teams: `/join/{inviteCode}/captain?team={joinCode}`
+
+---
+
+**Nächster empfohlener Schritt:** Remote-Admin-Dashboard (Phase 4) + Medien-Player im Level-UI (Phase 2) + Trigger-Engine (Phase 3).

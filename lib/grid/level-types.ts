@@ -1,5 +1,7 @@
 export type LevelType = "gps" | "digital" | "quiz";
 
+export type PlayerRole = "captain" | "solver" | "navigator";
+
 export type LevelLocation = {
   lat: number;
   lng: number;
@@ -11,6 +13,26 @@ export type QuizOption = {
   label: string;
 };
 
+export type LevelMedia = {
+  video_url?: string;
+  audio_url?: string;
+  image_url?: string;
+  iframe_url?: string;
+};
+
+export type LevelHint = {
+  id: string;
+  text: string;
+  point_cost: number;
+};
+
+export type LevelTriggers = {
+  type?: "sequential" | "time" | "distance" | "logic";
+  after_minutes?: number;
+  after_level?: number;
+  after_meters?: number;
+};
+
 export type LevelDefinition = {
   level: number;
   type: LevelType;
@@ -20,6 +42,10 @@ export type LevelDefinition = {
   answer?: string;
   options?: QuizOption[];
   correct_option_id?: string;
+  role_required?: PlayerRole | null;
+  media?: LevelMedia;
+  hints?: LevelHint[];
+  triggers?: LevelTriggers;
 };
 
 export type RouteTemplate = {
@@ -33,6 +59,7 @@ export type RouteTemplate = {
 
 export type EventContentConfig = {
   template_slug?: string;
+  city_slug?: string;
 };
 
 export type EventRouteOverride = {
@@ -60,3 +87,6 @@ export type SolveLevelPayload = {
 
 export const EXITMANIA_TOTAL_LEVELS = 10;
 export const DEFAULT_TEMPLATE_SLUG = "default-exitmania";
+export const DEFAULT_CITY_SLUG = "berlin";
+export const DEFAULT_STARTING_SCORE = 1000;
+export const HINT_POINT_COST = 50;

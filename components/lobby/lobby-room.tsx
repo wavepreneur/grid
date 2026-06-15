@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  assignPlayerRole,
   getLobbySnapshot,
+  handoverSession,
   startGameManually,
+  transferCaptain,
 } from "@/app/actions/lobby";
 import {
   CopyInviteLink,
@@ -17,7 +20,8 @@ import {
 } from "@/components/grid/grid-shell";
 import { useTeamSync } from "@/lib/hooks/use-team-sync";
 import { buildTeamInviteUrl } from "@/lib/grid/codes";
-import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
+import { clearPlayerSession } from "@/lib/grid/player-session";
+import type { LobbySnapshot, PlayerRole, PlayerSession } from "@/lib/grid/types";
 
 type LobbyRoomProps = {
   inviteCode: string;
@@ -134,6 +138,67 @@ export function LobbyRoom({
     });
   }
 
+  function handleHandover() {
+    setError(null);
+
+    startTransition(async () => {
+      const result = await handoverSession({
+        inviteCode,
+        joinCode,
+        sessionId: playerSession.sessionId,
+      });
+
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+
+      clearPlayerSession();
+      router.replace(`/join/${inviteCode}?team=${joinCode}`);
+    });
+  }
+
+  function handleTransferCaptain(targetPlayerId: string) {
+    setError(null);
+
+    startTransition(async () => {
+      const result = await transferCaptain({
+        inviteCode,
+        joinCode,
+        sessionId: playerSession.sessionId,
+        targetPlayerId,
+      });
+
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+
+      await refreshLobby();
+    });
+  }
+
+  function handleAssignRole(targetPlayerId: string, role: Exclude<PlayerRole, "captain">) {
+    setError(null);
+
+    startTransition(async () => {
+      const result = await assignPlayerRole({
+        inviteCode,
+        joinCode,
+        sessionId: playerSession.sessionId,
+        targetPlayerId,
+        role,
+      });
+
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+
+      await refreshLobby();
+    });
+  }
+
   const isCaptain = playerSession.isCaptain;
   const isLobby = snapshot.team_status === "lobby";
 
@@ -166,14 +231,48 @@ export function LobbyRoom({
           {snapshot.players.map((player) => (
             <li
               key={player.id}
-              className="flex items-center justify-between rounded-xl border border-[var(--grid-border)] bg-black/20 px-4 py-3 text-sm"
+              className="flex flex-col gap-2 rounded-xl border border-[var(--grid-border)] bg-black/20 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
             >
-              <span className="text-white">{player.display_name}</span>
-              {player.is_captain ? (
-                <span className="text-xs uppercase tracking-[0.16em] text-[var(--grid-accent)]">
-                  Captain
-                </span>
-              ) : null}
+              <div>
+                <span className="text-white">{player.display_name}</span>
+                {player.role && player.role !== "captain" ? (
+                  <span className="ml-2 text-xs text-[var(--grid-muted)]">
+                    ({player.role})
+                  </span>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {player.is_captain ? (
+                  <span className="text-xs uppercase tracking-[0.16em] text-[var(--grid-accent)]">
+                    Captain
+                  </span>
+                ) : null}
+                {isCaptain && isLobby && !player.is_captain && player.id !== playerSession.playerId ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleTransferCaptain(player.id)}
+                      className="text-xs text-[var(--grid-accent)] underline-offset-2 hover:underline"
+                    >
+                      Captain übertragen
+                    </button>
+                    <select
+                      className="rounded-lg border border-[var(--grid-border)] bg-black/40 px-2 py-1 text-xs text-white"
+                      defaultValue={player.role ?? "solver"}
+                      onChange={(event) =>
+                        handleAssignRole(
+                          player.id,
+                          event.target.value as Exclude<PlayerRole, "captain">,
+                        )
+                      }
+                    >
+                      <option value="solver">Solver</option>
+                      <option value="navigator">Navigator</option>
+                    </select>
+                  </>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>
@@ -205,6 +304,17 @@ export function LobbyRoom({
         <p className="text-center text-sm text-[var(--grid-muted)]">
           Warte auf den Captain oder den Auto-Start-Timer…
         </p>
+      ) : null}
+
+      {isLobby ? (
+        <GridButton
+          type="button"
+          className="border-[var(--grid-border)] bg-transparent text-[var(--grid-muted)] hover:bg-black/20"
+          disabled={isPending}
+          onClick={handleHandover}
+        >
+          Gerät übergeben / Platz freigeben
+        </GridButton>
       ) : null}
 
       {realtimeError ? <GridError message={realtimeError} /> : null}

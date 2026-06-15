@@ -12,10 +12,14 @@ export type GridTeamStatus =
   | "finished"
   | "disbanded";
 
+export type PlayerRole = "captain" | "solver" | "navigator";
+
 export type GridEvent = {
   id: string;
   title: string;
+  organization_id: string;
   organization_name: string | null;
+  city_id: string | null;
   invite_code: string;
   status: GridEventStatus;
   max_teams: number | null;
@@ -23,6 +27,7 @@ export type GridEvent = {
   lobby_auto_start_seconds: number;
   content_config?: Record<string, unknown> | null;
   route_override?: Record<string, unknown> | null;
+  booking_reference?: string | null;
 };
 
 export type GridTeam = {
@@ -46,6 +51,7 @@ export type GridPlayer = {
   session_id: string;
   display_name: string;
   is_captain: boolean;
+  role: PlayerRole;
   joined_at: string;
 };
 
@@ -53,6 +59,7 @@ export type LobbyPlayer = {
   id: string;
   display_name: string;
   is_captain: boolean;
+  role?: PlayerRole;
   joined_at: string;
 };
 

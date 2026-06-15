@@ -2,7 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { createTeamAsCaptain } from "@/app/actions/lobby";
+import {
+  createTeamAsCaptain,
+  setupPrebookedTeamAsCaptain,
+} from "@/app/actions/lobby";
 import {
   GridButton,
   GridError,
@@ -18,25 +21,31 @@ import { savePlayerSession } from "@/lib/grid/player-session";
 
 type CaptainSetupFormProps = {
   inviteCode: string;
+  joinCode?: string;
 };
 
-export function CaptainSetupForm({ inviteCode }: CaptainSetupFormProps) {
+export function CaptainSetupForm({ inviteCode, joinCode }: CaptainSetupFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const isPrebooked = Boolean(joinCode);
 
   function handleSubmit(formData: FormData) {
     setError(null);
 
     startTransition(async () => {
-      const result = await createTeamAsCaptain({
+      const payload = {
         inviteCode,
         teamName: String(formData.get("teamName") ?? ""),
         maxSize: Number(formData.get("maxSize") ?? 4),
         department: String(formData.get("department") ?? ""),
         region: String(formData.get("region") ?? ""),
         displayName: String(formData.get("displayName") ?? ""),
-      });
+      };
+
+      const result = isPrebooked && joinCode
+        ? await setupPrebookedTeamAsCaptain({ ...payload, joinCode })
+        : await createTeamAsCaptain(payload);
 
       if (!result.success) {
         setError(result.error);
@@ -50,6 +59,12 @@ export function CaptainSetupForm({ inviteCode }: CaptainSetupFormProps) {
 
   return (
     <form action={handleSubmit} className="flex flex-col gap-5">
+      {isPrebooked ? (
+        <p className="rounded-xl border border-[var(--grid-accent)]/30 bg-[var(--grid-accent)]/10 px-4 py-3 text-sm text-[var(--grid-accent)]">
+          Vorgebuchtes Team <strong>{joinCode}</strong> — konfiguriere Name und Metadaten.
+        </p>
+      ) : null}
+
       <div>
         <GridLabel>Dein Spielername (Pseudonym)</GridLabel>
         <GridInput
@@ -114,7 +129,11 @@ export function CaptainSetupForm({ inviteCode }: CaptainSetupFormProps) {
       {error ? <GridError message={error} /> : null}
 
       <GridButton type="submit" disabled={isPending}>
-        {isPending ? "Lobby wird erstellt…" : "Team erstellen & Lobby öffnen"}
+        {isPending
+          ? "Lobby wird erstellt…"
+          : isPrebooked
+            ? "Team konfigurieren & Lobby öffnen"
+            : "Team erstellen & Lobby öffnen"}
       </GridButton>
     </form>
   );

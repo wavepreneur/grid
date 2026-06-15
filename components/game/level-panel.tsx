@@ -14,6 +14,7 @@ type LevelPanelProps = {
   level: LevelDefinition;
   disabled: boolean;
   isPending: boolean;
+  isCaptain: boolean;
   onSubmit: (payload: {
     answer?: string;
     selectedOptionId?: string;
@@ -25,11 +26,12 @@ export function LevelPanel({
   level,
   disabled,
   isPending,
+  isCaptain,
   onSubmit,
 }: LevelPanelProps) {
   const [answer, setAnswer] = useState("");
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
-  const gpsEnabled = level.type === "gps" && Boolean(level.location);
+  const gpsEnabled = level.type === "gps" && Boolean(level.location) && isCaptain;
   const { sample, error: gpsError, isLoading: gpsLoading } = useGeolocation(gpsEnabled);
 
   const distance =
@@ -66,7 +68,9 @@ export function LevelPanel({
           Level {level.level} · {level.type.toUpperCase()}
         </p>
         {level.type === "gps" ? (
-          <span className="text-xs text-[var(--grid-accent)]">GPS aktiv</span>
+          <span className="text-xs text-[var(--grid-accent)]">
+            {isCaptain ? "GPS · Captain-Gerät" : "Nur Captain-GPS"}
+          </span>
         ) : (
           <span className="text-xs text-[var(--grid-muted)]">Kein GPS nötig</span>
         )}
@@ -79,11 +83,17 @@ export function LevelPanel({
 
       {level.type === "gps" && level.location ? (
         <div className="mt-4 rounded-xl border border-[var(--grid-border)] bg-black/30 px-4 py-3 text-sm text-[var(--grid-muted)]">
-          {gpsLoading ? (
+          {!isCaptain ? (
+            <p>
+              Der Captain bestätigt diesen Checkpoint am Zielort. Ihr könnt parallel
+              Rätsel auf eurem Gerät lösen.
+            </p>
+          ) : null}
+          {isCaptain && gpsLoading ? (
             <p>GPS-Position wird ermittelt…</p>
           ) : null}
-          {gpsError ? <p className="text-red-300">{gpsError}</p> : null}
-          {sample ? (
+          {isCaptain && gpsError ? <p className="text-red-300">{gpsError}</p> : null}
+          {isCaptain && sample ? (
             <>
               <p>
                 Entfernung zum Checkpoint:{" "}
@@ -142,7 +152,7 @@ export function LevelPanel({
         disabled={
           disabled ||
           isPending ||
-          (level.type === "gps" && !withinRadius) ||
+          (level.type === "gps" && (!isCaptain || !withinRadius)) ||
           (level.type === "digital" && !answer.trim()) ||
           (level.type === "quiz" && !selectedOptionId)
         }

@@ -1,6 +1,8 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { writeAuditLog } from "@/lib/grid/audit-log";
+import { loadResolvedEventContent } from "@/lib/grid/content-loader";
 import {
   buildLevelCompletedModal,
   createInitialGameState,
@@ -10,11 +12,10 @@ import {
 } from "@/lib/grid/game-state";
 import {
   getLevelDefinition,
-  loadResolvedEventContent,
   validateLevelSolution,
 } from "@/lib/grid/level-validation";
-import { EXITMANIA_TOTAL_LEVELS } from "@/lib/grid/level-types";
-import type { SolveLevelPayload } from "@/lib/grid/level-types";
+import { HINT_POINT_COST, EXITMANIA_TOTAL_LEVELS } from "@/lib/grid/level-types";
+import type { PlayerRole, SolveLevelPayload } from "@/lib/grid/level-types";
 import { assertPlayerSession } from "@/lib/grid/session-auth";
 import type { ActionResult } from "@/lib/grid/types";
 
@@ -96,19 +97,38 @@ export async function solveCurrentLevel(input: {
       return { success: false, error: "Bitte zuerst die Synchronisations-Meldung schließen." };
     }
 
-    const content = await loadResolvedEventContent(
-      event.id,
-      event.content_config,
-      event.route_override,
-    );
+    const content = await loadResolvedEventContent({
+      eventId: event.id,
+      organizationId: event.organization_id,
+      cityId: event.city_id,
+      contentConfig: event.content_config,
+      routeOverride: event.route_override,
+    });
     const levelDefinition = getLevelDefinition(content, currentLevel);
 
     if (!levelDefinition) {
       return { success: false, error: "Level-Inhalt nicht gefunden." };
     }
 
-    const validation = validateLevelSolution(levelDefinition, input.payload ?? {});
+    const playerRole = (player.role ?? "solver") as PlayerRole;
+    const validation = validateLevelSolution(levelDefinition, input.payload ?? {}, {
+      isCaptain: player.is_captain,
+      playerRole,
+    });
+
     if (!validation.ok) {
+      await writeAuditLog({
+        organizationId: event.organization_id,
+        eventId: event.id,
+        teamId: team.id,
+        playerId: player.id,
+        action: "level_attempt_failed",
+        payload: {
+          level: currentLevel,
+          level_type: levelDefinition.type,
+          error: validation.error,
+        },
+      });
       return { success: false, error: validation.error };
     }
 
@@ -171,6 +191,21 @@ export async function solveCurrentLevel(input: {
         solved_by: solvedBy,
         next_level: isFinished ? null : nextLevel,
         level_type: levelDefinition.type,
+        score: nextGameState.score,
+      },
+    });
+
+    await writeAuditLog({
+      organizationId: event.organization_id,
+      eventId: event.id,
+      teamId: team.id,
+      playerId: player.id,
+      action: isFinished ? "game_finished" : "level_completed",
+      payload: {
+        level: currentLevel,
+        level_type: levelDefinition.type,
+        solved_by: solvedBy,
+        score: nextGameState.score,
       },
     });
 
@@ -184,6 +219,105 @@ export async function solveCurrentLevel(input: {
         startedAt: updatedTeam.started_at,
         lobbyAutoStartAt: updatedTeam.lobby_auto_start_at,
       },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
+
+export async function purchaseHint(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  hintId: string;
+}): Promise<ActionResult<{ hintText: string; score: number }>> {
+  try {
+    const { event, team, player } = await assertPlayerSession(input);
+
+    if (team.status !== "playing") {
+      return { success: false, error: "Das Spiel läuft noch nicht." };
+    }
+
+    const gameState = parseTeamGameState(team.game_state);
+    const currentLevel = team.current_level || 1;
+
+    const content = await loadResolvedEventContent({
+      eventId: event.id,
+      organizationId: event.organization_id,
+      cityId: event.city_id,
+      contentConfig: event.content_config,
+      routeOverride: event.route_override,
+    });
+    const levelDefinition = getLevelDefinition(content, currentLevel);
+
+    if (!levelDefinition?.hints?.length) {
+      return { success: false, error: "Für dieses Level gibt es keine Tipps." };
+    }
+
+    const hint = levelDefinition.hints.find((item) => item.id === input.hintId);
+    if (!hint) {
+      return { success: false, error: "Tipp nicht gefunden." };
+    }
+
+    const levelKey = String(currentLevel);
+    const hintsUsed = gameState.hints_used[levelKey] ?? 0;
+    if (hintsUsed >= 5) {
+      return { success: false, error: "Maximal 5 Tipps pro Aufgabe." };
+    }
+
+    const pointCost = hint.point_cost || HINT_POINT_COST;
+    if (gameState.score < pointCost) {
+      return { success: false, error: "Nicht genug Punkte für diesen Tipp." };
+    }
+
+    const nextGameState: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      score: gameState.score - pointCost,
+      hints_used: {
+        ...gameState.hints_used,
+        [levelKey]: hintsUsed + 1,
+      },
+    };
+
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from("teams")
+      .update({ game_state: nextGameState })
+      .eq("id", team.id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    await insertSyncEvent({
+      teamId: team.id,
+      eventType: "hint_purchased",
+      level: currentLevel,
+      actorPlayerId: player.id,
+      payload: { hint_id: hint.id, point_cost: pointCost, score: nextGameState.score },
+    });
+
+    await writeAuditLog({
+      organizationId: event.organization_id,
+      eventId: event.id,
+      teamId: team.id,
+      playerId: player.id,
+      action: "hint_purchased",
+      payload: {
+        level: currentLevel,
+        hint_id: hint.id,
+        point_cost: pointCost,
+        score: nextGameState.score,
+      },
+    });
+
+    return {
+      success: true,
+      data: { hintText: hint.text, score: nextGameState.score },
     };
   } catch (error) {
     return {
@@ -252,10 +386,18 @@ export async function initializeTeamGameState(
   teamId: string,
   actorPlayerId: string,
   eventId: string,
+  organizationId: string,
+  cityId: string | null,
   contentConfig: unknown,
   routeOverride: unknown,
 ) {
-  const content = await loadResolvedEventContent(eventId, contentConfig, routeOverride);
+  const content = await loadResolvedEventContent({
+    eventId,
+    organizationId,
+    cityId,
+    contentConfig,
+    routeOverride,
+  });
   const totalLevels = content.levels.length || EXITMANIA_TOTAL_LEVELS;
   const initialState = createInitialGameState(totalLevels);
 
@@ -276,6 +418,7 @@ export async function initializeTeamGameState(
     payload: {
       total_levels: totalLevels,
       template_slug: content.templateSlug,
+      starting_score: initialState.score,
     },
   });
 }

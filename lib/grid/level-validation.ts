@@ -2,24 +2,43 @@ import {
   getLevelDefinition,
   normalizeAnswer,
   requiresGps,
-  resolveEventContent,
 } from "@/lib/grid/content-engine";
 import { isWithinGeofence } from "@/lib/grid/geofence";
 import type {
   LevelDefinition,
-  ResolvedEventContent,
+  PlayerRole,
   SolveLevelPayload,
 } from "@/lib/grid/level-types";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { DEFAULT_TEMPLATE_SLUG } from "@/lib/grid/level-types";
+
+export type LevelValidationContext = {
+  isCaptain: boolean;
+  playerRole: PlayerRole;
+};
 
 export function validateLevelSolution(
   level: LevelDefinition,
   payload: SolveLevelPayload,
+  context?: LevelValidationContext,
 ): { ok: true } | { ok: false; error: string } {
+  if (level.role_required && context) {
+    const effectiveRole = context.isCaptain ? "captain" : context.playerRole;
+    if (level.role_required !== effectiveRole && level.role_required !== "captain") {
+      return {
+        ok: false,
+        error: `Diese Aufgabe ist für die Rolle „${level.role_required}" reserviert.`,
+      };
+    }
+  }
+
   if (level.type === "gps") {
     if (!level.location) {
       return { ok: false, error: "GPS-Level ohne Koordinaten konfiguriert." };
+    }
+    if (context && !context.isCaptain) {
+      return {
+        ok: false,
+        error: "GPS-Checkpoints können nur vom Captain-Gerät bestätigt werden.",
+      };
     }
     if (!payload.geolocation) {
       return { ok: false, error: "GPS-Position erforderlich. Bitte Standort freigeben." };
@@ -57,32 +76,6 @@ export function validateLevelSolution(
   }
 
   return { ok: false, error: "Unbekannter Level-Typ." };
-}
-
-export async function loadResolvedEventContent(
-  eventId: string,
-  contentConfig: unknown,
-  routeOverride: unknown,
-): Promise<ResolvedEventContent> {
-  const config = (contentConfig ?? {}) as Record<string, unknown>;
-  const templateSlug = (config.template_slug as string | undefined) ?? DEFAULT_TEMPLATE_SLUG;
-
-  const supabase = createAdminClient();
-  const { data: template, error } = await supabase
-    .from("route_templates")
-    .select("slug, name, city, levels")
-    .eq("slug", templateSlug)
-    .single();
-
-  if (error || !template) {
-    throw new Error(`Route-Template „${templateSlug}" nicht gefunden.`);
-  }
-
-  return resolveEventContent({
-    template,
-    contentConfig,
-    routeOverride,
-  });
 }
 
 export { getLevelDefinition, requiresGps };

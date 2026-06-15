@@ -7,10 +7,9 @@ export const LOBBY_POLL_INTERVAL_MS = 2000;
 export const DEFAULT_LOBBY_AUTO_START_SECONDS = 180;
 
 /**
- * Phase 4 analytics use `interaction_logs`, NOT the B2B `events` table.
- * Keep this constant when implementing telemetry.
+ * Phase 4 analytics stream table.
  */
-export const ANALYTICS_TABLE = "interaction_logs" as const;
+export const ANALYTICS_TABLE = "audit_logs" as const;
 
 export const DEPARTMENT_OPTIONS = [
   "Engineering",
