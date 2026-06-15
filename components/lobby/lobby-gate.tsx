@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getLobbySnapshot } from "@/app/actions/lobby";
 import { LobbyRoom } from "@/components/lobby/lobby-room";
+import { SessionBanner } from "@/components/lobby/session-banner";
 import { GridError } from "@/components/grid/grid-shell";
 import {
   abandonTeamSession,
@@ -14,9 +15,10 @@ import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
 type LobbyGateProps = {
   inviteCode: string;
   joinCode: string;
+  manageMode?: boolean;
 };
 
-export function LobbyGate({ inviteCode, joinCode }: LobbyGateProps) {
+export function LobbyGate({ inviteCode, joinCode, manageMode = false }: LobbyGateProps) {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState<LobbySnapshot | null>(null);
   const [session, setSession] = useState<PlayerSession | null>(null);
@@ -32,10 +34,11 @@ export function LobbyGate({ inviteCode, joinCode }: LobbyGateProps) {
 
       setSession(resolved.session);
 
-      if (
+      const isPlaying =
         resolved.session.teamStatus === "playing" ||
-        resolved.session.teamStatus === "finished"
-      ) {
+        resolved.session.teamStatus === "finished";
+
+      if (isPlaying && !manageMode) {
         router.replace(`/play/${inviteCode}/${joinCode}`);
         return;
       }
@@ -53,15 +56,24 @@ export function LobbyGate({ inviteCode, joinCode }: LobbyGateProps) {
         setSnapshot(result.data);
       });
     });
-  }, [inviteCode, joinCode, router]);
+  }, [inviteCode, joinCode, manageMode, router]);
 
   if (error) {
     return <GridError message={error} />;
   }
 
-  if (!snapshot || !session) {
+  if (!session) {
     return (
       <p className="text-sm text-[var(--grid-muted)]">Lobby wird geladen…</p>
+    );
+  }
+
+  if (!snapshot) {
+    return (
+      <div className="flex flex-col gap-4">
+        <SessionBanner inviteCode={inviteCode} joinCode={joinCode} session={session} />
+        <p className="text-sm text-[var(--grid-muted)]">Team-Daten werden geladen…</p>
+      </div>
     );
   }
 
@@ -71,6 +83,7 @@ export function LobbyGate({ inviteCode, joinCode }: LobbyGateProps) {
       joinCode={joinCode}
       initialSnapshot={snapshot}
       playerSession={session}
+      manageMode={manageMode}
     />
   );
 }

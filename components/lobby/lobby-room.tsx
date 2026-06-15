@@ -16,6 +16,7 @@ import {
   CopyInviteLink,
   QrInviteImage,
 } from "@/components/grid/copy-invite-link";
+import { SessionBanner } from "@/components/lobby/session-banner";
 import {
   GridButton,
   GridError,
@@ -32,6 +33,7 @@ type LobbyRoomProps = {
   joinCode: string;
   initialSnapshot: LobbySnapshot;
   playerSession: PlayerSession;
+  manageMode?: boolean;
 };
 
 function formatCountdown(targetIso: string | null): string {
@@ -63,6 +65,7 @@ export function LobbyRoom({
   joinCode,
   initialSnapshot,
   playerSession,
+  manageMode = false,
 }: LobbyRoomProps) {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState(initialSnapshot);
@@ -127,7 +130,7 @@ export function LobbyRoom({
   const { isConnected, error: realtimeError } = useTeamSync({
     sessionId: session.sessionId,
     teamId: session.teamId,
-    enabled: snapshot.team_status === "lobby",
+    enabled: snapshot.team_status === "lobby" || manageMode,
     onTeamStatusChange: handleTeamStatusChange,
     onPlayersChange: handlePlayersChange,
   });
@@ -272,15 +275,39 @@ export function LobbyRoom({
 
   const isCaptain = session.isCaptain;
   const isLobby = snapshot.team_status === "lobby";
+  const isPlaying = snapshot.team_status === "playing";
+  const canManageRoles = isCaptain && (isLobby || manageMode);
   const navigatorOffline = isNavigatorOffline(snapshot, snapshot.navigator_player_id);
   const canClaimNavigator =
-    isLobby &&
+    (isLobby || manageMode) &&
     !session.isNavigator &&
     navigatorOffline &&
     snapshot.active_player_count > 0;
 
   return (
     <div className="flex flex-col gap-6">
+      <SessionBanner
+        inviteCode={inviteCode}
+        joinCode={joinCode}
+        session={session}
+        manageHref={
+          isPlaying && !manageMode
+            ? `/join/${inviteCode}/lobby/${joinCode}?manage=1`
+            : undefined
+        }
+      />
+
+      {manageMode && isPlaying ? (
+        <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
+          Spiel läuft — hier Rollen verwalten (Captain, Team Lead GPS).{" "}
+          <a
+            href={`/play/${inviteCode}/${joinCode}`}
+            className="underline underline-offset-2"
+          >
+            Zurück zum Spiel
+          </a>
+        </div>
+      ) : null}
       <div className="grid grid-cols-2 gap-3">
         <GridStat label="Team" value={snapshot.team_name} />
         <GridStat
@@ -341,7 +368,7 @@ export function LobbyRoom({
                     Team Lead (GPS)
                   </span>
                 ) : null}
-                {isCaptain && isLobby && !player.is_captain && player.id !== session.playerId ? (
+                {canManageRoles && !player.is_captain && player.id !== session.playerId ? (
                   <>
                     <button
                       type="button"

@@ -43,12 +43,20 @@ export function mergeLevelOverrides(
   return baseLevels.map((level) => {
     const patch = overrideLevels[String(level.level)];
     if (!patch) return level;
+
+    const nextType = patch.type ?? level.type;
+
     return {
       ...level,
       ...patch,
       level: level.level,
+      type: nextType,
       options: patch.options ?? level.options,
-      location: patch.location ?? level.location,
+      location:
+        nextType === "gps"
+          ? (patch.location ?? level.location)
+          : patch.location,
+      answer: patch.answer ?? level.answer,
     };
   });
 }

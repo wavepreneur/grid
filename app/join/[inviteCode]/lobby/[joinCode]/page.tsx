@@ -5,12 +5,15 @@ import { LobbyGate } from "@/components/lobby/lobby-gate";
 
 type LobbyPageProps = {
   params: Promise<{ inviteCode: string; joinCode: string }>;
+  searchParams: Promise<{ manage?: string }>;
 };
 
-export default async function LobbyPage({ params }: LobbyPageProps) {
+export default async function LobbyPage({ params, searchParams }: LobbyPageProps) {
   const { inviteCode, joinCode } = await params;
+  const { manage } = await searchParams;
   const normalizedInviteCode = inviteCode.toUpperCase();
   const normalizedJoinCode = joinCode.toUpperCase();
+  const manageMode = manage === "1" || manage === "true";
 
   const eventResult = await getEventInvite(normalizedInviteCode);
   if (!eventResult.success) {
@@ -34,6 +37,7 @@ export default async function LobbyPage({ params }: LobbyPageProps) {
       <LobbyGate
         inviteCode={normalizedInviteCode}
         joinCode={normalizedJoinCode}
+        manageMode={manageMode}
       />
     </GridShell>
   );

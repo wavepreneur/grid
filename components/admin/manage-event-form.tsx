@@ -107,6 +107,15 @@ export function ManageEventForm() {
                 /join/{event.inviteCode}
               </Link>
             </p>
+            <p className="mt-2 break-all">
+              Event Cockpit:{" "}
+              <Link
+                href={`/cockpit/${event.inviteCode}`}
+                className="text-emerald-300 underline-offset-2 hover:underline"
+              >
+                /cockpit/{event.inviteCode}
+              </Link>
+            </p>
           </div>
 
           <div className="flex flex-col gap-4 rounded-xl border border-[var(--grid-accent)]/20 bg-[var(--grid-accent)]/5 p-4">

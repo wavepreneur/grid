@@ -7,6 +7,7 @@ import {
 } from "@/app/actions/game";
 import { LevelPanel } from "@/components/game/level-panel";
 import { SyncModal } from "@/components/game/sync-modal";
+import { SessionBanner } from "@/components/lobby/session-banner";
 import {
   GridError,
   GridStat,
@@ -126,6 +127,12 @@ export function GameRoom({
   return (
     <>
       <div className="flex flex-col gap-6">
+      <SessionBanner
+        inviteCode={inviteCode}
+        joinCode={joinCode}
+        session={playerSession}
+        manageHref={`/join/${inviteCode}/lobby/${joinCode}?manage=1`}
+      />
       <div className="grid grid-cols-2 gap-3">
         <GridStat label="Team" value={teamName} />
         <GridStat

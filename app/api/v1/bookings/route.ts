@@ -127,6 +127,7 @@ export async function POST(request: Request) {
       event_id: event.id,
       invite_code: event.invite_code,
       join_url: `/join/${event.invite_code}`,
+      cockpit_url: `/cockpit/${event.invite_code}`,
       teams,
     });
   } catch (error) {
