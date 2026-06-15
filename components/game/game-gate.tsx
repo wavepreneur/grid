@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { getEventContent, getEventContentRevision } from "@/app/actions/content";
 import { getGameState } from "@/app/actions/game";
 import { GameRoom } from "@/components/game/game-room";
-import { IdentityBar } from "@/components/player/identity-bar";
 import { GridError } from "@/components/grid/grid-shell";
 import { cacheEventContent } from "@/lib/grid/offline-content";
 import { eventTeamJoinPath } from "@/lib/grid/event-routes";
@@ -85,6 +84,9 @@ export function GameGate({
         templateName: contentResult.data.templateName,
         city: contentResult.data.city,
         levels: contentResult.data.levels,
+        uiLayout: contentResult.data.uiLayout,
+        showLiveScore: contentResult.data.showLiveScore,
+        missionDurationMinutes: contentResult.data.missionDurationMinutes,
       };
 
       cacheEventContent(contentResult.data.eventId, freshContent);
@@ -112,6 +114,9 @@ export function GameGate({
         templateName: contentResult.data.templateName,
         city: contentResult.data.city,
         levels: contentResult.data.levels,
+        uiLayout: contentResult.data.uiLayout,
+        showLiveScore: contentResult.data.showLiveScore,
+        missionDurationMinutes: contentResult.data.missionDurationMinutes,
       };
 
       cacheEventContent(contentResult.data.eventId, freshContent);
@@ -133,17 +138,14 @@ export function GameGate({
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <IdentityBar inviteCode={inviteCode} joinCode={joinCode} session={session} />
-      <GameRoom
-        inviteCode={inviteCode}
-        joinCode={joinCode}
-        playerSession={session}
-        initialState={initialState.data}
-        eventContent={eventContent}
-        teamName={teamName}
-        eventTitle={eventTitle}
-      />
-    </div>
+    <GameRoom
+      inviteCode={inviteCode}
+      joinCode={joinCode}
+      playerSession={session}
+      initialState={initialState.data}
+      eventContent={eventContent}
+      teamName={teamName}
+      eventTitle={eventTitle}
+    />
   );
 }

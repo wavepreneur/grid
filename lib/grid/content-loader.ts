@@ -17,6 +17,7 @@ import {
   DEFAULT_TEMPLATE_SLUG,
   EXITMANIA_TOTAL_LEVELS,
 } from "@/lib/grid/level-types";
+import { parseLevelTiles } from "@/lib/grid/level-content";
 
 type GlobalLevelRow = {
   level_number: number;
@@ -60,6 +61,11 @@ function assembleLevelDefinition(
   if (typeof content.role_required === "string") {
     level.role_required = content.role_required as LevelDefinition["role_required"];
   }
+  if (typeof content.hero_image_url === "string" && content.hero_image_url.trim()) {
+    level.hero_image_url = content.hero_image_url.trim();
+  }
+  const tiles = parseLevelTiles(content.tiles);
+  if (tiles) level.tiles = tiles;
   if (content.media && typeof content.media === "object") {
     level.media = content.media as LevelDefinition["media"];
   }
@@ -175,11 +181,18 @@ export async function loadResolvedEventContent(input: {
 
   const mergedLevels = mergeLevelOverrides(baseLevels, routeOverride);
 
+  const uiLayout = contentConfig.ui_layout ?? "exitmania";
+  const showLiveScore = contentConfig.show_live_score ?? true;
+  const missionDurationMinutes = contentConfig.mission_duration_minutes ?? 90;
+
   return {
     templateSlug,
     templateName,
     city: cityName,
     levels: mergedLevels.slice(0, EXITMANIA_TOTAL_LEVELS),
+    uiLayout,
+    showLiveScore,
+    missionDurationMinutes,
   };
 }
 

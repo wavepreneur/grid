@@ -52,6 +52,8 @@ export function mergeLevelOverrides(
       level: level.level,
       type: nextType,
       options: patch.options ?? level.options,
+      tiles: patch.tiles ?? level.tiles,
+      hero_image_url: patch.hero_image_url ?? level.hero_image_url,
       location:
         nextType === "gps"
           ? (patch.location ?? level.location)
@@ -76,6 +78,9 @@ export function resolveEventContent(input: {
     templateName: input.template.name,
     city: input.template.city,
     levels: mergedLevels.slice(0, EXITMANIA_TOTAL_LEVELS),
+    uiLayout: contentConfig.ui_layout ?? "exitmania",
+    showLiveScore: contentConfig.show_live_score ?? true,
+    missionDurationMinutes: contentConfig.mission_duration_minutes ?? 90,
   };
 }
 

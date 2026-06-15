@@ -13,6 +13,30 @@ export type QuizOption = {
   label: string;
 };
 
+export type LevelTileType =
+  | "image"
+  | "video"
+  | "audio"
+  | "panorama_360"
+  | "minigame"
+  | "iframe"
+  | "pdf";
+
+export type LevelTileHint = {
+  text: string;
+  point_cost?: number;
+};
+
+/** Lean content reference — URL/embed only, max 10 per level. */
+export type LevelContentTile = {
+  id: string;
+  type: LevelTileType;
+  url: string;
+  label?: string;
+  /** Optional hint tied to this tile (default 50 points). */
+  hint?: LevelTileHint;
+};
+
 export type LevelMedia = {
   video_url?: string;
   audio_url?: string;
@@ -38,6 +62,9 @@ export type LevelDefinition = {
   type: LevelType;
   title: string;
   description: string;
+  hero_image_url?: string;
+  /** Up to 10 embed tiles (Cloudflare / iframe / mini-game links). */
+  tiles?: LevelContentTile[];
   location?: LevelLocation;
   answer?: string;
   options?: QuizOption[];
@@ -60,6 +87,10 @@ export type RouteTemplate = {
 export type EventContentConfig = {
   template_slug?: string;
   city_slug?: string;
+  /** Player UI module — exitmania | quiz | training (future). */
+  ui_layout?: "exitmania" | "quiz" | "training";
+  show_live_score?: boolean;
+  mission_duration_minutes?: number;
 };
 
 export type EventRouteOverride = {
@@ -71,6 +102,9 @@ export type ResolvedEventContent = {
   templateName: string;
   city: string | null;
   levels: LevelDefinition[];
+  uiLayout: "exitmania" | "quiz" | "training";
+  showLiveScore: boolean;
+  missionDurationMinutes: number;
 };
 
 export type GeolocationSample = {

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GameGate } from "@/components/game/game-gate";
-import { GridShell } from "@/components/grid/grid-shell";
+import { GameShell } from "@/components/game/game-shell";
 
 type EventPlayPageProps = {
   params: Promise<{ inviteCode: string; joinCode: string }>;
@@ -22,9 +22,9 @@ export default async function EventPlayPage({ params }: EventPlayPageProps) {
   if (!teamResult.success) notFound();
 
   return (
-    <GridShell
-      title="Mission"
-      description={`${eventResult.data.title} · ${teamResult.data.teamName}`}
+    <GameShell
+      title={eventResult.data.title}
+      description={`Team ${teamResult.data.teamName}`}
     >
       <GameGate
         inviteCode={normalizedInvite}
@@ -32,6 +32,6 @@ export default async function EventPlayPage({ params }: EventPlayPageProps) {
         teamName={teamResult.data.teamName}
         eventTitle={eventResult.data.title}
       />
-    </GridShell>
+    </GameShell>
   );
 }

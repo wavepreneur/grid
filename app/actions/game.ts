@@ -243,8 +243,8 @@ export async function purchaseHint(input: {
   inviteCode: string;
   joinCode: string;
   sessionId: string;
-  hintId: string;
-}): Promise<ActionResult<{ hintText: string; score: number }>> {
+  tileId: string;
+}): Promise<ActionResult<{ hintText: string; score: number; cost: number }>> {
   try {
     const { event, team, player } = await assertPlayerSession(input);
 
@@ -254,6 +254,7 @@ export async function purchaseHint(input: {
 
     const gameState = parseTeamGameState(team.game_state);
     const currentLevel = team.current_level || 1;
+    const levelKey = String(currentLevel);
 
     const content = await loadResolvedEventContent({
       eventId: event.id,
@@ -264,33 +265,34 @@ export async function purchaseHint(input: {
     });
     const levelDefinition = getLevelDefinition(content, currentLevel);
 
-    if (!levelDefinition?.hints?.length) {
-      return { success: false, error: "Für dieses Level gibt es keine Tipps." };
+    const tile = levelDefinition?.tiles?.find((item) => item.id === input.tileId);
+    if (!tile?.hint) {
+      return { success: false, error: "Für diese Kachel gibt es keinen Tipp." };
     }
 
-    const hint = levelDefinition.hints.find((item) => item.id === input.hintId);
-    if (!hint) {
-      return { success: false, error: "Tipp nicht gefunden." };
+    const levelHints = gameState.purchased_tile_hints[levelKey] ?? {};
+    if (levelHints[input.tileId]) {
+      return { success: false, error: "Dieser Tipp wurde bereits freigeschaltet." };
     }
 
-    const levelKey = String(currentLevel);
-    const hintsUsed = gameState.hints_used[levelKey] ?? 0;
-    if (hintsUsed >= 5) {
-      return { success: false, error: "Maximal 5 Tipps pro Aufgabe." };
-    }
-
-    const pointCost = hint.point_cost || HINT_POINT_COST;
+    const pointCost = tile.hint.point_cost ?? HINT_POINT_COST;
     if (gameState.score < pointCost) {
-      return { success: false, error: "Nicht genug Punkte für diesen Tipp." };
+      return {
+        success: false,
+        error: `Nicht genug Punkte (benötigt: ${pointCost}).`,
+      };
     }
 
     const nextGameState: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
       score: gameState.score - pointCost,
-      hints_used: {
-        ...gameState.hints_used,
-        [levelKey]: hintsUsed + 1,
+      purchased_tile_hints: {
+        ...gameState.purchased_tile_hints,
+        [levelKey]: {
+          ...levelHints,
+          [input.tileId]: { text: tile.hint.text, cost: pointCost },
+        },
       },
     };
 
@@ -309,7 +311,11 @@ export async function purchaseHint(input: {
       eventType: "hint_purchased",
       level: currentLevel,
       actorPlayerId: player.id,
-      payload: { hint_id: hint.id, point_cost: pointCost, score: nextGameState.score },
+      payload: {
+        tile_id: tile.id,
+        point_cost: pointCost,
+        score: nextGameState.score,
+      },
     });
 
     await writeAuditLog({
@@ -320,7 +326,7 @@ export async function purchaseHint(input: {
       action: "hint_purchased",
       payload: {
         level: currentLevel,
-        hint_id: hint.id,
+        tile_id: tile.id,
         point_cost: pointCost,
         score: nextGameState.score,
       },
@@ -328,7 +334,7 @@ export async function purchaseHint(input: {
 
     return {
       success: true,
-      data: { hintText: hint.text, score: nextGameState.score },
+      data: { hintText: tile.hint.text, score: nextGameState.score, cost: pointCost },
     };
   } catch (error) {
     return {

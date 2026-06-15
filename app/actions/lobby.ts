@@ -188,7 +188,12 @@ export async function createEvent(input: {
         organization_name: input.organizationName?.trim() || null,
         invite_code: inviteCode,
         status: "lobby",
-        content_config: { city_slug: DEFAULT_CITY_SLUG },
+        content_config: {
+          city_slug: DEFAULT_CITY_SLUG,
+          ui_layout: "exitmania",
+          show_live_score: true,
+          mission_duration_minutes: 90,
+        },
       })
       .select(
         "id, title, organization_id, organization_name, city_id, invite_code, status, max_teams, max_players_per_team, lobby_auto_start_seconds, booking_reference",

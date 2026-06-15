@@ -14,11 +14,19 @@ export type GameModalState = {
   created_at: string;
 };
 
+export type PurchasedTileHint = {
+  text: string;
+  cost: number;
+};
+
 export type TeamGameState = {
   version: number;
   total_levels: number;
   score: number;
+  /** @deprecated Use purchased_tile_hints — kept for older saves. */
   hints_used: Record<string, number>;
+  /** levelKey -> tileId -> revealed hint */
+  purchased_tile_hints: Record<string, Record<string, PurchasedTileHint>>;
   modal: GameModalState | null;
   levels: Record<
     string,
@@ -74,6 +82,7 @@ export function createInitialGameState(
     total_levels: totalLevels,
     score: DEFAULT_STARTING_SCORE,
     hints_used: {},
+    purchased_tile_hints: {},
     modal: null,
     levels,
   };
@@ -90,6 +99,7 @@ export function parseTeamGameState(value: unknown): TeamGameState {
     total_levels: candidate.total_levels ?? EXITMANIA_TOTAL_LEVELS,
     score: candidate.score ?? DEFAULT_STARTING_SCORE,
     hints_used: candidate.hints_used ?? {},
+    purchased_tile_hints: candidate.purchased_tile_hints ?? {},
     modal: candidate.modal ?? null,
     levels: candidate.levels ?? createInitialGameState().levels,
   };
