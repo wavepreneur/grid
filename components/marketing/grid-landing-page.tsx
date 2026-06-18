@@ -1,272 +1,294 @@
+import fs from "fs";
+import path from "path";
 import Link from "next/link";
+import { EnterpriseBriefingForm } from "@/components/marketing/enterprise-briefing-form";
+import { EuropeDeploymentMap } from "@/components/marketing/europe-deployment-map";
+import { GridNav } from "@/components/marketing/grid-nav";
+import { MaturityBadge, type Maturity } from "@/components/marketing/maturity-badge";
+import "@/app/grid-marketing.css";
 
-type Maturity = "live" | "beta" | "vision";
+const maturityLegend: { status: Maturity; label: string }[] = [
+  { status: "live", label: "Production-ready" },
+  { status: "beta", label: "Pilot / partial" },
+  { status: "vision", label: "On the roadmap" },
+];
 
-const maturityLabel: Record<Maturity, string> = {
-  live: "Live",
-  beta: "In Arbeit",
-  vision: "Vision",
-};
-
-const maturityClass: Record<Maturity, string> = {
-  live: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",
-  beta: "border-amber-400/30 bg-amber-400/10 text-amber-200",
-  vision: "border-[var(--grid-border)] bg-black/20 text-[var(--grid-muted)]",
-};
-
-function MaturityBadge({ status }: { status: Maturity }) {
-  return (
-    <span
-      className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${maturityClass[status]}`}
-    >
-      {maturityLabel[status]}
-    </span>
-  );
-}
-
-const problems = [
+const deploymentPillars = [
   {
-    title: "Die App-Store-Barriere",
-    text: "„Ladet euch bitte alle vorab App X herunter.“ Die Realität: Passwörter vergessen, kein Datenvolumen, IT blockiert den Download. Das Event beginnt mit Frust und technischem Support.",
+    symbol: "⬡",
+    title: "Zero-Ops Multiplayer",
+    text: "No app downloads, no GPS requirement, no hardware logistics. Zero-Ops Multiplayer-Infrastruktur — a single browser link is all your teams need.",
+    status: "live" as Maturity,
   },
   {
-    title: "Das Isolations-Paradoxon",
-    text: "Selbst wenn Apps laufen, starrt jeder isoliert auf sein Display. Man läuft nebeneinanderher — parallele Bildschirmzeit statt echter Zusammenarbeit.",
+    symbol: "⟳",
+    title: "Multiplayer Sync",
+    text: "GRID connects players across multiple locations into one functional unit. Real-time interaction between home office, HQ, and field teams.",
+    status: "live" as Maturity,
   },
   {
-    title: "Der Vorbereitungs-Overhead",
-    text: "Maßgeschneiderte Events kosten Wochen Planung, komplexe Entwicklung oder ein Budget für externe Agenturen.",
+    symbol: "◷",
+    title: "Time-Boxed Intensity",
+    text: "60 to 90 minutes of high-concentration collaboration. Perfectly integrable into kick-offs, quarterly meetings, or global townhalls.",
+    status: "beta" as Maturity,
+  },
+  {
+    symbol: "↗",
+    title: "Infinite Scale",
+    text: "Whether 50 or 50,000 participants – GRID scales with your ambition. No performance degradation. No capacity limits.",
+    status: "beta" as Maturity,
   },
 ];
 
-const steps = [
+const analyticsCards = [
+  {
+    symbol: "⚡",
+    title: "Collaboration Speed",
+    text: "How fast do heterogeneous teams find solutions? Benchmarked against 50,000+ data points from real deployments.",
+    status: "beta" as Maturity,
+  },
+  {
+    symbol: "◎",
+    title: "Global Connection",
+    text: "Are your locations connecting effectively? Measure cross-site collaboration quality in real time.",
+    status: "beta" as Maturity,
+  },
+  {
+    symbol: "▲",
+    title: "Internal Benchmarking",
+    text: "Leverage the global GRID high score to foster healthy, cross-team competition and continuous improvement.",
+    status: "vision" as Maturity,
+  },
+];
+
+const goalTracker = [
+  { claim: "Zero-auth join: link + name, instant team", status: "live" as Maturity },
+  { claim: "Real-time sync: state, roles, sessions", status: "live" as Maturity },
+  { claim: "Self-healing sessions & device handoff", status: "live" as Maturity },
+  { claim: "Asymmetric roles: Captain, GPS, teammates", status: "live" as Maturity },
+  { claim: "Cross-device play (mobile + desktop)", status: "beta" as Maturity },
+  { claim: "GPS experiences at Exitmania scale", status: "live" as Maturity },
+  { claim: "Operator cockpit & arena live score", status: "live" as Maturity },
+  { claim: "Telemetry via audit_logs", status: "beta" as Maturity },
+  { claim: "Blueprint engine & creator CMS", status: "vision" as Maturity },
+  { claim: "Org dashboard with department filters", status: "vision" as Maturity },
+  { claim: "Post-deployment team-DNA analytics", status: "vision" as Maturity },
+];
+
+const whyGrid = [
+  {
+    symbol: "◈",
+    title: "You create. GRID orchestrates.",
+    text: "Upload your content once. GRID runs the session — roles, sync, scoring — so you focus on the experience, not the tech stack.",
+  },
+  {
+    symbol: "⟲",
+    title: "Real teamwork, not solo screens.",
+    text: "Asymmetric roles split information across devices. Teams talk, decide, and move together — not parallel phone-staring.",
+  },
+  {
+    symbol: "▲",
+    title: "Live today. Measurable tomorrow.",
+    text: "Zero app downloads, zero IT tickets. After the session: collaboration metrics — not just a leaderboard screenshot.",
+  },
+];
+
+const howItWorks = [
   {
     step: "01",
-    title: "Der Canva-Effekt",
-    subtitle: "Inhalte einpflegen",
-    text: "Wähle eine Interaktions-Blaupause. Lade PDFs, Fragen oder Seminarunterlagen hoch — und platziere Inhalte so einfach wie in Canva.",
-    status: "vision" as Maturity,
+    label: "Create",
+    title: "Add your content",
+    text: "Questions, PDFs, routes — drop in what your team needs. No developer required.",
   },
   {
     step: "02",
-    title: "Das Zauberei-Setup",
-    subtitle: "Verteilen",
-    text: "Für 10 Personen oder 100.000 Mitarbeiter: Event anlegen, zentralen Zugang generieren, Teams und Rollen vorbereiten.",
-    status: "beta" as Maturity,
+    label: "Deploy",
+    title: "Publish in minutes",
+    text: "One link or QR code. Teams join with a name. Roles and rooms are ready before the first minute.",
   },
   {
     step: "03",
-    title: "Scan & Play",
-    subtitle: "Echtzeit-Synchronisation",
-    text: "QR-Code scannen oder Link öffnen, Namen tippen, sofort im Team. Self-Healing UX: Refresh genügt — kein Neustart, kein Support.",
-    status: "live" as Maturity,
-  },
-];
-
-const features = [
-  {
-    icon: "⚡",
-    title: "Zero-Friction UX",
-    text: "100 % browserbasiert. iOS, Android, Windows, Mac. Keine Downloads — maximale Conversion vor Ort.",
-    status: "live" as Maturity,
-  },
-  {
-    icon: "🧠",
-    title: "Asymmetrischer Realtime-Sync",
-    text: "Informationen verteilen sich ungleich auf Team-Screens: Karte, Rätsel, Eingabe — das zwingt zum Gespräch.",
-    status: "beta" as Maturity,
-  },
-  {
-    icon: "🗺️",
-    title: "Hybride Flexibilität",
-    text: "Indoor-Quiz im Seminarraum oder GPS-Escape quer durch die City — ein Engine-Blueprint, viele Module.",
-    status: "live" as Maturity,
-  },
-  {
-    icon: "📊",
-    title: "Smarter HR-Ergebnisreport",
-    text: "Nach dem Event: Team-DNA, Kommunikationsmuster, Rollenverteilungen — datenbasiert statt reiner Highscore-Liste.",
-    status: "vision" as Maturity,
+    label: "Play",
+    title: "60–90 minutes of sync",
+    text: "Real-time multiplayer across phones and screens. Refresh-safe. Scale from 10 to 10,000.",
   },
 ];
 
 const useCases = [
   {
-    icon: "🏢",
+    symbol: "🏢",
     title: "Corporate Teambuilding",
-    text: "Remote- und Hybrid-Teams in Rekordzeit zusammenschweißen — ohne tagelange Logistik-Schleifen.",
+    text: "Remote, hybrid, or on-site — one synchronized mission that bonds teams without logistics loops.",
   },
   {
-    icon: "🚀",
+    symbol: "🚀",
     title: "New Hire Onboarding",
-    text: "Gelände, Kultur und Kollegen als interaktive, selbstgesteuerte Smartphone-Rallye.",
+    text: "Culture, campus, and colleagues as an interactive rallye new hires actually remember.",
   },
   {
-    icon: "🎓",
-    title: "Trainings & Seminare",
-    text: "PowerPoint durch Interaktion ersetzen. Trainer füllen die Engine — Teilnehmer erleben ein Seminar, das hängen bleibt.",
+    symbol: "🎓",
+    title: "Training & Seminars",
+    text: "Replace passive slides with interaction your trainers control — participants stay in the flow.",
   },
   {
-    icon: "🌍",
-    title: "Globale All-Hands",
-    text: "Tausende Mitarbeiter simultan verbinden — Fraktionen schalten über Live-Votings gemeinsame Ziele frei.",
+    symbol: "🌍",
+    title: "Global All-Hands",
+    text: "Thousands of employees, one live session. Votes and milestones unlock together across time zones.",
   },
 ];
 
-const goalTracker = [
-  { claim: "Zero-Auth: Link + Name, sofort im Team", status: "live" as Maturity },
-  { claim: "Self-Healing Sessions & Gerätewechsel", status: "live" as Maturity },
-  { claim: "Echtzeit-Sync (Spielstand, Lobby, Rollen)", status: "live" as Maturity },
-  { claim: "Asymmetrische Rollen (Captain, GPS, Mitspieler)", status: "live" as Maturity },
-  { claim: "Exitmania-Modul: Kacheln, Tipps, GPS-Karte", status: "live" as Maturity },
-  { claim: "Operator-Cockpit & Beamer-Live-Score", status: "live" as Maturity },
-  { claim: "Booking-API & Event-Provisioning", status: "beta" as Maturity },
-  { claim: "Canva-Style CMS & KI-Content-Import", status: "vision" as Maturity },
-  { claim: "HR Analytics & Team-DNA Dashboard", status: "vision" as Maturity },
-  { claim: "Globale All-Hands / Live-Voting Module", status: "vision" as Maturity },
-];
+function loadEuropeMapSvg(): string {
+  const filePath = path.join(process.cwd(), "public/europe-deployment-map.svg");
+  return fs.readFileSync(filePath, "utf8");
+}
 
 export function GridLandingPage() {
+  const europeMapSvg = loadEuropeMapSvg();
+
   return (
-    <div className="grid-bg min-h-screen text-white">
-      <header className="sticky top-0 z-50 border-b border-[var(--grid-border)] bg-[#030712]/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--grid-accent)]">
-              GRID
-            </p>
-            <p className="text-sm text-[var(--grid-muted)]">Enterprise Experience OS</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="#ziel-tracker"
-              className="hidden text-sm text-[var(--grid-muted)] hover:text-white sm:inline"
-            >
-              Produkt-Stand
-            </Link>
-            <Link
-              href="/admin/dev"
-              className="grid-button rounded-xl px-4 py-2.5 text-sm font-semibold whitespace-nowrap"
-            >
-              Event starten
-            </Link>
-          </div>
-        </div>
-      </header>
+    <div className="grid-marketing min-h-screen">
+      <GridNav />
 
       <main>
         {/* Hero */}
-        <section className="relative overflow-hidden border-b border-[var(--grid-border)]">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(46,233,218,0.14),transparent_55%)]" />
-          <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.35em] text-[var(--grid-accent)]">
-              Zero-Ops Multiplayer-Infrastruktur
-            </p>
-            <h1 className="max-w-4xl text-3xl font-semibold tracking-tight sm:text-5xl sm:leading-[1.1]">
-              Bringe jede Gruppe in 60 Sekunden in ein synchronisiertes Team-Erlebnis.
-            </h1>
-            <p className="mt-6 max-w-3xl text-base leading-8 text-[var(--grid-muted)] sm:text-lg">
-              Keine App-Downloads. Keine Logins. Keine IT-Freigaben. Ein einziger QR-Code
-              verwandelt Smartphones und PCs in ein interaktives Team-Cockpit — skalierbar von 2
-              bis 100.000 Personen.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Link
-                href="/admin/dev"
-                className="grid-button inline-flex items-center justify-center rounded-xl px-6 py-3.5 text-sm font-semibold"
-              >
-                Jetzt erstes Event kostenlos starten
-              </Link>
-              <p className="text-xs text-[var(--grid-muted)]">
-                Pilot über Dev-Dashboard · Self-Service folgt
-              </p>
+        <section
+          id="hero"
+          style={{
+            position: "relative",
+            minHeight: "100vh",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "120px 24px 80px",
+            textAlign: "center",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              opacity: 0.7,
+              backgroundImage:
+                "linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px)",
+              backgroundSize: "44px 44px",
+            }}
+            aria-hidden
+          />
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              background:
+                "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(0,229,255,0.07) 0%, transparent 70%)",
+            }}
+            aria-hidden
+          />
+          <div style={{ position: "relative", zIndex: 1, maxWidth: 900 }}>
+            <div style={{ marginBottom: 24 }}>
+              <span className="section-label">◈ Zero-Ops Multiplayer-Infrastruktur</span>
             </div>
-            <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <h1 className="grid-h1" style={{ marginBottom: 24, maxWidth: 900, marginInline: "auto" }}>
+              <span style={{ display: "block", color: "#f0f4ff" }}>BEYOND BORDERS.</span>
+              <span style={{ display: "block", color: "#f0f4ff" }}>BEYOND LIMITS.</span>
+              <span
+                style={{
+                  display: "block",
+                  color: "#00e5ff",
+                  textShadow: "0 0 40px rgba(0,229,255,0.4)",
+                }}
+              >
+                THE GRID.
+              </span>
+            </h1>
+            <p
+              style={{
+                fontSize: "clamp(16px, 2.2vw, 20px)",
+                color: "rgba(240,244,255,0.45)",
+                maxWidth: 680,
+                lineHeight: 1.65,
+                margin: "0 auto 48px",
+              }}
+            >
+              Built on the operational expertise of{" "}
+              <span style={{ color: "#f0f4ff", fontWeight: 600 }}>1,900 validated city deployments</span>{" "}
+              across Europe — Zero-Ops Multiplayer-Infrastruktur that syncs teams everywhere, on any device.
+            </p>
+            <p
+              style={{
+                fontSize: 15,
+                color: "rgba(0,229,255,0.75)",
+                maxWidth: 560,
+                lineHeight: 1.6,
+                margin: "-32px auto 48px",
+                fontWeight: 500,
+              }}
+            >
+              You bring the content. GRID syncs every device in the room — or across continents.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 16,
+                justifyContent: "center",
+                marginBottom: 80,
+              }}
+            >
+              <Link href="/admin/dev" className="grid-cta">
+                ◈ Request Access
+              </Link>
+              <a href="#platform" className="grid-cta-outline">
+                Explore Platform ↓
+              </a>
+            </div>
+            <div className="grid-hero-stats">
               {[
-                ["60s", "Onboarding"],
-                ["0", "App-Downloads"],
-                ["100%", "Browser"],
-                ["∞", "Geräte-Sync"],
+                ["1,900+", "Deployments"],
+                ["50K+", "Teams Live"],
+                ["0", "Zero-Ops"],
               ].map(([value, label]) => (
-                <div
-                  key={label}
-                  className="rounded-2xl border border-[var(--grid-border)] bg-black/20 px-4 py-4"
-                >
-                  <p className="text-2xl font-semibold text-[var(--grid-accent)]">{value}</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.14em] text-[var(--grid-muted)]">
-                    {label}
-                  </p>
+                <div key={label} className="grid-hero-stat">
+                  <div className="grid-stat-value">{value}</div>
+                  <div className="grid-stat-label">{label}</div>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* Problem */}
-        <section className="border-b border-[var(--grid-border)] py-16 sm:py-20">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-red-300/80">
-              Das Problem
-            </p>
-            <h2 className="mt-3 max-w-3xl text-2xl font-semibold sm:text-3xl">
-              Warum moderne Gruppen-Events ein logistischer Albtraum sind
-            </h2>
-            <div className="mt-10 grid gap-4 md:grid-cols-3">
-              {problems.map((item) => (
-                <article
-                  key={item.title}
-                  className="rounded-2xl border border-[var(--grid-border)] bg-black/20 p-5 sm:p-6"
-                >
-                  <h3 className="text-lg font-medium text-white">{item.title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-[var(--grid-muted)]">{item.text}</p>
-                </article>
-              ))}
+        {/* Why GRID */}
+        <section
+          id="why"
+          className="grid-section"
+          style={{ background: "#0d0d16", borderTop: "1px solid rgba(0,229,255,0.12)", paddingBlock: "clamp(64px, 8vw, 100px)" }}
+        >
+          <div className="grid-container">
+            <div style={{ textAlign: "center", marginBottom: 48 }}>
+              <span className="section-label">Why GRID</span>
+              <h2 className="grid-h2" style={{ fontSize: "clamp(24px, 3vw, 36px)" }}>
+                Exactly what enterprise teams need —
+                <br />
+                <span style={{ color: "#00e5ff" }}>without the overhead.</span>
+              </h2>
             </div>
-          </div>
-        </section>
-
-        {/* Solution */}
-        <section className="border-b border-[var(--grid-border)] py-16 sm:py-20">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--grid-accent)]">
-              Die Lösung
-            </p>
-            <h2 className="mt-3 max-w-3xl text-2xl font-semibold sm:text-3xl">
-              Schluss mit technischer Reibung. GRID ist die Zero-Ops-Infrastruktur für echte
-              Interaktion.
-            </h2>
-            <p className="mt-6 max-w-3xl text-sm leading-8 text-[var(--grid-muted)] sm:text-base">
-              GRID eliminiert die Technik-Hürde komplett. Es bringt das simple Onboarding von
-              Kahoot in die echte Welt und verbindet Geräte im Raum oder über Kontinente hinweg in
-              Millisekunden-Echtzeit. Smartphones verhalten sich nicht mehr wie isolierte
-              Bildschirme, sondern wie Knöpfe und Anzeigen in einem gemeinsamen
-              Raumschiff-Cockpit.
-            </p>
-          </div>
-        </section>
-
-        {/* How it works */}
-        <section id="how-it-works" className="border-b border-[var(--grid-border)] py-16 sm:py-20">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--grid-muted)]">
-              How it works
-            </p>
-            <h2 className="mt-3 text-2xl font-semibold sm:text-3xl">So funktioniert GRID</h2>
-            <div className="mt-10 grid gap-5 lg:grid-cols-3">
-              {steps.map((item) => (
-                <article
-                  key={item.step}
-                  className="flex flex-col rounded-2xl border border-[var(--grid-border)] bg-black/20 p-6"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-semibold tracking-[0.2em] text-[var(--grid-accent)]">
-                      Schritt {item.step}
-                    </span>
-                    <MaturityBadge status={item.status} />
-                  </div>
-                  <h3 className="mt-4 text-xl font-semibold">{item.title}</h3>
-                  <p className="mt-1 text-sm text-[var(--grid-accent)]">{item.subtitle}</p>
-                  <p className="mt-4 flex-1 text-sm leading-7 text-[var(--grid-muted)]">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                gap: 20,
+              }}
+            >
+              {whyGrid.map((item) => (
+                <article key={item.title} className="grid-card">
+                  <div style={{ fontSize: 24, marginBottom: 12, color: "#00e5ff" }}>{item.symbol}</div>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: "#f0f4ff", marginBottom: 10 }}>
+                    {item.title}
+                  </h3>
+                  <p style={{ fontSize: 13, color: "rgba(240,244,255,0.45)", lineHeight: 1.65 }}>
                     {item.text}
                   </p>
                 </article>
@@ -275,90 +297,503 @@ export function GridLandingPage() {
           </div>
         </section>
 
-        {/* Features */}
-        <section className="border-b border-[var(--grid-border)] py-16 sm:py-20">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--grid-muted)]">
-              Key Features
-            </p>
-            <h2 className="mt-3 text-2xl font-semibold sm:text-3xl">Die GRID Secret Sauce</h2>
-            <div className="mt-10 grid gap-4 sm:grid-cols-2">
-              {features.map((item) => (
-                <article
-                  key={item.title}
-                  className="rounded-2xl border border-[var(--grid-border)] bg-black/20 p-6"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="text-2xl" aria-hidden>
-                      {item.icon}
-                    </span>
+        {/* Platform / Logic */}
+        <section
+          id="platform"
+          className="grid-section"
+          style={{ background: "#0d0d16", borderTop: "1px solid rgba(0,229,255,0.12)" }}
+        >
+          <div className="grid-container">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                gap: 64,
+                alignItems: "center",
+              }}
+            >
+              <div>
+                <span className="section-label">The Logic</span>
+                <h2 className="grid-h2" style={{ marginBottom: 24 }}>
+                  From the Street
+                  <br />
+                  <span style={{ color: "#00e5ff" }}>Into the Cloud.</span>
+                </h2>
+                <div className="grid-accent-line grid-accent-line-cyan" />
+                <p className="grid-body" style={{ marginBottom: 20 }}>
+                  We have digitized and analyzed{" "}
+                  <span style={{ color: "#f0f4ff" }}>1,900 urban routes</span> across Europe. We
+                  understand how teams communicate under pressure, how puzzles are solved logically,
+                  and how tension is created across digital devices.
+                </p>
+                <p className="grid-body">
+                  GRID is Zero-Ops Multiplayer-Infrastruktur — the essence of this experience. We removed
+                  the physical constraints of city walls and transferred the mechanics into a borderless
+                  platform. The result: an absolutely stable, location-independent system that operates
+                  globally and simultaneously.
+                </p>
+              </div>
+              <EuropeDeploymentMap svgMarkup={europeMapSvg} />
+            </div>
+          </div>
+        </section>
+
+        {/* How it works */}
+        <section
+          id="how"
+          className="grid-section grid-section-grid-bg"
+          style={{ borderTop: "1px solid rgba(0,229,255,0.12)" }}
+        >
+          <div className="grid-container">
+            <div style={{ textAlign: "center", marginBottom: 56 }}>
+              <span className="section-label">How it works</span>
+              <h2 className="grid-h2">
+                From content to
+                <br />
+                <span style={{ color: "#00e5ff" }}>live team mission in 60 seconds.</span>
+              </h2>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                gap: 24,
+              }}
+            >
+              {howItWorks.map((item) => (
+                <article key={item.step} className="grid-card" style={{ position: "relative" }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: "0.14em",
+                      color: "#00e5ff",
+                      marginBottom: 8,
+                    }}
+                  >
+                    STEP {item.step} · {item.label}
+                  </div>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, color: "#f0f4ff", marginBottom: 10 }}>
+                    {item.title}
+                  </h3>
+                  <p style={{ fontSize: 13, color: "rgba(240,244,255,0.45)", lineHeight: 1.65 }}>
+                    {item.text}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Deployment */}
+        <section
+          id="deployment"
+          className="grid-section grid-section-grid-bg"
+          style={{ borderTop: "1px solid rgba(0,229,255,0.12)" }}
+        >
+          <div className="grid-container">
+            <div style={{ textAlign: "center", marginBottom: 64 }}>
+              <span className="section-label">The Deployment</span>
+              <h2 className="grid-h2">
+                Synchronization
+                <br />
+                <span style={{ color: "#00e5ff" }}>at the Push of a Button.</span>
+              </h2>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                gap: 20,
+              }}
+            >
+              {deploymentPillars.map((item) => (
+                <article key={item.title} className="grid-card" style={{ position: "relative" }}>
+                  <div className="grid-card-badge-slot">
                     <MaturityBadge status={item.status} />
                   </div>
-                  <h3 className="mt-4 text-lg font-semibold">{item.title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-[var(--grid-muted)]">{item.text}</p>
+                  <div style={{ fontSize: 28, marginBottom: 14, paddingRight: 72 }}>{item.symbol}</div>
+                  <h3
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: "#f0f4ff",
+                      marginBottom: 10,
+                      letterSpacing: "0.02em",
+                    }}
+                  >
+                    {item.title}
+                  </h3>
+                  <p style={{ fontSize: 13, color: "rgba(240,244,255,0.45)", lineHeight: 1.65 }}>
+                    {item.text}
+                  </p>
                 </article>
               ))}
             </div>
           </div>
         </section>
 
-        {/* Use cases */}
-        <section className="border-b border-[var(--grid-border)] py-16 sm:py-20">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--grid-muted)]">
-              Use Cases
-            </p>
-            <h2 className="mt-3 text-2xl font-semibold sm:text-3xl">Wo GRID gewinnt</h2>
-            <div className="mt-10 grid gap-4 sm:grid-cols-2">
-              {useCases.map((item) => (
-                <article
-                  key={item.title}
-                  className="rounded-2xl border border-[var(--grid-border)] bg-[var(--grid-accent-soft)]/30 p-6"
-                >
-                  <span className="text-2xl" aria-hidden>
-                    {item.icon}
-                  </span>
-                  <h3 className="mt-4 text-lg font-semibold">{item.title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-[var(--grid-muted)]">{item.text}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Goal tracker — north star for development */}
-        <section id="ziel-tracker" className="py-16 sm:py-20">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <div className="rounded-3xl border border-[var(--grid-border)] bg-black/30 p-6 sm:p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--grid-accent)]">
-                Ziel-Tracker
-              </p>
-              <h2 className="mt-3 text-2xl font-semibold sm:text-3xl">
-                Marketing-Versprechen vs. Produkt-Stand
+        {/* Use Cases */}
+        <section
+          id="use-cases"
+          className="grid-section"
+          style={{ background: "#0d0d16", borderTop: "1px solid rgba(0,229,255,0.12)" }}
+        >
+          <div className="grid-container">
+            <div style={{ textAlign: "center", marginBottom: 56 }}>
+              <span className="section-label">Use Cases</span>
+              <h2 className="grid-h2">
+                Where GRID
+                <br />
+                <span style={{ color: "#00e5ff" }}>wins every time.</span>
               </h2>
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--grid-muted)]">
-                Diese Seite ist unser Kompass: Was wir versprechen, was schon live ist und was
-                als Nächstes gebaut wird. Badges aktualisieren wir mit jedem Release.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-3 text-xs text-[var(--grid-muted)]">
-                <span className="inline-flex items-center gap-2">
-                  <MaturityBadge status="live" /> Produktiv nutzbar
-                </span>
-                <span className="inline-flex items-center gap-2">
-                  <MaturityBadge status="beta" /> Teilweise / Pilot
-                </span>
-                <span className="inline-flex items-center gap-2">
-                  <MaturityBadge status="vision" /> Noch nicht gebaut
-                </span>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: 20,
+              }}
+            >
+              {useCases.map((item) => (
+                <article key={item.title} className="grid-card">
+                  <div style={{ fontSize: 28, marginBottom: 12 }}>{item.symbol}</div>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: "#f0f4ff", marginBottom: 10 }}>
+                    {item.title}
+                  </h3>
+                  <p style={{ fontSize: 13, color: "rgba(240,244,255,0.45)", lineHeight: 1.65 }}>
+                    {item.text}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Analytics / Intelligence */}
+        <section
+          id="analytics"
+          className="grid-section"
+          style={{
+            background: "#0d0d16",
+            borderTop: "1px solid rgba(0,229,255,0.12)",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              opacity: 0.35,
+              backgroundImage:
+                "linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px)",
+              backgroundSize: "44px 44px",
+            }}
+            aria-hidden
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: 800,
+              height: 400,
+              pointerEvents: "none",
+              background:
+                "radial-gradient(ellipse at 50% 0%, rgba(0,255,136,0.06) 0%, transparent 70%)",
+            }}
+            aria-hidden
+          />
+          <div className="grid-container">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                gap: 64,
+                alignItems: "center",
+              }}
+            >
+              <div style={{ display: "grid", gap: 16 }}>
+                {analyticsCards.map((item) => (
+                  <article
+                    key={item.title}
+                    className="grid-card grid-card-topbar"
+                    style={{ position: "relative", overflow: "hidden", padding: "24px 20px" }}
+                  >
+                    <div className="grid-card-badge-slot">
+                      <MaturityBadge status={item.status} />
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 28,
+                        fontWeight: 800,
+                        color: "#00ff88",
+                        marginBottom: 8,
+                        letterSpacing: "-0.02em",
+                        paddingRight: 72,
+                      }}
+                    >
+                      {item.symbol}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: "#f0f4ff",
+                        marginBottom: 6,
+                      }}
+                    >
+                      {item.title}
+                    </div>
+                    <div style={{ fontSize: 13, color: "rgba(240,244,255,0.45)", lineHeight: 1.6 }}>
+                      {item.text}
+                    </div>
+                  </article>
+                ))}
               </div>
-              <ul className="mt-8 divide-y divide-[var(--grid-border)]">
-                {goalTracker.map((item) => (
+              <div>
+                <span className="section-label">The Intelligence</span>
+                <h2 className="grid-h2" style={{ marginBottom: 24 }}>
+                  More Than
+                  <br />
+                  <span style={{ color: "#00ff88" }}>Engagement.</span>
+                </h2>
+                <div className="grid-accent-line grid-accent-line-green" />
+                <p className="grid-body">
+                  GRID delivers what conventional events fail to provide:{" "}
+                  <span style={{ color: "#f0f4ff" }}>data</span>. Behind the facade of the
+                  &quot;mission,&quot; an analytics engine is at work. Receive anonymized reports
+                  after every deployment covering collaboration speed, global connection quality, and
+                  internal benchmarking data.
+                </p>
+                <div
+                  style={{
+                    marginTop: 32,
+                    padding: "20px 24px",
+                    background: "rgba(0,255,136,0.04)",
+                    border: "1px solid rgba(0,255,136,0.15)",
+                    borderRadius: 10,
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "rgba(0,255,136,0.8)",
+                      fontWeight: 600,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      marginBottom: 8,
+                    }}
+                  >
+                    Post-Deployment Report
+                  </p>
+                  {[
+                    "Avg. solution time: 4:32 min",
+                    "Cross-location sync: 94%",
+                    "Engagement score: 9.1 / 10",
+                  ].map((line) => (
+                    <div
+                      key={line}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        marginBottom: 6,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: "#00ff88",
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span style={{ fontSize: 13, color: "rgba(240,244,255,0.45)" }}>{line}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Enterprise */}
+        <section
+          id="enterprise"
+          className="grid-section grid-section-grid-bg"
+          style={{ borderTop: "1px solid rgba(0,229,255,0.12)" }}
+        >
+          <div className="grid-container">
+            <div style={{ textAlign: "center", marginBottom: 64 }}>
+              <span className="section-label">Enterprise Solutions</span>
+              <h2 className="grid-h2" style={{ marginBottom: 20 }}>
+                The Mania Strategy:
+                <br />
+                <span style={{ color: "#00e5ff" }}>Your Corporate Arena.</span>
+              </h2>
+              <p
+                style={{
+                  fontSize: 16,
+                  color: "rgba(240,244,255,0.45)",
+                  maxWidth: 580,
+                  margin: "0 auto",
+                }}
+              >
+                We don&apos;t sell individual events. We integrate GRID into your organization. With
+                an enterprise license, you receive a permanent, scalable infrastructure.
+              </p>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+                gap: 40,
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+                {[
+                  ["◈", "Branded Environments", "Your own landing pages in your corporate design. Custom domains, custom color systems, custom content – all powered by GRID infrastructure."],
+                  ["⟲", "Usage-Based Licensing", "Flexibly use contingents distributed throughout the year. No peak fees, no minimum commitments per quarter."],
+                  ["◉", "Global Support", "24/7 coverage for your international rollouts. Dedicated enterprise success managers for organizations with 500+ employees."],
+                ].map(([symbol, title, text]) => (
+                  <div key={title} style={{ display: "flex", gap: 16 }}>
+                    <div
+                      style={{
+                        flexShrink: 0,
+                        width: 44,
+                        height: 44,
+                        borderRadius: 10,
+                        background: "rgba(0,229,255,0.08)",
+                        border: "1px solid rgba(0,229,255,0.2)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 20,
+                      }}
+                    >
+                      {symbol}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#f0f4ff", marginBottom: 4 }}>
+                        {title}
+                      </div>
+                      <div style={{ fontSize: 13, color: "rgba(240,244,255,0.45)", lineHeight: 1.6 }}>
+                        {text}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(0,229,255,0.06) 0%, rgba(0,255,136,0.04) 100%)",
+                  border: "1px solid rgba(0,229,255,0.2)",
+                  borderRadius: 16,
+                  padding: "40px 32px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                }}
+              >
+                <p style={{ fontSize: 13, color: "#00e5ff", fontWeight: 600, marginBottom: 12 }}>
+                  A Product of Kinetic Pillar OÜ
+                </p>
+                <h3
+                  style={{
+                    fontSize: "clamp(22px, 3vw, 32px)",
+                    fontWeight: 800,
+                    lineHeight: 1.2,
+                    marginBottom: 16,
+                  }}
+                >
+                  The Mania Strategy:
+                  <br />
+                  Corporate Arena.
+                </h3>
+                <p style={{ fontSize: 14, color: "rgba(240,244,255,0.45)", lineHeight: 1.65, marginBottom: 28 }}>
+                  Leverage the operational expertise and content infrastructure of Kinetic Pillar OÜ to
+                  build your competitive advantage in team engagement.
+                </p>
+                <Link href="#briefing" className="grid-cta" style={{ width: "fit-content" }}>
+                  Request Enterprise Access
+                </Link>
+                <p style={{ fontSize: 11, color: "rgba(240,244,255,0.35)", marginTop: 12 }}>
+                  Response within 24 hours · NDA available
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Product Status */}
+        <section
+          id="status"
+          className="grid-section"
+          style={{ background: "#0d0d16", borderTop: "1px solid rgba(0,229,255,0.12)" }}
+        >
+          <div className="grid-container">
+            <div
+              style={{
+                borderRadius: 16,
+                border: "1px solid rgba(0,229,255,0.12)",
+                background: "rgba(0,0,0,0.35)",
+                padding: "clamp(32px, 5vw, 48px)",
+              }}
+            >
+              <span className="section-label">Product Status</span>
+              <h2 className="grid-h2" style={{ fontSize: "clamp(24px, 3vw, 36px)", marginBottom: 16 }}>
+                Promise vs. product — kept honest
+              </h2>
+              <p className="grid-body" style={{ maxWidth: 560, marginBottom: 24 }}>
+                What is live today, what is in progress, what is on the roadmap.
+              </p>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 12,
+                  marginBottom: 28,
+                }}
+              >
+                {maturityLegend.map((item) => (
+                  <div
+                    key={item.status}
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <MaturityBadge status={item.status} />
+                    <span style={{ fontSize: 12, color: "rgba(240,244,255,0.45)" }}>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                {goalTracker.map((item, index) => (
                   <li
                     key={item.claim}
-                    className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between"
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      padding: "16px 0",
+                      borderTop: index === 0 ? "none" : "1px solid rgba(240,244,255,0.08)",
+                    }}
                   >
-                    <span className="text-sm text-white">{item.claim}</span>
-                    <MaturityBadge status={item.status} />
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                      }}
+                    >
+                      <span style={{ fontSize: 14, color: "rgba(240,244,255,0.85)" }}>{item.claim}</span>
+                      <MaturityBadge status={item.status} />
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -366,35 +801,122 @@ export function GridLandingPage() {
           </div>
         </section>
 
-        {/* Final CTA */}
-        <section className="border-t border-[var(--grid-border)] py-16">
-          <div className="mx-auto max-w-6xl px-4 text-center sm:px-6">
-            <h2 className="text-2xl font-semibold sm:text-3xl">
-              Bereit für dein erstes synchronisiertes Team-Erlebnis?
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-[var(--grid-muted)]">
-              Starte ein Pilot-Event, lade dein Team per QR ein und erlebe Zero-Auth Multiplayer
-              in unter einer Minute.
-            </p>
-            <Link
-              href="/admin/dev"
-              className="grid-button mx-auto mt-8 inline-flex items-center justify-center rounded-xl px-8 py-3.5 text-sm font-semibold"
+        {/* Briefing */}
+        <section
+          id="briefing"
+          className="grid-section grid-section-grid-bg"
+          style={{ borderTop: "1px solid rgba(0,229,255,0.12)" }}
+        >
+          <div className="grid-container">
+            <div style={{ textAlign: "center", marginBottom: 40 }}>
+              <span className="section-label">Enterprise Briefing</span>
+              <h2 className="grid-h2" style={{ marginBottom: 16 }}>
+                Let&apos;s Talk
+                <br />
+                <span style={{ color: "#00e5ff" }}>Enterprise Scale.</span>
+              </h2>
+              <p
+                style={{
+                  fontSize: 16,
+                  color: "rgba(240,244,255,0.45)",
+                  lineHeight: 1.65,
+                  maxWidth: 560,
+                  margin: "0 auto",
+                }}
+              >
+                GRID is built for global organizations with 500+ employees across multiple locations.
+                Tell us about your deployment scope and we will reach out within 24 hours.
+              </p>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: 16,
+                marginBottom: 40,
+              }}
             >
-              Jetzt erstes Event kostenlos starten
-            </Link>
+              {[
+                ["◉", "Dedicated Success Manager", "Single point of contact for your rollout"],
+                ["⬡", "Custom Deployment", "Branded environments & custom domains"],
+                ["◈", "Enterprise SLA", "99% uptime · 24/7 global support"],
+                ["▲", "Mutual NDA", "Available before any disclosure"],
+              ].map(([symbol, title, text]) => (
+                <div
+                  key={title}
+                  style={{
+                    padding: "18px 14px",
+                    background: "rgba(0,229,255,0.04)",
+                    borderRadius: 10,
+                    border: "1px solid rgba(0,229,255,0.12)",
+                  }}
+                >
+                  <div style={{ fontSize: 18, marginBottom: 8, color: "#00e5ff" }}>{symbol}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#f0f4ff", marginBottom: 4 }}>
+                    {title}
+                  </div>
+                  <div style={{ fontSize: 11, color: "rgba(240,244,255,0.2)", lineHeight: 1.5 }}>
+                    {text}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <EnterpriseBriefingForm />
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-[var(--grid-border)] py-8">
-        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 text-xs text-[var(--grid-muted)] sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <p>© GRID · Enterprise Experience OS</p>
-          <div className="flex gap-4">
-            <Link href="/admin/dev" className="hover:text-white">
-              Dev-Dashboard
-            </Link>
-            <span>gridos.vercel.app</span>
+      <footer
+        style={{
+          borderTop: "1px solid rgba(0,229,255,0.12)",
+          padding: "48px 24px",
+          background: "#040408",
+        }}
+      >
+        <div className="grid-container">
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "space-between",
+              gap: 32,
+            }}
+          >
+            <div>
+              <p style={{ fontWeight: 800, letterSpacing: "0.15em", color: "#00e5ff" }}>GRID</p>
+              <p
+                style={{
+                  marginTop: 12,
+                  maxWidth: 320,
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: "rgba(240,244,255,0.45)",
+                }}
+              >
+                Global Digital Infrastructure for Synchronous Team Engagement.
+                <br />
+                <span style={{ color: "rgba(0,229,255,0.55)" }}>Zero-Ops Multiplayer-Infrastruktur</span>
+              </p>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
+              <Link href="/admin/dev" className="grid-nav-link" style={{ textTransform: "none" }}>
+                Request Access
+              </Link>
+              <span style={{ color: "rgba(240,244,255,0.25)" }}>gridos.vercel.app</span>
+            </div>
           </div>
+          <p
+            style={{
+              marginTop: 32,
+              paddingTop: 24,
+              borderTop: "1px solid rgba(240,244,255,0.08)",
+              fontSize: 11,
+              color: "rgba(240,244,255,0.25)",
+            }}
+          >
+            GRID is a product of Kinetic Pillar OÜ. Leveraging the operational expertise and content
+            infrastructure of Exitmania.com.
+          </p>
         </div>
       </footer>
     </div>

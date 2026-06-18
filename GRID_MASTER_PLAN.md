@@ -83,6 +83,8 @@ Default: Captain = GPS. Übertragbar in Lobby oder Operator-Cockpit.
 ### Phase 4: Analytics & Remote Control — 🟡 Basis
 * `audit_logs`, Cockpit-Eingriffe — Deep Dashboard offen
 
+**Architektur-Mandat (Omnichannel & Blaupausen):** Siehe [`GRID_ARCHITECTURE.md`](./GRID_ARCHITECTURE.md) — Mandat vs. Ist-Stand, Ziel-Tracker-Pflege.
+
 ---
 
 ## 5. Implementierungsstand

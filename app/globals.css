@@ -36,6 +36,16 @@ body {
     linear-gradient(180deg, #020617 0%, #030712 100%);
 }
 
+.landing-grid-line {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(46, 233, 218, 0.35),
+    transparent
+  );
+  height: 1px;
+}
+
 .grid-panel {
   border: 1px solid var(--grid-border);
   background: var(--grid-panel);
