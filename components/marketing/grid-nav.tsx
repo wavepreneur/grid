@@ -46,17 +46,17 @@ export function GridNav() {
           </span>
         </a>
         <div className="hidden-mobile" style={{ display: "flex", alignItems: "center", gap: 32 }}>
-          <a href="#how" className="grid-nav-link">
-            How it works
+          <a href="#archetypes" className="grid-nav-link">
+            Archetypes
           </a>
-          <a href="#use-cases" className="grid-nav-link">
-            Use Cases
+          <a href="#telemetry" className="grid-nav-link">
+            Telemetry
           </a>
-          <a href="#enterprise" className="grid-nav-link">
-            Enterprise
+          <a href="#status" className="grid-nav-link">
+            Status
           </a>
-          <Link href="/admin/dev" className="grid-cta grid-cta-sm">
-            Request Access
+          <Link href="#briefing" className="grid-cta grid-cta-sm">
+            Deploy Stress-Test
           </Link>
         </div>
       </div>

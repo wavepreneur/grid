@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import { GridLandingPage } from "@/components/marketing/grid-landing-page";
 
 export const metadata: Metadata = {
-  title: "GRID | Zero-Ops Multiplayer-Infrastruktur",
+  title: "GRID | Asymmetric Team Dynamics Engine",
   description:
-    "Zero-Ops Multiplayer-Infrastruktur für synchronisierte Team-Erlebnisse — ohne App-Downloads, ohne IT-Freigaben. Gebaut auf 1.900 validierten Deployments in Europa.",
+    "Turn corporate content into asymmetric multiplayer experiences. One engine, zero onboarding, unlimited scale. JSON-injected scenarios on a fixed FSM — not a game builder.",
   openGraph: {
-    title: "BEYOND BORDERS. BEYOND LIMITS. THE GRID.",
+    title: "Turn Corporate Content into Asymmetric Multiplayer Experiences.",
     description:
-      "Zero-Ops Multiplayer-Infrastruktur — synchronized team collaboration on any device. Zero infrastructure. Infinite scale.",
+      "The Asymmetric Team Dynamics Engine. Zero-Ops Multiplayer-Infrastruktur for enterprise team stress-tests and collaboration telemetry.",
   },
 };
 

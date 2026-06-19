@@ -8,7 +8,11 @@ Verwandt: [`GRID_MASTER_PLAN.md`](./GRID_MASTER_PLAN.md) (Roadmap, URLs, Phasen)
 
 ## Mandat (Non-Negotiables)
 
-GRID ist **keine isolierte App**, sondern eine **Zero-Ops-Plattform** (Next.js App Router + Supabase). Kund:innen erstellen Erlebnisse; GRID liefert Engine, Sync und Daten.
+GRID ist **keine Content-Plattform** (kein Canva, kein B2B-Kahoot). GRID ist eine **zustandsbasierte Engine (Finite State Machine)** mit **Zero-Ops Multiplayer-Infrastruktur** (Next.js App Router + Supabase).
+
+- **Variable:** Content als JSON (`global_levels`, `route_override`, Blueprint-Slugs)
+- **Fix:** Verhaltens-Engine, asymmetrische Sync-Schicht, ephemeral Team-Tokens — **keine persistenten User-Accounts**
+- **Landing Page = System of Record:** [`gridos.vercel.app`](https://gridos.vercel.app/) ist die Verfassung für Produkt und Code
 
 ---
 
