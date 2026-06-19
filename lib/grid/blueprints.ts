@@ -18,6 +18,10 @@ export type BlueprintDefinition = {
   archetype: BlueprintArchetype;
   uiLayout: ResolvedEventContent["uiLayout"];
   capabilities: BlueprintCapabilities;
+  /** Default minimum active players before game start (DB still allows max_size 1). */
+  minPlayersToStart: number;
+  /** When true, a lone Alpha can start and sees Beta UI (puzzle sheet). */
+  allowSoloPlay: boolean;
   defaultContent: Pick<
     EventContentConfig,
     "template_slug" | "city_slug" | "show_live_score" | "mission_duration_minutes" | "ui_layout"
@@ -30,6 +34,8 @@ export const BLUEPRINTS: Record<BlueprintSlug, BlueprintDefinition> = {
     archetype: "ASYMMETRIC_INFORMANT",
     uiLayout: "exitmania",
     capabilities: { gps: true, navigatorRole: true },
+    minPlayersToStart: 2,
+    allowSoloPlay: false,
     defaultContent: {
       city_slug: "berlin",
       show_live_score: true,
@@ -42,6 +48,8 @@ export const BLUEPRINTS: Record<BlueprintSlug, BlueprintDefinition> = {
     archetype: "ASYMMETRIC_INFORMANT",
     uiLayout: "exitmania",
     capabilities: { gps: false, navigatorRole: false },
+    minPlayersToStart: 2,
+    allowSoloPlay: false,
     defaultContent: {
       template_slug: "tabbrain-enterprise-demo",
       show_live_score: true,

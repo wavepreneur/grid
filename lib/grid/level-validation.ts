@@ -13,9 +13,25 @@ import type {
 export type LevelValidationContext = {
   isCaptain: boolean;
   isNavigator: boolean;
+  canUnlockGps?: boolean;
+  effectiveBeta?: boolean;
+  archetypeRole?: "alpha" | "beta" | "gamma";
   playerRole: PlayerRole;
   gpsEnabled?: boolean;
 };
+
+function normalizeRequiredRole(role: PlayerRole): "alpha" | "beta" | "gamma" | "captain" | "navigator" | "solver" {
+  if (role === "captain" || role === "navigator") return "alpha";
+  if (role === "solver") return "gamma";
+  return role;
+}
+
+function playerEffectiveArchetypeRole(context: LevelValidationContext): "alpha" | "beta" | "gamma" {
+  if (context.archetypeRole) return context.archetypeRole;
+  if (context.isCaptain) return "alpha";
+  if (context.playerRole === "beta") return "beta";
+  return "gamma";
+}
 
 export function validateLevelSolution(
   level: LevelDefinition,
@@ -23,11 +39,14 @@ export function validateLevelSolution(
   context?: LevelValidationContext,
 ): { ok: true } | { ok: false; error: string } {
   if (level.role_required && context) {
-    const effectiveRole = context.isCaptain ? "captain" : context.playerRole;
-    if (level.role_required !== effectiveRole && level.role_required !== "captain") {
+    const required = normalizeRequiredRole(level.role_required);
+    const playerRole = playerEffectiveArchetypeRole(context);
+    if (required !== playerRole && !(required === "beta" && context.effectiveBeta)) {
+      const label =
+        required === "alpha" ? "Alpha" : required === "beta" ? "Beta" : "Gamma";
       return {
         ok: false,
-        error: `Diese Aufgabe ist für die Rolle „${level.role_required}" reserviert.`,
+        error: `Diese Aufgabe ist für die Rolle „${label}" reserviert.`,
       };
     }
   }
@@ -39,10 +58,11 @@ export function validateLevelSolution(
     if (!level.location) {
       return { ok: false, error: "GPS-Level ohne Koordinaten konfiguriert." };
     }
-    if (context && !context.isNavigator) {
+    const canUnlockGps = context?.canUnlockGps ?? context?.isNavigator ?? false;
+    if (!canUnlockGps) {
       return {
         ok: false,
-        error: "GPS-Checkpoints können nur vom Team-Lead-Gerät (GPS) bestätigt werden.",
+        error: "GPS-Checkpoints kann nur Alpha am Zielort freischalten.",
       };
     }
     if (!payload.geolocation) {

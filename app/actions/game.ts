@@ -16,6 +16,10 @@ import {
 } from "@/lib/grid/level-validation";
 import { HINT_POINT_COST, EXITMANIA_TOTAL_LEVELS } from "@/lib/grid/level-types";
 import type { PlayerRole, SolveLevelPayload } from "@/lib/grid/level-types";
+import { resolveArchetypeRoleFlags } from "@/lib/grid/archetype-roles";
+import { resolveBlueprint } from "@/lib/grid/blueprints";
+import { parseContentConfig } from "@/lib/grid/content-engine";
+import { countActivePlayers } from "@/lib/grid/team-session";
 import { assertPlayerSession } from "@/lib/grid/session-auth";
 import type { ActionResult } from "@/lib/grid/types";
 
@@ -125,10 +129,27 @@ export async function solveCurrentLevel(input: {
       return { success: false, error: "Level-Inhalt nicht gefunden." };
     }
 
-    const playerRole = (player.role ?? "solver") as PlayerRole;
+    const playerRole = (player.role ?? "gamma") as PlayerRole;
+    const activePlayerCount = await countActivePlayers(team.id);
+    const blueprint = resolveBlueprint(parseContentConfig(event.content_config));
+    const archetype = resolveArchetypeRoleFlags({
+      playerId: player.id,
+      playerRole,
+      isCaptain: player.is_captain,
+      team: {
+        captainPlayerId: team.captain_player_id ?? null,
+        navigatorPlayerId: team.navigator_player_id ?? null,
+        betaPlayerId: team.beta_player_id ?? null,
+      },
+      activePlayerCount,
+      gpsEnabled: blueprint.capabilities.gps,
+    });
     const validation = validateLevelSolution(levelDefinition, input.payload ?? {}, {
       isCaptain: player.is_captain,
       isNavigator: team.navigator_player_id === player.id,
+      canUnlockGps: archetype.canUnlockGps,
+      effectiveBeta: archetype.effectiveBeta,
+      archetypeRole: archetype.archetypeRole,
       playerRole,
       gpsEnabled: content.capabilities.gps,
     });

@@ -87,7 +87,8 @@ export function GameRoom({
   );
 
   const currentLevelDefinition = eventContent.levels.find((level) => level.level === activeLevel);
-  const isNavigator = playerSession.isNavigator || Boolean(teamState.isNavigator);
+  const isNavigator = playerSession.canUnlockGps || Boolean(teamState.isNavigator);
+  const soloAlpha = playerSession.isAlpha && playerSession.effectiveBeta;
   const purchasedHints = teamState.gameState.purchased_tile_hints[String(activeLevel)] ?? {};
   const solveDisabled = levelState?.status !== "active" || Boolean(modal) || isHintPending;
 
@@ -221,7 +222,9 @@ export function GameRoom({
               score={teamState.gameState.score ?? 0}
               disabled={solveDisabled}
               isPending={isPending || isHintPending}
-              isNavigator={isNavigator}
+              canUnlockGps={isNavigator}
+              effectiveBeta={playerSession.effectiveBeta}
+              soloAlpha={soloAlpha}
               gpsCapability={eventContent.capabilities.gps}
               onSubmit={handleSolveLevel}
               onPurchaseHint={handlePurchaseHint}

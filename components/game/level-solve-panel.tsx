@@ -67,7 +67,7 @@ export function LevelSolvePanel({
   if (level.type === "gps" && !isNavigator) {
     return (
       <div className="rounded-xl border border-[var(--grid-border)] bg-black/20 px-4 py-4 text-sm text-[var(--grid-muted)]">
-        Der Team Lead (GPS) bestätigt diesen Checkpoint. Ihr könnt parallel Hinweise nutzen und
+        Das Alpha-Gerät bestätigt diesen Checkpoint. Ihr könnt parallel Hinweise nutzen und
         Rätsel lösen.
       </div>
     );

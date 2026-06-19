@@ -69,7 +69,7 @@ export function LevelPanel({
         </p>
         {level.type === "gps" ? (
           <span className="text-xs text-[var(--grid-accent)]">
-            {isNavigator ? "GPS · Team Lead" : "Nur Team Lead (GPS)"}
+            {isNavigator ? "GPS · Alpha" : "Nur Alpha (GPS)"}
           </span>
         ) : (
           <span className="text-xs text-[var(--grid-muted)]">Kein GPS nötig</span>
@@ -110,8 +110,8 @@ export function LevelPanel({
 
       {level.type === "gps" && !isNavigator ? (
         <p className="mt-4 rounded-xl border border-[var(--grid-border)] bg-black/30 px-4 py-3 text-sm text-[var(--grid-muted)]">
-          Der Team Lead (GPS) bestätigt diesen Checkpoint am Zielort. Ihr könnt parallel Rätsel
-          auf eurem Gerät lösen — GPS-Checkpoints schließt nur das Team-Lead-Gerät ab.
+          Alpha bestätigt diesen Checkpoint am Zielort. Ihr könnt parallel Rätsel auf eurem Gerät
+          lösen — GPS-Checkpoints schließt nur Alpha ab.
         </p>
       ) : null}
 

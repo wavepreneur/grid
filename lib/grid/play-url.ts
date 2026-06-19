@@ -1,6 +1,6 @@
 "use client";
 
-import { eventPlayPath } from "@/lib/grid/event-routes";
+import { eventLobbyPath, eventPlayPath } from "@/lib/grid/event-routes";
 
 export const PLAYER_RESUME_PARAM = "resume";
 
@@ -24,4 +24,14 @@ export function buildPlayUrlWithResume(
 ): string {
   const base = eventPlayPath(inviteCode, joinCode);
   return `${base}?${PLAYER_RESUME_PARAM}=${encodeURIComponent(resumeToken)}`;
+}
+
+export function buildManageTeamUrl(
+  inviteCode: string,
+  joinCode: string,
+  resumeToken?: string,
+): string {
+  const base = eventLobbyPath(inviteCode, joinCode, { manage: true });
+  if (!resumeToken) return base;
+  return `${base}&${PLAYER_RESUME_PARAM}=${encodeURIComponent(resumeToken)}`;
 }

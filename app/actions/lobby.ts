@@ -13,7 +13,9 @@ import {
   normalizeCode,
 } from "@/lib/grid/codes";
 import { writeAuditLog } from "@/lib/grid/audit-log";
-import { buildDefaultContentConfig, getBlueprint, isBlueprintSlug, type BlueprintSlug } from "@/lib/grid/blueprints";
+import { canStartTeamGame } from "@/lib/grid/archetype-roles";
+import { buildDefaultContentConfig, getBlueprint, isBlueprintSlug, resolveBlueprint, type BlueprintSlug } from "@/lib/grid/blueprints";
+import { parseContentConfig } from "@/lib/grid/content-engine";
 import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 import {
   getCityIdBySlug,
@@ -26,10 +28,14 @@ import {
 } from "@/lib/grid/resume-token";
 import { SESSION_ACTIVE } from "@/lib/grid/session-codes";
 import {
+  assignArchetypeRoleOnJoin,
   buildPlayerSession,
+  countActivePlayers,
   findActivePlayerByDisplayName,
   findActivePlayerById,
+  rebalanceArchetypeRoles,
   rotatePlayerSession,
+  setTeamBeta,
   setTeamNavigator,
   syncTeamLeadershipAfterPlayerLeaves,
 } from "@/lib/grid/team-session";
@@ -50,6 +56,7 @@ type TeamRow = {
   status: GridTeamStatus;
   navigator_player_id: string | null;
   captain_player_id?: string | null;
+  beta_player_id?: string | null;
   current_level?: number;
 };
 
@@ -68,19 +75,39 @@ function lobbyTeamStatus(status: GridTeamStatus): GridTeamStatus {
   return status === "setup" ? "lobby" : status;
 }
 
-function buildSessionForTeam(
-  player: Pick<ActivePlayerRow, "id" | "session_id" | "display_name" | "is_captain">,
-  team: Pick<TeamRow, "id" | "join_code" | "status" | "navigator_player_id">,
-  inviteCode: string,
-): PlayerSession {
+async function buildSessionForTeam(
+  player: Pick<ActivePlayerRow, "id" | "session_id" | "display_name" | "is_captain" | "role">,
+  team: Pick<
+    TeamRow,
+    "id" | "join_code" | "status" | "navigator_player_id" | "captain_player_id" | "beta_player_id"
+  >,
+  event: GridEvent,
+): Promise<PlayerSession> {
+  const activePlayerCount = await countActivePlayers(team.id);
+  const blueprint = resolveBlueprint(parseContentConfig(event.content_config));
+
   return buildPlayerSession({
     player,
     teamId: team.id,
     joinCode: team.join_code,
-    inviteCode,
+    inviteCode: event.invite_code,
     teamStatus: lobbyTeamStatus(team.status),
+    captainPlayerId: team.captain_player_id ?? null,
     navigatorPlayerId: team.navigator_player_id ?? null,
+    betaPlayerId: team.beta_player_id ?? null,
+    activePlayerCount,
+    gpsEnabled: blueprint.capabilities.gps,
   });
+}
+
+async function assertCanStartGame(event: GridEvent, teamId: string): Promise<ActionResult<true>> {
+  const activePlayerCount = await countActivePlayers(teamId);
+  const blueprint = resolveBlueprint(parseContentConfig(event.content_config));
+  const gate = canStartTeamGame({ activePlayerCount, blueprint });
+  if (!gate.ok) {
+    return { success: false, error: gate.error };
+  }
+  return { success: true, data: true };
 }
 
 async function getEventByInviteCode(
@@ -137,6 +164,17 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
   if (new Date(team.lobby_auto_start_at).getTime() > Date.now()) return;
   if (!team.captain_player_id) return;
 
+  const { data: event } = await supabase
+    .from("events")
+    .select("id, organization_id, city_id, content_config, route_override, invite_code")
+    .eq("id", team.event_id)
+    .single();
+
+  if (!event) return;
+
+  const startGate = await assertCanStartGame(event as GridEvent, teamId);
+  if (!startGate.success) return;
+
   const startedAt = new Date().toISOString();
   const { data: updated } = await supabase
     .from("teams")
@@ -150,12 +188,6 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
     .maybeSingle();
 
   if (updated) {
-    const { data: event } = await supabase
-      .from("events")
-      .select("id, organization_id, city_id, content_config, route_override")
-      .eq("id", team.event_id)
-      .single();
-
     if (event) {
       await initializeTeamGameState(
         teamId,
@@ -332,9 +364,9 @@ export async function createTeamAsCaptain(input: {
         session_id: sessionId,
         display_name: displayName,
         is_captain: true,
-        role: "captain",
+        role: "alpha",
       })
-      .select("id, display_name, is_captain, session_id")
+      .select("id, display_name, is_captain, session_id, role")
       .single();
 
     if (playerError || !player) {
@@ -354,17 +386,21 @@ export async function createTeamAsCaptain(input: {
       await supabase.from("events").update({ status: "lobby" }).eq("id", event.id);
     }
 
+    const refreshedTeam = await getTeamByJoinCode(team.join_code, event.id);
+
     return {
       success: true,
-      data: buildSessionForTeam(
+      data: await buildSessionForTeam(
         player,
         {
           id: team.id,
           join_code: team.join_code,
           status: "lobby",
           navigator_player_id: player.id,
+          captain_player_id: player.id,
+          beta_player_id: refreshedTeam?.beta_player_id ?? null,
         },
-        event.invite_code,
+        event,
       ),
     };
   } catch (error) {
@@ -407,10 +443,10 @@ export async function recoverSessionByPlayerId(input: {
       payload: { display_name: player.display_name },
     });
 
-    const session = buildSessionForTeam(
+    const session = await buildSessionForTeam(
       { ...player, session_id: sessionId },
       team,
-      event.invite_code,
+      event,
     );
 
     return {
@@ -452,7 +488,7 @@ export async function verifyTeamSession(input: {
     return {
       success: true,
       data: {
-        session: buildSessionForTeam(player, team, event.invite_code),
+        session: await buildSessionForTeam(player, team, event),
         path: teamEntryPath(event.invite_code, team.join_code, team.status),
       },
     };
@@ -552,10 +588,10 @@ export async function claimPlayerSession(input: {
       payload: { display_name: player.display_name },
     });
 
-    const session = buildSessionForTeam(
+    const session = await buildSessionForTeam(
       { ...player, session_id: sessionId },
       team,
-      event.invite_code,
+      event,
     );
 
     const resumeToken = await signPlayerResumeToken({
@@ -638,10 +674,10 @@ export async function joinTeamAsPlayer(input: {
 
       return {
         success: true,
-        data: buildSessionForTeam(
+        data: await buildSessionForTeam(
           { ...existingPlayer, session_id: sessionId },
           team,
-          event.invite_code,
+          event,
         ),
       };
     }
@@ -655,9 +691,9 @@ export async function joinTeamAsPlayer(input: {
         session_id: sessionId,
         display_name: displayName,
         is_captain: false,
-        role: "solver",
+        role: "gamma",
       })
-      .select("id, display_name, is_captain, session_id")
+      .select("id, display_name, is_captain, session_id, role")
       .single();
 
     if (error || !player) {
@@ -666,6 +702,19 @@ export async function joinTeamAsPlayer(input: {
       }
       return { success: false, error: error?.message ?? "Beitritt fehlgeschlagen." };
     }
+
+    await assignArchetypeRoleOnJoin(team.id, player.id);
+    await rebalanceArchetypeRoles(team.id);
+    const refreshedTeam = await getTeamByJoinCode(joinCode, event.id);
+    if (!refreshedTeam) {
+      return { success: false, error: "Team nach Beitritt nicht gefunden." };
+    }
+
+    const { data: refreshedPlayer } = await supabase
+      .from("players")
+      .select("id, display_name, is_captain, session_id, role")
+      .eq("id", player.id)
+      .single();
 
     if (team.status === "setup") {
       await supabase.from("teams").update({ status: "lobby" }).eq("id", team.id);
@@ -687,7 +736,11 @@ export async function joinTeamAsPlayer(input: {
 
     return {
       success: true,
-      data: buildSessionForTeam(player, team, event.invite_code),
+      data: await buildSessionForTeam(
+        refreshedPlayer ?? player,
+        refreshedTeam,
+        event,
+      ),
     };
   } catch (error) {
     return {
@@ -777,11 +830,16 @@ export async function startGameManually(input: {
 
     const player = await getPlayerBySessionId(input.sessionId);
     if (!player || player.team_id !== team.id || !player.is_captain) {
-      return { success: false, error: "Nur der Captain kann das Spiel starten." };
+      return { success: false, error: "Nur Alpha (Team Lead) kann die Mission starten." };
     }
 
     if (team.status !== "lobby") {
       return { success: false, error: "Das Team ist nicht mehr in der Lobby." };
+    }
+
+    const startGate = await assertCanStartGame(event, team.id);
+    if (!startGate.success) {
+      return startGate;
     }
 
     const startedAt = new Date().toISOString();
@@ -927,9 +985,9 @@ export async function setupPrebookedTeamAsCaptain(input: {
         session_id: sessionId,
         display_name: displayName,
         is_captain: true,
-        role: "captain",
+        role: "alpha",
       })
-      .select("id, display_name, is_captain, session_id")
+      .select("id, display_name, is_captain, session_id, role")
       .single();
 
     if (playerError || !player) {
@@ -970,10 +1028,10 @@ export async function setupPrebookedTeamAsCaptain(input: {
 
     return {
       success: true,
-      data: buildSessionForTeam(
+      data: await buildSessionForTeam(
         player,
-        { ...team, status: "lobby", navigator_player_id: player.id },
-        event.invite_code,
+        { ...team, status: "lobby", navigator_player_id: player.id, captain_player_id: player.id },
+        event,
       ),
     };
   } catch (error) {
@@ -1069,7 +1127,7 @@ export async function transferCaptain(input: {
 
     const captain = await getPlayerBySessionId(input.sessionId);
     if (!captain || captain.team_id !== team.id || !captain.is_captain) {
-      return { success: false, error: "Nur der Captain kann die Rolle übertragen." };
+      return { success: false, error: "Nur Alpha kann die Rolle übertragen." };
     }
 
     const supabase = createAdminClient();
@@ -1085,21 +1143,24 @@ export async function transferCaptain(input: {
 
     await supabase
       .from("players")
-      .update({ is_captain: false, role: "solver" })
+      .update({ is_captain: false, role: "gamma" })
       .eq("id", captain.id);
 
     const { error: promoteError } = await supabase
       .from("players")
-      .update({ is_captain: true, role: "captain" })
+      .update({ is_captain: true, role: "alpha" })
       .eq("id", target.id);
 
     if (promoteError) {
       await supabase
         .from("players")
-        .update({ is_captain: true, role: "captain" })
+        .update({ is_captain: true, role: "alpha" })
         .eq("id", captain.id);
       return { success: false, error: promoteError.message };
     }
+
+    await setTeamNavigator(team.id, target.id);
+    await rebalanceArchetypeRoles(team.id);
 
     await writeAuditLog({
       organizationId: event.organization_id,
@@ -1128,7 +1189,7 @@ export async function assignPlayerRole(input: {
   joinCode: string;
   sessionId: string;
   targetPlayerId: string;
-  role: Exclude<PlayerRole, "captain">;
+  role: "beta" | "gamma" | "navigator" | "solver";
 }): Promise<ActionResult<{ playerId: string; role: PlayerRole }>> {
   try {
     const event = await getEventByInviteCode(normalizeCode(input.inviteCode));
@@ -1143,7 +1204,7 @@ export async function assignPlayerRole(input: {
 
     const captain = await getPlayerBySessionId(input.sessionId);
     if (!captain || captain.team_id !== team.id || !captain.is_captain) {
-      return { success: false, error: "Nur der Captain kann Rollen zuweisen." };
+      return { success: false, error: "Nur Alpha kann Rollen zuweisen." };
     }
 
     const supabase = createAdminClient();
@@ -1157,21 +1218,26 @@ export async function assignPlayerRole(input: {
       return { success: false, error: "Spieler nicht gefunden." };
     }
     if (target.is_captain) {
-      return { success: false, error: "Captain-Rolle kann nur per Transfer geändert werden." };
+      return { success: false, error: "Alpha-Rolle kann nur per Transfer geändert werden." };
     }
 
-    if (input.role === "navigator") {
-      await setTeamNavigator(team.id, target.id);
+    if (input.role === "beta") {
+      await supabase
+        .from("players")
+        .update({ role: "gamma" })
+        .eq("team_id", team.id)
+        .eq("role", "beta")
+        .is("left_at", null);
+      await supabase.from("players").update({ role: "beta" }).eq("id", target.id);
+      await setTeamBeta(team.id, target.id);
+    } else {
+      await supabase.from("players").update({ role: "gamma" }).eq("id", target.id);
+      if (team.beta_player_id === target.id) {
+        await setTeamBeta(team.id, null);
+      }
     }
 
-    const { error } = await supabase
-      .from("players")
-      .update({ role: input.role === "navigator" ? "solver" : input.role })
-      .eq("id", target.id);
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
+    await rebalanceArchetypeRoles(team.id);
 
     await writeAuditLog({
       organizationId: event.organization_id,
@@ -1179,10 +1245,13 @@ export async function assignPlayerRole(input: {
       teamId: team.id,
       playerId: captain.id,
       action: "player_role_assigned",
-      payload: { target_player_id: target.id, role: input.role },
+      payload: { target_player_id: target.id, role: input.role === "beta" ? "beta" : "gamma" },
     });
 
-    return { success: true, data: { playerId: target.id, role: input.role } };
+    return {
+      success: true,
+      data: { playerId: target.id, role: input.role === "beta" ? "beta" : "gamma" },
+    };
   } catch (error) {
     return {
       success: false,

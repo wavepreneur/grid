@@ -12,7 +12,7 @@ export type GridTeamStatus =
   | "finished"
   | "disbanded";
 
-export type PlayerRole = "captain" | "solver" | "navigator";
+export type PlayerRole = "captain" | "solver" | "navigator" | "alpha" | "beta" | "gamma";
 
 export type GridEvent = {
   id: string;
@@ -44,6 +44,7 @@ export type GridTeam = {
   started_at: string | null;
   captain_player_id: string | null;
   navigator_player_id: string | null;
+  beta_player_id: string | null;
 };
 
 export type GridPlayer = {
@@ -61,6 +62,10 @@ export type LobbyPlayer = {
   display_name: string;
   is_captain: boolean;
   is_navigator?: boolean;
+  is_alpha?: boolean;
+  is_beta?: boolean;
+  is_gamma?: boolean;
+  archetype_role?: "alpha" | "beta" | "gamma";
   role?: PlayerRole;
   joined_at: string;
   last_seen_at?: string;
@@ -79,6 +84,7 @@ export type LobbySnapshot = {
   lobby_auto_start_at: string | null;
   captain_player_id: string | null;
   navigator_player_id: string | null;
+  beta_player_id: string | null;
   active_player_count: number;
   players: LobbyPlayer[];
 };
@@ -92,6 +98,13 @@ export type PlayerSession = {
   inviteCode: string;
   isCaptain: boolean;
   isNavigator: boolean;
+  archetypeRole: "alpha" | "beta" | "gamma";
+  isAlpha: boolean;
+  isBeta: boolean;
+  isGamma: boolean;
+  effectiveBeta: boolean;
+  canManageTeam: boolean;
+  canUnlockGps: boolean;
   teamStatus?: GridTeamStatus;
 };
 

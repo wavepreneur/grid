@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ContentTileGrid } from "@/components/game/content-tile-grid";
+import { BetaNotesPanel } from "@/components/game/beta-notes-panel";
 import {
   buildGpsWaypoints,
   computeTargetDistance,
@@ -22,7 +22,9 @@ type ExitmaniaLevelViewProps = {
   score: number;
   disabled: boolean;
   isPending: boolean;
-  isNavigator: boolean;
+  canUnlockGps: boolean;
+  effectiveBeta: boolean;
+  soloAlpha?: boolean;
   gpsCapability?: boolean;
   onSubmit: (payload: SolveLevelPayload) => void;
   onPurchaseHint: (tileId: string) => void;
@@ -36,7 +38,9 @@ export function ExitmaniaLevelView({
   score,
   disabled,
   isPending,
-  isNavigator,
+  canUnlockGps,
+  effectiveBeta,
+  soloAlpha = false,
   gpsCapability = true,
   onSubmit,
   onPurchaseHint,
@@ -44,7 +48,7 @@ export function ExitmaniaLevelView({
   const [activeTile, setActiveTile] = useState<LevelContentTile | null>(null);
   const tiles = level.tiles ?? [];
   const isGpsLevel = gpsCapability && level.type === "gps" && Boolean(level.location);
-  const gpsEnabled = isGpsLevel && isNavigator;
+  const gpsEnabled = isGpsLevel && canUnlockGps;
   const { sample } = useGeolocation(gpsEnabled);
 
   const waypoints = useMemo(
@@ -58,7 +62,7 @@ export function ExitmaniaLevelView({
       ? distanceToTarget <= level.location.radius_meters
       : false;
 
-  const tileGridProps = {
+  const betaPanelProps = {
     tiles,
     purchasedHints,
     score,
@@ -66,6 +70,7 @@ export function ExitmaniaLevelView({
     isPending,
     onOpen: setActiveTile,
     onPurchaseHint,
+    soloAlpha,
   };
 
   return (
@@ -111,26 +116,43 @@ export function ExitmaniaLevelView({
             </p>
           </div>
 
-          <div className="min-w-0 w-full lg:hidden">
-            <ContentTileGrid {...tileGridProps} layout="inline" />
-          </div>
+          {effectiveBeta ? (
+            <div className="min-w-0 w-full lg:hidden">
+              <BetaNotesPanel {...betaPanelProps} layout="inline" />
+            </div>
+          ) : (
+            <div className="rounded-xl border border-[var(--grid-border)] bg-black/20 px-4 py-4 text-sm text-[var(--grid-muted)] lg:hidden">
+              Rätselblatt und Dokumente sieht nur Beta. Koordiniert euch per Sprache — Alpha
+              schaltet GPS-Wegpunkte frei.
+            </div>
+          )}
 
           <LevelSolvePanel
             level={level}
             disabled={disabled}
             isPending={isPending}
-            isNavigator={isNavigator}
+            isNavigator={canUnlockGps}
             onSubmit={onSubmit}
             hideGpsStatus={isGpsLevel && waypoints.length > 0}
           />
         </section>
 
         <aside className="hidden lg:sticky lg:top-4 lg:block lg:self-start">
-          <ContentTileGrid {...tileGridProps} layout="sidebar" />
+          {effectiveBeta ? (
+            <BetaNotesPanel {...betaPanelProps} layout="sidebar" />
+          ) : (
+            <div className="rounded-2xl border border-[var(--grid-border)] bg-black/20 px-4 py-5 text-sm text-[var(--grid-muted)]">
+              <p className="text-xs uppercase tracking-[0.18em] text-[var(--grid-muted)]">Gamma</p>
+              <p className="mt-2">
+                Du löst Aufgaben mit dem Team. Rätselblatt und Medien liegen bei Beta — sprecht euch
+                ab.
+              </p>
+            </div>
+          )}
         </aside>
       </div>
 
-      <MediaModal tile={activeTile} onClose={() => setActiveTile(null)} />
+      {effectiveBeta ? <MediaModal tile={activeTile} onClose={() => setActiveTile(null)} /> : null}
     </>
   );
 }

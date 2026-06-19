@@ -103,13 +103,14 @@ Tabbrain bucht das Erlebnis; Exitmania-JSON (oder kundenspezifisches JSON im sel
 
 | Anforderung | Status | Code / Schema |
 |---|---|---|
-| GPS nur auf Team-Lead-Gerät | ✅ Live | `teams.navigator_player_id`, `useGeolocation(gpsEnabled)`, `level-validation.ts` |
+| GPS nur auf Alpha-Gerät | ✅ Live | `teams.navigator_player_id` (= Alpha), `canUnlockGps`, `level-validation.ts` |
 | Desktop + Mobile im selben Team | ✅ Live | Browser-UI, `level.type` digital/quiz/gps |
-| Rollen Captain / GPS / Mitspieler | ✅ Live | `grid_player_role`, Lobby + Cockpit-Transfer |
+| Rollen Alpha / Beta / Gamma | ✅ Live | `grid_player_role`, `teams.beta_player_id`, `lib/grid/archetype-roles.ts`, Lobby-Transfer |
+| Legacy Captain / Navigator | ✅ Kompatibel | `is_captain` = Alpha, `navigator_player_id` folgt Alpha |
 | Beamer-Ansicht | ✅ Live (Operator) | `/cockpit/{code}/show` — **kein Team-Spieler**, sondern Operator-Display |
-| Blueprint-Step steuert Hardware | ⬜ Vision | Heute: `level.type` + `isNavigator`, nicht `blueprint_step` |
+| Blueprint-Step steuert Hardware | ⬜ Vision | Heute: `level.type` + `canUnlockGps`, nicht `blueprint_step` |
 | `device_type` (mobile/desktop) | ⬜ Schema only | Spalte existiert, wird im Code **nicht gesetzt** |
-| Alpha/Beta/Gamma Views | ⬜ Vision | Nicht implementiert |
+| Alpha/Beta/Gamma Views | ✅ Beta (Exitmania) | Alpha: GPS-Map · Beta: Rätselblatt/Tiles · Gamma: Aufgaben-Panel |
 
 **Nächster Schritt:** `device_type` beim Join setzen; Blueprint-Step-Resolver (`resolveStepCapabilities(role, step)`) vor `ui_layout`-Switch.
 

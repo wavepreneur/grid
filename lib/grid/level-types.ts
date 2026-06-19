@@ -1,6 +1,6 @@
 export type LevelType = "gps" | "digital" | "quiz";
 
-export type PlayerRole = "captain" | "solver" | "navigator";
+export type PlayerRole = "captain" | "solver" | "navigator" | "alpha" | "beta" | "gamma";
 
 export type LevelLocation = {
   lat: number;

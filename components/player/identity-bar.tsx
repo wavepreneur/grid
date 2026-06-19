@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import { getPlayerResumeToken } from "@/app/actions/lobby";
 import { abandonTeamSession } from "@/lib/grid/session-recovery";
 import {
-  eventLobbyPath,
   eventPath,
   eventTeamJoinPath,
 } from "@/lib/grid/event-routes";
-import { buildPlayUrlWithResume } from "@/lib/grid/play-url";
+import { buildManageTeamUrl, buildPlayUrlWithResume } from "@/lib/grid/play-url";
+import { archetypeRoleLabel } from "@/lib/grid/archetype-roles";
 import type { PlayerSession } from "@/lib/grid/types";
 
 type IdentityBarProps = {
@@ -22,9 +22,10 @@ type IdentityBarProps = {
 };
 
 function roleLabel(session: PlayerSession): string {
-  if (session.isCaptain) return "Captain";
-  if (session.isNavigator) return "GPS";
-  return "Mitspieler";
+  if (session.effectiveBeta && session.isAlpha) {
+    return "Alpha · Beta";
+  }
+  return archetypeRoleLabel(session.archetypeRole);
 }
 
 export function IdentityBar({
@@ -37,7 +38,7 @@ export function IdentityBar({
 }: IdentityBarProps) {
   const router = useRouter();
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
-  const [, startCopyTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   function handleSwitchPlayer() {
     abandonTeamSession();
@@ -45,11 +46,25 @@ export function IdentityBar({
   }
 
   function handleManageTeam() {
-    router.push(eventLobbyPath(inviteCode, joinCode, { manage: true }));
+    startTransition(async () => {
+      const result = await getPlayerResumeToken({
+        inviteCode,
+        joinCode,
+        sessionId: session.sessionId,
+      });
+
+      router.push(
+        buildManageTeamUrl(
+          inviteCode,
+          joinCode,
+          result.success ? result.data.resumeToken : undefined,
+        ),
+      );
+    });
   }
 
   function handleCopyPlayLink() {
-    startCopyTransition(async () => {
+    startTransition(async () => {
       const result = await getPlayerResumeToken({
         inviteCode,
         joinCode,
