@@ -87,6 +87,8 @@ export type RouteTemplate = {
 export type EventContentConfig = {
   template_slug?: string;
   city_slug?: string;
+  /** Reference to a content pack in global_levels (e.g. berlin-classic). */
+  content_pack_slug?: string;
   /** Engine blueprint — exitmania (GPS) | tabbrain (digital/quiz only). */
   blueprint_slug?: "exitmania" | "tabbrain";
   /** Player UI module — exitmania | quiz | training (legacy fallback). */

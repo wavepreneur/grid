@@ -1,70 +1,33 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAuditLog } from "@/lib/grid/audit-log";
 import {
-  buildDefaultContentConfig,
-  getBlueprint,
-  isBlueprintSlug,
-  type BlueprintSlug,
-} from "@/lib/grid/blueprints";
+  authorizeBookingApi,
+  buildBookingResponse,
+  findEventByBookingReference,
+  getPublicOrigin,
+  provisionGridBooking,
+  resolveBookingBlueprint,
+  validateBookingRequest,
+  type GridBookingRequest,
+} from "@/lib/grid/booking-api";
 import { generateInviteCode, generateJoinCode } from "@/lib/grid/codes";
-import {
-  getCityIdBySlug,
-  getOrganizationBySlug,
-} from "@/lib/grid/organizations";
-import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
-
-type BookingRequest = {
-  organization_slug?: string;
-  blueprint_slug?: string;
-  title: string;
-  team_count: number;
-  players_per_team?: number;
-  city_slug?: string;
-  booking_reference?: string;
-  scheduled_start_at?: string;
-};
-
-function resolveBookingBlueprint(orgSlug: string, requested?: string): BlueprintSlug {
-  if (requested && isBlueprintSlug(requested)) return requested;
-  if (orgSlug === "tabbrain") return "tabbrain";
-  return "exitmania";
-}
+import { getOrganizationBySlug } from "@/lib/grid/organizations";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
-export async function POST(request: Request) {
-  const apiKey = request.headers.get("x-grid-api-key");
-  const expectedKey = process.env.GRID_BOOKING_API_KEY;
-
-  if (!expectedKey || apiKey !== expectedKey) {
+export async function GET(request: Request) {
+  if (!authorizeBookingApi(request)) {
     return unauthorized();
   }
 
-  let body: BookingRequest;
-  try {
-    body = (await request.json()) as BookingRequest;
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  const url = new URL(request.url);
+  const bookingReference = url.searchParams.get("booking_reference")?.trim();
+  const orgSlug = url.searchParams.get("organization_slug")?.trim() ?? "exitmania";
 
-  const title = body.title?.trim();
-  const teamCount = body.team_count;
-  const playersPerTeam = body.players_per_team ?? 8;
-  const orgSlug = body.organization_slug ?? "exitmania";
-  const blueprintSlug = resolveBookingBlueprint(orgSlug, body.blueprint_slug);
-  const blueprint = getBlueprint(blueprintSlug);
-
-  if (!title || title.length < 3) {
-    return NextResponse.json({ error: "title must be at least 3 characters" }, { status: 400 });
-  }
-  if (!Number.isInteger(teamCount) || teamCount < 1 || teamCount > 500) {
-    return NextResponse.json({ error: "team_count must be between 1 and 500" }, { status: 400 });
-  }
-  if (playersPerTeam < 1 || playersPerTeam > 8) {
-    return NextResponse.json({ error: "players_per_team must be between 1 and 8" }, { status: 400 });
+  if (!bookingReference) {
+    return NextResponse.json({ error: "booking_reference query param required" }, { status: 400 });
   }
 
   try {
@@ -73,91 +36,128 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Organization "${orgSlug}" not found` }, { status: 404 });
     }
 
-    const citySlug = body.city_slug ?? blueprint.defaultContent.city_slug ?? DEFAULT_CITY_SLUG;
-    let cityId: string | null = null;
-
-    if (blueprint.capabilities.gps) {
-      cityId = await getCityIdBySlug(organization.id, citySlug);
-      if (!cityId) {
-        return NextResponse.json({ error: `City "${citySlug}" not found` }, { status: 404 });
-      }
+    const event = await findEventByBookingReference(organization.id, bookingReference);
+    if (!event) {
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    const contentConfig = {
-      ...buildDefaultContentConfig(blueprintSlug),
-      ...(body.city_slug ? { city_slug: body.city_slug } : {}),
-      ...(blueprint.capabilities.gps ? { city_slug: citySlug } : {}),
-    };
-
+    const { createAdminClient } = await import("@/lib/supabase/admin");
     const supabase = createAdminClient();
-    const inviteCode = generateInviteCode();
+    const { data: teams, error } = await supabase
+      .from("teams")
+      .select("id, join_code, name, status, current_level, game_state, started_at, finished_at")
+      .eq("event_id", event.id)
+      .order("join_code", { ascending: true });
 
-    const { data: event, error: eventError } = await supabase
-      .from("events")
-      .insert({
-        title,
-        organization_id: organization.id,
-        city_id: cityId,
-        invite_code: inviteCode,
-        status: "lobby",
-        max_teams: teamCount,
-        max_players_per_team: playersPerTeam,
-        booking_reference: body.booking_reference?.trim() || null,
-        scheduled_start_at: body.scheduled_start_at ?? null,
-        content_config: contentConfig,
-      })
-      .select("id, invite_code")
-      .single();
-
-    if (eventError || !event) {
-      return NextResponse.json({ error: eventError?.message ?? "Event creation failed" }, { status: 500 });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const teams: Array<{ join_code: string; team_name: string }> = [];
+    const blueprintSlug = resolveBookingBlueprint(orgSlug);
+    const response = await buildBookingResponse({
+      event,
+      teams: teams ?? [],
+      origin: getPublicOrigin(request),
+      blueprintSlug,
+      idempotent: true,
+    });
 
-    for (let index = 1; index <= teamCount; index += 1) {
-      const joinCode = generateJoinCode();
-      const teamName = `Team ${index}`;
+    return NextResponse.json(response);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Internal error" },
+      { status: 500 },
+    );
+  }
+}
 
-      const { error: teamError } = await supabase.from("teams").insert({
-        event_id: event.id,
-        organization_id: organization.id,
-        join_code: joinCode,
-        name: teamName,
-        max_size: playersPerTeam,
-        status: "setup",
-      });
+export async function POST(request: Request) {
+  if (!authorizeBookingApi(request)) {
+    return unauthorized();
+  }
 
-      if (teamError) {
-        return NextResponse.json({ error: teamError.message }, { status: 500 });
+  let body: GridBookingRequest;
+  try {
+    body = (await request.json()) as GridBookingRequest;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const validationError = validateBookingRequest(body);
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
+  }
+
+  const orgSlug = body.organization_slug ?? "exitmania";
+
+  try {
+    const organization = await getOrganizationBySlug(orgSlug);
+    if (!organization) {
+      return NextResponse.json({ error: `Organization "${orgSlug}" not found` }, { status: 404 });
+    }
+
+    if (body.booking_reference?.trim()) {
+      const existing = await findEventByBookingReference(organization.id, body.booking_reference);
+      if (existing) {
+        const { createAdminClient } = await import("@/lib/supabase/admin");
+        const supabase = createAdminClient();
+        const { data: teams } = await supabase
+          .from("teams")
+          .select("id, join_code, name, status, current_level, game_state, started_at, finished_at")
+          .eq("event_id", existing.id)
+          .order("join_code", { ascending: true });
+
+        const response = await buildBookingResponse({
+          event: existing,
+          teams: teams ?? [],
+          origin: getPublicOrigin(request),
+          blueprintSlug: resolveBookingBlueprint(orgSlug, body.blueprint_slug),
+          idempotent: true,
+        });
+
+        return NextResponse.json(response);
       }
-
-      teams.push({ join_code: joinCode, team_name: teamName });
     }
+
+    const inviteCode = generateInviteCode();
+    const joinCodes = Array.from({ length: body.team_count }, (_, index) => ({
+      joinCode: generateJoinCode(),
+      teamName: `Team ${index + 1}`,
+    }));
+
+    const { event, teams } = await provisionGridBooking({
+      organizationId: organization.id,
+      orgSlug,
+      body,
+      inviteCode,
+      joinCodes,
+    });
+
+    const blueprintSlug = resolveBookingBlueprint(orgSlug, body.blueprint_slug);
 
     await writeAuditLog({
       organizationId: organization.id,
       eventId: event.id,
       action: "booking_created",
       payload: {
-        title,
-        team_count: teamCount,
-        players_per_team: playersPerTeam,
+        title: body.title.trim(),
+        team_count: body.team_count,
+        players_per_team: body.players_per_team ?? 8,
         blueprint_slug: blueprintSlug,
-        city_slug: blueprint.capabilities.gps ? citySlug : null,
+        content_pack_slug: body.content_pack_slug ?? null,
+        city_slug: body.city_slug ?? null,
         booking_reference: body.booking_reference ?? null,
       },
     });
 
-    return NextResponse.json({
-      event_id: event.id,
-      invite_code: event.invite_code,
-      blueprint_slug: blueprintSlug,
-      join_url: `/e/${event.invite_code}`,
-      cockpit_url: `/cockpit/${event.invite_code}`,
-      show_url: `/cockpit/${event.invite_code}/show`,
+    const response = await buildBookingResponse({
+      event,
       teams,
+      origin: getPublicOrigin(request),
+      blueprintSlug,
     });
+
+    return NextResponse.json(response, { status: 201 });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal error" },

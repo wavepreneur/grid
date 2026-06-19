@@ -82,13 +82,14 @@ Tabbrain bucht das Erlebnis; Exitmania-JSON (oder kundenspezifisches JSON im sel
 | Tabbrain als `organization` | 🟡 Basis | Migration `20260620100000_tabbrain_blueprint.sql` |
 | Tabbrain → Token bei Buchung | 🟡 Basis | Booking-API `blueprint_slug: tabbrain`, Org-Default |
 | Enterprise-Landing auf Tabbrain | ⬜ Extern | Nicht in diesem Repo — Tabbrain-eigenes Produkt |
-| Content-JSON von Tabbrain an GRID | 🟡 Basis | `global_levels` / `route_override`; kein `content_payload` in Booking-API |
+| Content-JSON von Tabbrain an GRID | 🟡 Basis | `global_levels` / `route_override`; Booking-API: `content_pack_slug`, `route_override`, idempotent `booking_reference` |
+| Exitmania → GRID Session (Loquiz-Ersatz) | 🟡 Phase 0 | `POST/GET /api/v1/bookings`, `GET /api/v1/events/{code}/status`; Exitmania `create-grid-session` |
 | Spieler: Zero-Auth + ephemeral Session | ✅ Live | `/e/{code}`, Resume-Tokens |
 | HR: Magic-Link-Dashboard (Tabbrain-Branding) | ⬜ Vision | Heute: Operator-Cockpit `/cockpit/{code}` ohne Buyer-Login |
 | Analytics-Hoheit bei GRID | 🟡 Basis | `audit_logs` in GRID |
 | Exitmania = Archetyp 01 Referenz | ✅ Live | `blueprint_slug: exitmania`, GPS an |
 
-**Nächster Integrations-Schritt:** `organizations.slug: "tabbrain"` + Booking-API: `content_payload`, `blueprint_slug`, skalierbare `team_count` (3.000+) → Tabbrain ruft einmal pro Enterprise-Buchung auf.
+**Nächster Integrations-Schritt:** Exitmania-Pilot (1 Spiel, `games.grid_enabled`) → Loquiz parallel; Tabbrain nutzt dieselbe Booking-API mit `organization_slug: tabbrain`.
 
 ---
 

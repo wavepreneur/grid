@@ -1,0 +1,30 @@
+---
+description: Exitmania, Tabbrain, GRID — Produktgrenzen und Integrationsmandat
+alwaysApply: true
+---
+
+# GRID Ecosystem
+
+Read `docs/EXITMANIA_GRID_INTEGRATION.md` before integration or content work.
+
+## Ownership
+
+- **GRID (this repo):** Live engine only — FSM, Alpha/Beta/Gamma, Realtime, Cockpit, `global_levels`, Booking-API
+- **Exitmania (../Developer/exitmania):** Commerce — Paddle, SEO, portals, admin; replaces Loquiz with GRID, does NOT reimplement gameplay
+- **Tabbrain (not built):** Enterprise GTM; same GRID engine, `blueprint_slug: tabbrain`
+
+## Content
+
+- Master levels: `global_levels` + `local_waypoints` (one dictionary, many events)
+- Per booking: `events.content_config` + `events.route_override` (patches only)
+- Never duplicate full route JSON per event
+
+## Booking API
+
+Exitmania/Tabbrain provision via `POST /api/v1/bookings` with `booking_reference` (idempotent), `content_pack_slug`, optional `route_override`.
+
+## Do not
+
+- Add checkout/Paddle to GRID
+- Add CMS for master content to GRID (use migrations or future Exitmania pack pipeline)
+- Build separate game runtime in Exitmania
