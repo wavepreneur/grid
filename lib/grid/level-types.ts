@@ -87,10 +87,17 @@ export type RouteTemplate = {
 export type EventContentConfig = {
   template_slug?: string;
   city_slug?: string;
-  /** Player UI module — exitmania | quiz | training (future). */
+  /** Engine blueprint — exitmania (GPS) | tabbrain (digital/quiz only). */
+  blueprint_slug?: "exitmania" | "tabbrain";
+  /** Player UI module — exitmania | quiz | training (legacy fallback). */
   ui_layout?: "exitmania" | "quiz" | "training";
   show_live_score?: boolean;
   mission_duration_minutes?: number;
+};
+
+export type BlueprintCapabilities = {
+  gps: boolean;
+  navigatorRole: boolean;
 };
 
 export type EventRouteOverride = {
@@ -102,6 +109,9 @@ export type ResolvedEventContent = {
   templateName: string;
   city: string | null;
   levels: LevelDefinition[];
+  blueprintSlug: "exitmania" | "tabbrain";
+  archetype: "ASYMMETRIC_INFORMANT" | "TIME_DECAY_SPRINT" | "COOPERATIVE_COLLECTIVE";
+  capabilities: BlueprintCapabilities;
   uiLayout: "exitmania" | "quiz" | "training";
   showLiveScore: boolean;
   missionDurationMinutes: number;

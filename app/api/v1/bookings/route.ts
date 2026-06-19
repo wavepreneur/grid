@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAuditLog } from "@/lib/grid/audit-log";
+import {
+  buildDefaultContentConfig,
+  getBlueprint,
+  isBlueprintSlug,
+  type BlueprintSlug,
+} from "@/lib/grid/blueprints";
 import { generateInviteCode, generateJoinCode } from "@/lib/grid/codes";
 import {
   getCityIdBySlug,
@@ -10,6 +16,7 @@ import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 
 type BookingRequest = {
   organization_slug?: string;
+  blueprint_slug?: string;
   title: string;
   team_count: number;
   players_per_team?: number;
@@ -17,6 +24,12 @@ type BookingRequest = {
   booking_reference?: string;
   scheduled_start_at?: string;
 };
+
+function resolveBookingBlueprint(orgSlug: string, requested?: string): BlueprintSlug {
+  if (requested && isBlueprintSlug(requested)) return requested;
+  if (orgSlug === "tabbrain") return "tabbrain";
+  return "exitmania";
+}
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,7 +54,8 @@ export async function POST(request: Request) {
   const teamCount = body.team_count;
   const playersPerTeam = body.players_per_team ?? 8;
   const orgSlug = body.organization_slug ?? "exitmania";
-  const citySlug = body.city_slug ?? DEFAULT_CITY_SLUG;
+  const blueprintSlug = resolveBookingBlueprint(orgSlug, body.blueprint_slug);
+  const blueprint = getBlueprint(blueprintSlug);
 
   if (!title || title.length < 3) {
     return NextResponse.json({ error: "title must be at least 3 characters" }, { status: 400 });
@@ -59,10 +73,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Organization "${orgSlug}" not found` }, { status: 404 });
     }
 
-    const cityId = await getCityIdBySlug(organization.id, citySlug);
-    if (!cityId) {
-      return NextResponse.json({ error: `City "${citySlug}" not found` }, { status: 404 });
+    const citySlug = body.city_slug ?? blueprint.defaultContent.city_slug ?? DEFAULT_CITY_SLUG;
+    let cityId: string | null = null;
+
+    if (blueprint.capabilities.gps) {
+      cityId = await getCityIdBySlug(organization.id, citySlug);
+      if (!cityId) {
+        return NextResponse.json({ error: `City "${citySlug}" not found` }, { status: 404 });
+      }
     }
+
+    const contentConfig = {
+      ...buildDefaultContentConfig(blueprintSlug),
+      ...(body.city_slug ? { city_slug: body.city_slug } : {}),
+      ...(blueprint.capabilities.gps ? { city_slug: citySlug } : {}),
+    };
 
     const supabase = createAdminClient();
     const inviteCode = generateInviteCode();
@@ -79,7 +104,7 @@ export async function POST(request: Request) {
         max_players_per_team: playersPerTeam,
         booking_reference: body.booking_reference?.trim() || null,
         scheduled_start_at: body.scheduled_start_at ?? null,
-        content_config: { city_slug: citySlug },
+        content_config: contentConfig,
       })
       .select("id, invite_code")
       .single();
@@ -118,7 +143,8 @@ export async function POST(request: Request) {
         title,
         team_count: teamCount,
         players_per_team: playersPerTeam,
-        city_slug: citySlug,
+        blueprint_slug: blueprintSlug,
+        city_slug: blueprint.capabilities.gps ? citySlug : null,
         booking_reference: body.booking_reference ?? null,
       },
     });
@@ -126,6 +152,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       event_id: event.id,
       invite_code: event.invite_code,
+      blueprint_slug: blueprintSlug,
       join_url: `/e/${event.invite_code}`,
       cockpit_url: `/cockpit/${event.invite_code}`,
       show_url: `/cockpit/${event.invite_code}/show`,

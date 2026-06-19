@@ -7,6 +7,7 @@ import {
   purchaseHint,
   solveCurrentLevel,
 } from "@/app/actions/game";
+import { usesMissionShell } from "@/lib/grid/blueprints";
 import { ExitmaniaLevelView } from "@/components/game/exitmania-level-view";
 import { GameHud } from "@/components/game/game-hud";
 import { LevelPanel } from "@/components/game/level-panel";
@@ -211,7 +212,7 @@ export function GameRoom({
             ) : null}
           </div>
         ) : currentLevelDefinition ? (
-          eventContent.uiLayout === "exitmania" ? (
+          usesMissionShell(eventContent) ? (
             <ExitmaniaLevelView
               level={currentLevelDefinition}
               allLevels={eventContent.levels}
@@ -221,6 +222,7 @@ export function GameRoom({
               disabled={solveDisabled}
               isPending={isPending || isHintPending}
               isNavigator={isNavigator}
+              gpsCapability={eventContent.capabilities.gps}
               onSubmit={handleSolveLevel}
               onPurchaseHint={handlePurchaseHint}
             />

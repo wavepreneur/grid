@@ -39,7 +39,8 @@ const coreArchetypes = [
     tag: "Collaboration",
     rule: "Forces fragmented data streams. One team, three isolated views (Alpha, Beta, Gamma). Complete information asymmetry. Solvable only through zero-latency synchronization.",
     enterpriseCase: "Post-merger cultural integration & cross-functional onboarding.",
-    status: "vision" as Maturity,
+    status: "beta" as Maturity,
+    reference: "Exitmania (live reference module)",
   },
   {
     id: "02",
@@ -104,11 +105,12 @@ const goalTracker = [
   { claim: "Zero-auth join: link + name, ephemeral team token", status: "live" as Maturity },
   { claim: "Real-time FSM sync: state, roles, sessions", status: "live" as Maturity },
   { claim: "Self-healing sessions & device handoff", status: "live" as Maturity },
-  { claim: "Asymmetric roles: Captain, GPS, teammates (Exitmania module)", status: "live" as Maturity },
+  { claim: "Asymmetric roles: Captain, GPS, teammates (Exitmania = Archetype 01)", status: "live" as Maturity },
   { claim: "JSON content injection via global_levels / route_override", status: "beta" as Maturity },
+  { claim: "Tabbrain enterprise booking → GRID session token provisioning", status: "beta" as Maturity },
   { claim: "Operator cockpit & arena live score", status: "live" as Maturity },
-  { claim: "Telemetry via audit_logs", status: "beta" as Maturity },
-  { claim: "Archetype routing: ASYMMETRIC_INFORMANT", status: "vision" as Maturity },
+  { claim: "Telemetry via audit_logs (GRID-owned analytics)", status: "beta" as Maturity },
+  { claim: "Formal blueprint_slug routing (exitmania | tabbrain)", status: "live" as Maturity },
   { claim: "Archetype routing: TIME_DECAY_SPRINT", status: "vision" as Maturity },
   { claim: "Archetype routing: COOPERATIVE_COLLECTIVE", status: "vision" as Maturity },
   { claim: "Mission Control dashboard with department filters", status: "vision" as Maturity },
@@ -319,10 +321,11 @@ export function GridLandingPage() {
                   role routing, and telemetry pipeline remain constant across every deployment.
                 </p>
                 <p className="grid-body">
-                  Built on{" "}
-                  <span style={{ color: "#f0f4ff" }}>1,900 validated field deployments</span> across
-                  Europe — stress-tested mechanics transferred from physical routes into a borderless,
-                  location-independent engine.
+                  Enterprise customers book on{" "}
+                  <span style={{ color: "#f0f4ff" }}>Tabbrain</span> — Tabbrain generates GRID
+                  session tokens; players land here with zero accounts. Built on{" "}
+                  <span style={{ color: "#f0f4ff" }}>1,900 validated field deployments</span>{" "}
+                  (Exitmania mechanics = Archetype 01 reference).
                 </p>
               </div>
               <div style={{ display: "grid", gap: 16 }}>
@@ -453,6 +456,11 @@ export function GridLandingPage() {
                     <span style={{ color: "#00e5ff", fontWeight: 600 }}>Enterprise case: </span>
                     {item.enterpriseCase}
                   </p>
+                  {"reference" in item && item.reference ? (
+                    <p style={{ fontSize: 11, color: "rgba(52,211,153,0.65)", marginTop: 10 }}>
+                      Live reference: {item.reference}
+                    </p>
+                  ) : null}
                 </article>
               ))}
             </div>

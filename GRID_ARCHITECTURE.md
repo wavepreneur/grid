@@ -12,7 +12,83 @@ GRID ist **keine Content-Plattform** (kein Canva, kein B2B-Kahoot). GRID ist ein
 
 - **Variable:** Content als JSON (`global_levels`, `route_override`, Blueprint-Slugs)
 - **Fix:** Verhaltens-Engine, asymmetrische Sync-Schicht, ephemeral Team-Tokens — **keine persistenten User-Accounts**
-- **Landing Page = System of Record:** [`gridos.vercel.app`](https://gridos.vercel.app/) ist die Verfassung für Produkt und Code
+- **Landing Page = System of Record (Engine):** [`gridos.vercel.app`](https://gridos.vercel.app/) — Architektur-Verfassung, **nicht** Enterprise-Kauf-Funnel (das ist **Tabbrain**)
+
+---
+
+## 0. Vertriebs- & Integrationsmodell (Tabbrain → GRID)
+
+GRID ist die **Live-Engine** — keine Enterprise-Landingpage, kein Shop. **Tabbrain** ist die **Enterprise-Plattform** für Kund:innen, die z. B. ein Erlebnis für 3.000 Mitarbeitende buchen. **Exitmania** liefert die **validierten Spielmechaniken** (Archetyp 01) als JSON-Referenz.
+
+### Drei Ebenen
+
+| Ebene | Produkt | Zielgruppe | Rolle |
+|---|---|---|---|
+| **Enterprise GTM** | **Tabbrain** (`tabbrain.com`) | HR, L&D, Event-Leiter (500–3.000+ MA) | Landing Page, Buchung, Content-Konfiguration, **Token-Generierung für GRID** |
+| **Live-Engine** | **GRID** (`gridos.app` / `engine.gridos.app`) | Spieler + Operator | FSM, Realtime-Sync, Cockpit, **Analytics-Hoheit** (`audit_logs`) |
+| **Mechanik-Referenz** | **Exitmania** | Content-Quelle / Field-Proof | Archetyp 01 `ASYMMETRIC_INFORMANT` — JSON, nicht separates Engine-Produkt |
+
+**GRID-Landingpage** ([gridos.vercel.app](https://gridos.vercel.app/)) = Verfassung für Engine, Architektur und Investoren — **nicht** der Enterprise-Kauf-Funnel. Enterprise-Kund:innen starten auf **Tabbrain**.
+
+### Rollentrennung
+
+| Partei | Wo | Account |
+|---|---|---|
+| **Enterprise-Käufer (HR)** | Tabbrain Landing → Buchung | Tabbrain-Account; danach Magic Link → GRID-Dashboard (Tabbrain-Branding) |
+| **Spieler (3.000 MA)** | Redirect auf GRID Play-URL | **Kein Account** — ephemeral Team-Token (`player_id` + Resume-JWT) |
+| **Tabbrain** | Commerce, Story/JSON, Token-Ausstellung | Generiert bei Buchung GRID-Session via Booking-API |
+| **GRID** | Live-Infrastruktur + Telemetrie | `organizations`-Tenant, Sessions, `audit_logs` |
+| **Exitmania** | Content-Mechanik (JSON) | Kein Enterprise-Shop — liefert Blueprint-Inhalt an Tabbrain/GRID |
+
+### Buchung → Token → Spiel (Enterprise-Flow)
+
+```text
+1. Enterprise-Kunde auf tabbrain.com
+   → Landing Page, Paket wählen (z. B. 3.000 Spieler, Compliance-Onboarding)
+   → Tabbrain speichert Content (Story, Texte, Szenario-JSON)
+
+2. Tabbrain generiert GRID-Session (Server-to-Server)
+   POST /api/v1/bookings  (x-grid-api-key)
+   organization_slug: "tabbrain"
+   → GRID erzeugt Event, Teams, invite_code / signierte Play-Tokens
+   → Response: play_url, cockpit_url, buyer_dashboard_url
+
+3. Fliegender Wechsel (Spieler merken Tabbrain nicht)
+   play.tabbrain.com/…  →  engine.gridos.app/e/{inviteCode}
+   Zero-Auth: Name tippen, sofort im Team
+
+4. HR-Manager
+   Magic Link (von Tabbrain ausgelöst) → GRID Mission Control
+   Tabbrain-Branding (`organizations.theme_config`), Daten nativ in GRID
+```
+
+**Token-Hoheit:** Tabbrain **stellt aus** (Buchungsmoment), GRID **validiert & betreibt** (Session-Laufzeit). Analytics bleiben in GRID.
+
+### Archetyp ↔ Exitmania
+
+**Archetyp 01 `ASYMMETRIC_INFORMANT` = Exitmania-Mechanik als Referenz-Implementierung.**
+
+- Fragmentierte Informationsströme (GPS-Navigator vs. Mitspieler)
+- Ein Team, mehrere isolierte Geräte-Rollen
+- Lösbar nur durch Echtzeit-Synchronisation
+
+Tabbrain bucht das Erlebnis; Exitmania-JSON (oder kundenspezifisches JSON im selben Blueprint-Format) wird injiziert. Technischer Pfad: `blueprint_slug: "exitmania"` → Archetyp-Registry — **Refactor, kein Rewrite**.
+
+### Ist-Stand Integration
+
+| Anforderung | Status | Code / Gap |
+|---|---|---|
+| GRID Booking-API (Session provisionieren) | ✅ Live | `POST /api/v1/bookings` — Tabbrain muss Caller sein |
+| Tabbrain als `organization` | 🟡 Basis | Migration `20260620100000_tabbrain_blueprint.sql` |
+| Tabbrain → Token bei Buchung | 🟡 Basis | Booking-API `blueprint_slug: tabbrain`, Org-Default |
+| Enterprise-Landing auf Tabbrain | ⬜ Extern | Nicht in diesem Repo — Tabbrain-eigenes Produkt |
+| Content-JSON von Tabbrain an GRID | 🟡 Basis | `global_levels` / `route_override`; kein `content_payload` in Booking-API |
+| Spieler: Zero-Auth + ephemeral Session | ✅ Live | `/e/{code}`, Resume-Tokens |
+| HR: Magic-Link-Dashboard (Tabbrain-Branding) | ⬜ Vision | Heute: Operator-Cockpit `/cockpit/{code}` ohne Buyer-Login |
+| Analytics-Hoheit bei GRID | 🟡 Basis | `audit_logs` in GRID |
+| Exitmania = Archetyp 01 Referenz | ✅ Live | `blueprint_slug: exitmania`, GPS an |
+
+**Nächster Integrations-Schritt:** `organizations.slug: "tabbrain"` + Booking-API: `content_payload`, `blueprint_slug`, skalierbare `team_count` (3.000+) → Tabbrain ruft einmal pro Enterprise-Buchung auf.
 
 ---
 
@@ -57,15 +133,15 @@ UI-Logik **strikt getrennt vom Inhalt**, archetyp-basiert:
 |---|---|---|
 | JSON-Content-Engine | 🟡 Basis | `global_levels`, `route_override`, `content-loader.ts` |
 | `ui_layout` Module | 🟡 Basis | `exitmania` live; `quiz` / `training` nur Typen |
-| Exitmania (konkretes Spiel) | ✅ Live | Kacheln, Tipps, GPS-Karte, 10 Levels |
-| `blueprint_slug` / Archetyp-Routing | ⬜ Vision | Fehlt in Schema und Frontend |
-| ASYMMETRIC_INFORMANT | ⬜ Vision | Keine Alpha/Beta/Gamma-Komponenten |
+| Exitmania (konkretes Spiel) | ✅ Live | Kacheln, Tipps, GPS-Karte, 10 Levels — **= Referenz für ASYMMETRIC_INFORMANT** |
+| `blueprint_slug` / Archetyp-Routing | ✅ Live | `lib/grid/blueprints.ts`, `content_config.blueprint_slug` |
+| ASYMMETRIC_INFORMANT | 🟡 Referenz live | Exitmania + Tabbrain (no GPS) share mission shell |
 | TIME_DECAY_SPRINT | ⬜ Vision | Kein Server-Decay, keine Joker in `game_state` |
 | COOPERATIVE_COLLECTIVE | ⬜ Vision | Kein Voting, keine Fraktionen |
 
-**Wichtig:** Exitmania ist ein **Referenz-Modul**, noch **keine** generische Blaupausen-Engine. Marketing-Blaupausen = Zielbild.
+**Wichtig:** Exitmania ist die **live Referenz** für Archetyp 01 — kein separates Produkt. Marketing-Archetypen 02/03 = Zielbild.
 
-**Nächster Schritt:** `content_config.blueprint_slug` + `components/blueprints/` mit je eigenem Step-Renderer; Server-Actions pro Archetyp.
+**Nächster Schritt:** `content_config.blueprint_slug: "exitmania"` + Archetyp-Registry; Tabbrain liefert JSON, Engine parst.
 
 ---
 
@@ -113,12 +189,13 @@ Bei jedem Release prüfen:
 
 ## 5. Empfohlene Build-Reihenfolge
 
-1. **Blueprint-Routing** — `blueprint_slug` + Step-Capabilities (entblockt Matrix-Mandat)
-2. **ASYMMETRIC_INFORMANT** — erstes archetyp-eigenes UI (Referenz für Engine)
-3. **activity_logs + Cockpit-Filter** — schließt Analytics-Lücke ohne Großgruppen
-4. **TIME_DECAY_SPRINT** — Server-Timer + Joker
-5. **Canva/CMS + KI-Import** — Creator-Flow für Nicht-Devs
-6. **COOPERATIVE_COLLECTIVE** — Voting / 1.000+ (skalierungskritisch)
+1. **Blueprint-Routing** — `blueprint_slug`; Exitmania → `ASYMMETRIC_INFORMANT` formal registrieren
+2. **Tabbrain Booking-Contract** — API: `content_payload` + Redirect-URLs; Org `tabbrain` anlegen
+3. **activity_logs + Cockpit-Filter** — Analytics-Hoheit in GRID; Käufer-Dashboard v0 (Magic Link)
+4. **TIME_DECAY_SPRINT** — zweiter Archetyp (Compliance-Stress)
+5. **COOPERATIVE_COLLECTIVE** — Voting / 1.000+ (skalierungskritisch)
+
+**Nicht in GRID bauen:** Content-Shop, Zahlungsabwicklung, Story-Editor — das bleibt Tabbrain/Exitmania.
 
 ---
 
@@ -131,6 +208,7 @@ Bei jedem Release prüfen:
 | Content | `lib/grid/content-loader.ts`, `lib/grid/level-types.ts` |
 | Operator | `app/actions/cockpit.ts`, `components/cockpit/event-cockpit-show.tsx` |
 | Telemetrie | `lib/grid/audit-log.ts`, `supabase/migrations/20260615120000_architecture_foundation.sql` |
+| Booking / Tabbrain-Integration | `app/api/v1/bookings/route.ts`, `lib/grid/organizations.ts` |
 | Marketing-Kompass | `components/marketing/grid-landing-page.tsx` |
 
 ---

@@ -130,6 +130,7 @@ export async function solveCurrentLevel(input: {
       isCaptain: player.is_captain,
       isNavigator: team.navigator_player_id === player.id,
       playerRole,
+      gpsEnabled: content.capabilities.gps,
     });
 
     if (!validation.ok) {

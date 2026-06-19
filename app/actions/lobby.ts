@@ -13,11 +13,13 @@ import {
   normalizeCode,
 } from "@/lib/grid/codes";
 import { writeAuditLog } from "@/lib/grid/audit-log";
+import { buildDefaultContentConfig, getBlueprint, isBlueprintSlug, type BlueprintSlug } from "@/lib/grid/blueprints";
+import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 import {
   getCityIdBySlug,
   getDefaultOrganizationId,
+  getOrganizationBySlug,
 } from "@/lib/grid/organizations";
-import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 import {
   signPlayerResumeToken,
   verifyPlayerResumeToken,
@@ -171,6 +173,7 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
 export async function createEvent(input: {
   title: string;
   organizationName?: string;
+  blueprintSlug?: BlueprintSlug;
 }): Promise<ActionResult<GridEvent>> {
   try {
     const title = input.title.trim();
@@ -178,26 +181,38 @@ export async function createEvent(input: {
       return { success: false, error: "Titel muss mindestens 3 Zeichen haben." };
     }
 
+    const blueprintSlug =
+      input.blueprintSlug && isBlueprintSlug(input.blueprintSlug)
+        ? input.blueprintSlug
+        : "exitmania";
+    const blueprint = getBlueprint(blueprintSlug);
+    const orgSlug = blueprintSlug === "tabbrain" ? "tabbrain" : "exitmania";
+
     const supabase = createAdminClient();
     const inviteCode = generateInviteCode();
-    const organizationId = await getDefaultOrganizationId();
-    const cityId = await getCityIdBySlug(organizationId, DEFAULT_CITY_SLUG);
+    const organization = await getOrganizationBySlug(orgSlug);
+    if (!organization) {
+      return { success: false, error: `Organisation „${orgSlug}" nicht gefunden.` };
+    }
+
+    let cityId: string | null = null;
+    if (blueprint.capabilities.gps) {
+      cityId = await getCityIdBySlug(organization.id, DEFAULT_CITY_SLUG);
+      if (!cityId) {
+        return { success: false, error: "Stadt für Exitmania-Blueprint nicht gefunden." };
+      }
+    }
 
     const { data, error } = await supabase
       .from("events")
       .insert({
         title,
-        organization_id: organizationId,
+        organization_id: organization.id,
         city_id: cityId,
         organization_name: input.organizationName?.trim() || null,
         invite_code: inviteCode,
         status: "lobby",
-        content_config: {
-          city_slug: DEFAULT_CITY_SLUG,
-          ui_layout: "exitmania",
-          show_live_score: true,
-          mission_duration_minutes: 90,
-        },
+        content_config: buildDefaultContentConfig(blueprintSlug),
       })
       .select(
         "id, title, organization_id, organization_name, city_id, invite_code, status, max_teams, max_players_per_team, lobby_auto_start_seconds, booking_reference",

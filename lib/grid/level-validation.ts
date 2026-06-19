@@ -14,6 +14,7 @@ export type LevelValidationContext = {
   isCaptain: boolean;
   isNavigator: boolean;
   playerRole: PlayerRole;
+  gpsEnabled?: boolean;
 };
 
 export function validateLevelSolution(
@@ -32,6 +33,9 @@ export function validateLevelSolution(
   }
 
   if (level.type === "gps") {
+    if (context?.gpsEnabled === false) {
+      return { ok: false, error: "GPS ist für dieses Event deaktiviert." };
+    }
     if (!level.location) {
       return { ok: false, error: "GPS-Level ohne Koordinaten konfiguriert." };
     }

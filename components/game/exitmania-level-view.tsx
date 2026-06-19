@@ -23,6 +23,7 @@ type ExitmaniaLevelViewProps = {
   disabled: boolean;
   isPending: boolean;
   isNavigator: boolean;
+  gpsCapability?: boolean;
   onSubmit: (payload: SolveLevelPayload) => void;
   onPurchaseHint: (tileId: string) => void;
 };
@@ -36,12 +37,13 @@ export function ExitmaniaLevelView({
   disabled,
   isPending,
   isNavigator,
+  gpsCapability = true,
   onSubmit,
   onPurchaseHint,
 }: ExitmaniaLevelViewProps) {
   const [activeTile, setActiveTile] = useState<LevelContentTile | null>(null);
   const tiles = level.tiles ?? [];
-  const isGpsLevel = level.type === "gps" && Boolean(level.location);
+  const isGpsLevel = gpsCapability && level.type === "gps" && Boolean(level.location);
   const gpsEnabled = isGpsLevel && isNavigator;
   const { sample } = useGeolocation(gpsEnabled);
 

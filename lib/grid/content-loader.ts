@@ -5,6 +5,12 @@ import {
   parseLevelDefinitions,
   parseRouteOverride,
 } from "@/lib/grid/content-engine";
+import {
+  applyBlueprintLevelConstraints,
+  buildResolvedBlueprintFields,
+  mergeContentConfigWithBlueprint,
+  resolveBlueprint,
+} from "@/lib/grid/blueprints";
 import { getCityIdBySlug } from "@/lib/grid/organizations";
 import type {
   EventContentConfig,
@@ -152,18 +158,23 @@ export async function loadResolvedEventContent(input: {
   contentConfig: unknown;
   routeOverride: unknown;
 }): Promise<ResolvedEventContent> {
-  const contentConfig = parseContentConfig(input.contentConfig);
+  const contentConfig = mergeContentConfigWithBlueprint(parseContentConfig(input.contentConfig));
+  const blueprint = resolveBlueprint(contentConfig);
   const routeOverride = parseRouteOverride(input.routeOverride);
-  const citySlug = contentConfig.city_slug ?? DEFAULT_CITY_SLUG;
+  const citySlug = contentConfig.city_slug ?? blueprint.defaultContent.city_slug ?? DEFAULT_CITY_SLUG;
 
   let baseLevels: LevelDefinition[];
   let templateName: string;
   let cityName: string | null = null;
   let templateSlug = contentConfig.template_slug ?? DEFAULT_TEMPLATE_SLUG;
 
-  const resolvedCityId =
-    input.cityId ??
-    (await getCityIdBySlug(input.organizationId, citySlug));
+  const useGlobalSchema =
+    blueprint.capabilities.gps &&
+    Boolean(contentConfig.city_slug ?? blueprint.defaultContent.city_slug);
+
+  const resolvedCityId = useGlobalSchema
+    ? (input.cityId ?? (await getCityIdBySlug(input.organizationId, citySlug)))
+    : null;
 
   if (resolvedCityId) {
     baseLevels = await loadLevelsFromGlobalSchema(resolvedCityId);
@@ -171,28 +182,30 @@ export async function loadResolvedEventContent(input: {
     cityName = citySlug;
     templateSlug = `global:${citySlug}`;
   } else {
-    const legacy = await loadLevelsFromLegacyTemplate(
-      contentConfig.template_slug ?? DEFAULT_TEMPLATE_SLUG,
-    );
+    const legacyTemplateSlug =
+      contentConfig.template_slug ?? blueprint.defaultContent.template_slug ?? DEFAULT_TEMPLATE_SLUG;
+    const legacy = await loadLevelsFromLegacyTemplate(legacyTemplateSlug);
     baseLevels = legacy.levels;
     templateName = legacy.templateName;
     cityName = legacy.city;
+    templateSlug = legacyTemplateSlug;
   }
 
-  const mergedLevels = mergeLevelOverrides(baseLevels, routeOverride);
+  const mergedLevels = applyBlueprintLevelConstraints(
+    mergeLevelOverrides(baseLevels, routeOverride),
+    blueprint,
+  );
 
-  const uiLayout = contentConfig.ui_layout ?? "exitmania";
-  const showLiveScore = contentConfig.show_live_score ?? true;
-  const missionDurationMinutes = contentConfig.mission_duration_minutes ?? 90;
+  const blueprintFields = buildResolvedBlueprintFields(contentConfig);
 
   return {
     templateSlug,
     templateName,
     city: cityName,
     levels: mergedLevels.slice(0, EXITMANIA_TOTAL_LEVELS),
-    uiLayout,
-    showLiveScore,
-    missionDurationMinutes,
+    ...blueprintFields,
+    showLiveScore: contentConfig.show_live_score ?? true,
+    missionDurationMinutes: contentConfig.mission_duration_minutes ?? 90,
   };
 }
 

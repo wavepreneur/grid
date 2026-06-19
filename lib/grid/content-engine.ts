@@ -5,6 +5,12 @@ import type {
   ResolvedEventContent,
   RouteTemplate,
 } from "@/lib/grid/level-types";
+import {
+  applyBlueprintLevelConstraints,
+  buildResolvedBlueprintFields,
+  mergeContentConfigWithBlueprint,
+  resolveBlueprint,
+} from "@/lib/grid/blueprints";
 import { DEFAULT_TEMPLATE_SLUG, EXITMANIA_TOTAL_LEVELS } from "@/lib/grid/level-types";
 
 export function parseLevelDefinitions(value: unknown): LevelDefinition[] {
@@ -68,17 +74,21 @@ export function resolveEventContent(input: {
   contentConfig: unknown;
   routeOverride: unknown;
 }): ResolvedEventContent {
-  const contentConfig = parseContentConfig(input.contentConfig);
+  const contentConfig = mergeContentConfigWithBlueprint(parseContentConfig(input.contentConfig));
+  const blueprint = resolveBlueprint(contentConfig);
   const routeOverride = parseRouteOverride(input.routeOverride);
   const baseLevels = parseLevelDefinitions(input.template.levels);
-  const mergedLevels = mergeLevelOverrides(baseLevels, routeOverride);
+  const mergedLevels = applyBlueprintLevelConstraints(
+    mergeLevelOverrides(baseLevels, routeOverride),
+    blueprint,
+  );
 
   return {
     templateSlug: contentConfig.template_slug ?? input.template.slug ?? DEFAULT_TEMPLATE_SLUG,
     templateName: input.template.name,
     city: input.template.city,
     levels: mergedLevels.slice(0, EXITMANIA_TOTAL_LEVELS),
-    uiLayout: contentConfig.ui_layout ?? "exitmania",
+    ...buildResolvedBlueprintFields(contentConfig),
     showLiveScore: contentConfig.show_live_score ?? true,
     missionDurationMinutes: contentConfig.mission_duration_minutes ?? 90,
   };

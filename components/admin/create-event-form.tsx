@@ -27,6 +27,7 @@ export function CreateEventForm() {
       const result = await createEvent({
         title: String(formData.get("title") ?? ""),
         organizationName: String(formData.get("organizationName") ?? ""),
+        blueprintSlug: String(formData.get("blueprintSlug") ?? "exitmania") as "exitmania" | "tabbrain",
       });
 
       if (!result.success) {
@@ -49,6 +50,18 @@ export function CreateEventForm() {
             required
             minLength={3}
           />
+        </div>
+
+        <div>
+          <GridLabel>Blueprint</GridLabel>
+          <select
+            name="blueprintSlug"
+            defaultValue="exitmania"
+            className="w-full rounded-lg border border-[var(--grid-border)] bg-black/35 px-3 py-2 text-sm text-white"
+          >
+            <option value="exitmania">Exitmania (GPS + Mission Shell)</option>
+            <option value="tabbrain">Tabbrain (Mission Shell, kein GPS)</option>
+          </select>
         </div>
 
         <div>
