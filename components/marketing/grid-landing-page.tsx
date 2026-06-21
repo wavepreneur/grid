@@ -33,10 +33,10 @@ const enterpriseProblems = [
 
 const deploymentPillars = [
   {
-    pillar: "Säule 1",
+    pillar: "Pillar 1",
     title: "Macro-Events",
     duration: "90 Min",
-    tag: "Synchron",
+    tag: "Synchronous",
     drivers: "Tabbrain · Exitmania",
     description:
       "Live stress-tests with Alpha/Beta/Gamma roles. WebSocket FSM rooms — zero-latency coordination under pressure.",
@@ -44,10 +44,10 @@ const deploymentPillars = [
     accent: "#00e5ff",
   },
   {
-    pillar: "Säule 2",
+    pillar: "Pillar 2",
     title: "Micro-Pulses",
     duration: "10 Min",
-    tag: "Asynchron",
+    tag: "Asynchronous",
     drivers: "Slack · MS Teams",
     description:
       "Weekly collaboration streaks via REST — no permanent WebSockets. Stateless pulse_player_states log progress in the flow of work.",
@@ -331,8 +331,8 @@ export function GridLandingPage() {
                 margin: "0 auto 32px",
               }}
             >
-              Global Team Intelligence Score = synchroner Stress-Index (Macro) minus asynchrone
-              Alltags-Schlagzahl (Micro) — beide Ströme in{" "}
+              Global Team Intelligence Score = synchronous stress index (Macro) minus asynchronous
+              daily collaboration cadence (Micro) — both streams in{" "}
               <code style={{ color: "#00e5ff" }}>domain_telemetry_metrics</code>.
             </p>
             <div
