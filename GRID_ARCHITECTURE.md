@@ -147,6 +147,37 @@ UI-Logik **strikt getrennt vom Inhalt**, archetyp-basiert:
 
 ---
 
+## 2b. Pulse-Sprint-Protokoll (Macro vs. Micro)
+
+### Mandat
+
+Zwei Deployment-Säulen unter **einer Engine**:
+
+| Säule | Dauer | Transport | Produkt |
+|---|---|---|---|
+| **Macro-Events** | ~90 Min | WebSocket FSM (`sync_live`) | Exitmania · Tabbrain |
+| **Micro-Pulses** | ~10 Min | REST POST (`async_pulse`) | Slack · MS Teams · wöchentliche Streaks |
+
+Micro-Pulses dürfen **keine permanenten WebSockets** nutzen. Fortschritt = stateless `pulse_player_states`.
+
+**Global Team Intelligence Score** = `stress_index` (sync) − `collaboration_streak` (async) — beide in `domain_telemetry_metrics`.
+
+### Ist-Stand
+
+| Anforderung | Status | Code / Schema |
+|---|---|---|
+| `events.play_mode = sync_live` | ✅ Schema | Migration `20260623100000_pulse_sprint_telemetry.sql` |
+| `pulse_sessions` / `pulse_player_states` | ✅ Schema | REST-only async rooms |
+| `pulse_programs` (B2B ARR / Jahres-Landing) | ✅ Schema | Org container + streak interval |
+| `domain_telemetry_metrics` | ✅ Schema | Unified `telemetry_envelope` JSON |
+| Envelope builder | ✅ Code | `lib/grid/telemetry-envelope.ts`, `domain-telemetry.ts` |
+| REST API (pulse POST) | ⬜ Vision | Nächster Implementierungsschritt |
+| Slack/Teams Bot | ⬜ Vision | Tabbrain / Integration layer |
+
+**Unified envelope:** `lib/grid/telemetry-envelope.ts` — `schema_version: 1`, `play_mode`, `content_config`, `performance`.
+
+---
+
 ## 3. Live-Daten & Filtering
 
 ### Mandat
@@ -158,8 +189,9 @@ UI-Logik **strikt getrennt vom Inhalt**, archetyp-basiert:
 
 | Anforderung | Status | Code / Schema |
 |---|---|---|
-| `activity_logs` | ⬜ Vision | **Nicht vorhanden** — heute: `audit_logs` |
-| `audit_logs` (Basis-Telemetrie) | 🟡 Basis | `lib/grid/audit-log.ts`, Events in `game.ts`, `lobby.ts`, `cockpit.ts` |
+| `activity_logs` | ⬜ Vision | **Nicht vorhanden** — heute: `audit_logs` + `domain_telemetry_metrics` |
+| `audit_logs` (Ops-Rohlog) | 🟡 Basis | `lib/grid/audit-log.ts` |
+| `domain_telemetry_metrics` (Master-Analytik) | 🟡 Schema | sync_live + async_pulse unified envelope |
 | `teams.department` / `teams.region` | ✅ Live | Captain-Setup, `team_lobby_snapshot` |
 | Metadaten in Logs denormalisiert | ⬜ Vision | Logs haben `team_id`, Abteilung nur via Join |
 | Cockpit Live-Ranking | 🟡 Basis | `getEventCockpitSnapshot`, Poll 3s, **ohne Filter** |

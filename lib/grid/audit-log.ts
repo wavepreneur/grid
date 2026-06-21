@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { mirrorAuditToDomainTelemetry } from "@/lib/grid/telemetry-bridge";
 
 export type AuditLogInput = {
   organizationId: string;
@@ -19,4 +20,10 @@ export async function writeAuditLog(input: AuditLogInput): Promise<void> {
     action: input.action,
     payload: input.payload ?? {},
   });
+
+  try {
+    await mirrorAuditToDomainTelemetry(input);
+  } catch {
+    // Telemetry must not break gameplay or API flows.
+  }
 }

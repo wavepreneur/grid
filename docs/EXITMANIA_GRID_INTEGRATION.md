@@ -8,7 +8,7 @@
 |---------|----------|--------|----------------|
 | **Exitmania** | Kurzfristige Stadt-Escape-Games (B2C + B2B Teamevents) | Shop, SEO, Checkout (Paddle), Portale, Admin, E-Mails, Minigames `/m/*` | Live-Spiel statt Loquiz |
 | **Tabbrain** | Org-/Team-Lead-Multiplayer (Standard + Enterprise-Jahres-Landing) — *noch nicht gebaut* | GTM, Org-Accounts, Billing, Branding | Dieselbe Engine, anderer Blueprint |
-| **GRID** | nichts (Engine) | FSM, Rollen, Realtime, Cockpit, `audit_logs` | — |
+| **GRID** | nichts (Engine) | FSM, Rollen, Realtime, Cockpit, `audit_logs`, `domain_telemetry_metrics` | — |
 
 **Exitmania verkauft genauso wie Tabbrain — unterschiedliche Produkte, gleiche Runtime.**
 
@@ -93,6 +93,7 @@ Pilot: **ein Spiel, eine Stadt**, Loquiz parallel für Rest.
 - Gleiche GRID-API, `organization_slug: "tabbrain"`, `blueprint_slug: "tabbrain"`
 - Kein Loquiz-Migration-Pfad nötig
 - Enterprise: `route_override` / `content_payload` bei Buchung
+- **Micro-Pulses:** REST-only via `POST /api/v1/pulse/sessions` — siehe [`docs/PULSE_SPRINT_PROTOCOL.md`](./PULSE_SPRINT_PROTOCOL.md)
 
 ## Agent-Regeln
 

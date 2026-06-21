@@ -340,8 +340,4 @@ export function validateBookingRequest(body: GridBookingRequest): string | null 
   return null;
 }
 
-export function authorizeBookingApi(request: Request): boolean {
-  const apiKey = request.headers.get("x-grid-api-key");
-  const expectedKey = process.env.GRID_BOOKING_API_KEY;
-  return Boolean(expectedKey && apiKey === expectedKey);
-}
+export { authorizeGridApi as authorizeBookingApi } from "@/lib/grid/api-auth";

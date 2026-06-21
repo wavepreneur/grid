@@ -26,6 +26,8 @@ Rule: `.cursor/rules/ecosystem-exitmania-tabbrain.mdc`
 |------|------|
 | Blueprints | `lib/grid/blueprints.ts` |
 | Roles | `lib/grid/archetype-roles.ts` |
+| Pulse / Telemetry envelope | `lib/grid/telemetry-envelope.ts`, `lib/grid/domain-telemetry.ts`, `lib/grid/telemetry-bridge.ts` |
+| Pulse REST API | `lib/grid/pulse-api.ts`, `app/api/v1/pulse/` |
 | Content load | `lib/grid/content-loader.ts` |
 | Booking API | `app/api/v1/bookings/route.ts`, `lib/grid/booking-api.ts` |
 | Architecture | `GRID_ARCHITECTURE.md` |

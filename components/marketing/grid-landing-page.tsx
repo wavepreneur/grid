@@ -31,6 +31,31 @@ const enterpriseProblems = [
   },
 ];
 
+const deploymentPillars = [
+  {
+    pillar: "Säule 1",
+    title: "Macro-Events",
+    duration: "90 Min",
+    tag: "Synchron",
+    drivers: "Tabbrain · Exitmania",
+    description:
+      "Live stress-tests with Alpha/Beta/Gamma roles. WebSocket FSM rooms — zero-latency coordination under pressure.",
+    status: "beta" as Maturity,
+    accent: "#00e5ff",
+  },
+  {
+    pillar: "Säule 2",
+    title: "Micro-Pulses",
+    duration: "10 Min",
+    tag: "Asynchron",
+    drivers: "Slack · MS Teams",
+    description:
+      "Weekly collaboration streaks via REST — no permanent WebSockets. Stateless pulse_player_states log progress in the flow of work.",
+    status: "vision" as Maturity,
+    accent: "#a78bfa",
+  },
+];
+
 const coreArchetypes = [
   {
     id: "01",
@@ -110,6 +135,8 @@ const goalTracker = [
   { claim: "Tabbrain enterprise booking → GRID session token provisioning", status: "beta" as Maturity },
   { claim: "Operator cockpit & arena live score", status: "live" as Maturity },
   { claim: "Telemetry via audit_logs (GRID-owned analytics)", status: "beta" as Maturity },
+  { claim: "Pulse-Sprint schema: pulse_sessions + pulse_player_states (REST)", status: "beta" as Maturity },
+  { claim: "domain_telemetry_metrics (sync + async unified envelope)", status: "beta" as Maturity },
   { claim: "Formal blueprint_slug routing (exitmania | tabbrain)", status: "live" as Maturity },
   { claim: "Archetype routing: TIME_DECAY_SPRINT", status: "vision" as Maturity },
   { claim: "Archetype routing: COOPERATIVE_COLLECTIVE", status: "vision" as Maturity },
@@ -217,12 +244,96 @@ export function GridLandingPage() {
                 color: "rgba(0,229,255,0.65)",
                 maxWidth: 640,
                 lineHeight: 1.55,
-                margin: "0 auto 40px",
+                margin: "0 auto 32px",
                 letterSpacing: "0.02em",
               }}
             >
               Not a game builder. Not B2B Kahoot. A state-based engine with JSON-injected content
-              and fixed asymmetric sync.
+              and fixed asymmetric sync — plus REST-native micro-pulses for daily collaboration
+              telemetry.
+            </p>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                gap: 16,
+                maxWidth: 820,
+                margin: "0 auto 40px",
+                textAlign: "left",
+              }}
+            >
+              {deploymentPillars.map((item) => (
+                <article
+                  key={item.title}
+                  className="grid-card"
+                  style={{
+                    borderColor: `${item.accent}33`,
+                    background: `linear-gradient(145deg, ${item.accent}08 0%, rgba(13,13,22,0.9) 100%)`,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 10,
+                        letterSpacing: "0.14em",
+                        textTransform: "uppercase",
+                        color: item.accent,
+                      }}
+                    >
+                      {item.pillar}
+                    </span>
+                    <MaturityBadge status={item.status} />
+                  </div>
+                  <h2
+                    style={{
+                      fontSize: 22,
+                      fontWeight: 700,
+                      color: "#f0f4ff",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {item.title}{" "}
+                    <span style={{ color: item.accent, fontWeight: 600 }}>({item.duration})</span>
+                  </h2>
+                  <p
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: "rgba(240,244,255,0.45)",
+                      marginBottom: 10,
+                    }}
+                  >
+                    {item.tag} · {item.drivers}
+                  </p>
+                  <p style={{ fontSize: 13, color: "rgba(240,244,255,0.5)", lineHeight: 1.6 }}>
+                    {item.description}
+                  </p>
+                </article>
+              ))}
+            </div>
+
+            <p
+              style={{
+                fontSize: 12,
+                color: "rgba(240,244,255,0.4)",
+                maxWidth: 680,
+                lineHeight: 1.55,
+                margin: "0 auto 32px",
+              }}
+            >
+              Global Team Intelligence Score = synchroner Stress-Index (Macro) minus asynchrone
+              Alltags-Schlagzahl (Micro) — beide Ströme in{" "}
+              <code style={{ color: "#00e5ff" }}>domain_telemetry_metrics</code>.
             </p>
             <div
               style={{

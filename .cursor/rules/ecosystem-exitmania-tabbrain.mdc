@@ -28,3 +28,4 @@ Exitmania/Tabbrain provision via `POST /api/v1/bookings` with `booking_reference
 - Add checkout/Paddle to GRID
 - Add CMS for master content to GRID (use migrations or future Exitmania pack pipeline)
 - Build separate game runtime in Exitmania
+- Use permanent WebSockets for `pulse_sessions` (REST + `pulse_player_states` only)
