@@ -25,6 +25,7 @@ import {
 import { eventPlayPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
 import { useTeamSync } from "@/lib/hooks/use-team-sync";
 import { buildTeamInviteUrl } from "@/lib/grid/codes";
+import { isLobbyRosterFull } from "@/lib/grid/lobby-auto-start";
 import { archetypeRoleLabel } from "@/lib/grid/archetype-roles";
 import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
@@ -81,6 +82,8 @@ export function LobbyRoom({
     formatCountdown(initialSnapshot.lobby_auto_start_at),
   );
   const [isPending, startTransition] = useTransition();
+
+  const rosterFull = isLobbyRosterFull(snapshot);
 
   const teammateUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -152,13 +155,13 @@ export function LobbyRoom({
 
     const autoStartCheckId = window.setInterval(() => {
       void refreshLobby();
-    }, 5000);
+    }, rosterFull ? 1000 : 5000);
 
     return () => {
       window.clearInterval(countdownId);
       window.clearInterval(autoStartCheckId);
     };
-  }, [refreshLobby, snapshot.lobby_auto_start_at, snapshot.team_status]);
+  }, [refreshLobby, rosterFull, snapshot.lobby_auto_start_at, snapshot.team_status]);
 
   function handleStartGame() {
     setError(null);
@@ -339,7 +342,11 @@ export function LobbyRoom({
 
       {isLobby ? (
         <div className="rounded-xl border border-[var(--grid-accent)]/30 bg-[var(--grid-accent)]/10 px-4 py-3 text-sm text-[var(--grid-accent)]">
-          Auto-Start in {countdown} — oder Alpha startet manuell.
+          {rosterFull ? (
+            <>Team voll — Start in {countdown}…</>
+          ) : (
+            <>Auto-Start in {countdown} — oder Alpha startet manuell, sobald alle da sind.</>
+          )}
         </div>
       ) : null}
 

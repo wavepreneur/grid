@@ -36,6 +36,18 @@ body {
     linear-gradient(180deg, #020617 0%, #030712 100%);
 }
 
+.studio-bg {
+  background:
+    radial-gradient(ellipse 80% 50% at 0% 0%, rgba(46, 233, 218, 0.08), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(99, 102, 241, 0.06), transparent 45%),
+    linear-gradient(180deg, #020617 0%, #030712 100%);
+}
+
+.studio-sidebar {
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(16px);
+}
+
 .landing-grid-line {
   background: linear-gradient(
     90deg,
@@ -74,6 +86,11 @@ body {
 .grid-input:focus {
   border-color: rgba(46, 233, 218, 0.55);
   box-shadow: 0 0 0 3px rgba(46, 233, 218, 0.12);
+}
+
+select.grid-input option {
+  background: #0f172a;
+  color: #f8fafc;
 }
 
 .tile-slider {

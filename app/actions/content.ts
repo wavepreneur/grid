@@ -65,6 +65,7 @@ export async function getEventContent(
       cityId: event.city_id,
       contentConfig: event.content_config,
       routeOverride: event.route_override,
+      studioGameVersionId: event.studio_game_version_id,
     });
 
     const contentRevision =
@@ -173,6 +174,7 @@ export async function applyGpsTestOverride(input: {
       cityId: event.city_id,
       contentConfig: event.content_config,
       routeOverride: event.route_override,
+      studioGameVersionId: event.studio_game_version_id,
     });
 
     const gpsLevels = content.levels.filter((level) => level.type === "gps");

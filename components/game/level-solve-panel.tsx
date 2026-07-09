@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   GridButton,
   GridInput,
@@ -17,6 +17,7 @@ type LevelSolvePanelProps = {
   isNavigator: boolean;
   onSubmit: (payload: SolveLevelPayload) => void;
   hideGpsStatus?: boolean;
+  autoSubmitGps?: boolean;
 };
 
 export function LevelSolvePanel({
@@ -26,9 +27,14 @@ export function LevelSolvePanel({
   isNavigator,
   onSubmit,
   hideGpsStatus = false,
+  autoSubmitGps = true,
 }: LevelSolvePanelProps) {
   const [answer, setAnswer] = useState("");
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
+  const [autoTriggered, setAutoTriggered] = useState(false);
+  const onSubmitRef = useRef(onSubmit);
+  onSubmitRef.current = onSubmit;
+
   const gpsEnabled = level.type === "gps" && Boolean(level.location) && isNavigator;
   const { sample, error: gpsError, isLoading: gpsLoading } = useGeolocation(gpsEnabled);
 
@@ -39,6 +45,35 @@ export function LevelSolvePanel({
     sample && level.location && distance !== null
       ? distance <= level.location.radius_meters
       : false;
+
+  useEffect(() => {
+    setAutoTriggered(false);
+  }, [level.level]);
+
+  useEffect(() => {
+    if (
+      level.type !== "gps" ||
+      !autoSubmitGps ||
+      !withinRadius ||
+      !sample ||
+      disabled ||
+      isPending ||
+      autoTriggered
+    ) {
+      return;
+    }
+
+    setAutoTriggered(true);
+    onSubmitRef.current({ geolocation: sample });
+  }, [
+    level.type,
+    autoSubmitGps,
+    withinRadius,
+    sample,
+    disabled,
+    isPending,
+    autoTriggered,
+  ]);
 
   function handleSubmit() {
     if (level.type === "gps") {
@@ -89,9 +124,15 @@ export function LevelSolvePanel({
               </p>
               <p className="mt-1">
                 {withinRadius ? (
-                  <span className="text-emerald-300">Im Checkpoint-Bereich</span>
+                  <span className="text-emerald-300">
+                    {autoSubmitGps && autoTriggered
+                      ? "Checkpoint wird bestätigt…"
+                      : autoSubmitGps
+                        ? "Im Checkpoint — wird automatisch aktiviert"
+                        : "Im Checkpoint-Bereich"}
+                  </span>
                 ) : (
-                  <span className="text-amber-300">Noch nicht am Ziel</span>
+                  <span className="text-amber-300">Unterwegs zum Ziel</span>
                 )}
               </p>
             </>
@@ -131,14 +172,22 @@ export function LevelSolvePanel({
         </div>
       ) : null}
 
-      <GridButton
-        type="button"
-        className="mt-4"
-        disabled={disabled || isPending || !canSubmit}
-        onClick={handleSubmit}
-      >
-        {isPending ? "Sende…" : level.type === "gps" ? "Checkpoint bestätigen" : "Bestätigen"}
-      </GridButton>
+      {level.type === "gps" && autoSubmitGps ? (
+        <p className="mt-4 text-sm text-[var(--grid-muted)]">
+          {withinRadius
+            ? "Kein Tippen nötig — der Checkpoint wird im Radius automatisch bestätigt."
+            : "Zum Zielpunkt laufen — die Aufgabe startet automatisch im Radius."}
+        </p>
+      ) : (
+        <GridButton
+          type="button"
+          className="mt-4"
+          disabled={disabled || isPending || !canSubmit}
+          onClick={handleSubmit}
+        >
+          {isPending ? "Sende…" : level.type === "gps" ? "Checkpoint bestätigen" : "Bestätigen"}
+        </GridButton>
+      )}
     </div>
   );
 }

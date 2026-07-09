@@ -77,6 +77,7 @@ export async function getEventCockpitSnapshot(
       cityId: event.city_id,
       contentConfig: event.content_config,
       routeOverride: event.route_override,
+      studioGameVersionId: event.studio_game_version_id,
     });
 
     const override =
@@ -285,6 +286,7 @@ export async function operatorEnableLevelGps(input: {
       cityId: event.city_id,
       contentConfig: event.content_config,
       routeOverride: event.route_override,
+      studioGameVersionId: event.studio_game_version_id,
     });
 
     const baseLevel = content.levels.find((l) => l.level === input.level);

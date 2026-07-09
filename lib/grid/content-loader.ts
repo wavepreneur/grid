@@ -24,6 +24,7 @@ import {
   EXITMANIA_TOTAL_LEVELS,
 } from "@/lib/grid/level-types";
 import { parseLevelTiles } from "@/lib/grid/level-content";
+import { loadStudioVersionSnapshot } from "@/lib/cms/studio-snapshot";
 
 type GlobalLevelRow = {
   level_number: number;
@@ -157,10 +158,41 @@ export async function loadResolvedEventContent(input: {
   cityId: string | null;
   contentConfig: unknown;
   routeOverride: unknown;
+  studioGameVersionId?: string | null;
 }): Promise<ResolvedEventContent> {
   const contentConfig = mergeContentConfigWithBlueprint(parseContentConfig(input.contentConfig));
-  const blueprint = resolveBlueprint(contentConfig);
   const routeOverride = parseRouteOverride(input.routeOverride);
+
+  if (input.studioGameVersionId) {
+    const snapshot = await loadStudioVersionSnapshot(input.studioGameVersionId);
+    if (snapshot && snapshot.levels.length > 0) {
+      const { game, levels } = snapshot;
+      const mergedConfig = mergeContentConfigWithBlueprint({
+        ...contentConfig,
+        blueprint_slug: game.gps_enabled ? "exitmania" : "tabbrain",
+        city_slug: game.city_slug ?? contentConfig.city_slug,
+      });
+      const blueprint = resolveBlueprint(mergedConfig);
+      const mergedLevels = applyBlueprintLevelConstraints(
+        mergeLevelOverrides(levels, routeOverride),
+        blueprint,
+      );
+      const blueprintFields = buildResolvedBlueprintFields(mergedConfig);
+
+      return {
+        templateSlug: `cms:${game.slug}:v${game.published_version_number}`,
+        templateName: game.name,
+        city: game.city_slug,
+        levels: mergedLevels,
+        ...blueprintFields,
+        showLiveScore: contentConfig.show_live_score ?? true,
+        missionDurationMinutes:
+          game.duration_minutes ?? contentConfig.mission_duration_minutes ?? 90,
+      };
+    }
+  }
+
+  const blueprint = resolveBlueprint(contentConfig);
   const citySlug = contentConfig.city_slug ?? blueprint.defaultContent.city_slug ?? DEFAULT_CITY_SLUG;
 
   let baseLevels: LevelDefinition[];
@@ -215,7 +247,9 @@ export async function loadResolvedEventContentByEventId(
   const supabase = createAdminClient();
   const { data: event, error } = await supabase
     .from("events")
-    .select("id, organization_id, city_id, content_config, route_override")
+    .select(
+      "id, organization_id, city_id, content_config, route_override, studio_game_version_id",
+    )
     .eq("id", eventId)
     .single();
 
@@ -229,5 +263,6 @@ export async function loadResolvedEventContentByEventId(
     cityId: event.city_id,
     contentConfig: event.content_config,
     routeOverride: event.route_override,
+    studioGameVersionId: event.studio_game_version_id,
   });
 }

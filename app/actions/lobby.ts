@@ -6,6 +6,7 @@ import {
   DEFAULT_LOBBY_AUTO_START_SECONDS,
   NAVIGATOR_OFFLINE_MS,
 } from "@/lib/grid/constants";
+import { computeLobbyAutoStartAt } from "@/lib/grid/lobby-auto-start";
 import {
   generateInviteCode,
   generateJoinCode,
@@ -156,17 +157,24 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
   const supabase = createAdminClient();
   const { data: team } = await supabase
     .from("teams")
-    .select("id, status, lobby_auto_start_at, captain_player_id, event_id")
+    .select("id, status, lobby_auto_start_at, captain_player_id, event_id, max_size")
     .eq("id", teamId)
     .single();
 
-  if (!team || team.status !== "lobby" || !team.lobby_auto_start_at) return;
-  if (new Date(team.lobby_auto_start_at).getTime() > Date.now()) return;
+  if (!team || team.status !== "lobby") return;
   if (!team.captain_player_id) return;
+
+  const activePlayerCount = await countActivePlayers(teamId);
+  const rosterFull = activePlayerCount >= team.max_size;
+  const timerExpired =
+    !team.lobby_auto_start_at ||
+    new Date(team.lobby_auto_start_at).getTime() <= Date.now();
+
+  if (!rosterFull && !timerExpired) return;
 
   const { data: event } = await supabase
     .from("events")
-    .select("id, organization_id, city_id, content_config, route_override, invite_code")
+    .select("id, organization_id, city_id, content_config, route_override, invite_code, studio_game_version_id")
     .eq("id", team.event_id)
     .single();
 
@@ -197,6 +205,7 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
         event.city_id,
         event.content_config,
         event.route_override,
+        event.studio_game_version_id,
       );
     }
   }
@@ -333,9 +342,12 @@ export async function createTeamAsCaptain(input: {
     const autoStartSeconds =
       event.lobby_auto_start_seconds || DEFAULT_LOBBY_AUTO_START_SECONDS;
     const lobbyOpenedAt = new Date();
-    const lobbyAutoStartAt = new Date(
-      lobbyOpenedAt.getTime() + autoStartSeconds * 1000,
-    );
+    const lobbyAutoStartAt = computeLobbyAutoStartAt({
+      autoStartSeconds,
+      maxSize: input.maxSize,
+      activePlayerCount: 1,
+      from: lobbyOpenedAt,
+    });
 
     const { data: team, error: teamError } = await supabase
       .from("teams")
@@ -385,6 +397,8 @@ export async function createTeamAsCaptain(input: {
     if (event.status === "draft") {
       await supabase.from("events").update({ status: "lobby" }).eq("id", event.id);
     }
+
+    await maybeAutoStartTeam(team.id);
 
     const refreshedTeam = await getTeamByJoinCode(team.join_code, event.id);
 
@@ -720,6 +734,23 @@ export async function joinTeamAsPlayer(input: {
       await supabase.from("teams").update({ status: "lobby" }).eq("id", team.id);
     }
 
+    const activeCount = await countActivePlayers(refreshedTeam.id);
+    if (activeCount >= refreshedTeam.max_size && refreshedTeam.status === "lobby") {
+      const lobbyAutoStartAt = computeLobbyAutoStartAt({
+        autoStartSeconds:
+          event.lobby_auto_start_seconds || DEFAULT_LOBBY_AUTO_START_SECONDS,
+        maxSize: refreshedTeam.max_size,
+        activePlayerCount: activeCount,
+      });
+      await supabase
+        .from("teams")
+        .update({ lobby_auto_start_at: lobbyAutoStartAt.toISOString() })
+        .eq("id", refreshedTeam.id)
+        .eq("status", "lobby");
+    }
+
+    await maybeAutoStartTeam(refreshedTeam.id);
+
     if (team.status === "playing") {
       await writeAuditLog({
         organizationId: event.organization_id,
@@ -866,6 +897,7 @@ export async function startGameManually(input: {
       event.city_id,
       event.content_config,
       event.route_override,
+      event.studio_game_version_id,
     );
 
     await supabase
@@ -974,9 +1006,12 @@ export async function setupPrebookedTeamAsCaptain(input: {
     const autoStartSeconds =
       event.lobby_auto_start_seconds || DEFAULT_LOBBY_AUTO_START_SECONDS;
     const lobbyOpenedAt = new Date();
-    const lobbyAutoStartAt = new Date(
-      lobbyOpenedAt.getTime() + autoStartSeconds * 1000,
-    );
+    const lobbyAutoStartAt = computeLobbyAutoStartAt({
+      autoStartSeconds,
+      maxSize: input.maxSize,
+      activePlayerCount: 1,
+      from: lobbyOpenedAt,
+    });
 
     const { data: player, error: playerError } = await supabase
       .from("players")
@@ -1016,6 +1051,8 @@ export async function setupPrebookedTeamAsCaptain(input: {
       await supabase.from("players").delete().eq("id", player.id);
       return { success: false, error: teamError.message };
     }
+
+    await maybeAutoStartTeam(team.id);
 
     await writeAuditLog({
       organizationId: event.organization_id,

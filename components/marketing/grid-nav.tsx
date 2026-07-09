@@ -52,6 +52,9 @@ export function GridNav() {
           <a href="#telemetry" className="grid-nav-link">
             Telemetry
           </a>
+          <a href="#studio" className="grid-nav-link">
+            Studio
+          </a>
           <a href="#status" className="grid-nav-link">
             Status
           </a>

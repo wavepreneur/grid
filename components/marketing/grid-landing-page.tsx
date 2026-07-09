@@ -111,8 +111,8 @@ const telemetryMetrics = [
 const enginePrinciples = [
   {
     symbol: "◈",
-    title: "Variable content, fixed engine",
-    text: "Your scenarios arrive as JSON. The finite-state machine, asymmetric sync layer, and role routing stay constant — no drag-and-drop CMS, no game builder.",
+    title: "Draft vs. live — one engine",
+    text: "GRID Studio authors games (tasks, flow, GPS). Publish freezes a version snapshot. Live events bind to that snapshot — editing the draft never mutates a running mission.",
   },
   {
     symbol: "⟲",
@@ -121,8 +121,71 @@ const enginePrinciples = [
   },
   {
     symbol: "⬡",
-    title: "Scan & play under cognitive load limits",
-    text: "Employees enter the magic circle instantly. Setup cost is zero — all mental energy flows into asymmetric coordination with colleagues.",
+    title: "Visual flow, not rule forms",
+    text: "Drag task order, pick Linear / Rogain / Open — the compiler generates runtime logic. GPS waypoints on a map with radius. No brick-by-brick condition editor.",
+  },
+];
+
+const gridStudioTracker = [
+  {
+    claim: "GRID Studio admin (/admin): tasks, games, templates, tickets",
+    status: "beta" as Maturity,
+  },
+  {
+    claim: "Task library: tile preview, full-image tiles, media upload",
+    status: "beta" as Maturity,
+  },
+  {
+    claim: "Game editor: settings, Spielablauf (drag order, Linear/Rogain/Open)",
+    status: "beta" as Maturity,
+  },
+  {
+    claim: "GPS waypoints per task (map, lat/lng, radius) → publish snapshot",
+    status: "beta" as Maturity,
+  },
+  {
+    claim: "Publish → studio_game_versions immutable snapshot + compiled levels",
+    status: "beta" as Maturity,
+  },
+  {
+    claim: "Live-Event starten: event binds studio_game_version_id",
+    status: "beta" as Maturity,
+  },
+  {
+    claim: "Runtime loads CMS snapshot (replaces global_levels for studio events)",
+    status: "beta" as Maturity,
+  },
+  {
+    claim: "GPS auto-checkpoint in radius (Team Lead / Alpha)",
+    status: "beta" as Maturity,
+  },
+  {
+    claim: "Lobby auto-start when roster full (solo test ≈ 3s)",
+    status: "beta" as Maturity,
+  },
+  {
+    claim: "Edit task in-context from game editor (return to game)",
+    status: "beta" as Maturity,
+  },
+  {
+    claim: "Push-to-Live: update running event from new publish (manual confirm)",
+    status: "vision" as Maturity,
+  },
+  {
+    claim: "Runtime logic engine: Rogain hide, points gates, end_game rules",
+    status: "vision" as Maturity,
+  },
+  {
+    claim: "Ticket pool → bulk event provisioning (10k+ teams scale test)",
+    status: "vision" as Maturity,
+  },
+  {
+    claim: "Exitmania checkout pilot (grid_enabled) on production traffic",
+    status: "vision" as Maturity,
+  },
+  {
+    claim: "Advanced logic UI (roles, delays, per-rule GPS) — power users only",
+    status: "vision" as Maturity,
   },
 ];
 
@@ -132,6 +195,7 @@ const goalTracker = [
   { claim: "Self-healing sessions & device handoff", status: "live" as Maturity },
   { claim: "Asymmetric roles: Captain, GPS, teammates (Exitmania = Archetype 01)", status: "live" as Maturity },
   { claim: "JSON content injection via global_levels / route_override", status: "beta" as Maturity },
+  { claim: "Legacy JSON path (global_levels) — being superseded by GRID Studio snapshots", status: "beta" as Maturity },
   { claim: "Tabbrain enterprise booking → GRID session token provisioning", status: "beta" as Maturity },
   { claim: "Operator cockpit & arena live score", status: "live" as Maturity },
   { claim: "Telemetry via audit_logs (GRID-owned analytics)", status: "beta" as Maturity },
@@ -248,9 +312,12 @@ export function GridLandingPage() {
                 letterSpacing: "0.02em",
               }}
             >
-              Not a game builder. Not B2B Kahoot. A state-based engine with JSON-injected content
-              and fixed asymmetric sync — plus REST-native micro-pulses for daily collaboration
-              telemetry.
+              Runtime engine + multiplayer sync stay fixed.{" "}
+              <strong style={{ color: "rgba(240,244,255,0.85)", fontWeight: 600 }}>
+                GRID Studio
+              </strong>{" "}
+              is where you author outdoor games, tasks, GPS waypoints, and flow — then publish a
+              frozen version for live events.
             </p>
 
             <div
@@ -696,6 +763,97 @@ export function GridLandingPage() {
           </div>
         </section>
 
+        {/* GRID Studio */}
+        <section
+          id="studio"
+          className="grid-section"
+          style={{ borderTop: "1px solid rgba(0,229,255,0.12)" }}
+        >
+          <div className="grid-container">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                gap: 48,
+                alignItems: "start",
+              }}
+            >
+              <div>
+                <span className="section-label">GRID Studio</span>
+                <h2 className="grid-h2" style={{ marginBottom: 20 }}>
+                  Author games.
+                  <br />
+                  <span style={{ color: "#00e5ff" }}>Publish once. Run many.</span>
+                </h2>
+                <div className="grid-accent-line grid-accent-line-cyan" />
+                <p className="grid-body" style={{ marginBottom: 16 }}>
+                  Replaces Loquiz-style authoring inside GRID: task library, game draft, visual
+                  flow (drag order + presets), GPS pins with activation radius, version publish, and
+                  live events that load the snapshot — not the editable draft.
+                </p>
+                <p className="grid-body" style={{ marginBottom: 24, fontSize: 13 }}>
+                  <strong style={{ color: "#f0f4ff" }}>Separation:</strong>{" "}
+                  <code style={{ color: "#00e5ff" }}>studio_games</code> = draft ·{" "}
+                  <code style={{ color: "#00e5ff" }}>studio_game_versions</code> = frozen ·{" "}
+                  <code style={{ color: "#00e5ff" }}>events</code> = live run
+                </p>
+                <Link
+                  href="/admin"
+                  className="grid-cta"
+                  style={{ display: "inline-flex", textDecoration: "none" }}
+                >
+                  Open GRID Studio →
+                </Link>
+              </div>
+              <div
+                style={{
+                  borderRadius: 16,
+                  border: "1px solid rgba(0,229,255,0.12)",
+                  background: "rgba(0,0,0,0.35)",
+                  padding: "clamp(24px, 4vw, 32px)",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "rgba(240,244,255,0.45)",
+                    marginBottom: 20,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Studio shipped in beta — needs field QA before we call it production-ready.
+                </p>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                  {gridStudioTracker.map((item, index) => (
+                    <li
+                      key={item.claim}
+                      style={{
+                        padding: "14px 0",
+                        borderTop: index === 0 ? "none" : "1px solid rgba(240,244,255,0.08)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 12,
+                        }}
+                      >
+                        <span style={{ fontSize: 13, color: "rgba(240,244,255,0.85)" }}>
+                          {item.claim}
+                        </span>
+                        <MaturityBadge status={item.status} />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Product Status */}
         <section
           id="status"
@@ -716,8 +874,8 @@ export function GridLandingPage() {
                 Promise vs. engine — kept honest
               </h2>
               <p className="grid-body" style={{ maxWidth: 640, marginBottom: 24 }}>
-                This page is our constitution for product and code. What the FSM delivers today,
-                what runs in pilot, what the archetype roadmap targets.
+                Engine capabilities (FSM, roles, telemetry) plus GRID Studio authoring status.
+                What ships today, what runs in pilot, what the archetype roadmap targets.
               </p>
               <div
                 style={{

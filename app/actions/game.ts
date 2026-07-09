@@ -122,6 +122,7 @@ export async function solveCurrentLevel(input: {
       cityId: event.city_id,
       contentConfig: event.content_config,
       routeOverride: event.route_override,
+      studioGameVersionId: event.studio_game_version_id,
     });
     const levelDefinition = getLevelDefinition(content, currentLevel);
 
@@ -284,6 +285,7 @@ export async function purchaseHint(input: {
       cityId: event.city_id,
       contentConfig: event.content_config,
       routeOverride: event.route_override,
+      studioGameVersionId: event.studio_game_version_id,
     });
     const levelDefinition = getLevelDefinition(content, currentLevel);
 
@@ -424,6 +426,7 @@ export async function initializeTeamGameState(
   cityId: string | null,
   contentConfig: unknown,
   routeOverride: unknown,
+  studioGameVersionId?: string | null,
 ) {
   const content = await loadResolvedEventContent({
     eventId,
@@ -431,6 +434,7 @@ export async function initializeTeamGameState(
     cityId,
     contentConfig,
     routeOverride,
+    studioGameVersionId,
   });
   const totalLevels = content.levels.length || EXITMANIA_TOTAL_LEVELS;
   const initialState = createInitialGameState(totalLevels);

@@ -27,6 +27,7 @@ export type GridEvent = {
   lobby_auto_start_seconds: number;
   content_config?: Record<string, unknown> | null;
   route_override?: Record<string, unknown> | null;
+  studio_game_version_id?: string | null;
   booking_reference?: string | null;
 };
 
