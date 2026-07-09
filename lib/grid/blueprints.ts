@@ -34,8 +34,8 @@ export const BLUEPRINTS: Record<BlueprintSlug, BlueprintDefinition> = {
     archetype: "ASYMMETRIC_INFORMANT",
     uiLayout: "exitmania",
     capabilities: { gps: true, navigatorRole: true },
-    minPlayersToStart: 2,
-    allowSoloPlay: false,
+    minPlayersToStart: 1,
+    allowSoloPlay: true,
     defaultContent: {
       city_slug: "berlin",
       show_live_score: true,
@@ -48,8 +48,8 @@ export const BLUEPRINTS: Record<BlueprintSlug, BlueprintDefinition> = {
     archetype: "ASYMMETRIC_INFORMANT",
     uiLayout: "exitmania",
     capabilities: { gps: false, navigatorRole: false },
-    minPlayersToStart: 2,
-    allowSoloPlay: false,
+    minPlayersToStart: 1,
+    allowSoloPlay: true,
     defaultContent: {
       template_slug: "tabbrain-enterprise-demo",
       show_live_score: true,

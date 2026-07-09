@@ -110,7 +110,7 @@ export function archetypeRoleForJoinOrder(joinOrder: number): ArchetypeRole {
 }
 
 export function minPlayersToStart(blueprint: BlueprintDefinition): number {
-  return blueprint.minPlayersToStart ?? 2;
+  return blueprint.minPlayersToStart ?? 1;
 }
 
 export function canStartTeamGame(input: {
@@ -121,13 +121,10 @@ export function canStartTeamGame(input: {
   if (input.activePlayerCount >= min) {
     return { ok: true };
   }
-  if (input.blueprint.allowSoloPlay && input.activePlayerCount === 1) {
-    return { ok: true };
-  }
-  if (input.activePlayerCount === 1) {
+  if (input.activePlayerCount === 0) {
     return {
       ok: false,
-      error: `Mindestens ${min} Spieler nötig. Exitmania startet standardmäßig ab zwei Personen (Alpha + Beta).`,
+      error: "Mindestens ein Spieler muss im Team sein, bevor die Mission startet.",
     };
   }
   return {

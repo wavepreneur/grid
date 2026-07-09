@@ -288,7 +288,7 @@ export function LobbyRoom({
   const isLobby = snapshot.team_status === "lobby";
   const isPlaying = snapshot.team_status === "playing";
   const canManageRoles = isAlpha && (isLobby || manageMode);
-  const minPlayersToStart = 2;
+  const minPlayersToStart = 1;
   const canStart = snapshot.active_player_count >= minPlayersToStart;
   const canInviteTeammates =
     isAlpha &&
@@ -345,7 +345,7 @@ export function LobbyRoom({
 
       {isAlpha && isLobby && !canStart ? (
         <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-          Mindestens {minPlayersToStart} Spieler nötig (Alpha + Beta), bevor die Mission startet.
+          Mindestens ein Spieler muss im Team sein, bevor die Mission startet.
         </div>
       ) : null}
 
