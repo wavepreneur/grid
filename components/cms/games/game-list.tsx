@@ -14,6 +14,12 @@ import {
   duplicateGames,
 } from "@/app/actions/cms/games";
 import type { GameDeleteStatus } from "@/lib/cms/delete-status";
+import {
+  useGamesLiveMeta,
+  useInvalidateStudioGames,
+  useStudioGamesList,
+  useStudioTemplates,
+} from "@/lib/hooks/use-studio-games";
 import { StudioBadge } from "@/components/cms/admin-shell";
 import { GameStatusSwitch } from "@/components/cms/games/game-status-switch";
 import { StudioBulkBar, StudioSelectCheckbox } from "@/components/cms/shared/studio-bulk-bar";
@@ -78,12 +84,29 @@ function sortGames<T extends StudioGame>(list: T[], sort: GameSort): T[] {
 }
 
 type Props = {
-  games: GameWithLive[];
-  templates: StudioGame[];
+  initialGames: StudioGame[];
+  initialTemplates: StudioGame[];
 };
 
-export function GameList({ games, templates }: Props) {
+export function GameList({ initialGames, initialTemplates }: Props) {
   const router = useRouter();
+  const invalidateGames = useInvalidateStudioGames();
+  const { data: games = initialGames } = useStudioGamesList(initialGames);
+  const { data: templates = initialTemplates } = useStudioTemplates(initialTemplates);
+  const gameIds = useMemo(() => games.map((g) => g.id), [games]);
+  const { data: liveMeta = [] } = useGamesLiveMeta(gameIds);
+  const liveCountByGame = useMemo(
+    () => new Map(liveMeta.map((s) => [s.gameId, s.liveEvents.length])),
+    [liveMeta],
+  );
+  const gamesWithLive = useMemo(
+    () =>
+      games.map((game) => ({
+        ...game,
+        liveEventCount: liveCountByGame.get(game.id) ?? 0,
+      })),
+    [games, liveCountByGame],
+  );
   const [open, setOpen] = useState(false);
   const [createMode, setCreateMode] = useState<CreateMode>("blank");
   const [name, setName] = useState("");
@@ -103,7 +126,7 @@ export function GameList({ games, templates }: Props) {
   const [duplicatePending, setDuplicatePending] = useState(false);
   const [sort, setSort] = useState<GameSort>("updated");
 
-  const sortedGames = useMemo(() => sortGames(games, sort), [games, sort]);
+  const sortedGames = useMemo(() => sortGames(gamesWithLive, sort), [gamesWithLive, sort]);
   const sortedTemplates = useMemo(
     () => sortGames(templates, "updated"),
     [templates],
@@ -146,8 +169,8 @@ export function GameList({ games, templates }: Props) {
           return;
         }
         setOpen(false);
+        invalidateGames();
         router.push(`/admin/games/${result.data.id}`);
-        router.refresh();
         return;
       }
 
@@ -161,8 +184,8 @@ export function GameList({ games, templates }: Props) {
         return;
       }
       setOpen(false);
+      invalidateGames();
       router.push(`/admin/games/${result.data.id}`);
-      router.refresh();
     } finally {
       setCreating(false);
     }
@@ -217,7 +240,7 @@ export function GameList({ games, templates }: Props) {
           ? "Spiel dupliziert."
           : `${createdCount} Spiele dupliziert.`,
       );
-      router.refresh();
+      invalidateGames();
     } finally {
       setDuplicatePending(false);
     }
@@ -280,7 +303,7 @@ export function GameList({ games, templates }: Props) {
       if (failed.length > 0) {
         setError(`${failed.length} Eintrag/Einträge konnten nicht gelöscht werden.`);
       }
-      router.refresh();
+      invalidateGames();
     } finally {
       setDeletePending(false);
     }
@@ -433,7 +456,7 @@ export function GameList({ games, templates }: Props) {
           description="Entwürfe und veröffentlichte Spiele für Live-Events."
         />
 
-        {games.length === 0 ? (
+        {gamesWithLive.length === 0 ? (
           <StudioEmptyState
             icon={<IconGamepad size={32} />}
             title="Noch keine Spiele"

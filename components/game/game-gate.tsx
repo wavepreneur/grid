@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getEventContent, getEventContentRevision } from "@/app/actions/content";
 import { getGameState } from "@/app/actions/game";
 import { GameRoom } from "@/components/game/game-room";
+import { GameGateSkeleton } from "@/components/game/game-gate-skeleton";
 import { GridError } from "@/components/grid/grid-shell";
 import { cacheEventContent } from "@/lib/grid/offline-content";
 import { eventTeamJoinPath } from "@/lib/grid/event-routes";
@@ -138,9 +139,7 @@ export function GameGate({
   }
 
   if (!ready || !initialState?.success || !session || !eventContent) {
-    return (
-      <p className="text-sm text-[var(--grid-muted)]">Spiel wird geladen…</p>
-    );
+    return <GameGateSkeleton />;
   }
 
   return (

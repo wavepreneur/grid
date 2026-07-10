@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   addTaskToGame,
@@ -16,6 +15,7 @@ import {
   parseLogicRules,
 } from "@/lib/cms/logic-rules";
 import { isLayerActive, LAYER_DEFINITIONS, type StudioLayer } from "@/lib/cms/layer-model";
+import { useDebouncedValue, useTaskLibrarySearch } from "@/lib/hooks/use-task-library-search";
 import { StudioPanel } from "@/components/cms/admin-shell";
 import { GameLayerColumn, GameTaskLibrarySidebar } from "@/components/cms/games/game-layer-columns";
 import { GameLogicFlowModal } from "@/components/cms/games/game-logic-flow-modal";
@@ -29,7 +29,7 @@ import {
   StudioSectionTitle,
   StudioSuccess,
 } from "@/components/cms/studio-ui";
-import type { StudioGameTaskLink, StudioTask } from "@/lib/cms/types";
+import type { StudioGameTaskLink } from "@/lib/cms/types";
 
 type Props = {
   gameId: string;
@@ -39,7 +39,6 @@ type Props = {
   activeLayers: StudioLayer[];
   initialLinks: StudioGameTaskLink[];
   initialRules: unknown[];
-  libraryTasks: StudioTask[];
 };
 
 export function GameLogicPanel({
@@ -50,9 +49,7 @@ export function GameLogicPanel({
   activeLayers,
   initialLinks,
   initialRules,
-  libraryTasks,
 }: Props) {
-  const router = useRouter();
   const [links, setLinks] = useState(() => sortLinks(initialLinks));
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +60,10 @@ export function GameLogicPanel({
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [focusedLayer, setFocusedLayer] = useState<StudioLayer>(2);
 
+  const debouncedSearch = useDebouncedValue(search, 250);
+  const { data: libraryTasks = [], isFetching: libraryLoading } =
+    useTaskLibrarySearch(debouncedSearch);
+
   const mapDefault = useMemo(() => defaultMapCenter(citySlug), [citySlug]);
   const visibleLayers = useMemo(
     () => ([1, 2, 3] as StudioLayer[]).filter((l) => isLayerActive(l, activeLayers)),
@@ -71,17 +72,7 @@ export function GameLogicPanel({
   const grouped = useMemo(() => groupLinksByLayerOnLink(links), [links]);
   const assignedIds = useMemo(() => new Set(links.map((l) => l.task_id)), [links]);
 
-  const libraryFiltered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return libraryTasks.filter((task) => {
-      if (!q) return true;
-      return (
-        task.title.toLowerCase().includes(q) ||
-        task.slug.includes(q) ||
-        task.description.toLowerCase().includes(q)
-      );
-    });
-  }, [libraryTasks, search]);
+  const libraryFiltered = useMemo(() => libraryTasks, [libraryTasks]);
 
   useEffect(() => {
     setLinks(sortLinks(initialLinks));
@@ -126,7 +117,6 @@ export function GameLogicPanel({
       if (layer === 2) await saveMissionFlow(next);
       setMessage(`Aufgabe zu ${LAYER_DEFINITIONS[layer].shortDe} hinzugefügt.`);
       setDraggingTaskId(null);
-      router.refresh();
     });
   }
 
@@ -142,7 +132,6 @@ export function GameLogicPanel({
       setLinks(next);
       setSelectedLink(null);
       await saveMissionFlow(next);
-      router.refresh();
     });
   }
 
@@ -151,10 +140,7 @@ export function GameLogicPanel({
     setMessage(null);
     startTransition(async () => {
       const ok = await saveMissionFlow(links);
-      if (ok) {
-        setMessage("Spiel-Logik gespeichert.");
-        router.refresh();
-      }
+      if (ok) setMessage("Spiel-Logik gespeichert.");
     });
   }
 
@@ -183,7 +169,6 @@ export function GameLogicPanel({
           ? "Reihenfolge gespeichert."
           : "Reihenfolge in der Spalte gespeichert.",
       );
-      router.refresh();
     });
   }
 

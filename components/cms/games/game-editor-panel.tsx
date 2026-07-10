@@ -35,12 +35,11 @@ import {
 } from "@/components/cms/studio-ui";
 import { parseActiveLayers } from "@/lib/cms/layer-model";
 import { parseLogicRules, type StudioLogicRule } from "@/lib/cms/logic-rules";
-import type { StudioGame, StudioGameTaskLink, StudioTask } from "@/lib/cms/types";
+import type { StudioGame, StudioGameTaskLink } from "@/lib/cms/types";
 
 type Props = {
   game: StudioGame;
   taskLinks: StudioGameTaskLink[];
-  libraryTasks: StudioTask[];
   liveEventCount?: number;
 };
 
@@ -53,7 +52,6 @@ function toEditorState(game: StudioGame): GameEditorState {
 export function GameEditorPanel({
   game: initialGame,
   taskLinks,
-  libraryTasks,
   liveEventCount = 0,
 }: Props) {
   const router = useRouter();
@@ -338,7 +336,6 @@ export function GameEditorPanel({
         activeLayers={parseActiveLayers(game.active_layers)}
         initialLinks={taskLinks}
         initialRules={game.logic_rules}
-        libraryTasks={libraryTasks}
       />
     </div>
   );

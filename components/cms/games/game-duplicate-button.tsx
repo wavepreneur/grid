@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { duplicateGames } from "@/app/actions/cms/games";
+import { useInvalidateStudioGames } from "@/lib/hooks/use-studio-games";
 import { StudioDuplicateModal } from "@/components/cms/shared/studio-duplicate-modal";
 import { IconCopy } from "@/components/cms/studio-icons";
 import { StudioButton } from "@/components/cms/studio-ui";
@@ -20,6 +21,7 @@ export function GameDuplicateButton({
   className,
 }: Props) {
   const router = useRouter();
+  const invalidateGames = useInvalidateStudioGames();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +44,7 @@ export function GameDuplicateButton({
       } else {
         router.push(listPath);
       }
-      router.refresh();
+      invalidateGames();
     } finally {
       setPending(false);
     }

@@ -6,6 +6,7 @@ import type { StudioOrganization } from "@/lib/cms/types";
 import type { ActionResult } from "@/lib/grid/types";
 
 const ORG_COOKIE = "grid_studio_org";
+const ORG_ID_COOKIE = "grid_studio_org_id";
 
 export async function listOrganizations(): Promise<ActionResult<StudioOrganization[]>> {
   try {
@@ -27,6 +28,9 @@ export async function listOrganizations(): Promise<ActionResult<StudioOrganizati
 
 export async function getStudioOrganizationId(): Promise<string> {
   const cookieStore = await cookies();
+  const cachedId = cookieStore.get(ORG_ID_COOKIE)?.value;
+  if (cachedId) return cachedId;
+
   const slug = cookieStore.get(ORG_COOKIE)?.value ?? "exitmania";
 
   const supabase = createAdminClient();
@@ -43,8 +47,21 @@ export async function getStudioOrganizationId(): Promise<string> {
       .eq("slug", "exitmania")
       .maybeSingle();
     if (!fallback?.id) throw new Error("Keine Organisation gefunden.");
+    cookieStore.set(ORG_ID_COOKIE, fallback.id, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 365,
+    });
     return fallback.id;
   }
+
+  cookieStore.set(ORG_ID_COOKIE, data.id, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 365,
+  });
 
   return data.id;
 }
@@ -54,7 +71,7 @@ export async function setStudioOrganization(slug: string): Promise<ActionResult<
     const supabase = createAdminClient();
     const { data, error } = await supabase
       .from("organizations")
-      .select("slug")
+      .select("id, slug")
       .eq("slug", slug)
       .maybeSingle();
 
@@ -63,6 +80,12 @@ export async function setStudioOrganization(slug: string): Promise<ActionResult<
 
     const cookieStore = await cookies();
     cookieStore.set(ORG_COOKIE, slug, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+    cookieStore.set(ORG_ID_COOKIE, data.id, {
       path: "/",
       httpOnly: true,
       sameSite: "lax",

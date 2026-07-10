@@ -69,6 +69,56 @@ export async function listTasks(filters: TaskFilterInput = {}): Promise<ActionRe
   }
 }
 
+export type TaskLibraryItem = {
+  id: string;
+  title: string;
+  slug: string;
+  tags: string[];
+};
+
+/** Lightweight task search for the game logic sidebar — no full content payload. */
+export async function searchTaskLibrary(input: {
+  query?: string;
+  limit?: number;
+}): Promise<ActionResult<TaskLibraryItem[]>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const limit = Math.min(50, Math.max(1, input.limit ?? 30));
+
+    let query = supabase
+      .from("studio_tasks")
+      .select("id, title, slug, tags")
+      .eq("is_active", true)
+      .or(`organization_id.eq.${orgId},organization_id.is.null`)
+      .order("updated_at", { ascending: false })
+      .limit(limit);
+
+    const q = input.query?.trim();
+    if (q) {
+      query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,slug.ilike.%${q}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+
+    return {
+      success: true,
+      data: (data ?? []).map((row) => ({
+        id: row.id as string,
+        title: row.title as string,
+        slug: row.slug as string,
+        tags: (row.tags as string[]) ?? [],
+      })),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Aufgaben-Suche fehlgeschlagen.",
+    };
+  }
+}
+
 export async function getTask(taskId: string): Promise<ActionResult<StudioTask>> {
   try {
     const supabase = createAdminClient();

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { OrgSwitcher } from "@/components/cms/org-switcher";
+import { ProductNav } from "@/components/platform/product-nav";
 import {
   IconCode,
   IconGamepad,
@@ -56,6 +57,10 @@ export function AdminShell({
                 <p className="text-xs text-slate-500">Inhalte verwalten</p>
               </div>
             </div>
+          </div>
+
+          <div className="px-3 pb-2">
+            <ProductNav active="studio" compact />
           </div>
 
           <nav className="flex flex-1 flex-col gap-0.5 px-3 py-4">

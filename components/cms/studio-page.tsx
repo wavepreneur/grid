@@ -1,9 +1,8 @@
+"use client";
+
 import type { ReactNode } from "react";
-import {
-  getStudioOrganizationSlug,
-  listOrganizations,
-} from "@/app/actions/cms/organizations";
 import { AdminShell } from "@/components/cms/admin-shell";
+import { useStudioShell } from "@/components/cms/studio-shell-provider";
 
 type Props = {
   children: ReactNode;
@@ -13,19 +12,8 @@ type Props = {
   activePath: string;
 };
 
-export async function StudioPage({
-  children,
-  title,
-  description,
-  actions,
-  activePath,
-}: Props) {
-  const [orgsResult, orgSlug] = await Promise.all([
-    listOrganizations(),
-    getStudioOrganizationSlug(),
-  ]);
-
-  const organizations = orgsResult.success ? orgsResult.data! : [];
+export function StudioPage({ children, title, description, actions, activePath }: Props) {
+  const { organizations, orgSlug } = useStudioShell();
 
   return (
     <AdminShell

@@ -3,8 +3,6 @@ import { StudioPage } from "@/components/cms/studio-page";
 import { GameEditorPanel } from "@/components/cms/games/game-editor-panel";
 import { getGameDeleteStatus } from "@/app/actions/cms/delete";
 import { getGame, listGameTasks } from "@/app/actions/cms/games";
-import { listTasks } from "@/app/actions/cms/tasks";
-import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -12,19 +10,16 @@ type Props = {
 
 export default async function AdminGameDetailPage({ params }: Props) {
   const { id } = await params;
-  const orgId = await getStudioOrganizationId();
 
-  const [gameResult, linksResult, libraryResult] = await Promise.all([
+  const [gameResult, linksResult] = await Promise.all([
     getGame(id),
     listGameTasks(id),
-    listTasks({ organizationId: orgId }),
   ]);
 
   if (!gameResult.success || !gameResult.data) notFound();
 
   const liveMeta = await getGameDeleteStatus(id);
   const liveEventCount = liveMeta.success ? liveMeta.data!.liveEvents.length : 0;
-
   const game = gameResult.data;
 
   return (
@@ -40,7 +35,6 @@ export default async function AdminGameDetailPage({ params }: Props) {
       <GameEditorPanel
         game={game}
         taskLinks={linksResult.success ? linksResult.data! : []}
-        libraryTasks={libraryResult.success ? libraryResult.data! : []}
         liveEventCount={liveEventCount}
       />
     </StudioPage>

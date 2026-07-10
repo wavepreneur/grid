@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useTransition } from "react";
 import {
   applyGpsTestOverride,
   getEventCockpitSnapshot,
@@ -9,8 +10,9 @@ import {
   operatorEnableLevelGps,
   operatorClearLevelOverride,
   operatorSetTeamNavigator,
-  type EventCockpitSnapshot,
 } from "@/app/actions/cockpit";
+import { ProductNav } from "@/components/platform/product-nav";
+import { queryKeys } from "@/lib/platform/query-keys";
 import { CockpitLink, CockpitSection } from "@/components/cockpit/cockpit-shell";
 import {
   IconArrowRight,
@@ -40,7 +42,22 @@ function statusLabel(status: string): string {
 }
 
 export function EventCockpit({ inviteCode }: EventCockpitProps) {
-  const [snapshot, setSnapshot] = useState<EventCockpitSnapshot | null>(null);
+  const queryClient = useQueryClient();
+  const {
+    data: snapshot = null,
+    error: queryError,
+    isFetching,
+  } = useQuery({
+    queryKey: queryKeys.cockpit.snapshot(inviteCode),
+    queryFn: async () => {
+      const result = await getEventCockpitSnapshot(inviteCode);
+      if (!result.success) throw new Error(result.error);
+      return result.data!;
+    },
+    refetchInterval: 4_000,
+    staleTime: 2_000,
+  });
+
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [radiusMeters, setRadiusMeters] = useState("50000");
@@ -48,23 +65,11 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
   const [lng, setLng] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  const refresh = useCallback(async () => {
-    const result = await getEventCockpitSnapshot(inviteCode);
-    if (!result.success) {
-      setError(result.error);
-      return;
-    }
-    setSnapshot(result.data);
-    setError(null);
-  }, [inviteCode]);
+  const displayError = error ?? (queryError instanceof Error ? queryError.message : null);
 
-  useEffect(() => {
-    void refresh();
-    const interval = window.setInterval(() => {
-      void refresh();
-    }, 5000);
-    return () => window.clearInterval(interval);
-  }, [refresh]);
+  function invalidateSnapshot() {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.cockpit.snapshot(inviteCode) });
+  }
 
   function useMyLocation() {
     if (!navigator.geolocation) {
@@ -102,7 +107,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
       setMessage(
         `GPS-Testmodus für Aufgaben ${result.data.gpsLevels.join(", ")} aktiv — Teams bitte Seite neu laden.`,
       );
-      await refresh();
+      await invalidateSnapshot();
     });
   }
 
@@ -117,7 +122,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
         return;
       }
       setMessage(`Aufgabe ${level}: GPS aus — Teams bitte Seite neu laden.`);
-      await refresh();
+      await invalidateSnapshot();
     });
   }
 
@@ -139,7 +144,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
         return;
       }
       setMessage(`Aufgabe ${level}: GPS wieder aktiv — Teams bitte Seite neu laden.`);
-      await refresh();
+      await invalidateSnapshot();
     });
   }
 
@@ -154,7 +159,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
         return;
       }
       setMessage(`Aufgabe ${level}: Einstellungen zurückgesetzt.`);
-      await refresh();
+      await invalidateSnapshot();
     });
   }
 
@@ -175,7 +180,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
       }
 
       setMessage(`Team ${joinCode}: Team-Leiter (GPS) → ${result.data.navigatorName}`);
-      await refresh();
+      await invalidateSnapshot();
     });
   }
 
@@ -211,7 +216,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
       </GridHint>
 
       {message ? <GridSuccess message={message} /> : null}
-      {error ? <GridError message={error} /> : null}
+      {displayError ? <GridError message={displayError} /> : null}
 
       <CockpitSection
         icon={<IconUsers size={18} />}
