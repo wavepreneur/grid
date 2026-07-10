@@ -290,6 +290,10 @@ export function GameList({ games, templates }: Props) {
     if (deleteStatuses.length === 0) return null;
     const live = deleteStatuses.filter((s) => s.liveEvents.length > 0);
     const pools = deleteStatuses.filter((s) => s.activeTicketPools > 0);
+    const poolDeletes = deleteStatuses.filter(
+      (s) => s.ticketPoolCount > 0 && s.activeTicketPools === 0 && s.liveEvents.length === 0,
+    );
+    const totalPoolsToDelete = poolDeletes.reduce((sum, s) => sum + s.ticketPoolCount, 0);
     return (
       <>
         {live.length > 0 ? (
@@ -312,6 +316,13 @@ export function GameList({ games, templates }: Props) {
         {pools.length > 0 && live.length === 0 ? (
           <StudioHint tone="warn">
             {pools.length} Spiel(e) haben aktive Ticket-Pools. Diese werden beim Offline-Stellen pausiert.
+          </StudioHint>
+        ) : null}
+        {totalPoolsToDelete > 0 && live.length === 0 && pools.length === 0 ? (
+          <StudioHint tone="info">
+            {totalPoolsToDelete === 1
+              ? "1 Ticket-Pool wird mit den Spielen gelöscht."
+              : `${totalPoolsToDelete} Ticket-Pools werden mit den Spielen gelöscht.`}
           </StudioHint>
         ) : null}
       </>

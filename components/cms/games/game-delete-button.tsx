@@ -91,6 +91,15 @@ export function GameDeleteButton({
         {status.activeTicketPools > 0 && status.liveEvents.length === 0 ? (
           <StudioHint tone="warn">Aktive Ticket-Pools werden beim Offline-Stellen pausiert.</StudioHint>
         ) : null}
+        {status.ticketPoolCount > 0 &&
+        status.activeTicketPools === 0 &&
+        status.liveEvents.length === 0 ? (
+          <StudioHint tone="info">
+            {status.ticketPoolCount === 1
+              ? "1 Ticket-Pool wird mit dem Spiel gelöscht."
+              : `${status.ticketPoolCount} Ticket-Pools werden mit dem Spiel gelöscht.`}
+          </StudioHint>
+        ) : null}
         {error ? <StudioError message={error} /> : null}
       </>
     );

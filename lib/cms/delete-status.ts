@@ -13,6 +13,7 @@ export type GameDeleteStatus = {
   gameId: string;
   liveEvents: LiveEventSummary[];
   activeTicketPools: number;
+  ticketPoolCount: number;
   canDelete: boolean;
   blockReason: string | null;
 };
@@ -102,12 +103,14 @@ export function buildGameDeleteStatus(
   gameId: string,
   liveEvents: LiveEventSummary[],
   activeTicketPools: number,
+  ticketPoolCount: number,
 ): GameDeleteStatus {
   if (liveEvents.length > 0) {
     return {
       gameId,
       liveEvents,
       activeTicketPools,
+      ticketPoolCount,
       canDelete: false,
       blockReason: `Dieses Spiel hat ${liveEvents.length} laufende Live-Event(s). Stelle es zuerst offline.`,
     };
@@ -117,6 +120,7 @@ export function buildGameDeleteStatus(
       gameId,
       liveEvents,
       activeTicketPools,
+      ticketPoolCount,
       canDelete: false,
       blockReason: `Dieses Spiel hat ${activeTicketPools} aktive Ticket-Pools. Stelle sie zuerst offline.`,
     };
@@ -125,6 +129,7 @@ export function buildGameDeleteStatus(
     gameId,
     liveEvents,
     activeTicketPools,
+    ticketPoolCount,
     canDelete: true,
     blockReason: null,
   };

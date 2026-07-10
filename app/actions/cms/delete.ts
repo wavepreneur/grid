@@ -197,16 +197,19 @@ export async function getGamesDeleteStatus(
 
     const { data: pools, error: poolsError } = await supabase
       .from("studio_ticket_pools")
-      .select("game_id")
-      .in("game_id", [...allowedIds])
-      .eq("status", "active");
+      .select("game_id, status")
+      .in("game_id", [...allowedIds]);
 
     if (poolsError) throw new Error(poolsError.message);
 
+    const ticketPoolCountByGame = new Map<string, number>();
     const activePoolsByGame = new Map<string, number>();
     for (const pool of pools ?? []) {
       const gameId = pool.game_id as string;
-      activePoolsByGame.set(gameId, (activePoolsByGame.get(gameId) ?? 0) + 1);
+      ticketPoolCountByGame.set(gameId, (ticketPoolCountByGame.get(gameId) ?? 0) + 1);
+      if (pool.status === "active") {
+        activePoolsByGame.set(gameId, (activePoolsByGame.get(gameId) ?? 0) + 1);
+      }
     }
 
     const result = gameIds.map((gameId) => {
@@ -215,6 +218,7 @@ export async function getGamesDeleteStatus(
           gameId,
           liveEvents: [],
           activeTicketPools: 0,
+          ticketPoolCount: 0,
           canDelete: false,
           blockReason: "Spiel nicht gefunden oder keine Berechtigung.",
         } satisfies GameDeleteStatus;
@@ -223,6 +227,7 @@ export async function getGamesDeleteStatus(
         gameId,
         liveEventsByGame.get(gameId) ?? [],
         activePoolsByGame.get(gameId) ?? 0,
+        ticketPoolCountByGame.get(gameId) ?? 0,
       );
     });
 
@@ -282,6 +287,14 @@ export async function takeGamesOffline(gameIds: string[]): Promise<ActionResult<
   }
 }
 
+async function deleteTicketPoolsForGame(
+  supabase: ReturnType<typeof createAdminClient>,
+  gameId: string,
+): Promise<void> {
+  const { error } = await supabase.from("studio_ticket_pools").delete().eq("game_id", gameId);
+  if (error) throw new Error(error.message);
+}
+
 export async function deleteGames(gameIds: string[]): Promise<ActionResult<BulkDeleteGamesResult>> {
   try {
     if (gameIds.length === 0) {
@@ -304,21 +317,31 @@ export async function deleteGames(gameIds: string[]): Promise<ActionResult<BulkD
         continue;
       }
 
-      const { error } = await supabase
-        .from("studio_games")
-        .delete()
-        .eq("id", status.gameId)
-        .eq("organization_id", orgId);
+      try {
+        await deleteTicketPoolsForGame(supabase, status.gameId);
 
-      if (error) {
-        failed.push({ id: status.gameId, error: error.message, status });
-        continue;
+        const { error } = await supabase
+          .from("studio_games")
+          .delete()
+          .eq("id", status.gameId)
+          .eq("organization_id", orgId);
+
+        if (error) {
+          failed.push({ id: status.gameId, error: error.message, status });
+          continue;
+        }
+        deletedIds.push(status.gameId);
+      } catch (err) {
+        failed.push({
+          id: status.gameId,
+          error: err instanceof Error ? err.message : "Löschen fehlgeschlagen.",
+          status,
+        });
       }
-      deletedIds.push(status.gameId);
     }
 
     revalidatePath("/admin/games");
-    revalidatePath("/admin/games");
+    revalidatePath("/admin/tickets");
     return { success: true, data: { deletedIds, failed } };
   } catch (error) {
     return {
