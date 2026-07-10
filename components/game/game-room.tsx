@@ -79,6 +79,7 @@ export function GameRoom({
 
   const activeLevel = teamState.currentLevel;
   const levelState = teamState.gameState.levels[String(activeLevel)];
+  const levelStartedAt = levelState?.started_at ?? null;
   const isFinished = teamState.status === "finished";
   const modal = teamState.gameState.modal;
   const completedLevels = useMemo(
@@ -89,7 +90,7 @@ export function GameRoom({
   const currentLevelDefinition = eventContent.levels.find((level) => level.level === activeLevel);
   const isNavigator = playerSession.canUnlockGps || Boolean(teamState.isNavigator);
   const soloAlpha = playerSession.isAlpha && playerSession.effectiveBeta;
-  const purchasedHints = teamState.gameState.purchased_tile_hints[String(activeLevel)] ?? {};
+  const purchasedTileHints = teamState.gameState.purchased_tile_hints[String(activeLevel)] ?? {};
   const solveDisabled = levelState?.status !== "active" || Boolean(modal) || isHintPending;
 
   function handlePurchaseHint(tileId: string) {
@@ -216,7 +217,7 @@ export function GameRoom({
               level={currentLevelDefinition}
               allLevels={eventContent.levels}
               levelStatuses={teamState.gameState.levels}
-              purchasedHints={purchasedHints}
+              purchasedHints={purchasedTileHints}
               score={teamState.gameState.score ?? 0}
               disabled={solveDisabled}
               isPending={isPending || isHintPending}
@@ -224,6 +225,8 @@ export function GameRoom({
               effectiveBeta={playerSession.effectiveBeta}
               soloAlpha={soloAlpha}
               gpsCapability={eventContent.capabilities.gps}
+              levelStartedAt={levelStartedAt}
+              teamStartedAt={teamState.startedAt}
               onSubmit={handleSolveLevel}
               onPurchaseHint={handlePurchaseHint}
             />

@@ -4,13 +4,17 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { upsertTask, type TaskUpsertInput } from "@/app/actions/cms/tasks";
-import { TaskIconPicker, TaskTilePreview } from "@/components/cms/tasks/task-tile-preview";
+import { TaskDeleteButton } from "@/components/cms/tasks/task-delete-button";
+import { TaskDuplicateButton } from "@/components/cms/tasks/task-duplicate-button";
+import { TaskEditorPreview } from "@/components/cms/tasks/task-editor-preview";
+import { TaskScoringEditor, TaskTilesEditor } from "@/components/cms/tasks/task-tiles-editor";
 import { ImageUploadField } from "@/components/cms/shared/image-upload-field";
 import { StudioPanel } from "@/components/cms/admin-shell";
-import { IconArrowRight, IconSave } from "@/components/cms/studio-icons";
+import { IconArrowRight, IconPlus, IconSave, IconTrash } from "@/components/cms/studio-icons";
 import {
   StudioButton,
   StudioError,
+  StudioHint,
   StudioInput,
   StudioLabel,
   StudioSectionTitle,
@@ -18,10 +22,14 @@ import {
   StudioTextarea,
 } from "@/components/cms/studio-ui";
 import {
+  createTaskOptionId,
+  defaultTaskScoring,
+  normalizeTaskContent,
+} from "@/lib/cms/task-content";
+import {
   DEFAULT_TASK_CONTENT,
   type StudioTask,
   type StudioTaskContent,
-  type TaskOpenMediaType,
 } from "@/lib/cms/types";
 
 type Props = {
@@ -36,18 +44,40 @@ export function TaskEditor({ task, returnTo }: Props) {
 
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
-  const [language, setLanguage] = useState<"de" | "en">(task?.language ?? "de");
-  const [citySlug, setCitySlug] = useState(task?.city_slug ?? "");
-  const [gameType, setGameType] = useState(task?.game_type ?? "");
   const [tags, setTags] = useState((task?.tags ?? []).join(", "));
-  const [content, setContent] = useState<StudioTaskContent>(
-    task?.content ?? DEFAULT_TASK_CONTENT,
+  const [content, setContent] = useState<StudioTaskContent>(() =>
+    normalizeTaskContent(task?.content ?? DEFAULT_TASK_CONTENT),
   );
 
   const previewContent = useMemo(() => content, [content]);
 
   function patchContent(patch: Partial<StudioTaskContent>) {
     setContent((prev) => ({ ...prev, ...patch }));
+  }
+
+  function patchScoring(scoring: NonNullable<StudioTaskContent["scoring"]>) {
+    patchContent({ scoring });
+  }
+
+  function addOption() {
+    const options = [...(content.options ?? []), { id: createTaskOptionId(), label: "", correct: false }];
+    patchContent({ options });
+  }
+
+  function patchOption(id: string, patch: Partial<{ label: string; correct: boolean }>) {
+    patchContent({
+      options: (content.options ?? []).map((o) => (o.id === id ? { ...o, ...patch } : o)),
+    });
+  }
+
+  function removeOption(id: string) {
+    patchContent({ options: (content.options ?? []).filter((o) => o.id !== id) });
+  }
+
+  function setSingleCorrect(id: string) {
+    patchContent({
+      options: (content.options ?? []).map((o) => ({ ...o, correct: o.id === id })),
+    });
   }
 
   function handleSubmit(event: React.FormEvent) {
@@ -58,14 +88,11 @@ export function TaskEditor({ task, returnTo }: Props) {
       id: task?.id,
       title,
       description,
-      language,
-      city_slug: citySlug || null,
-      game_type: gameType || null,
       tags: tags
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean),
-      content,
+      content: normalizeTaskContent(content),
     };
 
     startTransition(async () => {
@@ -79,15 +106,17 @@ export function TaskEditor({ task, returnTo }: Props) {
     });
   }
 
+  const scoring = content.scoring ?? defaultTaskScoring();
+
   return (
-    <form onSubmit={handleSubmit} className="grid gap-8 xl:grid-cols-[1fr_300px]">
+    <form onSubmit={handleSubmit} className="grid gap-8 xl:grid-cols-[1fr_320px]">
       <div className="space-y-6">
         {error ? <StudioError message={error} /> : null}
 
         <StudioPanel>
           <StudioSectionTitle
             title="Grunddaten"
-            description="Name und Kategorien für die Bibliothek"
+            description="Universelle Aufgabe — Zuordnung zu Spiel & Layer passiert erst im Spiel-Editor."
           />
           <div className="space-y-4">
             <div>
@@ -97,186 +126,142 @@ export function TaskEditor({ task, returnTo }: Props) {
             <div>
               <StudioLabel>Beschreibung</StudioLabel>
               <StudioTextarea
-                className="min-h-24"
+                className="min-h-28"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                placeholder="Story / Kontext — was der Spieler vor dem Rätsel liest"
               />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <StudioLabel>Sprache</StudioLabel>
-                <StudioSelect
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value as "de" | "en")}
-                >
-                  <option value="de">Deutsch</option>
-                  <option value="en">English</option>
-                </StudioSelect>
-              </div>
-              <div>
-                <StudioLabel hint="Zum Filtern in der Bibliothek">Stadt</StudioLabel>
-                <StudioInput
-                  value={citySlug}
-                  onChange={(e) => setCitySlug(e.target.value)}
-                  placeholder="berlin"
-                />
-              </div>
-              <div>
-                <StudioLabel hint="z. B. outdoor, quiz">Spiel-Typ</StudioLabel>
-                <StudioInput
-                  value={gameType}
-                  onChange={(e) => setGameType(e.target.value)}
-                  placeholder="outdoor, quiz…"
-                />
-              </div>
-              <div>
-                <StudioLabel hint="Kommagetrennt">Tags</StudioLabel>
-                <StudioInput
-                  value={tags}
-                  onChange={(e) => setTags(e.target.value)}
-                  placeholder="kira, berlin"
-                />
-              </div>
+            <ImageUploadField
+              label="Titelbild"
+              hint="Querformat empfohlen · wird oben in der Aufgabe angezeigt"
+              value={content.hero_image_url ?? ""}
+              onChange={(url) => patchContent({ hero_image_url: url || undefined })}
+            />
+            <div>
+              <StudioLabel hint="Kommagetrennt — zum Filtern in der Bibliothek">Tags</StudioLabel>
+              <StudioInput
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                placeholder="berlin, mauer, outdoor, quiz…"
+              />
             </div>
           </div>
         </StudioPanel>
 
         <StudioPanel>
           <StudioSectionTitle
-            title="Kachel & Medien"
-            description="So sieht die Aufgabe für Spieler aus"
+            title="Punkte & Zeit"
+            description="Belohnung, optionaler Countdown und Punkte-Verfall"
           />
+          <TaskScoringEditor scoring={scoring} onChange={patchScoring} />
+        </StudioPanel>
+
+        <StudioPanel>
+          <StudioSectionTitle
+            title="Medien-Kacheln"
+            description="Spieler tippt Kacheln an → Modal mit Bild, Video, Audio oder Webseite. Pro Kachel optional ein kaufbarer Hinweis zum Kachel-Inhalt."
+          />
+          <StudioHint tone="info">
+            Pro Kachel ein Cover-Bild hochladen (1:1). Eine Kachel wird zentriert, zwei nebeneinander wie
+            im Spiel.
+          </StudioHint>
+          <div className="mt-4">
+            <TaskTilesEditor
+              tiles={content.tiles ?? []}
+              onChange={(tiles) => patchContent({ tiles })}
+            />
+          </div>
+        </StudioPanel>
+
+        <StudioPanel>
+          <StudioSectionTitle title="Frage & Antwort" description="Lösung am Ende der Aufgabe" />
           <div className="space-y-4">
             <div>
-              <StudioLabel>Darstellung auf der Karte</StudioLabel>
-              <StudioSelect
-                value={content.tile.display}
-                onChange={(e) =>
-                  patchContent({
-                    tile: {
-                      ...content.tile,
-                      display: e.target.value as "icon" | "image",
-                    },
-                  })
-                }
-              >
-                <option value="icon">Icon (Standard)</option>
-                <option value="image">Vollbild-Bild</option>
-              </StudioSelect>
-            </div>
-
-            {content.tile.display === "icon" ? (
-              <div>
-                <StudioLabel>Icon wählen</StudioLabel>
-                <TaskIconPicker
-                  value={content.tile.icon_key}
-                  onChange={(key) =>
-                    patchContent({ tile: { ...content.tile, icon_key: key } })
-                  }
-                />
-              </div>
-            ) : (
-              <div>
-                <StudioLabel>Bild-URL</StudioLabel>
-                <StudioInput
-                  value={content.tile.image_url ?? ""}
-                  onChange={(e) =>
-                    patchContent({ tile: { ...content.tile, image_url: e.target.value } })
-                  }
-                  placeholder="https://…"
-                />
-              </div>
-            )}
-
-            <ImageUploadField
-              label="Kachel-Bild"
-              hint="Füllt die gesamte Kachel — Icon wird ausgeblendet."
-              value={content.tile.label_image_url ?? ""}
-              onChange={(url) =>
-                patchContent({
-                  tile: { ...content.tile, label_image_url: url || undefined },
-                })
-              }
-            />
-
-            <div>
-              <StudioLabel hint="Fallback wenn kein Bild gesetzt">Kachel-Text</StudioLabel>
+              <StudioLabel>Frage</StudioLabel>
               <StudioInput
-                value={content.tile.label ?? ""}
-                onChange={(e) =>
-                  patchContent({ tile: { ...content.tile, label: e.target.value } })
-                }
-                placeholder="Kurzer Text"
+                value={content.question ?? ""}
+                onChange={(e) => patchContent({ question: e.target.value })}
+                placeholder="Wie lautet der Code für das Schloss?"
               />
             </div>
 
             <div>
-              <StudioLabel>Beim Öffnen der Aufgabe</StudioLabel>
+              <StudioLabel>Antwort-Typ</StudioLabel>
               <StudioSelect
-                value={content.open_media.type}
-                onChange={(e) =>
+                value={content.answer_type}
+                onChange={(e) => {
+                  const answer_type = e.target.value as StudioTaskContent["answer_type"];
                   patchContent({
-                    open_media: {
-                      ...content.open_media,
-                      type: e.target.value as TaskOpenMediaType,
-                    },
-                  })
-                }
+                    answer_type,
+                    options:
+                      answer_type === "text"
+                        ? undefined
+                        : content.options?.length
+                          ? content.options
+                          : [{ id: createTaskOptionId(), label: "", correct: true }],
+                  });
+                }}
               >
-                <option value="none">Frage & Eingabe</option>
-                <option value="image">Bild anzeigen</option>
-                <option value="audio">Audio abspielen</option>
-                <option value="video">Video abspielen</option>
-                <option value="iframe">Webseite einbetten</option>
+                <option value="text">Freitext-Eingabe</option>
+                <option value="choice">Multiple Choice (eine richtig)</option>
+                <option value="multi_choice">Mehrfachauswahl (mehrere richtig)</option>
               </StudioSelect>
             </div>
 
-            {content.open_media.type !== "none" ? (
+            {content.answer_type === "text" ? (
               <div>
-                <StudioLabel>Medien-URL / Link</StudioLabel>
+                <StudioLabel>Richtige Antwort</StudioLabel>
                 <StudioInput
-                  value={content.open_media.url ?? ""}
-                  onChange={(e) =>
-                    patchContent({
-                      open_media: { ...content.open_media, url: e.target.value },
-                    })
-                  }
+                  value={content.answer ?? ""}
+                  onChange={(e) => patchContent({ answer: e.target.value })}
+                  placeholder="Lösung"
                 />
               </div>
             ) : (
-              <>
-                <div>
-                  <StudioLabel>Frage</StudioLabel>
-                  <StudioInput
-                    value={content.question ?? ""}
-                    onChange={(e) => patchContent({ question: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <StudioLabel>Antwort-Typ</StudioLabel>
-                    <StudioSelect
-                      value={content.answer_type}
-                      onChange={(e) =>
-                        patchContent({
-                          answer_type: e.target.value as StudioTaskContent["answer_type"],
-                        })
-                      }
-                    >
-                      <option value="text">Text</option>
-                      <option value="number">Zahl</option>
-                      <option value="choice">Auswahl</option>
-                    </StudioSelect>
-                  </div>
-                  <div>
-                    <StudioLabel>Richtige Antwort</StudioLabel>
-                    <StudioInput
-                      value={content.answer ?? ""}
-                      onChange={(e) => patchContent({ answer: e.target.value })}
+              <div className="space-y-3">
+                <StudioLabel>
+                  {content.answer_type === "choice"
+                    ? "Antwortoptionen — genau eine als richtig markieren"
+                    : "Antwortoptionen — alle richtigen markieren"}
+                </StudioLabel>
+                {(content.options ?? []).map((opt) => (
+                  <div key={opt.id} className="flex items-center gap-2">
+                    <input
+                      type={content.answer_type === "choice" ? "radio" : "checkbox"}
+                      name="correct-option"
+                      checked={Boolean(opt.correct)}
+                      onChange={() => {
+                        if (content.answer_type === "choice") setSingleCorrect(opt.id);
+                        else patchOption(opt.id, { correct: !opt.correct });
+                      }}
+                      className="shrink-0"
                     />
+                    <StudioInput
+                      className="flex-1"
+                      value={opt.label}
+                      onChange={(e) => patchOption(opt.id, { label: e.target.value })}
+                      placeholder="Antworttext"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeOption(opt.id)}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-red-600"
+                      aria-label="Option entfernen"
+                    >
+                      <IconTrash size={14} />
+                    </button>
                   </div>
-                </div>
-              </>
+                ))}
+                <StudioButton
+                  type="button"
+                  variant="secondary"
+                  icon={<IconPlus size={14} />}
+                  onClick={addOption}
+                >
+                  Option hinzufügen
+                </StudioButton>
+              </div>
             )}
           </div>
         </StudioPanel>
@@ -285,6 +270,20 @@ export function TaskEditor({ task, returnTo }: Props) {
           <StudioButton type="submit" disabled={pending} icon={<IconSave size={16} />}>
             {pending ? "Speichern…" : task ? "Aufgabe speichern" : "Aufgabe erstellen"}
           </StudioButton>
+          {task ? (
+            <>
+              <TaskDuplicateButton
+                taskId={task.id}
+                taskTitle={task.title}
+                listPath={returnTo ?? "/admin/tasks"}
+              />
+              <TaskDeleteButton
+                taskId={task.id}
+                taskTitle={task.title}
+                redirectTo={returnTo ?? "/admin/tasks"}
+              />
+            </>
+          ) : null}
           <Link
             href={returnTo ?? "/admin/tasks"}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
@@ -304,18 +303,9 @@ export function TaskEditor({ task, returnTo }: Props) {
       <aside className="xl:sticky xl:top-8 xl:self-start">
         <StudioPanel>
           <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Vorschau
+            Vorschau (Spieler-Ansicht)
           </p>
-          <div className="mx-auto w-[260px] rounded-[1.75rem] border border-slate-200 bg-slate-900 p-3 shadow-lg">
-            <div className="rounded-[1.25rem] bg-[#0b1220] p-4">
-              <TaskTilePreview title={title || "Neue Aufgabe"} content={previewContent} solo />
-              <p className="mt-4 text-center text-xs text-slate-400">
-                {content.open_media.type === "none"
-                  ? "Öffnet Frage & Eingabefeld"
-                  : `Öffnet ${content.open_media.type}`}
-              </p>
-            </div>
-          </div>
+          <TaskEditorPreview title={title} description={description} content={previewContent} />
         </StudioPanel>
       </aside>
     </form>

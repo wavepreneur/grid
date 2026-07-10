@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
 import {
+  parseContentContext,
+  parseRoleAssignment,
+} from "@/lib/cms/layer-model";
+import {
   DEFAULT_TASK_CONTENT,
   slugifyStudio,
   type StudioTask,
@@ -12,12 +16,16 @@ import {
 } from "@/lib/cms/types";
 import type { ActionResult } from "@/lib/grid/types";
 
-function normalizeTaskContent(raw: unknown): StudioTaskContent {
-  const base = { ...DEFAULT_TASK_CONTENT, ...(raw as StudioTaskContent) };
+import { normalizeTaskContent } from "@/lib/cms/task-content";
+
+function normalizeTaskRow(row: StudioTask): StudioTask {
   return {
-    ...base,
-    tile: { ...DEFAULT_TASK_CONTENT.tile, ...base.tile },
-    open_media: { ...DEFAULT_TASK_CONTENT.open_media, ...base.open_media },
+    ...(row as StudioTask),
+    content: normalizeTaskContent((row as StudioTask).content),
+    tags: (row as StudioTask).tags ?? [],
+    layer: (row as StudioTask).layer ?? 2,
+    content_context: parseContentContext((row as StudioTask).content_context),
+    role_assignment: parseRoleAssignment((row as StudioTask).role_assignment),
   };
 }
 
@@ -44,14 +52,13 @@ export async function listTasks(filters: TaskFilterInput = {}): Promise<ActionRe
       query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,slug.ilike.%${q}%`);
     }
 
+    if (filters.layer) query = query.eq("layer", filters.layer);
+    if (filters.contentContext) query = query.eq("content_context", filters.contentContext);
+
     const { data, error } = await query.limit(200);
     if (error) throw new Error(error.message);
 
-    const tasks = (data ?? []).map((row) => ({
-      ...(row as StudioTask),
-      content: normalizeTaskContent((row as StudioTask).content),
-      tags: (row as StudioTask).tags ?? [],
-    }));
+    const tasks = (data ?? []).map((row) => normalizeTaskRow(row as StudioTask));
 
     return { success: true, data: tasks };
   } catch (error) {
@@ -76,11 +83,7 @@ export async function getTask(taskId: string): Promise<ActionResult<StudioTask>>
 
     return {
       success: true,
-      data: {
-        ...(data as StudioTask),
-        content: normalizeTaskContent((data as StudioTask).content),
-        tags: (data as StudioTask).tags ?? [],
-      },
+      data: normalizeTaskRow(data as StudioTask),
     };
   } catch (error) {
     return {
@@ -100,6 +103,9 @@ export type TaskUpsertInput = {
   game_type?: string | null;
   tags?: string[];
   content?: StudioTaskContent;
+  layer?: import("@/lib/cms/layer-model").StudioLayer;
+  content_context?: import("@/lib/cms/layer-model").ContentContext;
+  role_assignment?: import("@/lib/cms/layer-model").RoleAssignment;
   organization_scoped?: boolean;
 };
 
@@ -122,6 +128,9 @@ export async function upsertTask(input: TaskUpsertInput): Promise<ActionResult<S
       game_type: input.game_type?.trim() || null,
       tags: input.tags ?? [],
       content: normalizeTaskContent(input.content ?? DEFAULT_TASK_CONTENT),
+      layer: input.layer ?? 2,
+      content_context: input.content_context ?? "any",
+      role_assignment: input.role_assignment ?? "team",
       updated_at: new Date().toISOString(),
     };
 
@@ -139,7 +148,7 @@ export async function upsertTask(input: TaskUpsertInput): Promise<ActionResult<S
       revalidatePath("/admin/tasks");
       return {
         success: true,
-        data: { ...(data as StudioTask), content: normalizeTaskContent(data.content) },
+        data: normalizeTaskRow(data as StudioTask),
       };
     }
 
@@ -153,12 +162,110 @@ export async function upsertTask(input: TaskUpsertInput): Promise<ActionResult<S
     revalidatePath("/admin/tasks");
     return {
       success: true,
-      data: { ...(data as StudioTask), content: normalizeTaskContent(data.content) },
+      data: normalizeTaskRow(data as StudioTask),
     };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Task konnte nicht gespeichert werden.",
+    };
+  }
+}
+
+async function ensureUniqueTaskSlug(
+  supabase: ReturnType<typeof createAdminClient>,
+  organizationId: string | null,
+  name: string,
+): Promise<string> {
+  const base = slugifyStudio(name) || "aufgabe";
+  let candidate = base;
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    let query = supabase.from("studio_tasks").select("id").eq("slug", candidate);
+    if (organizationId) {
+      query = query.eq("organization_id", organizationId);
+    } else {
+      query = query.is("organization_id", null);
+    }
+    const { data } = await query.maybeSingle();
+    if (!data) return candidate;
+    candidate = `${base}-${attempt + 2}`.slice(0, 64);
+  }
+  return `${base}-${Date.now()}`.slice(0, 64);
+}
+
+export type DuplicateTasksResult = {
+  createdIds: string[];
+  createdCount: number;
+};
+
+export async function duplicateTasks(
+  taskIds: string[],
+  count: number,
+): Promise<ActionResult<DuplicateTasksResult>> {
+  try {
+    const copies = Math.min(100, Math.max(1, Math.floor(count)));
+    const uniqueIds = [...new Set(taskIds.filter(Boolean))];
+    if (uniqueIds.length === 0) {
+      return { success: false, error: "Keine Aufgaben ausgewählt." };
+    }
+
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+
+    const { data: tasks, error: fetchError } = await supabase
+      .from("studio_tasks")
+      .select("*")
+      .eq("is_active", true)
+      .in("id", uniqueIds);
+
+    if (fetchError) throw new Error(fetchError.message);
+
+    const sourceById = new Map((tasks ?? []).map((t) => [t.id as string, t as StudioTask]));
+    const createdIds: string[] = [];
+
+    for (const taskId of uniqueIds) {
+      const source = sourceById.get(taskId);
+      if (!source) continue;
+
+      for (let i = 1; i <= copies; i += 1) {
+        const title = `${i} ${source.title}`;
+        const slug = await ensureUniqueTaskSlug(supabase, source.organization_id ?? orgId, title);
+
+        const { data, error } = await supabase
+          .from("studio_tasks")
+          .insert({
+            organization_id: source.organization_id ?? orgId,
+            slug,
+            title,
+            description: source.description,
+            language: source.language,
+            city_slug: source.city_slug,
+            game_type: source.game_type,
+            tags: source.tags ?? [],
+            content: normalizeTaskContent(source.content),
+            layer: source.layer ?? 2,
+            content_context: source.content_context ?? "any",
+            role_assignment: source.role_assignment ?? "team",
+            is_active: true,
+          })
+          .select("*")
+          .single();
+
+        if (error) throw new Error(error.message);
+        createdIds.push((data as StudioTask).id);
+      }
+    }
+
+    if (createdIds.length === 0) {
+      return { success: false, error: "Keine Aufgaben zum Duplizieren gefunden." };
+    }
+
+    revalidatePath("/admin/tasks");
+    return { success: true, data: { createdIds, createdCount: createdIds.length } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Aufgaben konnten nicht dupliziert werden.",
     };
   }
 }

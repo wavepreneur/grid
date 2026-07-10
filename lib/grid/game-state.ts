@@ -27,11 +27,14 @@ export type TeamGameState = {
   hints_used: Record<string, number>;
   /** levelKey -> tileId -> revealed hint */
   purchased_tile_hints: Record<string, Record<string, PurchasedTileHint>>;
+  /** levelKey -> hintId -> purchased task hint */
+  purchased_level_hints: Record<string, Record<string, PurchasedTileHint>>;
   modal: GameModalState | null;
   levels: Record<
     string,
     {
       status: GameLevelStatus;
+      started_at?: string;
       completed_at?: string;
       completed_by?: string[];
     }
@@ -74,6 +77,7 @@ export function createInitialGameState(
   for (let level = 1; level <= totalLevels; level += 1) {
     levels[String(level)] = {
       status: level === 1 ? "active" : "locked",
+      ...(level === 1 ? { started_at: new Date().toISOString() } : {}),
     };
   }
 
@@ -83,6 +87,7 @@ export function createInitialGameState(
     score: DEFAULT_STARTING_SCORE,
     hints_used: {},
     purchased_tile_hints: {},
+    purchased_level_hints: {},
     modal: null,
     levels,
   };
@@ -100,20 +105,44 @@ export function parseTeamGameState(value: unknown): TeamGameState {
     score: candidate.score ?? DEFAULT_STARTING_SCORE,
     hints_used: candidate.hints_used ?? {},
     purchased_tile_hints: candidate.purchased_tile_hints ?? {},
+    purchased_level_hints: candidate.purchased_level_hints ?? {},
     modal: candidate.modal ?? null,
     levels: candidate.levels ?? createInitialGameState().levels,
+  };
+}
+
+export function activateLevelEntry(
+  levels: TeamGameState["levels"],
+  levelKey: string,
+): TeamGameState["levels"] {
+  const entry = levels[levelKey];
+  if (!entry) return levels;
+  const now = new Date().toISOString();
+  return {
+    ...levels,
+    [levelKey]: {
+      ...entry,
+      status: "active",
+      started_at: entry.started_at ?? now,
+    },
   };
 }
 
 export function buildLevelCompletedModal(input: {
   level: number;
   solvedBy: string[];
+  pointsEarned?: number;
 }): GameModalState {
+  const pointsSuffix =
+    input.pointsEarned !== undefined && input.pointsEarned !== 0
+      ? ` · ${input.pointsEarned >= 0 ? "+" : ""}${input.pointsEarned} Punkte`
+      : "";
+
   return {
     id: crypto.randomUUID(),
     type: "puzzle_solved",
     level: input.level,
-    message: "Rätsel gelöst!",
+    message: `Rätsel gelöst!${pointsSuffix}`,
     solved_by: input.solvedBy,
     created_at: new Date().toISOString(),
   };

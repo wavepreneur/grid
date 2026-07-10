@@ -1,6 +1,12 @@
 import type { LevelDefinition, PlayerRole } from "@/lib/grid/level-types";
 import type { StudioGame, StudioGameTaskLink, StudioTaskContent } from "@/lib/cms/types";
-import { DEFAULT_TASK_CONTENT } from "@/lib/cms/types";
+import {
+  groupLinksByLayerOnLink,
+  parseBonusTrigger,
+  parseLinkOverrides,
+  roleAssignmentToPlayerRole,
+} from "@/lib/cms/game-link-config";
+import { correctOptionIds, normalizeTaskContent } from "@/lib/cms/task-content";
 
 /** When → Then rule (stored on studio_games.logic_rules). */
 export type LogicWhenType =
@@ -248,9 +254,82 @@ export function buildFinishRule(sourceTaskId: string): StudioLogicRule {
   };
 }
 
-function taskContentToLevelType(content: StudioTaskContent, gpsEnabled: boolean): LevelDefinition["type"] {
-  if (gpsEnabled && content.open_media.type === "none") return "gps";
-  if (content.answer_type === "choice") return "quiz";
+/** Convert Layer-3 link overrides → runtime logic rules. */
+export function buildBonusRulesFromLinks(links: StudioGameTaskLink[]): StudioLogicRule[] {
+  const bonusLinks = groupLinksByLayerOnLink(links)[3];
+  const rules: StudioLogicRule[] = [];
+
+  for (const link of bonusLinks) {
+    const overrides = parseLinkOverrides(link.overrides);
+    const trigger = parseBonusTrigger(overrides);
+    const playerRole = roleAssignmentToPlayerRole(overrides.role);
+
+    const baseThen = {
+      target_task_id: link.task_id,
+      role: playerRole,
+      delay_minutes: null as number | null,
+      delay_meters: null as number | null,
+      gps: null as LogicGpsPin | null,
+    };
+
+    switch (trigger.type) {
+      case "game_start":
+        rules.push({
+          id: createRuleId(),
+          enabled: true,
+          when: { type: "game_start" },
+          then: { type: "show_task", ...baseThen },
+        });
+        break;
+      case "after_task_solved":
+        if (!trigger.source_task_id) break;
+        rules.push({
+          id: createRuleId(),
+          enabled: true,
+          when: { type: "task_solved", source_task_id: trigger.source_task_id },
+          then: {
+            type: "unlock_task",
+            ...baseThen,
+            delay_minutes: trigger.delay_seconds
+              ? Math.max(1, Math.ceil(trigger.delay_seconds / 60))
+              : null,
+          },
+        });
+        break;
+      case "team_points_at_least":
+        rules.push({
+          id: createRuleId(),
+          enabled: true,
+          when: { type: "team_points_at_least", points: trigger.points ?? 0 },
+          then: { type: "unlock_task", ...baseThen },
+        });
+        break;
+      case "elapsed_minutes":
+        rules.push({
+          id: createRuleId(),
+          enabled: true,
+          when: { type: "game_start" },
+          then: {
+            type: "unlock_task",
+            ...baseThen,
+            delay_minutes: trigger.minutes ?? null,
+          },
+        });
+        break;
+    }
+  }
+
+  return rules;
+}
+
+/** Geo → Mission → Bonus — matches Studio column order and flow preview. */
+export function orderLinksForCompile(links: StudioGameTaskLink[]): StudioGameTaskLink[] {
+  const grouped = groupLinksByLayerOnLink(links);
+  return [...grouped[1], ...grouped[2], ...grouped[3]];
+}
+
+function taskContentToLevelType(content: StudioTaskContent): LevelDefinition["type"] {
+  if (content.answer_type === "choice" || content.answer_type === "multi_choice") return "quiz";
   return "digital";
 }
 
@@ -260,43 +339,70 @@ function linkToLevelDefinition(
   game: StudioGame,
   rules: StudioLogicRule[],
 ): LevelDefinition {
-  const content = { ...DEFAULT_TASK_CONTENT, ...link.task.content };
+  const content = normalizeTaskContent(link.task.content);
   const overrides = link.overrides as { gps?: LogicGpsPin; location?: LogicGpsPin };
 
   const level: LevelDefinition = {
     level: levelNumber,
-    type: taskContentToLevelType(content, game.gps_enabled),
+    type: taskContentToLevelType(content),
     title: link.task.title,
     description: link.task.description,
   };
 
-  if (content.question) level.description = content.question;
+  if (content.hero_image_url?.trim()) {
+    level.hero_image_url = content.hero_image_url.trim();
+  }
+
+  if (content.question?.trim()) {
+    level.question = content.question.trim();
+  }
+
   if (content.answer) level.answer = content.answer;
+
   if (content.options?.length) {
-    level.options = content.options;
+    level.options = content.options.map((o) => ({ id: o.id, label: o.label }));
     if (content.answer_type === "choice") {
-      const match = content.options.find((o) => o.label === content.answer);
+      const match = content.options.find((o) => o.correct) ?? content.options.find((o) => o.label === content.answer);
       if (match) level.correct_option_id = match.id;
+    }
+    if (content.answer_type === "multi_choice") {
+      const ids = correctOptionIds(content);
+      if (ids.length > 0) level.correct_option_ids = ids;
     }
   }
 
-  const tileImageUrl =
-    content.tile.label_image_url?.trim() ||
-    (content.tile.display === "image" ? content.tile.image_url?.trim() : undefined);
-  if (tileImageUrl) {
-    level.hero_image_url = tileImageUrl;
+  if (content.tiles?.length) {
+    level.tiles = content.tiles
+      .filter((t) => t.media_url.trim())
+      .map((t) => {
+        const tile: NonNullable<LevelDefinition["tiles"]>[number] = {
+          id: t.id,
+          type: t.media_type,
+          url: t.media_url.trim(),
+          label: t.label?.trim() || undefined,
+          cover_image_url: t.cover_image_url?.trim() || undefined,
+        };
+        if (t.hint_text?.trim()) {
+          tile.hint = {
+            text: t.hint_text.trim(),
+            point_cost: t.hint_point_cost ?? 50,
+          };
+        }
+        return tile;
+      });
   }
 
-  if (content.open_media.type === "iframe" && content.open_media.url) {
-    level.media = { iframe_url: content.open_media.url };
-  } else if (content.open_media.type === "video" && content.open_media.url) {
-    level.media = { video_url: content.open_media.url };
-  } else if (content.open_media.type === "audio" && content.open_media.url) {
-    level.media = { audio_url: content.open_media.url };
-  } else if (content.open_media.type === "image" && content.open_media.url) {
-    level.media = { image_url: content.open_media.url };
+  if (content.scoring) {
+    level.scoring = {
+      points: content.scoring.points,
+      countdown_seconds: content.scoring.countdown_seconds ?? null,
+      decay_enabled: content.scoring.decay_enabled,
+      decay_floor: content.scoring.decay_floor ?? 0,
+    };
   }
 
+  const overridesParsed = parseLinkOverrides(link.overrides);
+  const roleFromLink = roleAssignmentToPlayerRole(overridesParsed.role);
   const roleRule = rules.find(
     (r) =>
       r.enabled &&
@@ -305,6 +411,7 @@ function linkToLevelDefinition(
       (r.then.type === "show_task" || r.then.type === "unlock_task"),
   );
   if (roleRule?.then.role) level.role_required = roleRule.then.role;
+  else if (roleFromLink) level.role_required = roleFromLink;
 
   const gpsFromRule = rules.find(
     (r) =>
@@ -321,6 +428,7 @@ function linkToLevelDefinition(
       lng: gps.lng,
       radius_meters: gps.radius_meters,
     };
+    level.type = "gps";
   }
 
   const triggerRules = rules.filter(
@@ -366,7 +474,7 @@ export function compileStudioGameToLevels(input: {
   links: StudioGameTaskLink[];
   rules: StudioLogicRule[];
 }): LevelDefinition[] {
-  const sorted = [...input.links].sort((a, b) => a.sort_order - b.sort_order);
+  const sorted = orderLinksForCompile(input.links);
   const taskToLevel = new Map<string, number>();
   sorted.forEach((link, index) => taskToLevel.set(link.task_id, index + 1));
 
@@ -410,6 +518,8 @@ export function compileStudioGameToLevels(input: {
 export type CompiledGameLogic = {
   rules: StudioLogicRule[];
   levels: LevelDefinition[];
+  task_id_by_level: Record<number, string>;
+  level_by_task_id: Record<string, number>;
   end_game_on_task_ids: string[];
   hide_on_any_solve_task_ids: string[];
   points_gates: Array<{ points: number; unlock_task_id: string }>;
@@ -420,12 +530,25 @@ export function compileGameLogic(input: {
   links: StudioGameTaskLink[];
   rules: StudioLogicRule[];
 }): CompiledGameLogic {
-  const rules = input.rules.filter((r) => r.enabled);
-  const levels = compileStudioGameToLevels({ ...input, rules });
+  const bonusRules = buildBonusRulesFromLinks(input.links);
+  const mergedRules = [...input.rules, ...bonusRules];
+  const rules = mergedRules.filter((r) => r.enabled);
+  const orderedLinks = orderLinksForCompile(input.links);
+  const levels = compileStudioGameToLevels({ ...input, links: orderedLinks, rules });
+
+  const task_id_by_level: Record<number, string> = {};
+  const level_by_task_id: Record<string, number> = {};
+  orderedLinks.forEach((link, index) => {
+    const levelNumber = index + 1;
+    task_id_by_level[levelNumber] = link.task_id;
+    level_by_task_id[link.task_id] = levelNumber;
+  });
 
   return {
     rules,
     levels,
+    task_id_by_level,
+    level_by_task_id,
     end_game_on_task_ids: rules
       .filter((r) => r.then.type === "end_game" && r.when.source_task_id)
       .map((r) => r.when.source_task_id!),

@@ -1,0 +1,47 @@
+---
+description: GRID Layer-Modell — Studio-Prioritäten und Anti-Patterns
+alwaysApply: true
+---
+
+# GRID Layer Model
+
+Read `docs/GRID_LAYER_MODEL.md` before any Studio CMS or content architecture work.
+
+## Mandate
+
+- **Wenige Spiele, maximale Skalierung** — not a Loquiz-style multi-partner platform
+- Content = **modular layers** (1=geo, 2=mission, 3=bonus/roles), freely combinable
+- **Fixed engine** (Alpha/Beta/Gamma FSM) + variable JSON snapshots
+
+## Before building a Studio feature
+
+Run the checklist in `lib/cms/layer-model.ts` → `LAYER_FEATURE_CHECKLIST`.
+
+If the feature does not serve Layer 1 city scaling, Layer 2 global mission, Layer 3 roles/triggers, or runtime switches (indoor, pulse, language) — **do not build it**.
+
+## Layer mapping
+
+| Layer | Studio field | Runtime |
+|-------|--------------|---------|
+| 1 Geo | `studio_tasks.layer=1`, `city_slug`, GPS overrides | `local_waypoints` |
+| 2 Mission | `studio_tasks.layer=2` | `global_levels` |
+| 3 Bonus | `studio_tasks.layer=3`, `role_assignment`, `logic_rules` | triggers + roles |
+
+## Game profiles
+
+Presets in `LAYER_GAME_PRESETS`: full (1+2+3), city_explorer, mission (2+3), micro_pulse (3 only).
+
+`studio_games.active_layers` + `runtime_profiles` define what runs; `content_mode` on events switches outdoor↔indoor.
+
+## Do not prioritize
+
+- Loquiz clone features (Rogain/Open/Match as primary UX) unless runtime engine supports them
+- Generic task library features without layer assignment
+- Partner self-service game builder
+- Checkout/commerce in GRID
+
+## Key paths
+
+- Layer model: `lib/cms/layer-model.ts`
+- Docs: `docs/GRID_LAYER_MODEL.md`
+- Layer profile UI: `components/cms/games/game-layer-profile-panel.tsx`

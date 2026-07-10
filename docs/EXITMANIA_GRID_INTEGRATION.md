@@ -14,6 +14,18 @@
 
 Loquiz wird **nur** durch GRID ersetzt — nicht Exitmanias Commerce-Schicht.
 
+## Content-Layer (GRID-Mandat)
+
+**Pflichtlektüre:** [`GRID_LAYER_MODEL.md`](./GRID_LAYER_MODEL.md)
+
+| Layer | Exitmania-Beispiel | Skalierung |
+|-------|-------------------|------------|
+| **1** | GPS-Wegpunkt + Umgebungs-Quiz | Pro Stadt (`local_waypoints`, `city_slug`) |
+| **2** | Mission/Rätselblatt nach Freischaltung | Global (`global_levels`) |
+| **3** | Bonus, Alpha/Beta/Gamma-Aufgaben | Trigger + Rollen |
+
+Spiele kombinieren Layer frei. Indoor-Fallback = `content_config.content_mode`. Kunden-Override Layer 1 = `route_override`.
+
 ## Content — keine Duplikate
 
 ```text

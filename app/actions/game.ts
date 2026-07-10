@@ -7,9 +7,16 @@ import {
   buildLevelCompletedModal,
   createInitialGameState,
   parseTeamGameState,
+  activateLevelEntry,
   type TeamGameState,
   type TeamRealtimeState,
 } from "@/lib/grid/game-state";
+import {
+  createInitialGameStateFromCompiled,
+  elapsedMinutesSince,
+  resolveProgressionAfterSolve,
+} from "@/lib/grid/logic-engine";
+import { computeLevelReward } from "@/lib/grid/level-scoring";
 import {
   getLevelDefinition,
   validateLevelSolution,
@@ -175,32 +182,86 @@ export async function solveCurrentLevel(input: {
       new Set([...(levelState.completed_by ?? []), player.display_name]),
     );
 
-    const nextLevel = currentLevel + 1;
-    const isFinished = nextLevel > content.levels.length;
+    const compiledLogic = content.compiledLogic;
+    const elapsedMinutes = elapsedMinutesSince(team.started_at);
 
-    const nextGameState: TeamGameState = {
-      ...gameState,
-      version: gameState.version + 1,
-      total_levels: content.levels.length,
-      modal: buildLevelCompletedModal({
-        level: currentLevel,
-        solvedBy,
-      }),
-      levels: {
+    let nextLevel: number;
+    let isFinished: boolean;
+    let progressionLevels: TeamGameState["levels"];
+
+    if (compiledLogic && compiledLogic.levels.length > 0) {
+      const partialState: TeamGameState = {
+        ...gameState,
+        levels: {
+          ...gameState.levels,
+          [levelKey]: {
+            status: "completed",
+            completed_at: new Date().toISOString(),
+            completed_by: solvedBy,
+          },
+        },
+      };
+
+      const progression = resolveProgressionAfterSolve({
+        gameState: partialState,
+        compiled: compiledLogic,
+        completedLevel: currentLevel,
+        score: gameState.score,
+        elapsedMinutes: elapsedMinutes ?? undefined,
+      });
+
+      progressionLevels = {
+        ...progression.gameState.levels,
+        [levelKey]: {
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          completed_by: solvedBy,
+        },
+      };
+
+      const unlockedNext = progression.nextCurrentLevel;
+      if (
+        unlockedNext !== currentLevel &&
+        unlockedNext <= content.levels.length &&
+        progressionLevels[String(unlockedNext)]?.status !== "completed"
+      ) {
+        progressionLevels = activateLevelEntry(progressionLevels, String(unlockedNext));
+      }
+
+      nextLevel = unlockedNext;
+      isFinished =
+        progression.endGame ||
+        nextLevel > content.levels.length ||
+        Object.values(progressionLevels).every((entry) => entry.status === "completed");
+    } else {
+      nextLevel = currentLevel + 1;
+      isFinished = nextLevel > content.levels.length;
+      progressionLevels = {
         ...gameState.levels,
         [levelKey]: {
           status: "completed",
           completed_at: new Date().toISOString(),
           completed_by: solvedBy,
         },
-        ...(isFinished
-          ? {}
-          : {
-              [String(nextLevel)]: {
-                status: "active",
-              },
-            }),
-      },
+      };
+      if (!isFinished) {
+        progressionLevels = activateLevelEntry(progressionLevels, String(nextLevel));
+      }
+    }
+
+    const pointsEarned = computeLevelReward(levelDefinition.scoring, levelState.started_at);
+
+    const nextGameState: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      total_levels: content.levels.length,
+      score: gameState.score + pointsEarned,
+      modal: buildLevelCompletedModal({
+        level: currentLevel,
+        solvedBy,
+        pointsEarned,
+      }),
+      levels: progressionLevels,
     };
 
     const supabase = createAdminClient();
@@ -233,6 +294,7 @@ export async function solveCurrentLevel(input: {
         next_level: isFinished ? null : nextLevel,
         level_type: levelDefinition.type,
         score: nextGameState.score,
+        points_earned: pointsEarned,
       },
     });
 
@@ -437,26 +499,36 @@ export async function initializeTeamGameState(
     studioGameVersionId,
   });
   const totalLevels = content.levels.length || EXITMANIA_TOTAL_LEVELS;
-  const initialState = createInitialGameState(totalLevels);
+  const initialState =
+    content.compiledLogic && content.compiledLogic.levels.length > 0
+      ? createInitialGameStateFromCompiled(content.compiledLogic)
+      : createInitialGameState(totalLevels);
+
+  const firstActive = Object.entries(initialState.levels).find(
+    ([, entry]) => entry.status === "active",
+  );
+  const startLevel = firstActive ? Number(firstActive[0]) : 1;
+  const stampedState = activateLevelEntry(initialState.levels, String(startLevel));
+  const gameStateWithStart = { ...initialState, levels: stampedState };
 
   const supabase = createAdminClient();
   await supabase
     .from("teams")
     .update({
-      current_level: 1,
-      game_state: initialState,
+      current_level: startLevel,
+      game_state: gameStateWithStart,
     })
     .eq("id", teamId);
 
   await insertSyncEvent({
     teamId,
     eventType: "game_started",
-    level: 1,
+    level: startLevel,
     actorPlayerId,
     payload: {
       total_levels: totalLevels,
       template_slug: content.templateSlug,
-      starting_score: initialState.score,
+      starting_score: gameStateWithStart.score,
     },
   });
 }

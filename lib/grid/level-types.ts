@@ -1,3 +1,5 @@
+import type { CompiledGameLogic } from "@/lib/cms/logic-rules";
+
 export type LevelType = "gps" | "digital" | "quiz";
 
 export type PlayerRole = "captain" | "solver" | "navigator" | "alpha" | "beta" | "gamma";
@@ -33,8 +35,17 @@ export type LevelContentTile = {
   type: LevelTileType;
   url: string;
   label?: string;
+  /** Optional cover image for the tile button (1:1). */
+  cover_image_url?: string;
   /** Optional hint tied to this tile (default 50 points). */
   hint?: LevelTileHint;
+};
+
+export type LevelScoring = {
+  points: number;
+  countdown_seconds?: number | null;
+  decay_enabled?: boolean;
+  decay_floor?: number;
 };
 
 export type LevelMedia = {
@@ -62,6 +73,7 @@ export type LevelDefinition = {
   type: LevelType;
   title: string;
   description: string;
+  question?: string;
   hero_image_url?: string;
   /** Up to 10 embed tiles (Cloudflare / iframe / mini-game links). */
   tiles?: LevelContentTile[];
@@ -69,10 +81,12 @@ export type LevelDefinition = {
   answer?: string;
   options?: QuizOption[];
   correct_option_id?: string;
+  correct_option_ids?: string[];
   role_required?: PlayerRole | null;
   media?: LevelMedia;
   hints?: LevelHint[];
   triggers?: LevelTriggers;
+  scoring?: LevelScoring;
 };
 
 export type RouteTemplate = {
@@ -117,6 +131,8 @@ export type ResolvedEventContent = {
   uiLayout: "exitmania" | "quiz" | "training";
   showLiveScore: boolean;
   missionDurationMinutes: number;
+  /** Studio publish snapshot — logic rules for bonus triggers at runtime. */
+  compiledLogic?: CompiledGameLogic | null;
 };
 
 export type GeolocationSample = {
@@ -128,6 +144,7 @@ export type GeolocationSample = {
 export type SolveLevelPayload = {
   answer?: string;
   selectedOptionId?: string;
+  selectedOptionIds?: string[];
   geolocation?: GeolocationSample;
 };
 

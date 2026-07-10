@@ -42,7 +42,7 @@ export default async function AdminOverviewPage() {
         <MetricCard
           label="Vorlagen"
           value={stats.templates}
-          href="/admin/templates"
+          href="/admin/games#vorlagen"
           icon={<IconTemplate size={20} />}
         />
         <MetricCard

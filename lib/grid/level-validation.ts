@@ -91,6 +91,20 @@ export function validateLevelSolution(
   }
 
   if (level.type === "quiz") {
+    if (level.correct_option_ids?.length) {
+      const selected = new Set(payload.selectedOptionIds ?? []);
+      const required = new Set(level.correct_option_ids);
+      if (selected.size !== required.size) {
+        return { ok: false, error: "Bitte alle richtigen Antworten auswählen." };
+      }
+      for (const id of required) {
+        if (!selected.has(id)) {
+          return { ok: false, error: "Nicht alle richtigen Antworten gewählt." };
+        }
+      }
+      return { ok: true };
+    }
+
     if (!payload.selectedOptionId) {
       return { ok: false, error: "Bitte eine Antwort auswählen." };
     }

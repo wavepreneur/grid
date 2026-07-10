@@ -16,9 +16,10 @@ type Props = {
   onChange: (url: string) => void;
   onClear?: () => void;
   hint?: string;
+  detail?: string;
 };
 
-export function ImageUploadField({ label, value, onChange, onClear, hint }: Props) {
+export function ImageUploadField({ label, value, onChange, onClear, hint, detail }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -41,6 +42,7 @@ export function ImageUploadField({ label, value, onChange, onClear, hint }: Prop
   return (
     <div className="space-y-2">
       <StudioLabel hint={hint}>{label}</StudioLabel>
+      {detail ? <p className="text-xs leading-5 text-slate-500">{detail}</p> : null}
       {error ? <StudioError message={error} /> : null}
 
       {value ? (

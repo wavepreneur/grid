@@ -6,7 +6,6 @@ import {
   IconGamepad,
   IconHome,
   IconPuzzle,
-  IconTemplate,
   IconTicket,
 } from "@/components/cms/studio-icons";
 import type { StudioOrganization } from "@/lib/cms/types";
@@ -19,7 +18,6 @@ const NAV: Array<{
 }> = [
   { href: "/admin", label: "Übersicht", exact: true, icon: <IconHome size={18} /> },
   { href: "/admin/games", label: "Spiele", icon: <IconGamepad size={18} /> },
-  { href: "/admin/templates", label: "Vorlagen", icon: <IconTemplate size={18} /> },
   { href: "/admin/tasks", label: "Aufgaben", icon: <IconPuzzle size={18} /> },
   { href: "/admin/tickets", label: "Tickets", icon: <IconTicket size={18} /> },
   { href: "/admin/dev", label: "Entwicklung", icon: <IconCode size={18} /> },

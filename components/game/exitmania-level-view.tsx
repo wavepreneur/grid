@@ -26,6 +26,8 @@ type ExitmaniaLevelViewProps = {
   effectiveBeta: boolean;
   soloAlpha?: boolean;
   gpsCapability?: boolean;
+  levelStartedAt?: string | null;
+  teamStartedAt?: string | null;
   onSubmit: (payload: SolveLevelPayload) => void;
   onPurchaseHint: (tileId: string) => void;
 };
@@ -42,6 +44,8 @@ export function ExitmaniaLevelView({
   effectiveBeta,
   soloAlpha = false,
   gpsCapability = true,
+  levelStartedAt,
+  teamStartedAt,
   onSubmit,
   onPurchaseHint,
 }: ExitmaniaLevelViewProps) {
@@ -90,16 +94,16 @@ export function ExitmaniaLevelView({
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-8">
         <section className="flex min-w-0 flex-col gap-5">
           {!isGpsLevel && level.hero_image_url ? (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+            <div className="mx-auto aspect-square w-full max-w-[280px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 sm:max-w-xs">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={level.hero_image_url}
                 alt=""
-                className="aspect-[16/10] max-h-52 w-full object-cover sm:aspect-[2/1] sm:max-h-none"
+                className="h-full w-full object-cover"
               />
             </div>
           ) : !isGpsLevel ? (
-            <div className="flex aspect-[16/10] max-h-52 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-teal-50 to-slate-100 sm:aspect-[2/1] sm:max-h-none">
+            <div className="mx-auto flex aspect-square w-full max-w-[280px] items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-teal-50 to-slate-100 sm:max-w-xs">
               <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
                 Aufgabe {level.level}
               </span>
@@ -132,6 +136,8 @@ export function ExitmaniaLevelView({
             disabled={disabled}
             isPending={isPending}
             isNavigator={canUnlockGps}
+            levelStartedAt={levelStartedAt}
+            fallbackStartedAt={teamStartedAt}
             onSubmit={onSubmit}
             hideGpsStatus={isGpsLevel && waypoints.length > 0}
           />

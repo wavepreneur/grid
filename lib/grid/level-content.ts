@@ -33,6 +33,10 @@ export function parseLevelTiles(value: unknown): LevelContentTile[] | undefined 
       label: typeof row.label === "string" ? row.label.trim() : undefined,
     };
 
+    if (typeof row.cover_image_url === "string" && row.cover_image_url.trim()) {
+      tile.cover_image_url = row.cover_image_url.trim();
+    }
+
     if (row.hint && typeof row.hint === "object") {
       const hintRow = row.hint as Record<string, unknown>;
       const hintText = hintRow.text;
@@ -72,7 +76,7 @@ export function tileTypeLabel(type: LevelTileType): string {
   }
 }
 
-export function tileTypeIcon(type: LevelTileType): string {
+export function tileTypeIcon(type: LevelTileType | "iframe"): string {
   switch (type) {
     case "image":
       return "🖼";

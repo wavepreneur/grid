@@ -56,14 +56,25 @@ function TileCard({
         type="button"
         disabled={disabled}
         onClick={() => onOpen(tile)}
-        className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-3 px-3 py-4 transition hover:bg-teal-50 active:bg-teal-100 disabled:opacity-50"
+        className="relative flex aspect-square w-full overflow-hidden transition hover:opacity-95 active:opacity-90 disabled:opacity-50"
       >
-        <span className="text-4xl leading-none" aria-hidden>
-          {tileTypeIcon(tile.type)}
-        </span>
-        <span className="text-center text-[11px] font-semibold uppercase tracking-wide text-slate-700">
-          {label}
-        </span>
+        {tile.cover_image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={tile.cover_image_url}
+            alt={label}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <span className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#1a4d52] px-3 py-4 text-white">
+            <span className="text-4xl leading-none" aria-hidden>
+              {tileTypeIcon(tile.type)}
+            </span>
+            <span className="text-center text-[11px] font-semibold uppercase tracking-wide">
+              {label}
+            </span>
+          </span>
+        )}
       </button>
 
       {hasHint ? (
@@ -135,7 +146,11 @@ export function ContentTileGrid({
         </div>
 
         {isSidebar ? (
-          <ul className="grid max-h-[min(70vh,calc(100dvh-11rem))] grid-cols-2 gap-3 overflow-y-auto overscroll-contain pr-1">
+          <ul
+            className={`grid max-h-[min(70vh,calc(100dvh-11rem))] gap-3 overflow-y-auto overscroll-contain pr-1 ${
+              tiles.length === 1 ? "grid-cols-1 place-items-center" : "grid-cols-2"
+            }`}
+          >
             {tiles.map((tile) => {
               const label = tile.label ?? tileTypeLabel(tile.type);
               return (
@@ -155,8 +170,11 @@ export function ContentTileGrid({
             })}
           </ul>
         ) : (
-          <div className="game-panel-bleed">
-            <ul className="tile-slider" aria-label="Hinweise und Medien">
+          <div className={tiles.length === 1 ? "flex justify-center" : "game-panel-bleed"}>
+            <ul
+              className={tiles.length === 1 ? "grid w-full max-w-[11rem]" : "tile-slider"}
+              aria-label="Hinweise und Medien"
+            >
               {tiles.map((tile) => {
                 const label = tile.label ?? tileTypeLabel(tile.type);
                 return (

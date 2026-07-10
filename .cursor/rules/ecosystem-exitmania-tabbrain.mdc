@@ -5,19 +5,22 @@ alwaysApply: true
 
 # GRID Ecosystem
 
-Read `docs/EXITMANIA_GRID_INTEGRATION.md` before integration or content work.
+Read `docs/EXITMANIA_GRID_INTEGRATION.md` and `docs/GRID_LAYER_MODEL.md` before integration or content work.
 
 ## Ownership
 
-- **GRID (this repo):** Live engine only — FSM, Alpha/Beta/Gamma, Realtime, Cockpit, `global_levels`, Booking-API
-- **Exitmania (../Developer/exitmania):** Commerce — Paddle, SEO, portals, admin; replaces Loquiz with GRID, does NOT reimplement gameplay
-- **Tabbrain (not built):** Enterprise GTM; same GRID engine, `blueprint_slug: tabbrain`
+- **GRID (this repo):** Live engine — FSM, Alpha/Beta/Gamma, Realtime, Cockpit, layer-based content
+- **Exitmania (../Developer/exitmania):** Commerce — replaces Loquiz with GRID, does NOT reimplement gameplay
+- **Tabbrain (not built):** Enterprise GTM; same GRID engine
 
-## Content
+## Content (Layer model)
 
-- Master levels: `global_levels` + `local_waypoints` (one dictionary, many events)
-- Per booking: `events.content_config` + `events.route_override` (patches only)
+- **Layer 1:** `local_waypoints` + city-scoped tasks (geo/env)
+- **Layer 2:** `global_levels` (global mission)
+- **Layer 3:** logic rules + role assignments (bonus, Micro-Pulse)
+- Per booking: `events.content_config` + `events.route_override` (Layer 1 deltas only)
 - Never duplicate full route JSON per event
+- See `docs/GRID_LAYER_MODEL.md` for Studio priorities
 
 ## Booking API
 

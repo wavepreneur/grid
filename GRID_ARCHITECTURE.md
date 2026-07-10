@@ -8,11 +8,14 @@ Verwandt: [`GRID_MASTER_PLAN.md`](./GRID_MASTER_PLAN.md) (Roadmap, URLs, Phasen)
 
 ## Mandat (Non-Negotiables)
 
-GRID ist **keine Content-Plattform** (kein Canva, kein B2B-Kahoot). GRID ist eine **zustandsbasierte Engine (Finite State Machine)** mit **Zero-Ops Multiplayer-Infrastruktur** (Next.js App Router + Supabase).
+GRID ist **keine Content-Plattform** (kein Canva, kein B2B-Kahoot, **kein Loquiz-Klon für viele Partner**). GRID ist eine **zustandsbasierte Engine (Finite State Machine)** mit **Zero-Ops Multiplayer-Infrastruktur** (Next.js App Router + Supabase).
 
-- **Variable:** Content als JSON (`global_levels`, `route_override`, Blueprint-Slugs)
+- **Variable:** Content als JSON (`global_levels`, `local_waypoints`, `route_override`, Layer-Snapshots)
 - **Fix:** Verhaltens-Engine, asymmetrische Sync-Schicht, ephemeral Team-Tokens — **keine persistenten User-Accounts**
+- **Skalierung:** **Wenige Spiele**, maximal skalierbar über **modulare Content-Layer** (1/2/3), Städte, Indoor/Outdoor, Events, Sprachen
 - **Landing Page = System of Record (Engine):** [`gridos.vercel.app`](https://gridos.vercel.app/) — Architektur-Verfassung, **nicht** Enterprise-Kauf-Funnel (das ist **Tabbrain**)
+
+**Layer-Modell (Pflichtlektüre):** [`docs/GRID_LAYER_MODEL.md`](docs/GRID_LAYER_MODEL.md)
 
 ---
 
@@ -223,13 +226,17 @@ Bei jedem Release prüfen:
 
 ## 5. Empfohlene Build-Reihenfolge
 
-1. **Blueprint-Routing** — `blueprint_slug`; Exitmania → `ASYMMETRIC_INFORMANT` formal registrieren
-2. **Tabbrain Booking-Contract** — API: `content_payload` + Redirect-URLs; Org `tabbrain` anlegen
-3. **activity_logs + Cockpit-Filter** — Analytics-Hoheit in GRID; Käufer-Dashboard v0 (Magic Link)
-4. **TIME_DECAY_SPRINT** — zweiter Archetyp (Compliance-Stress)
-5. **COOPERATIVE_COLLECTIVE** — Voting / 1.000+ (skalierungskritisch)
+1. **Layer-Modell im Studio** — Profil, Task-Layer, Publish-Snapshot (`docs/GRID_LAYER_MODEL.md`) ✅ Basis
+2. **Runtime content_mode** — Content-Loader filtert Layer 1/3 nach Outdoor/Indoor
+3. **Logic-Engine zur Laufzeit** — Layer-3-Trigger + Layer-2-Freischaltung (heute linear)
+4. **Kunden-Override UI** — Formular → `route_override` (Layer 1)
+5. **Micro-Pulse API** — Layer-3-only Sessions (REST)
+6. **Sprache pro Team** — Event-Level
+7. **Blueprint-Routing** — Archetyp-Registry formalisieren
+8. **activity_logs + Cockpit-Filter** — Analytics
+9. **TIME_DECAY_SPRINT / COOPERATIVE_COLLECTIVE** — weitere Archetypen
 
-**Nicht in GRID bauen:** Content-Shop, Zahlungsabwicklung, Story-Editor — das bleibt Tabbrain/Exitmania.
+**Nicht in GRID bauen:** Content-Shop, Zahlungsabwicklung, Story-Editor, Loquiz-Klon-Features ohne Layer-Bezug — das bleibt Tabbrain/Exitmania bzw. ist bewusst out of scope.
 
 ---
 
@@ -243,8 +250,23 @@ Bei jedem Release prüfen:
 | Operator | `app/actions/cockpit.ts`, `components/cockpit/event-cockpit-show.tsx` |
 | Telemetrie | `lib/grid/audit-log.ts`, `supabase/migrations/20260615120000_architecture_foundation.sql` |
 | Booking / Tabbrain-Integration | `app/api/v1/bookings/route.ts`, `lib/grid/organizations.ts` |
+| Layer profile UI | `components/cms/games/game-layer-profile-panel.tsx` |
 | Marketing-Kompass | `components/marketing/grid-landing-page.tsx` |
 
 ---
 
-*Zuletzt abgeglichen mit Codebase: Juni 2026.*
+## 7. Content-Layer-Modell (Kurz)
+
+Siehe [`docs/GRID_LAYER_MODEL.md`](docs/GRID_LAYER_MODEL.md).
+
+| Layer | Runtime | Studio |
+|-------|---------|--------|
+| 1 Geo | `local_waypoints` | `studio_tasks.layer=1`, GPS overrides |
+| 2 Mission | `global_levels` | `studio_tasks.layer=2` |
+| 3 Bonus/Rollen | logic_rules + roles | `studio_tasks.layer=3`, `role_assignment` |
+
+Spiele kombinieren Layer frei (1+2+3, nur 1, nur 3 für Micro-Pulse, …). Indoor-Fallback = Runtime `content_mode`.
+
+---
+
+*Zuletzt abgeglichen mit Codebase: Juli 2026.*

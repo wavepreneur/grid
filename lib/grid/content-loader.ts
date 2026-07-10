@@ -12,12 +12,7 @@ import {
   resolveBlueprint,
 } from "@/lib/grid/blueprints";
 import { getCityIdBySlug } from "@/lib/grid/organizations";
-import type {
-  EventContentConfig,
-  EventRouteOverride,
-  LevelDefinition,
-  ResolvedEventContent,
-} from "@/lib/grid/level-types";
+import type { LevelDefinition, ResolvedEventContent } from "@/lib/grid/level-types";
 import {
   DEFAULT_CITY_SLUG,
   DEFAULT_TEMPLATE_SLUG,
@@ -166,7 +161,7 @@ export async function loadResolvedEventContent(input: {
   if (input.studioGameVersionId) {
     const snapshot = await loadStudioVersionSnapshot(input.studioGameVersionId);
     if (snapshot && snapshot.levels.length > 0) {
-      const { game, levels } = snapshot;
+      const { game, levels, compiledLogic } = snapshot;
       const mergedConfig = mergeContentConfigWithBlueprint({
         ...contentConfig,
         blueprint_slug: game.gps_enabled ? "exitmania" : "tabbrain",
@@ -184,6 +179,7 @@ export async function loadResolvedEventContent(input: {
         templateName: game.name,
         city: game.city_slug,
         levels: mergedLevels,
+        compiledLogic,
         ...blueprintFields,
         showLiveScore: contentConfig.show_live_score ?? true,
         missionDurationMinutes:

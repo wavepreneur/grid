@@ -5,15 +5,21 @@ import { useRouter } from "next/navigation";
 import { createLiveEventFromGame } from "@/app/actions/cms/events";
 import {
   publishGame,
+  removeGameTemplate,
   saveGameAsTemplate,
   updateGame,
 } from "@/app/actions/cms/games";
 import { StudioBadge, StudioPanel } from "@/components/cms/admin-shell";
-import { GameFlowPanel } from "@/components/cms/games/game-flow-panel";
+import { GameLayerProfilePanel } from "@/components/cms/games/game-layer-profile-panel";
+import { GameLogicPanel } from "@/components/cms/games/game-logic-panel";
+import { GameDeleteButton } from "@/components/cms/games/game-delete-button";
+import { GameDuplicateButton } from "@/components/cms/games/game-duplicate-button";
+import { GameStatusSwitch } from "@/components/cms/games/game-status-switch";
 import {
-  IconCopy,
+  IconGamepad,
   IconPlay,
   IconSave,
+  IconTemplate,
   IconUpload,
 } from "@/components/cms/studio-icons";
 import {
@@ -27,13 +33,15 @@ import {
   StudioSuccess,
   StudioTextarea,
 } from "@/components/cms/studio-ui";
-import type { StudioGame, StudioGameTaskLink, StudioTask } from "@/lib/cms/types";
+import { parseActiveLayers } from "@/lib/cms/layer-model";
 import { parseLogicRules, type StudioLogicRule } from "@/lib/cms/logic-rules";
+import type { StudioGame, StudioGameTaskLink, StudioTask } from "@/lib/cms/types";
 
 type Props = {
   game: StudioGame;
   taskLinks: StudioGameTaskLink[];
   libraryTasks: StudioTask[];
+  liveEventCount?: number;
 };
 
 type GameEditorState = Omit<StudioGame, "logic_rules"> & { logic_rules: StudioLogicRule[] };
@@ -42,7 +50,12 @@ function toEditorState(game: StudioGame): GameEditorState {
   return { ...game, logic_rules: parseLogicRules(game.logic_rules) };
 }
 
-export function GameEditorPanel({ game: initialGame, taskLinks, libraryTasks }: Props) {
+export function GameEditorPanel({
+  game: initialGame,
+  taskLinks,
+  libraryTasks,
+  liveEventCount = 0,
+}: Props) {
   const router = useRouter();
   const [game, setGame] = useState<GameEditorState>(() => toEditorState(initialGame));
   const [error, setError] = useState<string | null>(null);
@@ -97,8 +110,26 @@ export function GameEditorPanel({ game: initialGame, taskLinks, libraryTasks }: 
   function handleSaveTemplate() {
     startTransition(async () => {
       const result = await saveGameAsTemplate(game.id);
-      if (!result.success) setError(result.error);
-      else setMessage("Als Vorlage gespeichert — findest du unter Vorlagen.");
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      setMessage('Als Vorlage gespeichert — findest du auf der Spiele-Seite unter „Meine Vorlagen".');
+      router.push("/admin/games#vorlagen");
+      router.refresh();
+    });
+  }
+
+  function handleRemoveTemplate() {
+    startTransition(async () => {
+      const result = await removeGameTemplate(game.id);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      setGame((g) => ({ ...g, is_template: false }));
+      setMessage('Vorlagen-Status entfernt — das Spiel erscheint wieder unter „Meine Spiele".');
+      router.refresh();
     });
   }
 
@@ -131,11 +162,18 @@ export function GameEditorPanel({ game: initialGame, taskLinks, libraryTasks }: 
             description="Grunddaten für dieses Spiel — Änderungen betreffen nur den Entwurf."
           />
 
-          <div className="mb-6 flex flex-wrap items-center gap-2">
-            <StudioBadge tone={game.status === "published" ? "live" : "draft"}>
-              {game.status === "published" ? "Veröffentlicht" : "Entwurf"}
-            </StudioBadge>
-            <StudioBadge>Version {game.published_version_number}</StudioBadge>
+          <div className="mb-6 flex flex-wrap items-center gap-3">
+            <GameStatusSwitch
+              gameId={game.id}
+              status={game.status}
+              publishedVersionNumber={game.published_version_number}
+              liveEventCount={liveEventCount}
+              onStatusChange={(next) => setGame((g) => ({ ...g, status: next }))}
+            />
+            {game.is_template ? <StudioBadge tone="draft">Vorlage</StudioBadge> : null}
+            {!game.is_template ? (
+              <StudioBadge>Version {game.published_version_number}</StudioBadge>
+            ) : null}
             {game.gps_enabled ? (
               <StudioBadge>GPS</StudioBadge>
             ) : (
@@ -200,16 +238,6 @@ export function GameEditorPanel({ game: initialGame, taskLinks, libraryTasks }: 
                 }
               />
             </div>
-            <div>
-              <StudioLabel>Spielmodus</StudioLabel>
-              <StudioSelect
-                value={game.gps_enabled ? "1" : "0"}
-                onChange={(e) => setGame({ ...game, gps_enabled: e.target.value === "1" })}
-              >
-                <option value="1">GPS — Aufgaben vor Ort freischalten</option>
-                <option value="0">Indoor / Digital — ohne GPS</option>
-              </StudioSelect>
-            </div>
             <div className="md:col-span-2">
               <StudioLabel hint="Wird am Spielende allen Teams angezeigt">Abschiedstext</StudioLabel>
               <StudioTextarea
@@ -229,35 +257,53 @@ export function GameEditorPanel({ game: initialGame, taskLinks, libraryTasks }: 
               <StudioButton type="submit" disabled={pending} icon={<IconSave size={16} />}>
                 {pending ? "Speichern…" : "Speichern"}
               </StudioButton>
-              <StudioButton
-                type="button"
-                variant="secondary"
-                disabled={pending}
-                icon={<IconUpload size={16} />}
-                onClick={handlePublish}
-              >
-                Veröffentlichen
-              </StudioButton>
-              <StudioButton
-                type="button"
-                variant="secondary"
-                disabled={pending || game.published_version_number < 1}
-                icon={<IconPlay size={16} />}
-                onClick={handleStartLiveEvent}
-              >
-                Live-Event starten
-              </StudioButton>
-              <StudioButton
-                type="button"
-                variant="ghost"
-                disabled={pending}
-                icon={<IconCopy size={16} />}
-                onClick={handleSaveTemplate}
-              >
-                Als Vorlage
-              </StudioButton>
+              {!game.is_template ? (
+                <>
+                  <StudioButton
+                    type="button"
+                    variant="secondary"
+                    disabled={pending}
+                    icon={<IconUpload size={16} />}
+                    onClick={handlePublish}
+                  >
+                    Veröffentlichen
+                  </StudioButton>
+                  <StudioButton
+                    type="button"
+                    variant="secondary"
+                    disabled={pending || game.published_version_number < 1}
+                    icon={<IconPlay size={16} />}
+                    onClick={handleStartLiveEvent}
+                  >
+                    Live-Event starten
+                  </StudioButton>
+                  <StudioButton
+                    type="button"
+                    variant="ghost"
+                    disabled={pending}
+                    icon={<IconTemplate size={16} />}
+                    onClick={handleSaveTemplate}
+                  >
+                    Als Vorlage
+                  </StudioButton>
+                </>
+              ) : (
+                <StudioButton
+                  type="button"
+                  variant="ghost"
+                  disabled={pending}
+                  icon={<IconGamepad size={16} />}
+                  onClick={handleRemoveTemplate}
+                >
+                  Als Spiel wiederherstellen
+                </StudioButton>
+              )}
+              {!game.is_template ? (
+                <GameDuplicateButton gameId={game.id} gameName={game.name} />
+              ) : null}
+              <GameDeleteButton gameId={game.id} gameName={game.name} />
             </div>
-            {game.published_version_number < 1 ? (
+            {!game.is_template && game.published_version_number < 1 ? (
               <div className="mt-4">
                 <StudioHint tone="warn">
                   Zuerst veröffentlichen, bevor du ein Live-Event starten kannst.
@@ -282,11 +328,14 @@ export function GameEditorPanel({ game: initialGame, taskLinks, libraryTasks }: 
         </StudioPanel>
       </form>
 
-      <GameFlowPanel
+      <GameLayerProfilePanel game={game} />
+
+      <GameLogicPanel
         gameId={game.id}
         language={game.language}
         gpsEnabled={game.gps_enabled}
         citySlug={game.city_slug}
+        activeLayers={parseActiveLayers(game.active_layers)}
         initialLinks={taskLinks}
         initialRules={game.logic_rules}
         libraryTasks={libraryTasks}

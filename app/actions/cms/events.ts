@@ -22,6 +22,9 @@ export async function createLiveEventFromGame(
     }
 
     const game = gameResult.data;
+    if (game.is_template) {
+      return { success: false, error: "Vorlagen können nicht als Live-Event gestartet werden." };
+    }
     if (game.published_version_number < 1) {
       return {
         success: false,

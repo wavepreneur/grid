@@ -10,6 +10,8 @@ import {
 import { IconCheck, IconMapPin } from "@/components/cms/studio-icons";
 import { distanceMeters, formatDistance } from "@/lib/grid/geofence";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
+import { LevelScoringBar } from "@/components/game/level-scoring-bar";
+import { hasLiveLevelScoring } from "@/lib/grid/level-scoring";
 import type { LevelDefinition, SolveLevelPayload } from "@/lib/grid/level-types";
 
 type LevelSolvePanelProps = {
@@ -17,6 +19,8 @@ type LevelSolvePanelProps = {
   disabled: boolean;
   isPending: boolean;
   isNavigator: boolean;
+  levelStartedAt?: string | null;
+  fallbackStartedAt?: string | null;
   onSubmit: (payload: SolveLevelPayload) => void;
   hideGpsStatus?: boolean;
   autoSubmitGps?: boolean;
@@ -27,12 +31,15 @@ export function LevelSolvePanel({
   disabled,
   isPending,
   isNavigator,
+  levelStartedAt,
+  fallbackStartedAt,
   onSubmit,
   hideGpsStatus = false,
   autoSubmitGps = true,
 }: LevelSolvePanelProps) {
   const [answer, setAnswer] = useState("");
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
+  const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
   const [autoTriggered, setAutoTriggered] = useState(false);
   const onSubmitRef = useRef(onSubmit);
   onSubmitRef.current = onSubmit;
@@ -50,6 +57,9 @@ export function LevelSolvePanel({
 
   useEffect(() => {
     setAutoTriggered(false);
+    setAnswer("");
+    setSelectedOptionId(null);
+    setSelectedOptionIds([]);
   }, [level.level]);
 
   useEffect(() => {
@@ -87,10 +97,17 @@ export function LevelSolvePanel({
       onSubmit({ answer });
       return;
     }
+    if (level.type === "quiz" && level.correct_option_ids?.length) {
+      if (selectedOptionIds.length === 0) return;
+      onSubmit({ selectedOptionIds });
+      return;
+    }
     if (level.type === "quiz" && selectedOptionId) {
       onSubmit({ selectedOptionId });
     }
   }
+
+  const isMultiQuiz = level.type === "quiz" && Boolean(level.correct_option_ids?.length);
 
   const canSubmit =
     level.type === "gps"
@@ -98,7 +115,9 @@ export function LevelSolvePanel({
       : level.type === "digital"
         ? Boolean(answer.trim())
         : level.type === "quiz"
-          ? Boolean(selectedOptionId)
+          ? isMultiQuiz
+            ? selectedOptionIds.length > 0
+            : Boolean(selectedOptionId)
           : false;
 
   if (level.type === "gps" && !isNavigator) {
@@ -112,6 +131,32 @@ export function LevelSolvePanel({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+      {level.question ? (
+        <div className="mb-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-700">Frage</p>
+          <div className="mt-2 rounded-2xl bg-[#e8913a] px-4 py-3 text-center text-sm font-semibold text-white">
+            {level.question}
+          </div>
+        </div>
+      ) : null}
+
+      {level.scoring && hasLiveLevelScoring(level.scoring) ? (
+        <div className="mb-4">
+          <LevelScoringBar
+            scoring={level.scoring}
+            startedAt={levelStartedAt}
+            fallbackStartedAt={fallbackStartedAt}
+          />
+        </div>
+      ) : level.scoring ? (
+        <div className="mb-4 flex flex-wrap gap-2 text-xs text-slate-600">
+          <span className="rounded-full bg-slate-100 px-2.5 py-1">
+            {level.scoring.points >= 0 ? "+" : ""}
+            {level.scoring.points} Punkte
+          </span>
+        </div>
+      ) : null}
+
       {level.type === "gps" && level.location && !hideGpsStatus ? (
         <div className="mb-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
           {gpsLoading ? <p>Standort wird ermittelt…</p> : null}
@@ -158,21 +203,36 @@ export function LevelSolvePanel({
 
       {level.type === "quiz" && level.options ? (
         <div className="flex flex-col gap-2">
-          {level.options.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              disabled={disabled || isPending}
-              onClick={() => setSelectedOptionId(option.id)}
-              className={`rounded-xl border px-4 py-3 text-left text-sm transition ${
-                selectedOptionId === option.id
-                  ? "border-teal-500 bg-teal-50 font-medium text-teal-900"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-teal-200 hover:bg-slate-50"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
+          {level.options.map((option) => {
+            const multiSelected = selectedOptionIds.includes(option.id);
+            const singleSelected = selectedOptionId === option.id;
+            const selected = isMultiQuiz ? multiSelected : singleSelected;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                disabled={disabled || isPending}
+                onClick={() => {
+                  if (isMultiQuiz) {
+                    setSelectedOptionIds((prev) =>
+                      prev.includes(option.id)
+                        ? prev.filter((id) => id !== option.id)
+                        : [...prev, option.id],
+                    );
+                  } else {
+                    setSelectedOptionId(option.id);
+                  }
+                }}
+                className={`rounded-xl border px-4 py-3 text-left text-sm transition ${
+                  selected
+                    ? "border-teal-500 bg-teal-50 font-medium text-teal-900"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-teal-200 hover:bg-slate-50"
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
         </div>
       ) : null}
 

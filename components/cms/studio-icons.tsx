@@ -222,6 +222,14 @@ export function IconCheck(props: IconProps) {
   );
 }
 
+export function IconClose(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </Icon>
+  );
+}
+
 export function IconRoute(props: IconProps) {
   return (
     <Icon {...props}>
