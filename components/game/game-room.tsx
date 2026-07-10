@@ -195,18 +195,16 @@ export function GameRoom({
         />
 
         {isFinished ? (
-          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-6 text-sm text-emerald-100">
-            <p className="text-xl font-semibold text-emerald-200">Mission abgeschlossen!</p>
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-6 text-sm text-emerald-900">
+            <p className="text-xl font-semibold text-emerald-800">Mission abgeschlossen!</p>
             <p className="mt-2">
-              {teamName} · {eventContent.levels.length} Level ·{" "}
-              <span className="font-semibold text-white">
-                {teamState.gameState.score ?? 0} Punkte
-              </span>
+              {teamName} · {eventContent.levels.length} Aufgaben ·{" "}
+              <span className="font-semibold">{teamState.gameState.score ?? 0} Punkte</span>
             </p>
             {eventContent.showLiveScore ? (
               <Link
                 href={cockpitShowPath(inviteCode)}
-                className="mt-4 inline-block text-[var(--grid-accent)] underline-offset-2 hover:underline"
+                className="mt-4 inline-block font-medium text-teal-600 underline-offset-2 hover:underline"
               >
                 Live-Ranking ansehen →
               </Link>

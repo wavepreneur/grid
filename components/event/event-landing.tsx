@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { GridButton } from "@/components/grid/grid-shell";
+import { GridButton, GridHint, GridInput } from "@/components/grid/grid-shell";
+import { IconArrowRight, IconPlay, IconUsers } from "@/components/cms/studio-icons";
 import { eventPath } from "@/lib/grid/event-routes";
 import { loadPlayerSession } from "@/lib/grid/player-session";
 import { resolveTeamSession } from "@/lib/grid/session-recovery";
@@ -37,14 +38,19 @@ export function EventResumeCard({ inviteCode }: EventResumeCardProps) {
   if (loading || !resumeLabel || !resumePath) return null;
 
   return (
-    <div className="rounded-xl border border-[var(--grid-accent)]/30 bg-[var(--grid-accent)]/10 px-4 py-4">
-      <p className="text-sm text-[var(--grid-muted)]">
-        Willkommen zurück, <span className="text-white">{resumeLabel}</span>
+    <GridHint tone="success">
+      <p>
+        Willkommen zurück, <strong>{resumeLabel}</strong>!
       </p>
-      <GridButton type="button" className="mt-3" onClick={() => router.push(resumePath)}>
+      <GridButton
+        type="button"
+        className="mt-3"
+        icon={<IconPlay size={16} />}
+        onClick={() => router.push(resumePath)}
+      >
         Weiterspielen
       </GridButton>
-    </div>
+    </GridHint>
   );
 }
 
@@ -61,30 +67,30 @@ export function EventLanding({ event }: EventLandingProps) {
       <EventResumeCard inviteCode={inviteCode} />
 
       <div className="flex flex-col gap-3">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--grid-muted)]">
-          Neu im Team?
-        </p>
+        <p className="text-sm font-medium text-slate-700">Du organisierst das Team?</p>
         <GridButton
           type="button"
+          icon={<IconPlay size={16} />}
           onClick={() => router.push(`${eventPath(inviteCode)}/captain`)}
         >
-          Erstes Team starten (Captain)
+          Erstes Team starten
         </GridButton>
-        <p className="text-xs leading-6 text-[var(--grid-muted)]">
-          Du bist der Organisator — erstellst das Team und lädst per QR ein.
+        <p className="text-xs leading-6 text-slate-500">
+          Als Team-Leiter erstellst du das Team und lädst Mitspieler per Link oder QR-Code ein.
         </p>
       </div>
 
-      <div className="border-t border-[var(--grid-border)] pt-8">
-        <p className="mb-4 text-xs font-medium uppercase tracking-[0.18em] text-[var(--grid-muted)]">
+      <div className="border-t border-slate-100 pt-8">
+        <p className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+          <IconUsers size={16} className="text-teal-600" />
           Team beitreten
         </p>
         <TeamCodeInline inviteCode={inviteCode} />
       </div>
 
-      <p className="text-center text-xs text-[var(--grid-muted)]">
+      <p className="text-center text-xs text-slate-500">
         Event-Code:{" "}
-        <span className="font-mono text-[var(--grid-accent)]">{inviteCode}</span>
+        <span className="font-mono font-medium text-teal-600">{inviteCode}</span>
       </p>
     </div>
   );
@@ -103,14 +109,17 @@ function TeamCodeInline({ inviteCode }: { inviteCode: string }) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <input
+      <GridInput
         value={joinCode}
         onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
-        placeholder="Team-Code (z. B. WC2RJ9)"
+        placeholder="Team-Code eingeben (z. B. WC2RJ9)"
         maxLength={8}
-        className="grid-input w-full rounded-xl px-4 py-3 text-sm text-white outline-none"
       />
-      <GridButton type="submit" disabled={joinCode.trim().length < 4}>
+      <GridButton
+        type="submit"
+        disabled={joinCode.trim().length < 4}
+        icon={<IconArrowRight size={16} />}
+      >
         Beitreten
       </GridButton>
     </form>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { GridButton, GridError } from "@/components/grid/grid-shell";
+import { IconCopy } from "@/components/cms/studio-icons";
 
 type CopyInviteLinkProps = {
   url: string;
@@ -10,7 +11,7 @@ type CopyInviteLinkProps = {
 
 export function CopyInviteLink({
   url,
-  label = "Teammate-Link kopieren",
+  label = "Einladungslink kopieren",
 }: CopyInviteLinkProps) {
   const [copied, setCopied] = useState(false);
 
@@ -22,10 +23,10 @@ export function CopyInviteLink({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-xl border border-[var(--grid-border)] bg-black/30 px-4 py-3 text-xs break-all text-[var(--grid-muted)]">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs break-all text-slate-600">
         {url}
       </div>
-      <GridButton type="button" onClick={handleCopy}>
+      <GridButton type="button" icon={<IconCopy size={16} />} onClick={handleCopy}>
         {copied ? "Kopiert!" : label}
       </GridButton>
     </div>
@@ -41,11 +42,11 @@ export function QrInviteImage({ url }: { url: string }) {
       <img
         src={qrUrl}
         alt="QR-Code für Teammate-Link"
-        className="rounded-xl border border-[var(--grid-border)] bg-white p-3"
+        className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
         width={220}
         height={220}
       />
-      <p className="text-center text-xs text-[var(--grid-muted)]">
+      <p className="text-center text-xs text-slate-500">
         Mitspieler scannen diesen QR-Code, um der Lobby beizutreten.
       </p>
     </div>

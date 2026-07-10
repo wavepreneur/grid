@@ -2,7 +2,13 @@
 
 import { useRef, useState, useTransition } from "react";
 import { uploadStudioImage } from "@/app/actions/cms/media";
-import { GridButton, GridError, GridInput, GridLabel } from "@/components/grid/grid-shell";
+import { IconUpload } from "@/components/cms/studio-icons";
+import {
+  StudioButton,
+  StudioError,
+  StudioInput,
+  StudioLabel,
+} from "@/components/cms/studio-ui";
 
 type Props = {
   label: string;
@@ -34,36 +40,37 @@ export function ImageUploadField({ label, value, onChange, onClear, hint }: Prop
 
   return (
     <div className="space-y-2">
-      <GridLabel>{label}</GridLabel>
-      {hint ? <p className="text-xs text-[var(--grid-muted)]">{hint}</p> : null}
-      {error ? <GridError message={error} /> : null}
+      <StudioLabel hint={hint}>{label}</StudioLabel>
+      {error ? <StudioError message={error} /> : null}
 
       {value ? (
         <div className="flex items-start gap-4">
-          <div className="relative h-20 w-20 overflow-hidden rounded-xl border border-[var(--grid-border)] bg-black/30">
+          <div className="relative h-20 w-20 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={value} alt="" className="h-full w-full object-cover" />
           </div>
           <div className="flex flex-col gap-2">
-            <button
+            <StudioButton
               type="button"
+              variant="ghost"
               disabled={pending}
+              className="px-0 py-1 text-sm"
               onClick={() => inputRef.current?.click()}
-              className="text-sm text-[var(--grid-accent)] hover:underline disabled:opacity-50"
             >
               Bild ersetzen
-            </button>
-            <button
+            </StudioButton>
+            <StudioButton
               type="button"
+              variant="ghost"
               disabled={pending}
+              className="px-0 py-1 text-sm text-red-600 hover:bg-transparent hover:text-red-700"
               onClick={() => {
                 onChange("");
                 onClear?.();
               }}
-              className="text-sm text-red-300 hover:underline disabled:opacity-50"
             >
               Entfernen
-            </button>
+            </StudioButton>
           </div>
         </div>
       ) : (
@@ -71,9 +78,9 @@ export function ImageUploadField({ label, value, onChange, onClear, hint }: Prop
           type="button"
           disabled={pending}
           onClick={() => inputRef.current?.click()}
-          className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--grid-border)] bg-black/20 px-4 py-8 text-sm text-[var(--grid-muted)] transition hover:border-[var(--grid-accent)]/40 hover:text-white disabled:opacity-50"
+          className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-sm text-slate-500 transition hover:border-teal-300 hover:bg-teal-50/50 hover:text-teal-700 disabled:opacity-50"
         >
-          <span className="text-2xl">↑</span>
+          <IconUpload size={24} className="text-slate-400" />
           {pending ? "Wird hochgeladen…" : "Bild hochladen"}
         </button>
       )}
@@ -87,8 +94,8 @@ export function ImageUploadField({ label, value, onChange, onClear, hint }: Prop
       />
 
       <div>
-        <GridLabel>Oder URL</GridLabel>
-        <GridInput
+        <StudioLabel hint="Alternativ direkt einfügen">Bild-URL</StudioLabel>
+        <StudioInput
           value={value}
           placeholder="https://…"
           disabled={pending}

@@ -29,8 +29,8 @@ export default async function EventCaptainPage({ params, searchParams }: EventCa
       }
     >
       <CaptainSetupForm inviteCode={normalizedInvite} joinCode={normalizedJoin} />
-      <p className="mt-6 text-center text-xs text-[var(--grid-muted)]">
-        <Link href={eventPath(normalizedInvite)} className="hover:text-white">
+      <p className="mt-6 text-center text-xs text-slate-500">
+        <Link href={eventPath(normalizedInvite)} className="text-teal-600 hover:underline">
           ← Zurück zum Event
         </Link>
       </p>

@@ -11,18 +11,33 @@ import {
   operatorSetTeamNavigator,
   type EventCockpitSnapshot,
 } from "@/app/actions/cockpit";
+import { CockpitLink, CockpitSection } from "@/components/cockpit/cockpit-shell";
+import {
+  IconArrowRight,
+  IconMapPin,
+  IconUsers,
+} from "@/components/cms/studio-icons";
 import {
   GridButton,
   GridError,
+  GridHint,
   GridInput,
   GridLabel,
   GridStat,
+  GridSuccess,
 } from "@/components/grid/grid-shell";
 import { cockpitShowPath, eventLobbyPath, eventPath } from "@/lib/grid/event-routes";
 
 type EventCockpitProps = {
   inviteCode: string;
 };
+
+function statusLabel(status: string): string {
+  if (status === "playing") return "Im Spiel";
+  if (status === "finished") return "Beendet";
+  if (status === "lobby") return "Lobby";
+  return status;
+}
 
 export function EventCockpit({ inviteCode }: EventCockpitProps) {
   const [snapshot, setSnapshot] = useState<EventCockpitSnapshot | null>(null);
@@ -53,7 +68,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
 
   function useMyLocation() {
     if (!navigator.geolocation) {
-      setError("Geolocation wird von diesem Browser nicht unterstützt.");
+      setError("Standort wird von diesem Browser nicht unterstützt.");
       return;
     }
 
@@ -85,7 +100,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
       }
 
       setMessage(
-        `GPS-Testmodus für Level ${result.data.gpsLevels.join(", ")} aktiv. Teams: Seite neu laden.`,
+        `GPS-Testmodus für Aufgaben ${result.data.gpsLevels.join(", ")} aktiv — Teams bitte Seite neu laden.`,
       );
       await refresh();
     });
@@ -101,7 +116,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
         setError(result.error);
         return;
       }
-      setMessage(`Level ${level}: GPS aus — Antwort „skip“. Teams: Seite neu laden.`);
+      setMessage(`Aufgabe ${level}: GPS aus — Teams bitte Seite neu laden.`);
       await refresh();
     });
   }
@@ -123,7 +138,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
         setError(result.error);
         return;
       }
-      setMessage(`Level ${level}: GPS wieder aktiv. Teams: Seite neu laden.`);
+      setMessage(`Aufgabe ${level}: GPS wieder aktiv — Teams bitte Seite neu laden.`);
       await refresh();
     });
   }
@@ -138,7 +153,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
         setError(result.error);
         return;
       }
-      setMessage(`Level ${level}: Override zurückgesetzt.`);
+      setMessage(`Aufgabe ${level}: Einstellungen zurückgesetzt.`);
       await refresh();
     });
   }
@@ -159,13 +174,13 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
         return;
       }
 
-      setMessage(`Team ${joinCode}: Team Lead (GPS) → ${result.data.navigatorName}`);
+      setMessage(`Team ${joinCode}: Team-Leiter (GPS) → ${result.data.navigatorName}`);
       await refresh();
     });
   }
 
   if (!snapshot) {
-    return <p className="text-sm text-[var(--grid-muted)]">Cockpit wird geladen…</p>;
+    return <p className="text-sm text-slate-500">Cockpit wird geladen…</p>;
   }
 
   const sortedTeams = [...snapshot.teams].sort((a, b) => b.score - a.score);
@@ -174,61 +189,75 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
     <div className="flex flex-col gap-8">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <GridStat label="Event" value={snapshot.title} />
-        <GridStat label="Status" value={snapshot.status} />
+        <GridStat label="Status" value={statusLabel(snapshot.status)} />
         <GridStat label="Teams" value={String(snapshot.teams.length)} />
         <GridStat label="Code" value={snapshot.invite_code} />
       </div>
 
-      <div className="rounded-xl border border-[var(--grid-accent)]/20 bg-[var(--grid-accent)]/5 p-4 text-sm text-[var(--grid-muted)]">
+      <GridHint tone="info">
         <p>
           Spieler-Einstieg:{" "}
-          <Link href={eventPath(snapshot.invite_code)} className="text-[var(--grid-accent)] hover:underline">
+          <CockpitLink href={eventPath(snapshot.invite_code)}>
             /e/{snapshot.invite_code}
-          </Link>
+          </CockpitLink>
         </p>
-        <p className="mt-2">
-          Live-Ranking (Beamer):{" "}
-          <Link href={cockpitShowPath(snapshot.invite_code)} className="text-emerald-300 hover:underline">
+        <p className="mt-2 inline-flex items-center gap-1">
+          Live-Ranking für Beamer:{" "}
+          <CockpitLink href={cockpitShowPath(snapshot.invite_code)} external>
             /cockpit/{snapshot.invite_code}/show
-          </Link>
+          </CockpitLink>
+          <IconArrowRight size={14} />
         </p>
-      </div>
+      </GridHint>
 
-      {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
+      {message ? <GridSuccess message={message} /> : null}
       {error ? <GridError message={error} /> : null}
 
-      <section>
-        <h2 className="mb-4 text-lg font-semibold text-white">Live-Highscore</h2>
+      <CockpitSection
+        icon={<IconUsers size={18} />}
+        title="Live-Ranking"
+        description="Aktuelle Punkte und Team-Status — aktualisiert alle 5 Sekunden."
+      >
         <div className="flex flex-col gap-3">
           {sortedTeams.length === 0 ? (
-            <p className="text-sm text-[var(--grid-muted)]">Noch keine Teams.</p>
+            <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              Noch keine Teams — Spieler treten über den Event-Link bei.
+            </p>
           ) : (
             sortedTeams.map((team, index) => (
               <div
                 key={team.id}
-                className="rounded-xl border border-[var(--grid-border)] bg-black/20 px-4 py-4"
+                className={`rounded-xl border px-4 py-4 ${
+                  index === 0
+                    ? "border-teal-200 bg-teal-50/50"
+                    : "border-slate-200 bg-white"
+                }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-white">
-                      #{index + 1} {team.name}{" "}
-                      <span className="text-xs text-[var(--grid-muted)]">({team.join_code})</span>
+                    <p className="font-semibold text-slate-900">
+                      <span className="mr-2 text-teal-600">#{index + 1}</span>
+                      {team.name}
+                      <span className="ml-2 text-xs font-normal text-slate-500">
+                        ({team.join_code})
+                      </span>
                     </p>
-                    <p className="mt-1 text-xs text-[var(--grid-muted)]">
-                      Level {team.current_level || "—"} · {team.status} · {team.active_player_count}{" "}
-                      Spieler · Captain: {team.captain_name ?? "—"} · GPS:{" "}
+                    <p className="mt-1 text-xs text-slate-500">
+                      Aufgabe {team.current_level || "—"} · {statusLabel(team.status)} ·{" "}
+                      {team.active_player_count} Spieler · Leiter: {team.captain_name ?? "—"} · GPS:{" "}
                       {team.navigator_name ?? "—"}
                     </p>
                   </div>
-                  <p className="text-2xl font-semibold text-[var(--grid-accent)]">{team.score}</p>
+                  <p className="text-2xl font-semibold tabular-nums text-teal-700">{team.score}</p>
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
                   <Link
                     href={eventLobbyPath(inviteCode, team.join_code, { manage: true })}
-                    className="text-xs text-emerald-300 underline-offset-2 hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700"
                   >
                     Team verwalten
+                    <IconArrowRight size={12} />
                   </Link>
                   {team.players.map((player) => (
                     <button
@@ -236,8 +265,9 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
                       type="button"
                       disabled={isPending || player.is_navigator}
                       onClick={() => handleSetNavigator(team.join_code, player.id)}
-                      className="rounded-lg border border-[var(--grid-border)] px-2 py-1 text-xs text-[var(--grid-muted)] hover:border-emerald-400/40 hover:text-emerald-300 disabled:opacity-40"
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 disabled:opacity-40"
                     >
+                      <IconMapPin size={12} />
                       GPS → {player.display_name}
                     </button>
                   ))}
@@ -246,17 +276,16 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
             ))
           )}
         </div>
-      </section>
+      </CockpitSection>
 
-      <section>
-        <h2 className="mb-2 text-lg font-semibold text-white">GPS steuern</h2>
-        <p className="mb-4 text-sm text-[var(--grid-muted)]">
-          Pro Level GPS an/aus — ohne JSON. Nach Änderungen müssen Spieler die Spielseite neu laden.
-        </p>
-
+      <CockpitSection
+        icon={<IconMapPin size={18} />}
+        title="GPS steuern"
+        description="Pro Aufgabe GPS ein- oder ausschalten. Nach Änderungen müssen Spieler die Spielseite neu laden."
+      >
         <div className="mb-4 grid gap-4 sm:grid-cols-3">
           <div>
-            <GridLabel>Radius (Meter)</GridLabel>
+            <GridLabel hint="Für Testmodus und GPS-Aktivierung">Radius (Meter)</GridLabel>
             <GridInput
               value={radiusMeters}
               onChange={(event) => setRadiusMeters(event.target.value)}
@@ -264,21 +293,27 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
             />
           </div>
           <div>
-            <GridLabel>Latitude (optional)</GridLabel>
+            <GridLabel hint="Optional">Breitengrad</GridLabel>
             <GridInput value={lat} onChange={(event) => setLat(event.target.value)} />
           </div>
           <div>
-            <GridLabel>Longitude (optional)</GridLabel>
+            <GridLabel hint="Optional">Längengrad</GridLabel>
             <GridInput value={lng} onChange={(event) => setLng(event.target.value)} />
           </div>
         </div>
 
         <div className="mb-6 flex flex-wrap gap-2">
-          <GridButton type="button" disabled={isPending} onClick={useMyLocation}>
-            Meine Position übernehmen
+          <GridButton
+            type="button"
+            variant="secondary"
+            disabled={isPending}
+            icon={<IconMapPin size={16} />}
+            onClick={useMyLocation}
+          >
+            Meine Position
           </GridButton>
           <GridButton type="button" disabled={isPending} onClick={handleGpsTestAll}>
-            Alle GPS-Level testen (Radius)
+            Alle GPS-Aufgaben testen
           </GridButton>
         </div>
 
@@ -286,15 +321,15 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
           {snapshot.levels.map((level) => (
             <li
               key={level.level}
-              className="flex flex-col gap-3 rounded-xl border border-[var(--grid-border)] bg-black/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
-                <p className="text-white">
-                  Level {level.level} · {level.title}
+                <p className="font-medium text-slate-900">
+                  Aufgabe {level.level} · {level.title}
                 </p>
-                <p className="text-xs text-[var(--grid-muted)]">
-                  Typ: {level.type}
-                  {level.has_override ? " · Override aktiv" : ""}
+                <p className="text-xs text-slate-500">
+                  {level.type === "gps" ? "GPS-Aufgabe" : "Ohne GPS"}
+                  {level.has_override ? " · Sonder-Einstellung aktiv" : ""}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -304,7 +339,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
                       type="button"
                       disabled={isPending}
                       onClick={() => handleDisableLevel(level.level)}
-                      className="rounded-lg border border-red-400/30 px-3 py-1 text-xs text-red-300 hover:bg-red-400/10"
+                      className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                     >
                       GPS aus
                     </button>
@@ -312,7 +347,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
                       type="button"
                       disabled={isPending}
                       onClick={() => handleEnableLevel(level.level)}
-                      className="rounded-lg border border-emerald-400/30 px-3 py-1 text-xs text-emerald-300 hover:bg-emerald-400/10"
+                      className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
                     >
                       GPS an
                     </button>
@@ -320,19 +355,19 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
                       type="button"
                       disabled={isPending}
                       onClick={() => handleResetLevel(level.level)}
-                      className="rounded-lg border border-[var(--grid-border)] px-3 py-1 text-xs text-[var(--grid-muted)]"
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
                     >
-                      Reset
+                      Zurücksetzen
                     </button>
                   </>
                 ) : (
-                  <span className="text-xs text-[var(--grid-muted)]">Kein GPS-Level</span>
+                  <span className="text-xs text-slate-400">Keine GPS-Steuerung</span>
                 )}
               </div>
             </li>
           ))}
         </ul>
-      </section>
+      </CockpitSection>
     </div>
   );
 }

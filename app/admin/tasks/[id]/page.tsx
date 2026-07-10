@@ -23,8 +23,8 @@ export default async function EditTaskPage({ params, searchParams }: Props) {
       title={result.data.title}
       description={
         returnTo
-          ? `Task bearbeiten · danach zurück zum Game`
-          : `Task bearbeiten · ${result.data.slug}`
+          ? "Aufgabe bearbeiten — danach kehrst du zum Spiel zurück."
+          : `Aufgabe bearbeiten · ${result.data.slug}`
       }
     >
       <TaskEditor task={result.data} returnTo={returnTo} />

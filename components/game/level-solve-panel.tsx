@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import {
   GridButton,
+  GridHint,
   GridInput,
   GridLabel,
 } from "@/components/grid/grid-shell";
+import { IconCheck, IconMapPin } from "@/components/cms/studio-icons";
 import { distanceMeters, formatDistance } from "@/lib/grid/geofence";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
 import type { LevelDefinition, SolveLevelPayload } from "@/lib/grid/level-types";
@@ -101,38 +103,40 @@ export function LevelSolvePanel({
 
   if (level.type === "gps" && !isNavigator) {
     return (
-      <div className="rounded-xl border border-[var(--grid-border)] bg-black/20 px-4 py-4 text-sm text-[var(--grid-muted)]">
-        Das Alpha-Gerät bestätigt diesen Checkpoint. Ihr könnt parallel Hinweise nutzen und
+      <GridHint tone="info">
+        Der Team-Leiter bestätigt diesen Wegpunkt vor Ort. Ihr könnt parallel Hinweise nutzen und
         Rätsel lösen.
-      </div>
+      </GridHint>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--grid-border)] bg-black/20 p-4 sm:p-5">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
       {level.type === "gps" && level.location && !hideGpsStatus ? (
-        <div className="mb-4 rounded-xl border border-[var(--grid-border)] bg-black/30 px-4 py-3 text-sm text-[var(--grid-muted)]">
-          {gpsLoading ? <p>GPS wird ermittelt…</p> : null}
-          {gpsError ? <p className="text-red-300">{gpsError}</p> : null}
+        <div className="mb-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          {gpsLoading ? <p>Standort wird ermittelt…</p> : null}
+          {gpsError ? <p className="text-red-600">{gpsError}</p> : null}
           {sample ? (
             <>
-              <p>
+              <p className="inline-flex items-center gap-1.5">
+                <IconMapPin size={14} className="text-teal-600" />
                 Entfernung:{" "}
-                <span className="text-white">
+                <span className="font-semibold text-slate-900">
                   {distance !== null ? formatDistance(distance) : "—"}
                 </span>
               </p>
               <p className="mt-1">
                 {withinRadius ? (
-                  <span className="text-emerald-300">
+                  <span className="inline-flex items-center gap-1 font-medium text-emerald-700">
+                    <IconCheck size={14} />
                     {autoSubmitGps && autoTriggered
-                      ? "Checkpoint wird bestätigt…"
+                      ? "Wegpunkt wird bestätigt…"
                       : autoSubmitGps
-                        ? "Im Checkpoint — wird automatisch aktiviert"
-                        : "Im Checkpoint-Bereich"}
+                        ? "Am Ziel — wird automatisch aktiviert"
+                        : "Am Ziel"}
                   </span>
                 ) : (
-                  <span className="text-amber-300">Unterwegs zum Ziel</span>
+                  <span className="text-amber-700">Unterwegs zum Ziel</span>
                 )}
               </p>
             </>
@@ -162,8 +166,8 @@ export function LevelSolvePanel({
               onClick={() => setSelectedOptionId(option.id)}
               className={`rounded-xl border px-4 py-3 text-left text-sm transition ${
                 selectedOptionId === option.id
-                  ? "border-[var(--grid-accent)] bg-[var(--grid-accent)]/10 text-white"
-                  : "border-[var(--grid-border)] bg-black/20 text-[var(--grid-muted)] hover:border-[var(--grid-accent)]/40"
+                  ? "border-teal-500 bg-teal-50 font-medium text-teal-900"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-teal-200 hover:bg-slate-50"
               }`}
             >
               {option.label}
@@ -173,10 +177,10 @@ export function LevelSolvePanel({
       ) : null}
 
       {level.type === "gps" && autoSubmitGps ? (
-        <p className="mt-4 text-sm text-[var(--grid-muted)]">
+        <p className="mt-4 text-sm text-slate-500">
           {withinRadius
-            ? "Kein Tippen nötig — der Checkpoint wird im Radius automatisch bestätigt."
-            : "Zum Zielpunkt laufen — die Aufgabe startet automatisch im Radius."}
+            ? "Kein Tippen nötig — der Wegpunkt wird automatisch bestätigt."
+            : "Zum Zielpunkt laufen — die Aufgabe startet automatisch in der Nähe."}
         </p>
       ) : (
         <GridButton
@@ -185,7 +189,7 @@ export function LevelSolvePanel({
           disabled={disabled || isPending || !canSubmit}
           onClick={handleSubmit}
         >
-          {isPending ? "Sende…" : level.type === "gps" ? "Checkpoint bestätigen" : "Bestätigen"}
+          {isPending ? "Sende…" : level.type === "gps" ? "Wegpunkt bestätigen" : "Antwort senden"}
         </GridButton>
       )}
     </div>

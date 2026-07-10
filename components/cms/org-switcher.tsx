@@ -3,7 +3,8 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setStudioOrganization } from "@/app/actions/cms/organizations";
-import { GridSelect, GridLabel } from "@/components/grid/grid-shell";
+import { IconBuilding } from "@/components/cms/studio-icons";
+import { StudioLabel, StudioSelect } from "@/components/cms/studio-ui";
 import type { StudioOrganization } from "@/lib/cms/types";
 
 type Props = {
@@ -17,8 +18,13 @@ export function OrgSwitcher({ organizations, currentSlug }: Props) {
 
   return (
     <div>
-      <GridLabel>Projekt</GridLabel>
-      <GridSelect
+      <StudioLabel>
+        <span className="inline-flex items-center gap-1.5">
+          <IconBuilding size={14} className="text-slate-400" />
+          Projekt
+        </span>
+      </StudioLabel>
+      <StudioSelect
         value={currentSlug}
         disabled={pending}
         onChange={(event) => {
@@ -34,7 +40,7 @@ export function OrgSwitcher({ organizations, currentSlug }: Props) {
             {org.name}
           </option>
         ))}
-      </GridSelect>
+      </StudioSelect>
     </div>
   );
 }

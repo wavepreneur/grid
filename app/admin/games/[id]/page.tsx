@@ -25,7 +25,7 @@ export default async function AdminGameDetailPage({ params }: Props) {
     <StudioPage
       activePath="/admin/games"
       title={gameResult.data.name}
-      description="Globale Settings, Tasks aus Bibliothek — Draft getrennt von Live-Events."
+      description="Einstellungen, Aufgaben und Spielablauf — Änderungen betreffen nur den Entwurf."
     >
       <GameEditorPanel
         game={gameResult.data}

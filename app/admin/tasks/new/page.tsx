@@ -5,8 +5,8 @@ export default function NewTaskPage() {
   return (
     <StudioPage
       activePath="/admin/tasks"
-      title="Neuer Task"
-      description="Standardisierter Aufbau: Kachel, Medien, Frage — Live-Preview rechts."
+      title="Neue Aufgabe"
+      description="Erstelle ein Rätsel für die Bibliothek — die Vorschau rechts zeigt, wie es für Spieler aussieht."
     >
       <TaskEditor />
     </StudioPage>

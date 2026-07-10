@@ -9,6 +9,7 @@ import {
 import {
   GridButton,
   GridError,
+  GridHint,
   GridInput,
   GridLabel,
   GridSelect,
@@ -61,13 +62,13 @@ export function CaptainSetupForm({ inviteCode, joinCode }: CaptainSetupFormProps
   return (
     <form action={handleSubmit} className="flex flex-col gap-5">
       {isPrebooked ? (
-        <p className="rounded-xl border border-[var(--grid-accent)]/30 bg-[var(--grid-accent)]/10 px-4 py-3 text-sm text-[var(--grid-accent)]">
-          Vorgebuchtes Team <strong>{joinCode}</strong> — konfiguriere Name und Metadaten.
-        </p>
+        <GridHint tone="info">
+          Vorgebuchtes Team <strong>{joinCode}</strong> — wähle Name und Teamgröße.
+        </GridHint>
       ) : null}
 
       <div>
-        <GridLabel>Dein Spielername (Pseudonym)</GridLabel>
+        <GridLabel hint="Wird im Team angezeigt">Dein Spielername</GridLabel>
         <GridInput
           name="displayName"
           placeholder="z. B. Nova-7"

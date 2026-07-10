@@ -10,6 +10,7 @@ import {
 } from "@/lib/grid/event-routes";
 import { buildManageTeamUrl, buildPlayUrlWithResume } from "@/lib/grid/play-url";
 import { archetypeRoleLabel } from "@/lib/grid/archetype-roles";
+import { IconHome, IconUsers } from "@/components/cms/studio-icons";
 import type { PlayerSession } from "@/lib/grid/types";
 
 type IdentityBarProps = {
@@ -23,7 +24,7 @@ type IdentityBarProps = {
 
 function roleLabel(session: PlayerSession): string {
   if (session.effectiveBeta && session.isAlpha) {
-    return "Alpha · Beta";
+    return "Team-Leiter · Hinweise";
   }
   return archetypeRoleLabel(session.archetypeRole);
 }
@@ -90,52 +91,54 @@ export function IdentityBar({
   }
 
   return (
-    <div className="rounded-xl border border-[var(--grid-border)] bg-black/40 px-4 py-3 text-sm backdrop-blur-sm">
+    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[var(--grid-muted)]">
-          Du bist{" "}
-          <span className="font-medium text-white">{session.displayName}</span>
-          <span className="ml-2 rounded-full bg-[var(--grid-accent)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--grid-accent)]">
+        <p className="text-slate-600">
+          Angemeldet als{" "}
+          <span className="font-semibold text-slate-900">{session.displayName}</span>
+          <span className="ml-2 rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-700">
             {roleLabel(session)}
           </span>
         </p>
-        <div className="flex flex-wrap gap-3 text-xs">
+        <div className="flex flex-wrap gap-2">
           {showCopyPlayLink ? (
             <button
               type="button"
               onClick={handleCopyPlayLink}
-              className="text-emerald-300 underline-offset-2 hover:underline"
+              className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
             >
               {copyState === "copied"
-                ? "Link kopiert"
+                ? "✓ Kopiert"
                 : copyState === "error"
-                  ? "Kopieren fehlgeschlagen"
-                  : "Spieler-Link kopieren"}
+                  ? "Fehler"
+                  : "Link kopieren"}
             </button>
           ) : null}
           {showManageTeam ? (
             <button
               type="button"
               onClick={handleManageTeam}
-              className="text-emerald-300 underline-offset-2 hover:underline"
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
             >
+              <IconUsers size={12} />
               Team verwalten
             </button>
           ) : null}
           <button
             type="button"
             onClick={handleSwitchPlayer}
-            className="text-[var(--grid-accent)] underline-offset-2 hover:underline"
+            className="rounded-lg px-2.5 py-1 text-xs font-medium text-teal-600 hover:bg-teal-50"
           >
-            Das bin nicht ich
+            Anderer Spieler
           </button>
           {showEventHome ? (
             <button
               type="button"
               onClick={() => router.push(eventPath(inviteCode))}
-              className="text-[var(--grid-muted)] underline-offset-2 hover:text-white hover:underline"
+              className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50"
             >
-              Event-Start
+              <IconHome size={12} />
+              Start
             </button>
           ) : null}
         </div>

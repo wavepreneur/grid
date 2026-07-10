@@ -11,8 +11,8 @@ export default async function AdminTemplatesPage() {
   return (
     <StudioPage
       activePath="/admin/templates"
-      title="Templates"
-      description="System-Blueprints (Quiz, Rogain, Match…) und deine gespeicherten Games als Vorlage."
+      title="Vorlagen"
+      description="Starte schnell mit fertigen Spieltypen oder nutze deine gespeicherten Vorlagen."
     >
       <TemplateGallery
         blueprints={blueprintsResult.success ? blueprintsResult.data! : []}

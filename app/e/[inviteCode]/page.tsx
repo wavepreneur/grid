@@ -31,9 +31,9 @@ export default async function EventPage({ params }: EventPageProps) {
       }
     >
       <EventLanding event={event} />
-      <p className="mt-8 text-center text-xs text-[var(--grid-muted)]">
+      <p className="mt-8 text-center text-xs text-slate-500">
         Event-Leiter?{" "}
-        <Link href={cockpitPath(normalized)} className="text-emerald-300 hover:underline">
+        <Link href={cockpitPath(normalized)} className="font-medium text-teal-600 hover:underline">
           Operator-Cockpit öffnen
         </Link>
       </p>

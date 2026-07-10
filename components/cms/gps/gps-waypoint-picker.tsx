@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap, Circle, Marker } from "leaflet";
-import { GridButton, GridInput, GridLabel } from "@/components/grid/grid-shell";
+import { IconMapPin } from "@/components/cms/studio-icons";
+import {
+  StudioButton,
+  StudioInput,
+  StudioLabel,
+} from "@/components/cms/studio-ui";
 import {
   DEFAULT_GPS_RADIUS_METERS,
   type GpsPin,
@@ -50,9 +55,9 @@ export function GpsWaypointPicker({ value, defaultCenter, onChange, disabled }: 
 
       const circle = L.circle([start.lat, start.lng], {
         radius: start.radius_meters,
-        color: "#2ee9da",
+        color: "#0d9488",
         weight: 2,
-        fillColor: "#2ee9da",
+        fillColor: "#0d9488",
         fillOpacity: 0.2,
       }).addTo(map);
       circleRef.current = circle;
@@ -110,16 +115,17 @@ export function GpsWaypointPicker({ value, defaultCenter, onChange, disabled }: 
 
   return (
     <div className="space-y-3">
-      <div className="overflow-hidden rounded-xl border border-[var(--grid-border)]">
+      <div className="overflow-hidden rounded-xl border border-slate-200">
         <div ref={containerRef} className="h-[220px] w-full sm:h-[260px]" />
       </div>
-      <p className="text-xs text-[var(--grid-muted)]">
-        Marker ziehen oder Koordinaten eingeben — der türkise Kreis zeigt den Aktivierungs-Radius.
+      <p className="text-xs text-slate-500">
+        Marker auf der Karte ziehen oder Koordinaten eingeben — der grüne Kreis zeigt den
+        Aktivierungs-Radius.
       </p>
       <div className="grid gap-3 sm:grid-cols-3">
         <div>
-          <GridLabel>Latitude</GridLabel>
-          <GridInput
+          <StudioLabel>Latitude</StudioLabel>
+          <StudioInput
             type="number"
             step="any"
             disabled={disabled}
@@ -128,8 +134,8 @@ export function GpsWaypointPicker({ value, defaultCenter, onChange, disabled }: 
           />
         </div>
         <div>
-          <GridLabel>Longitude</GridLabel>
-          <GridInput
+          <StudioLabel>Longitude</StudioLabel>
+          <StudioInput
             type="number"
             step="any"
             disabled={disabled}
@@ -138,8 +144,8 @@ export function GpsWaypointPicker({ value, defaultCenter, onChange, disabled }: 
           />
         </div>
         <div>
-          <GridLabel>Radius (Meter)</GridLabel>
-          <GridInput
+          <StudioLabel>Radius (Meter)</StudioLabel>
+          <StudioInput
             type="number"
             min={5}
             max={500}
@@ -153,14 +159,16 @@ export function GpsWaypointPicker({ value, defaultCenter, onChange, disabled }: 
           />
         </div>
       </div>
-      <GridButton
+      <StudioButton
         type="button"
+        variant="secondary"
         disabled={disabled}
-        className="w-auto px-4 py-2 text-sm"
+        className="px-4 py-2 text-sm"
+        icon={<IconMapPin size={16} />}
         onClick={useMyLocation}
       >
-        Meine Position
-      </GridButton>
+        Meine Position verwenden
+      </StudioButton>
     </div>
   );
 }

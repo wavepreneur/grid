@@ -4,8 +4,17 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createGame } from "@/app/actions/cms/games";
-import { GridButton, GridError, GridInput, GridLabel } from "@/components/grid/grid-shell";
 import { StudioBadge } from "@/components/cms/admin-shell";
+import { IconArrowRight, IconGamepad, IconPlus } from "@/components/cms/studio-icons";
+import {
+  StudioButton,
+  StudioEmptyState,
+  StudioError,
+  StudioInput,
+  StudioLabel,
+  StudioSectionTitle,
+  StudioSelect,
+} from "@/components/cms/studio-ui";
 import type { StudioBlueprint, StudioGame } from "@/lib/cms/types";
 
 type Props = {
@@ -47,76 +56,98 @@ export function GameList({ games, blueprints }: Props) {
   return (
     <div className="space-y-6">
       {open ? (
-        <form onSubmit={handleCreate} className="grid-panel space-y-4 rounded-2xl p-6">
-          <h2 className="text-lg font-semibold text-white">Neues Game</h2>
-          {error ? <GridError message={error} /> : null}
-          <div>
-            <GridLabel>Name</GridLabel>
-            <GridInput value={name} onChange={(e) => setName(e.target.value)} required />
+        <form
+          onSubmit={handleCreate}
+          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+        >
+          <StudioSectionTitle
+            icon={<IconPlus size={18} />}
+            title="Neues Spiel"
+            description="Gib einen Namen ein — optional startest du mit einer Vorlage."
+          />
+          {error ? <div className="mb-4"><StudioError message={error} /></div> : null}
+          <div className="space-y-4">
+            <div>
+              <StudioLabel>Name</StudioLabel>
+              <StudioInput value={name} onChange={(e) => setName(e.target.value)} required placeholder="z. B. Berlin City Quest" />
+            </div>
+            <div>
+              <StudioLabel hint="Optional — Features und Ablauf werden vorausgefüllt">
+                Vorlage
+              </StudioLabel>
+              <StudioSelect value={blueprintId} onChange={(e) => setBlueprintId(e.target.value)}>
+                <option value="">Leer starten</option>
+                {blueprints.map((bp) => (
+                  <option key={bp.id} value={bp.id}>
+                    {bp.name}
+                  </option>
+                ))}
+              </StudioSelect>
+            </div>
           </div>
-          <div>
-            <GridLabel>Blueprint (optional)</GridLabel>
-            <select
-              className="grid-input w-full rounded-xl px-4 py-3 text-sm text-white"
-              value={blueprintId}
-              onChange={(e) => setBlueprintId(e.target.value)}
-            >
-              <option value="">Leer starten — Features manuell wählen</option>
-              {blueprints.map((bp) => (
-                <option key={bp.id} value={bp.id}>
-                  {bp.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex gap-3">
-            <GridButton type="submit" disabled={pending} className="w-auto px-6">
-              {pending ? "Erstellen…" : "Game erstellen"}
-            </GridButton>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="rounded-xl border border-[var(--grid-border)] px-5 py-3 text-sm text-[var(--grid-muted)]"
-            >
+          <div className="mt-6 flex flex-wrap gap-3">
+            <StudioButton type="submit" disabled={pending} icon={<IconPlus size={16} />}>
+              {pending ? "Wird erstellt…" : "Spiel erstellen"}
+            </StudioButton>
+            <StudioButton type="button" variant="ghost" onClick={() => setOpen(false)}>
               Abbrechen
-            </button>
+            </StudioButton>
           </div>
         </form>
       ) : (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="grid-panel flex w-full items-center justify-center rounded-2xl border border-dashed border-[var(--grid-border)] p-8 text-sm font-medium text-[var(--grid-accent)] transition hover:border-[var(--grid-accent)]/50"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 bg-white px-6 py-10 text-sm font-medium text-teal-600 transition hover:border-teal-300 hover:bg-teal-50/50"
         >
-          + Game erstellen
+          <IconPlus size={18} />
+          Neues Spiel erstellen
         </button>
       )}
 
-      <div className="grid gap-4">
-        {games.map((game) => (
-          <Link
-            key={game.id}
-            href={`/admin/games/${game.id}`}
-            className="grid-panel flex flex-wrap items-center justify-between gap-4 rounded-2xl p-5 transition hover:border-[var(--grid-accent)]/30"
-          >
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-semibold text-white">{game.name}</h3>
-                <StudioBadge tone={game.status === "published" ? "live" : "draft"}>
-                  {game.status}
-                </StudioBadge>
-                {game.gps_enabled ? <StudioBadge tone="default">GPS</StudioBadge> : null}
+      {games.length === 0 ? (
+        <StudioEmptyState
+          icon={<IconGamepad size={32} />}
+          title="Noch keine Spiele"
+          description="Erstelle dein erstes Spiel oder starte mit einer Vorlage."
+        />
+      ) : (
+        <div className="grid gap-3">
+          {games.map((game) => (
+            <Link
+              key={game.id}
+              href={`/admin/games/${game.id}`}
+              className="group flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-200 hover:shadow-md"
+            >
+              <div className="flex items-start gap-4">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition group-hover:bg-teal-50 group-hover:text-teal-600">
+                  <IconGamepad size={20} />
+                </span>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-semibold text-slate-900">{game.name}</h3>
+                    <StudioBadge tone={game.status === "published" ? "live" : "draft"}>
+                      {game.status === "published" ? "Veröffentlicht" : "Entwurf"}
+                    </StudioBadge>
+                    {game.gps_enabled ? (
+                      <StudioBadge>GPS</StudioBadge>
+                    ) : (
+                      <StudioBadge>Indoor</StudioBadge>
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Version {game.published_version_number} · {game.slug}
+                  </p>
+                </div>
               </div>
-              <p className="mt-1 text-sm text-[var(--grid-muted)]">
-                v{game.published_version_number} · {game.slug}
-              </p>
-            </div>
-            <span className="text-xs text-[var(--grid-muted)]">
-              Bearbeiten → Live-Events nur via Publish / Push
-            </span>
-          </Link>
-        ))}
-      </div>
+              <span className="inline-flex items-center gap-1 text-sm font-medium text-teal-600">
+                Bearbeiten
+                <IconArrowRight size={16} className="transition group-hover:translate-x-0.5" />
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

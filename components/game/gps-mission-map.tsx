@@ -150,27 +150,27 @@ export function GpsMissionMap({
   }, [waypoints, activeLevel, playerPosition, showPlayer, target]);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--grid-border)] bg-black/20">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div ref={containerRef} className="h-[min(52vh,360px)] w-full sm:h-[320px] lg:h-[280px]" />
       {showPlayer && target ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--grid-border)] bg-black/40 px-4 py-3 text-sm">
-          <p className="text-[var(--grid-muted)]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3 text-sm">
+          <p className="text-slate-600">
             Entfernung zum Ziel:{" "}
-            <span className="font-medium text-white">
+            <span className="font-semibold text-slate-900">
               {distanceToTarget !== null ? formatDistance(distanceToTarget) : "—"}
             </span>
           </p>
           <p>
             {withinRadius ? (
-              <span className="text-emerald-300">Im Checkpoint-Bereich</span>
+              <span className="font-medium text-emerald-700">Am Wegpunkt</span>
             ) : (
-              <span className="text-amber-300">Unterwegs zum Ziel</span>
+              <span className="text-amber-700">Unterwegs</span>
             )}
           </p>
         </div>
       ) : (
-        <div className="border-t border-[var(--grid-border)] bg-black/40 px-4 py-3 text-sm text-[var(--grid-muted)]">
-          Route-Übersicht — der Team Lead (GPS) navigiert zum grün markierten Checkpoint.
+        <div className="border-t border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+          Kartenübersicht — der Team-Leiter navigiert zum grün markierten Wegpunkt.
         </div>
       )}
     </div>

@@ -90,7 +90,7 @@ export function ExitmaniaLevelView({
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-8">
         <section className="flex min-w-0 flex-col gap-5">
           {!isGpsLevel && level.hero_image_url ? (
-            <div className="overflow-hidden rounded-2xl border border-[var(--grid-border)] bg-black/20">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={level.hero_image_url}
@@ -99,19 +99,19 @@ export function ExitmaniaLevelView({
               />
             </div>
           ) : !isGpsLevel ? (
-            <div className="flex aspect-[16/10] max-h-52 items-center justify-center rounded-2xl border border-[var(--grid-border)] bg-gradient-to-br from-[var(--grid-accent)]/20 to-black/40 sm:aspect-[2/1] sm:max-h-none">
-              <span className="text-xs uppercase tracking-[0.25em] text-[var(--grid-muted)]">
-                Level {level.level}
+            <div className="flex aspect-[16/10] max-h-52 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-teal-50 to-slate-100 sm:aspect-[2/1] sm:max-h-none">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Aufgabe {level.level}
               </span>
             </div>
           ) : null}
 
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--grid-accent)]">
-              Aufgabe {level.level} · {level.type.toUpperCase()}
+            <p className="text-xs font-medium uppercase tracking-wide text-teal-600">
+              Aufgabe {level.level}
             </p>
-            <h2 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">{level.title}</h2>
-            <p className="mt-3 text-sm leading-7 text-[var(--grid-muted)] whitespace-pre-line">
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900 sm:text-3xl">{level.title}</h2>
+            <p className="mt-3 text-sm leading-7 text-slate-600 whitespace-pre-line">
               {level.description}
             </p>
           </div>
@@ -121,9 +121,9 @@ export function ExitmaniaLevelView({
               <BetaNotesPanel {...betaPanelProps} layout="inline" />
             </div>
           ) : (
-            <div className="rounded-xl border border-[var(--grid-border)] bg-black/20 px-4 py-4 text-sm text-[var(--grid-muted)] lg:hidden">
-              Rätselblatt und Dokumente sieht nur Beta. Koordiniert euch per Sprache — Alpha
-              schaltet GPS-Wegpunkte frei.
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600 lg:hidden">
+              Hinweise und Dokumente sieht nur die Hinweis-Rolle. Der Team-Leiter schaltet
+              Wegpunkte frei.
             </div>
           )}
 
@@ -141,11 +141,11 @@ export function ExitmaniaLevelView({
           {effectiveBeta ? (
             <BetaNotesPanel {...betaPanelProps} layout="sidebar" />
           ) : (
-            <div className="rounded-2xl border border-[var(--grid-border)] bg-black/20 px-4 py-5 text-sm text-[var(--grid-muted)]">
-              <p className="text-xs uppercase tracking-[0.18em] text-[var(--grid-muted)]">Gamma</p>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Mitspieler</p>
               <p className="mt-2">
-                Du löst Aufgaben mit dem Team. Rätselblatt und Medien liegen bei Beta — sprecht euch
-                ab.
+                Du löst Aufgaben mit dem Team. Hinweise und Medien liegen bei der Hinweis-Rolle —
+                sprecht euch ab.
               </p>
             </div>
           )}

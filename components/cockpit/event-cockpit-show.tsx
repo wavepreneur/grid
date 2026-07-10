@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { getEventCockpitSnapshot, type EventCockpitSnapshot } from "@/app/actions/cockpit";
+import { IconArrowRight, IconPlay } from "@/components/cms/studio-icons";
 import { cockpitPath } from "@/lib/grid/event-routes";
 
 type EventCockpitShowProps = {
@@ -32,8 +33,8 @@ export function EventCockpitShow({ inviteCode }: EventCockpitShowProps) {
 
   if (!snapshot) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black text-white">
-        <p className="text-[var(--grid-muted)]">Live-Ranking wird geladen…</p>
+      <div className="grid-bg flex min-h-screen items-center justify-center">
+        <p className="text-sm text-slate-500">Live-Ranking wird geladen…</p>
       </div>
     );
   }
@@ -44,52 +45,83 @@ export function EventCockpitShow({ inviteCode }: EventCockpitShowProps) {
   });
 
   return (
-    <div className="grid-bg min-h-screen px-6 py-10 text-white">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
-        <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-[var(--grid-accent)]">
-              Live Ranking
-            </p>
-            <h1 className="text-4xl font-semibold tracking-tight">{snapshot.title}</h1>
+    <div className="grid-bg min-h-screen px-4 py-8 sm:px-8 sm:py-12">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex items-start gap-4">
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-600 text-white">
+              <IconPlay size={22} />
+            </span>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-teal-600">
+                Live-Ranking
+              </p>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+                {snapshot.title}
+              </h1>
+              <p className="mt-1 text-sm text-slate-500">
+                {sortedTeams.length} Teams · Aktualisiert alle 3 Sekunden
+              </p>
+            </div>
           </div>
           <Link
             href={cockpitPath(inviteCode)}
-            className="text-sm text-[var(--grid-muted)] hover:text-white"
+            className="inline-flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700"
           >
-            Operator-Cockpit →
+            Operator-Cockpit
+            <IconArrowRight size={16} />
           </Link>
         </header>
 
-        <ul className="flex flex-col gap-4">
+        <ul className="flex flex-col gap-3">
           {sortedTeams.map((team, index) => (
             <li
               key={team.id}
-              className={`flex items-center justify-between rounded-2xl border px-6 py-5 ${
+              className={`flex items-center justify-between rounded-2xl border px-5 py-5 shadow-sm sm:px-6 sm:py-6 ${
                 index === 0
-                  ? "border-[var(--grid-accent)]/40 bg-[var(--grid-accent)]/10"
-                  : "border-[var(--grid-border)] bg-black/30"
+                  ? "border-teal-300 bg-teal-50"
+                  : index === 1
+                    ? "border-slate-200 bg-white"
+                    : index === 2
+                      ? "border-slate-200 bg-white"
+                      : "border-slate-100 bg-slate-50/80"
               }`}
             >
-              <div className="flex items-center gap-5">
-                <span className="text-3xl font-bold text-[var(--grid-accent)]">
-                  #{index + 1}
+              <div className="flex min-w-0 items-center gap-4 sm:gap-5">
+                <span
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-bold sm:h-12 sm:w-12 sm:text-xl ${
+                    index === 0
+                      ? "bg-teal-600 text-white"
+                      : index === 1
+                        ? "bg-slate-200 text-slate-700"
+                        : index === 2
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {index + 1}
                 </span>
-                <div>
-                  <p className="text-xl font-medium">{team.name}</p>
-                  <p className="mt-1 text-sm text-[var(--grid-muted)]">
-                    Level {team.current_level || "—"} · {statusLabel(team.status)} ·{" "}
+                <div className="min-w-0">
+                  <p className="truncate text-lg font-semibold text-slate-900 sm:text-xl">
+                    {team.name}
+                  </p>
+                  <p className="mt-0.5 text-sm text-slate-500">
+                    Aufgabe {team.current_level || "—"} · {statusLabel(team.status)} ·{" "}
                     {team.active_player_count} Spieler
                   </p>
                 </div>
               </div>
-              <p className="text-4xl font-semibold tabular-nums">{team.score}</p>
+              <p className="ml-4 shrink-0 text-3xl font-semibold tabular-nums text-teal-700 sm:text-4xl">
+                {team.score}
+              </p>
             </li>
           ))}
         </ul>
 
         {sortedTeams.length === 0 ? (
-          <p className="text-center text-[var(--grid-muted)]">Noch keine Teams aktiv.</p>
+          <p className="rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center text-slate-500">
+            Noch keine Teams aktiv — warte auf den ersten Start.
+          </p>
         ) : null}
       </div>
     </div>

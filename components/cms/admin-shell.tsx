@@ -1,15 +1,28 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { OrgSwitcher } from "@/components/cms/org-switcher";
+import {
+  IconCode,
+  IconGamepad,
+  IconHome,
+  IconPuzzle,
+  IconTemplate,
+  IconTicket,
+} from "@/components/cms/studio-icons";
 import type { StudioOrganization } from "@/lib/cms/types";
 
-const NAV: Array<{ href: string; label: string; exact?: boolean }> = [
-  { href: "/admin", label: "Overview", exact: true },
-  { href: "/admin/games", label: "Games" },
-  { href: "/admin/templates", label: "Templates" },
-  { href: "/admin/tasks", label: "Tasks" },
-  { href: "/admin/tickets", label: "Tickets" },
-  { href: "/admin/dev", label: "Dev" },
+const NAV: Array<{
+  href: string;
+  label: string;
+  exact?: boolean;
+  icon: ReactNode;
+}> = [
+  { href: "/admin", label: "Übersicht", exact: true, icon: <IconHome size={18} /> },
+  { href: "/admin/games", label: "Spiele", icon: <IconGamepad size={18} /> },
+  { href: "/admin/templates", label: "Vorlagen", icon: <IconTemplate size={18} /> },
+  { href: "/admin/tasks", label: "Aufgaben", icon: <IconPuzzle size={18} /> },
+  { href: "/admin/tickets", label: "Tickets", icon: <IconTicket size={18} /> },
+  { href: "/admin/dev", label: "Entwicklung", icon: <IconCode size={18} /> },
 ];
 
 type AdminShellProps = {
@@ -32,20 +45,22 @@ export function AdminShell({
   activePath,
 }: AdminShellProps) {
   return (
-    <div className="studio-bg min-h-screen">
+    <div className="studio-shell min-h-screen bg-slate-50 text-slate-900">
       <div className="mx-auto flex min-h-screen w-full max-w-[1600px]">
-        <aside className="studio-sidebar hidden w-64 shrink-0 flex-col border-r border-[var(--grid-border)] p-6 lg:flex">
-          <div className="mb-10">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-[var(--grid-accent)]">
-              GRID Studio
-            </p>
-            <p className="mt-2 text-lg font-semibold text-white">CMS</p>
-            <p className="mt-1 text-xs leading-5 text-[var(--grid-muted)]">
-              Content &amp; Events — getrennt von Live-Runs
-            </p>
+        <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
+          <div className="border-b border-slate-100 px-5 py-6">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-600 text-sm font-bold text-white">
+                G
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">GRID Studio</p>
+                <p className="text-xs text-slate-500">Inhalte verwalten</p>
+              </div>
+            </div>
           </div>
 
-          <nav className="flex flex-1 flex-col gap-1">
+          <nav className="flex flex-1 flex-col gap-0.5 px-3 py-4">
             {NAV.map((item) => {
               const active = item.exact
                 ? activePath === item.href
@@ -54,47 +69,56 @@ export function AdminShell({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
                     active
-                      ? "bg-[var(--grid-accent-soft)] text-[var(--grid-accent)]"
-                      : "text-[var(--grid-muted)] hover:bg-white/5 hover:text-white"
+                      ? "bg-teal-50 text-teal-700"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                   }`}
                 >
+                  <span className={active ? "text-teal-600" : "text-slate-400"}>{item.icon}</span>
                   {item.label}
                 </Link>
               );
             })}
           </nav>
 
-          <div className="mt-auto pt-6">
+          <div className="border-t border-slate-100 p-4">
             <OrgSwitcher organizations={organizations} currentSlug={currentOrgSlug} />
           </div>
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="border-b border-[var(--grid-border)] px-6 py-5 lg:px-10">
+          <header className="border-b border-slate-200 bg-white px-6 py-5 lg:px-10">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-white">{title}</h1>
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{title}</h1>
                 {description ? (
-                  <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--grid-muted)]">
-                    {description}
-                  </p>
+                  <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">{description}</p>
                 ) : null}
               </div>
               {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
             </div>
 
             <nav className="mt-4 flex gap-2 overflow-x-auto lg:hidden">
-              {NAV.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="shrink-0 rounded-full border border-[var(--grid-border)] px-3 py-1 text-xs text-[var(--grid-muted)]"
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {NAV.map((item) => {
+                const active = item.exact
+                  ? activePath === item.href
+                  : activePath.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
+                      active
+                        ? "border-teal-200 bg-teal-50 text-teal-700"
+                        : "border-slate-200 bg-white text-slate-600"
+                    }`}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </Link>
+                );
+              })}
             </nav>
           </header>
 
@@ -113,7 +137,11 @@ export function StudioPanel({
   className?: string;
 }) {
   return (
-    <section className={`grid-panel rounded-2xl p-6 ${className}`}>{children}</section>
+    <section
+      className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${className}`}
+    >
+      {children}
+    </section>
   );
 }
 
@@ -125,14 +153,14 @@ export function StudioBadge({
   tone?: "default" | "live" | "draft" | "warn";
 }) {
   const tones = {
-    default: "border-[var(--grid-border)] bg-white/5 text-[var(--grid-muted)]",
-    live: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
-    draft: "border-amber-500/30 bg-amber-500/10 text-amber-200",
-    warn: "border-red-500/30 bg-red-500/10 text-red-300",
+    default: "border-slate-200 bg-slate-50 text-slate-600",
+    live: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    draft: "border-amber-200 bg-amber-50 text-amber-800",
+    warn: "border-red-200 bg-red-50 text-red-700",
   };
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${tones[tone]}`}
+      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${tones[tone]}`}
     >
       {children}
     </span>

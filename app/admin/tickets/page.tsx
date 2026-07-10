@@ -10,7 +10,7 @@ export default async function AdminTicketsPage() {
     <StudioPage
       activePath="/admin/tickets"
       title="Tickets"
-      description="Kapazität & Aktivierungen — Einzel-Tickets oder Pools (z. B. 3.000 Tabbrain-Slots)."
+      description="Verwalte Teilnehmer-Zugänge — einzelne Tickets oder Pools mit gemeinsamer Kapazität."
     >
       <TicketPoolsPanel
         pools={poolsResult.success ? poolsResult.data! : []}

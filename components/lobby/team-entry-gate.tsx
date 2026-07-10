@@ -6,9 +6,11 @@ import { joinTeamAsPlayer } from "@/app/actions/lobby";
 import {
   GridButton,
   GridError,
+  GridHint,
   GridInput,
   GridLabel,
 } from "@/components/grid/grid-shell";
+import { IconArrowRight } from "@/components/cms/studio-icons";
 import { SESSION_ACTIVE } from "@/lib/grid/session-codes";
 import {
   abandonTeamSession,
@@ -87,34 +89,30 @@ export function TeamEntryGate({
   }
 
   if (checkingSession) {
-    return (
-      <p className="text-sm text-[var(--grid-muted)]">Sitzung wird wiederhergestellt…</p>
-    );
+    return <p className="text-sm text-slate-500">Sitzung wird wiederhergestellt…</p>;
   }
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="rounded-xl border border-[var(--grid-border)] bg-black/20 px-4 py-3 text-sm text-[var(--grid-muted)]">
+      <GridHint tone="info">
         <p>
-          Team <span className="text-white">{teamName}</span>
+          Team <strong>{teamName}</strong>
         </p>
         <p className="mt-2 text-xs leading-6">
           Dein Name ist deine Spieler-ID im Team. Nach einem Refresh erkennt GRID dich automatisch
-          wieder — bei Bedarf denselben Namen eingeben und Sitzung übernehmen.
+          wieder.
         </p>
         {isMidGame ? (
-          <p className="mt-2 text-[var(--grid-accent)]">
+          <p className="mt-2 font-medium text-teal-700">
             Das Spiel läuft — du springst direkt zum aktuellen Stand ein.
           </p>
         ) : null}
-      </div>
+      </GridHint>
 
       {pendingTakeover ? (
-        <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-4 text-sm">
-          <p className="font-medium text-amber-200">
-            „{pendingTakeover}" ist bereits aktiv
-          </p>
-          <p className="mt-2 leading-6 text-amber-100/80">
+        <GridHint tone="warn">
+          <p className="font-medium">„{pendingTakeover}" ist bereits aktiv</p>
+          <p className="mt-2 leading-6">
             Dieser Name ist auf einem anderen Gerät eingeloggt. Sitzung übernehmen? Das andere
             Gerät wird abgemeldet.
           </p>
@@ -124,7 +122,7 @@ export function TeamEntryGate({
             </GridButton>
             <GridButton
               type="button"
-              className="border-[var(--grid-border)] bg-transparent text-[var(--grid-muted)] hover:bg-black/20"
+              variant="secondary"
               disabled={isPending}
               onClick={() => {
                 setPendingTakeover(null);
@@ -134,11 +132,13 @@ export function TeamEntryGate({
               Abbrechen
             </GridButton>
           </div>
-        </div>
+        </GridHint>
       ) : (
         <>
           <div>
-            <GridLabel>Dein Spielername (eindeutig im Team)</GridLabel>
+            <GridLabel hint="Wird im Team angezeigt — eindeutig wählen">
+              Dein Spielername
+            </GridLabel>
             <GridInput
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
@@ -154,6 +154,7 @@ export function TeamEntryGate({
           <GridButton
             type="button"
             disabled={isPending || displayName.trim().length < 2}
+            icon={<IconArrowRight size={16} />}
             onClick={() => completeJoin(false)}
           >
             {isPending

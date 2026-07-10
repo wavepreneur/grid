@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { GridButton } from "@/components/grid/grid-shell";
+import { IconCheck } from "@/components/cms/studio-icons";
 
 type TileHintModalProps = {
   open: boolean;
@@ -48,26 +49,26 @@ export function TileHintModal({
 
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[110] flex items-end justify-center bg-slate-900/40 p-4 backdrop-blur-sm sm:items-center"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-[var(--grid-border)] bg-[#0a1218] p-5 shadow-2xl sm:p-6"
+        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6"
         onClick={(event) => event.stopPropagation()}
       >
         {mode === "confirm" ? (
           <>
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--grid-accent)]">
+            <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">
               Tipp freischalten
             </p>
-            <h3 className="mt-2 text-lg font-semibold text-white">Tipp für „{label}"</h3>
-            <p className="mt-3 text-sm leading-7 text-[var(--grid-muted)]">
+            <h3 className="mt-2 text-lg font-semibold text-slate-900">Tipp für „{label}"</h3>
+            <p className="mt-3 text-sm leading-7 text-slate-600">
               Es werden{" "}
-              <span className="font-semibold text-white">{hintCost} Punkte</span> von eurem Score
-              abgezogen. Der Tipp bezieht sich nur auf diese Kachel.
+              <span className="font-semibold text-slate-900">{hintCost} Punkte</span> von eurem
+              Score abgezogen.
             </p>
             {!canAfford ? (
-              <p className="mt-3 text-sm text-red-300">
+              <p className="mt-3 text-sm text-red-600">
                 Nicht genug Punkte (habt {score}, benötigt {hintCost}).
               </p>
             ) : null}
@@ -79,12 +80,7 @@ export function TileHintModal({
               >
                 {isPending ? "Wird geladen…" : `${hintCost}P abziehen & anzeigen`}
               </GridButton>
-              <GridButton
-                type="button"
-                className="border-[var(--grid-border)] bg-transparent text-[var(--grid-muted)] hover:bg-black/20"
-                disabled={isPending}
-                onClick={onClose}
-              >
+              <GridButton type="button" variant="secondary" disabled={isPending} onClick={onClose}>
                 Abbrechen
               </GridButton>
             </div>
@@ -93,16 +89,16 @@ export function TileHintModal({
           <>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-emerald-300">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">
                   Tipp freigeschaltet
                 </p>
-                <h3 className="mt-2 text-lg font-semibold text-white">{label}</h3>
+                <h3 className="mt-2 text-lg font-semibold text-slate-900">{label}</h3>
               </div>
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-300">
-                ✓
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                <IconCheck size={16} />
               </span>
             </div>
-            <p className="mt-4 text-sm leading-7 text-white whitespace-pre-line">{hintText}</p>
+            <p className="mt-4 text-sm leading-7 text-slate-700 whitespace-pre-line">{hintText}</p>
             <GridButton type="button" className="mt-5 w-full sm:w-auto" onClick={onClose}>
               Schließen
             </GridButton>

@@ -11,8 +11,8 @@ export default async function AdminGamesPage() {
   return (
     <StudioPage
       activePath="/admin/games"
-      title="Games"
-      description="Spiel-Definitionen (Draft). Publish erzeugt Version — Live-Events bleiben unberührt."
+      title="Spiele"
+      description="Erstelle und bearbeite Spiele. Änderungen am Entwurf betreffen laufende Events nicht — erst Veröffentlichen und Live-Event starten."
     >
       <GameList
         games={gamesResult.success ? gamesResult.data! : []}

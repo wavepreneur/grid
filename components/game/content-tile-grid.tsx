@@ -42,10 +42,10 @@ function TileCard({
   const hasHint = Boolean(tile.hint);
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--grid-border)] bg-[var(--grid-accent-soft)]/40">
+    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       {purchased ? (
         <span
-          className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400/20 text-xs font-bold text-emerald-300 ring-1 ring-emerald-400/30"
+          className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"
           aria-hidden
         >
           ✓
@@ -56,12 +56,12 @@ function TileCard({
         type="button"
         disabled={disabled}
         onClick={() => onOpen(tile)}
-        className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-3 px-3 py-4 transition hover:bg-[var(--grid-accent)]/10 active:bg-[var(--grid-accent)]/15 disabled:opacity-50"
+        className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-3 px-3 py-4 transition hover:bg-teal-50 active:bg-teal-100 disabled:opacity-50"
       >
-        <span className="text-4xl leading-none text-[var(--grid-accent)]" aria-hidden>
+        <span className="text-4xl leading-none" aria-hidden>
           {tileTypeIcon(tile.type)}
         </span>
-        <span className="text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
+        <span className="text-center text-[11px] font-semibold uppercase tracking-wide text-slate-700">
           {label}
         </span>
       </button>
@@ -71,10 +71,10 @@ function TileCard({
           type="button"
           disabled={disabled || isPending}
           onClick={(event) => onHintClick(tile, event)}
-          className={`border-t border-[var(--grid-border)] px-2 py-2.5 text-center text-[10px] font-medium uppercase tracking-[0.1em] transition disabled:opacity-50 ${
+          className={`border-t border-slate-100 px-2 py-2.5 text-center text-[10px] font-medium uppercase tracking-wide transition disabled:opacity-50 ${
             purchased
-              ? "bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/15"
-              : "bg-black/20 text-[var(--grid-muted)] hover:bg-black/30 hover:text-white"
+              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
           }`}
         >
           {purchased ? "Tipp ansehen" : `Tipp · ${hintCost}P`}
@@ -128,11 +128,9 @@ export function ContentTileGrid({
     <>
       <div className={isSidebar ? "flex min-h-0 flex-col" : "min-w-0 w-full"}>
         <div className="mb-3 flex shrink-0 items-end justify-between gap-2">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--grid-muted)]">
-            Hinweise & Medien
-          </p>
+          <p className="text-sm font-medium text-slate-700">Hinweise & Medien</p>
           {showSwipeHint ? (
-            <p className="text-[10px] text-[var(--grid-muted)] sm:hidden">Wischen</p>
+            <p className="text-[10px] text-slate-400 sm:hidden">Wischen →</p>
           ) : null}
         </div>
 
@@ -158,10 +156,7 @@ export function ContentTileGrid({
           </ul>
         ) : (
           <div className="game-panel-bleed">
-            <ul
-              className="tile-slider"
-              aria-label="Hinweise und Medien"
-            >
+            <ul className="tile-slider" aria-label="Hinweise und Medien">
               {tiles.map((tile) => {
                 const label = tile.label ?? tileTypeLabel(tile.type);
                 return (

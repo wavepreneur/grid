@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { GridButton } from "@/components/grid/grid-shell";
+import { IconCheck } from "@/components/cms/studio-icons";
 import type { GameModalState } from "@/lib/grid/game-state";
 
 type SyncModalProps = {
@@ -20,17 +21,18 @@ export function SyncModal({ modal, onDismiss, isPending }: SyncModalProps) {
   }, [modal.id, onDismiss]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
-      <div className="grid-panel w-full max-w-md p-8 text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--grid-accent)]">
-          Sync
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-xl">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+          <IconCheck size={24} />
+        </span>
+        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-teal-600">
+          Aufgabe geschafft
         </p>
-        <h2 className="mt-4 text-3xl font-semibold text-white">{modal.message}</h2>
-        <p className="mt-3 text-sm text-[var(--grid-muted)]">
-          Level {modal.level} abgeschlossen
-        </p>
-        <p className="mt-2 text-sm text-white">
-          Gelöst von: {modal.solved_by.join(", ")}
+        <h2 className="mt-2 text-2xl font-semibold text-slate-900">{modal.message}</h2>
+        <p className="mt-3 text-sm text-slate-500">Aufgabe {modal.level} abgeschlossen</p>
+        <p className="mt-2 text-sm text-slate-600">
+          Gelöst von: <strong>{modal.solved_by.join(", ")}</strong>
         </p>
         <GridButton
           type="button"

@@ -20,6 +20,7 @@ import { SessionHandoffScreen } from "@/components/player/session-handoff-screen
 import {
   GridButton,
   GridError,
+  GridHint,
   GridStat,
 } from "@/components/grid/grid-shell";
 import { eventPlayPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
@@ -61,9 +62,9 @@ function playerRoleBadge(player: LobbySnapshot["players"][number]): string {
 }
 
 function playerRoleBadgeClass(role: string): string {
-  if (role === "Alpha") return "text-[var(--grid-accent)]";
-  if (role === "Beta") return "text-sky-300";
-  return "text-[var(--grid-muted)]";
+  if (role === "Alpha") return "text-teal-700 bg-teal-50";
+  if (role === "Beta") return "text-sky-700 bg-sky-50";
+  return "text-slate-600 bg-slate-100";
 }
 
 export function LobbyRoom({
@@ -317,15 +318,15 @@ export function LobbyRoom({
       ) : (
         <>
       {manageMode && isPlaying ? (
-        <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
-          Spiel läuft — hier Rollen verwalten (Alpha, Beta, Gamma).{" "}
+        <GridHint tone="success">
+          Spiel läuft — hier kannst du Rollen verwalten.{" "}
           <a
             href={eventPlayPath(inviteCode, joinCode)}
-            className="underline underline-offset-2"
+            className="font-medium text-emerald-700 underline underline-offset-2"
           >
             Zurück zum Spiel
           </a>
-        </div>
+        </GridHint>
       ) : null}
       <div className="grid grid-cols-2 gap-3">
         <GridStat label="Team" value={snapshot.team_name} />
@@ -341,35 +342,33 @@ export function LobbyRoom({
       </div>
 
       {isLobby ? (
-        <div className="rounded-xl border border-[var(--grid-accent)]/30 bg-[var(--grid-accent)]/10 px-4 py-3 text-sm text-[var(--grid-accent)]">
+        <GridHint tone="info">
           {rosterFull ? (
             <>Team voll — Start in {countdown}…</>
           ) : (
-            <>Auto-Start in {countdown} — oder Alpha startet manuell, sobald alle da sind.</>
+            <>Auto-Start in {countdown} — oder der Team-Leiter startet manuell.</>
           )}
-        </div>
+        </GridHint>
       ) : null}
 
       {isAlpha && isLobby && !canStart ? (
-        <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <GridHint tone="warn">
           Mindestens ein Spieler muss im Team sein, bevor die Mission startet.
-        </div>
+        </GridHint>
       ) : null}
 
       <div>
-        <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-[var(--grid-muted)]">
-          Lobby
-        </p>
+        <p className="mb-3 text-sm font-medium text-slate-700">Spieler im Team</p>
         <ul className="flex flex-col gap-2">
           {snapshot.players.map((player) => (
             <li
               key={player.id}
-              className="flex flex-col gap-2 rounded-xl border border-[var(--grid-border)] bg-black/20 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
-                <span className="text-white">{player.display_name}</span>
+                <span className="font-medium text-slate-900">{player.display_name}</span>
                 {player.id === session.playerId ? (
-                  <span className="ml-2 text-xs text-[var(--grid-muted)]">(Du)</span>
+                  <span className="ml-2 text-xs text-slate-500">(Du)</span>
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -377,7 +376,7 @@ export function LobbyRoom({
                   const role = playerRoleBadge(player);
                   return (
                     <span
-                      className={`text-xs uppercase tracking-[0.16em] ${playerRoleBadgeClass(role)}`}
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${playerRoleBadgeClass(role)}`}
                     >
                       {role}
                     </span>
@@ -389,18 +388,18 @@ export function LobbyRoom({
                       type="button"
                       disabled={isPending}
                       onClick={() => handleTransferCaptain(player.id)}
-                      className="text-xs text-[var(--grid-accent)] underline-offset-2 hover:underline"
+                      className="text-xs font-medium text-teal-600 underline-offset-2 hover:underline"
                     >
-                      Alpha übertragen
+                      Leitung übergeben
                     </button>
                     {!player.is_beta && snapshot.active_player_count >= 2 ? (
                       <button
                         type="button"
                         disabled={isPending}
                         onClick={() => handleAssignBeta(player.id)}
-                        className="text-xs text-sky-300 underline-offset-2 hover:underline"
+                        className="text-xs font-medium text-sky-600 underline-offset-2 hover:underline"
                       >
-                        Beta zuweisen
+                        Hinweise zuweisen
                       </button>
                     ) : null}
                     {player.is_beta && snapshot.active_player_count >= 3 ? (
@@ -408,16 +407,16 @@ export function LobbyRoom({
                         type="button"
                         disabled={isPending}
                         onClick={() => handleAssignGamma(player.id)}
-                        className="text-xs text-[var(--grid-muted)] underline-offset-2 hover:underline"
+                        className="text-xs font-medium text-slate-500 underline-offset-2 hover:underline"
                       >
-                        Gamma setzen
+                        Standard-Rolle
                       </button>
                     ) : null}
                     <button
                       type="button"
                       disabled={isPending}
                       onClick={() => handleRemovePlayer(player.id)}
-                      className="text-xs text-red-300 underline-offset-2 hover:underline"
+                      className="text-xs font-medium text-red-600 underline-offset-2 hover:underline"
                     >
                       Entfernen
                     </button>
@@ -432,13 +431,10 @@ export function LobbyRoom({
       {canInviteTeammates ? (
         <div className="flex flex-col gap-4">
           <div>
-            <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-[var(--grid-muted)]">
-              Teammates einladen
-            </p>
+            <p className="mb-3 text-sm font-medium text-slate-700">Mitspieler einladen</p>
             {manageMode && isPlaying ? (
-              <p className="mb-3 text-sm text-[var(--grid-muted)]">
-                Neuer Spieler kann auch während der laufenden Mission beitreten und wird automatisch
-                Beta oder Gamma zugewiesen.
+              <p className="mb-3 text-sm text-slate-500">
+                Neuer Spieler kann auch während der laufenden Mission beitreten.
               </p>
             ) : null}
             {teammateUrl ? (
@@ -464,19 +460,14 @@ export function LobbyRoom({
       ) : null}
 
       {!isAlpha && isLobby ? (
-        <p className="text-center text-sm text-[var(--grid-muted)]">
-          Warte auf Alpha oder den Auto-Start-Timer…
+        <p className="text-center text-sm text-slate-500">
+          Warte auf den Team-Leiter oder den Auto-Start…
         </p>
       ) : null}
 
       {isLobby ? (
-        <GridButton
-          type="button"
-          className="border-[var(--grid-border)] bg-transparent text-[var(--grid-muted)] hover:bg-black/20"
-          disabled={isPending}
-          onClick={handleHandover}
-        >
-          Gerät übergeben / Platz freigeben
+        <GridButton type="button" variant="ghost" disabled={isPending} onClick={handleHandover}>
+          Gerät übergeben
         </GridButton>
       ) : null}
 

@@ -8,9 +8,25 @@ import {
   saveGameAsTemplate,
   updateGame,
 } from "@/app/actions/cms/games";
-import { GridButton, GridError, GridInput, GridLabel, GridSelect } from "@/components/grid/grid-shell";
 import { StudioBadge, StudioPanel } from "@/components/cms/admin-shell";
 import { GameFlowPanel } from "@/components/cms/games/game-flow-panel";
+import {
+  IconCopy,
+  IconPlay,
+  IconSave,
+  IconUpload,
+} from "@/components/cms/studio-icons";
+import {
+  StudioButton,
+  StudioError,
+  StudioHint,
+  StudioInput,
+  StudioLabel,
+  StudioSectionTitle,
+  StudioSelect,
+  StudioSuccess,
+  StudioTextarea,
+} from "@/components/cms/studio-ui";
 import type { StudioGame, StudioGameTaskLink, StudioTask } from "@/lib/cms/types";
 import { parseLogicRules, type StudioLogicRule } from "@/lib/cms/logic-rules";
 
@@ -55,7 +71,7 @@ export function GameEditorPanel({ game: initialGame, taskLinks, libraryTasks }: 
         return;
       }
       setGame(toEditorState(result.data!));
-      setMessage("Einstellungen gespeichert (nur Draft — Live-Events unverändert).");
+      setMessage("Einstellungen gespeichert — laufende Events bleiben unverändert.");
       router.refresh();
     });
   }
@@ -73,7 +89,7 @@ export function GameEditorPanel({ game: initialGame, taskLinks, libraryTasks }: 
         status: "published",
         published_version_number: result.data!.versionNumber,
       }));
-      setMessage(`Version v${result.data!.versionNumber} veröffentlicht — Live-Events unverändert.`);
+      setMessage(`Version ${result.data!.versionNumber} veröffentlicht — bereit für Live-Events.`);
       router.refresh();
     });
   }
@@ -82,12 +98,12 @@ export function GameEditorPanel({ game: initialGame, taskLinks, libraryTasks }: 
     startTransition(async () => {
       const result = await saveGameAsTemplate(game.id);
       if (!result.success) setError(result.error);
-      else setMessage("Als Template gespeichert.");
+      else setMessage("Als Vorlage gespeichert — findest du unter Vorlagen.");
     });
   }
 
   function handleStartLiveEvent() {
-    if (!window.confirm("Live-Event aus dem veröffentlichten Snapshot erstellen?")) return;
+    if (!window.confirm("Live-Event aus der veröffentlichten Version erstellen?")) return;
     setError(null);
     setLiveLink(null);
     startTransition(async () => {
@@ -98,74 +114,81 @@ export function GameEditorPanel({ game: initialGame, taskLinks, libraryTasks }: 
       }
       setLiveLink(result.data!.joinPath);
       setMessage(
-        `Live-Event erstellt — Code ${result.data!.inviteCode}. Teams können über /e/${result.data!.inviteCode} beitreten.`,
+        `Live-Event erstellt — Code ${result.data!.inviteCode}. Teams können über den Link beitreten.`,
       );
     });
   }
 
   return (
     <div className="space-y-8">
-      {error ? <GridError message={error} /> : null}
-      {message ? (
-        <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-          {message}
-        </p>
-      ) : null}
+      {error ? <StudioError message={error} /> : null}
+      {message ? <StudioSuccess message={message} /> : null}
 
       <form onSubmit={handleSaveSettings}>
         <StudioPanel>
+          <StudioSectionTitle
+            title="Spiel-Einstellungen"
+            description="Grunddaten für dieses Spiel — Änderungen betreffen nur den Entwurf."
+          />
+
           <div className="mb-6 flex flex-wrap items-center gap-2">
-            <StudioBadge tone={game.status === "published" ? "live" : "draft"}>{game.status}</StudioBadge>
-            <StudioBadge>v{game.published_version_number}</StudioBadge>
-            {game.gps_enabled ? <StudioBadge>GPS</StudioBadge> : <StudioBadge>Indoor</StudioBadge>}
+            <StudioBadge tone={game.status === "published" ? "live" : "draft"}>
+              {game.status === "published" ? "Veröffentlicht" : "Entwurf"}
+            </StudioBadge>
+            <StudioBadge>Version {game.published_version_number}</StudioBadge>
+            {game.gps_enabled ? (
+              <StudioBadge>GPS</StudioBadge>
+            ) : (
+              <StudioBadge>Indoor</StudioBadge>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <GridLabel>Name</GridLabel>
-              <GridInput
+              <StudioLabel>Name</StudioLabel>
+              <StudioInput
                 value={game.name}
                 onChange={(e) => setGame({ ...game, name: e.target.value })}
                 required
               />
             </div>
             <div>
-              <GridLabel>Logo URL</GridLabel>
-              <GridInput
+              <StudioLabel hint="Optional — wird in der Lobby angezeigt">Logo-URL</StudioLabel>
+              <StudioInput
                 value={game.logo_url ?? ""}
                 onChange={(e) => setGame({ ...game, logo_url: e.target.value || null })}
                 placeholder="https://…"
               />
             </div>
             <div className="md:col-span-2">
-              <GridLabel>Beschreibung</GridLabel>
-              <textarea
-                className="grid-input min-h-20 w-full rounded-xl px-4 py-3 text-sm text-white outline-none"
+              <StudioLabel>Beschreibung</StudioLabel>
+              <StudioTextarea
+                className="min-h-20"
                 value={game.description}
                 onChange={(e) => setGame({ ...game, description: e.target.value })}
               />
             </div>
             <div>
-              <GridLabel>Sprache</GridLabel>
-              <GridSelect
+              <StudioLabel>Sprache</StudioLabel>
+              <StudioSelect
                 value={game.language}
                 onChange={(e) => setGame({ ...game, language: e.target.value as "de" | "en" })}
               >
                 <option value="de">Deutsch</option>
                 <option value="en">English</option>
-              </GridSelect>
+              </StudioSelect>
             </div>
             <div>
-              <GridLabel>Stadt</GridLabel>
-              <GridInput
+              <StudioLabel hint="Für Karten-Zentrum bei GPS-Spielen">Stadt</StudioLabel>
+              <StudioInput
                 value={game.city_slug ?? ""}
                 onChange={(e) => setGame({ ...game, city_slug: e.target.value || null })}
                 placeholder="berlin"
               />
             </div>
             <div>
-              <GridLabel>Dauer (Minuten)</GridLabel>
-              <GridInput
+              <StudioLabel>Spieldauer (Minuten)</StudioLabel>
+              <StudioInput
                 type="number"
                 min={1}
                 value={game.duration_minutes ?? ""}
@@ -178,19 +201,19 @@ export function GameEditorPanel({ game: initialGame, taskLinks, libraryTasks }: 
               />
             </div>
             <div>
-              <GridLabel>GPS</GridLabel>
-              <GridSelect
+              <StudioLabel>Spielmodus</StudioLabel>
+              <StudioSelect
                 value={game.gps_enabled ? "1" : "0"}
                 onChange={(e) => setGame({ ...game, gps_enabled: e.target.value === "1" })}
               >
-                <option value="1">GPS-gesteuert</option>
-                <option value="0">Ohne GPS (Indoor/Digital)</option>
-              </GridSelect>
+                <option value="1">GPS — Aufgaben vor Ort freischalten</option>
+                <option value="0">Indoor / Digital — ohne GPS</option>
+              </StudioSelect>
             </div>
             <div className="md:col-span-2">
-              <GridLabel>Abschiedstext (Spielende)</GridLabel>
-              <textarea
-                className="grid-input min-h-16 w-full rounded-xl px-4 py-3 text-sm text-white outline-none"
+              <StudioLabel hint="Wird am Spielende allen Teams angezeigt">Abschiedstext</StudioLabel>
+              <StudioTextarea
+                className="min-h-16"
                 value={game.farewell_text}
                 onChange={(e) => setGame({ ...game, farewell_text: e.target.value })}
                 placeholder="Danke fürs Spielen…"
@@ -198,41 +221,63 @@ export function GameEditorPanel({ game: initialGame, taskLinks, libraryTasks }: 
             </div>
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <GridButton type="submit" disabled={pending} className="w-auto px-6">
-              {pending ? "Speichern…" : "Einstellungen speichern"}
-            </GridButton>
-            <GridButton
-              type="button"
-              disabled={pending}
-              className="w-auto px-6"
-              onClick={handlePublish}
-            >
-              Version veröffentlichen
-            </GridButton>
-            <GridButton
-              type="button"
-              disabled={pending || game.published_version_number < 1}
-              className="w-auto px-6"
-              onClick={handleStartLiveEvent}
-            >
-              Live-Event starten
-            </GridButton>
-            <GridButton
-              type="button"
-              disabled={pending}
-              className="w-auto px-6"
-              onClick={handleSaveTemplate}
-            >
-              Als Template speichern
-            </GridButton>
+          <div className="mt-8 border-t border-slate-100 pt-6">
+            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+              Aktionen
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <StudioButton type="submit" disabled={pending} icon={<IconSave size={16} />}>
+                {pending ? "Speichern…" : "Speichern"}
+              </StudioButton>
+              <StudioButton
+                type="button"
+                variant="secondary"
+                disabled={pending}
+                icon={<IconUpload size={16} />}
+                onClick={handlePublish}
+              >
+                Veröffentlichen
+              </StudioButton>
+              <StudioButton
+                type="button"
+                variant="secondary"
+                disabled={pending || game.published_version_number < 1}
+                icon={<IconPlay size={16} />}
+                onClick={handleStartLiveEvent}
+              >
+                Live-Event starten
+              </StudioButton>
+              <StudioButton
+                type="button"
+                variant="ghost"
+                disabled={pending}
+                icon={<IconCopy size={16} />}
+                onClick={handleSaveTemplate}
+              >
+                Als Vorlage
+              </StudioButton>
+            </div>
+            {game.published_version_number < 1 ? (
+              <div className="mt-4">
+                <StudioHint tone="warn">
+                  Zuerst veröffentlichen, bevor du ein Live-Event starten kannst.
+                </StudioHint>
+              </div>
+            ) : null}
           </div>
+
           {liveLink ? (
-            <p className="mt-4 text-sm">
-              <a href={liveLink} className="text-[var(--grid-accent)] underline" target="_blank" rel="noreferrer">
+            <div className="mt-4 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3">
+              <p className="text-xs font-medium text-teal-800">Einladungslink</p>
+              <a
+                href={liveLink}
+                className="mt-1 block text-sm font-medium text-teal-700 underline-offset-2 hover:underline"
+                target="_blank"
+                rel="noreferrer"
+              >
                 {liveLink}
               </a>
-            </p>
+            </div>
           ) : null}
         </StudioPanel>
       </form>

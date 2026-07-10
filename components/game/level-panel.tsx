@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   GridButton,
+  GridHint,
   GridInput,
   GridLabel,
 } from "@/components/grid/grid-shell";
@@ -62,57 +63,53 @@ export function LevelPanel({
   }
 
   return (
-    <div className="rounded-xl border border-[var(--grid-border)] bg-black/20 p-6">
+    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--grid-muted)]">
-          Level {level.level} · {level.type.toUpperCase()}
+        <p className="text-xs font-medium text-slate-500">
+          Aufgabe {level.level}
         </p>
         {level.type === "gps" ? (
-          <span className="text-xs text-[var(--grid-accent)]">
-            {isNavigator ? "GPS · Alpha" : "Nur Alpha (GPS)"}
+          <span className="text-xs font-medium text-teal-600">
+            {isNavigator ? "GPS · Team-Leiter" : "Team-Leiter vor Ort"}
           </span>
-        ) : (
-          <span className="text-xs text-[var(--grid-muted)]">Kein GPS nötig</span>
-        )}
+        ) : null}
       </div>
 
-      <h2 className="mt-3 text-2xl font-semibold text-white">{level.title}</h2>
-      <p className="mt-3 text-sm leading-7 text-[var(--grid-muted)]">
-        {level.description}
-      </p>
+      <h2 className="mt-3 text-2xl font-semibold text-slate-900">{level.title}</h2>
+      <p className="mt-3 text-sm leading-7 text-slate-600">{level.description}</p>
 
       {level.type === "gps" && level.location && isNavigator ? (
-        <div className="mt-4 rounded-xl border border-[var(--grid-border)] bg-black/30 px-4 py-3 text-sm text-[var(--grid-muted)]">
-          {gpsLoading ? <p>GPS-Position wird ermittelt…</p> : null}
-          {gpsError ? <p className="text-red-300">{gpsError}</p> : null}
+        <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          {gpsLoading ? <p>Standort wird ermittelt…</p> : null}
+          {gpsError ? <p className="text-red-600">{gpsError}</p> : null}
           {sample ? (
             <>
               <p>
-                Entfernung zum Checkpoint:{" "}
-                <span className="text-white">
+                Entfernung:{" "}
+                <span className="font-semibold text-slate-900">
                   {distance !== null ? formatDistance(distance) : "—"}
                 </span>
               </p>
               <p className="mt-1">
-                Radius: {level.location.radius_meters} m ·{" "}
                 {withinRadius ? (
-                  <span className="text-emerald-300">Im Zielbereich</span>
+                  <span className="font-medium text-emerald-700">Am Ziel</span>
                 ) : (
-                  <span className="text-amber-300">Noch nicht am Ziel</span>
+                  <span className="text-amber-700">Noch unterwegs</span>
                 )}
               </p>
             </>
           ) : !gpsLoading && !gpsError ? (
-            <p>Warte auf GPS-Signal… Standortfreigabe im Browser erlauben.</p>
+            <p>Standortfreigabe im Browser erlauben.</p>
           ) : null}
         </div>
       ) : null}
 
       {level.type === "gps" && !isNavigator ? (
-        <p className="mt-4 rounded-xl border border-[var(--grid-border)] bg-black/30 px-4 py-3 text-sm text-[var(--grid-muted)]">
-          Alpha bestätigt diesen Checkpoint am Zielort. Ihr könnt parallel Rätsel auf eurem Gerät
-          lösen — GPS-Checkpoints schließt nur Alpha ab.
-        </p>
+        <div className="mt-4">
+          <GridHint tone="info">
+            Der Team-Leiter bestätigt diesen Wegpunkt vor Ort. Ihr könnt parallel Rätsel lösen.
+          </GridHint>
+        </div>
       ) : null}
 
       {level.type === "digital" ? (
@@ -137,8 +134,8 @@ export function LevelPanel({
               onClick={() => setSelectedOptionId(option.id)}
               className={`rounded-xl border px-4 py-3 text-left text-sm transition ${
                 selectedOptionId === option.id
-                  ? "border-[var(--grid-accent)] bg-[var(--grid-accent)]/10 text-white"
-                  : "border-[var(--grid-border)] bg-black/20 text-[var(--grid-muted)] hover:border-[var(--grid-accent)]/40"
+                  ? "border-teal-500 bg-teal-50 font-medium text-teal-900"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-teal-200 hover:bg-slate-50"
               }`}
             >
               {option.label}
@@ -160,7 +157,7 @@ export function LevelPanel({
           }
           onClick={handleSubmit}
         >
-          {isPending ? "Sende…" : "Level abschließen"}
+          {isPending ? "Sende…" : "Aufgabe abschließen"}
         </GridButton>
       )}
     </div>
