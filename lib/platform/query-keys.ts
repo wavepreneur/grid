@@ -15,6 +15,8 @@ export const queryKeys = {
     all: ["grid", "studio", "tasks"] as const,
     list: (filters?: Record<string, string | undefined>) =>
       [...queryKeys.tasks.all, "list", filters ?? {}] as const,
+    usageMeta: (taskIds: string[]) =>
+      [...queryKeys.tasks.all, "usage-meta", [...taskIds].sort().join(",")] as const,
     librarySearch: (query: string) => [...queryKeys.tasks.all, "library", query] as const,
   },
   cockpit: {

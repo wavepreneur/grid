@@ -50,3 +50,17 @@ export function useInvalidateStudioGames() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.games.all });
   };
 }
+
+export function useRefreshStudioGamesList() {
+  const queryClient = useQueryClient();
+  return async () => {
+    const [gamesResult, templatesResult] = await Promise.all([listGames(), listTemplates()]);
+    if (gamesResult.success && gamesResult.data) {
+      queryClient.setQueryData(queryKeys.games.list(), gamesResult.data);
+    }
+    if (templatesResult.success && templatesResult.data) {
+      queryClient.setQueryData(queryKeys.games.templates(), templatesResult.data);
+    }
+    void queryClient.invalidateQueries({ queryKey: queryKeys.games.all });
+  };
+}

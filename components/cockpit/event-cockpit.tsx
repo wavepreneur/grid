@@ -11,9 +11,9 @@ import {
   operatorClearLevelOverride,
   operatorSetTeamNavigator,
 } from "@/app/actions/cockpit";
-import { ProductNav } from "@/components/platform/product-nav";
-import { queryKeys } from "@/lib/platform/query-keys";
 import { CockpitLink, CockpitSection } from "@/components/cockpit/cockpit-shell";
+import { useCockpitSync } from "@/lib/hooks/use-cockpit-sync";
+import { queryKeys } from "@/lib/platform/query-keys";
 import {
   IconArrowRight,
   IconMapPin,
@@ -46,7 +46,6 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
   const {
     data: snapshot = null,
     error: queryError,
-    isFetching,
   } = useQuery({
     queryKey: queryKeys.cockpit.snapshot(inviteCode),
     queryFn: async () => {
@@ -54,8 +53,15 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
       if (!result.success) throw new Error(result.error);
       return result.data!;
     },
-    refetchInterval: 4_000,
-    staleTime: 2_000,
+    staleTime: 5_000,
+  });
+
+  useCockpitSync({
+    inviteCode,
+    enabled: Boolean(snapshot),
+    onUpdate: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cockpit.snapshot(inviteCode) });
+    },
   });
 
   const [error, setError] = useState<string | null>(null);
@@ -221,7 +227,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
       <CockpitSection
         icon={<IconUsers size={18} />}
         title="Live-Ranking"
-        description="Aktuelle Punkte und Team-Status — aktualisiert alle 5 Sekunden."
+        description="Aktuelle Punkte und Team-Status — aktualisiert live via Realtime."
       >
         <div className="flex flex-col gap-3">
           {sortedTeams.length === 0 ? (

@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { getEventCockpitSnapshot, type EventCockpitSnapshot } from "@/app/actions/cockpit";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getEventCockpitSnapshot } from "@/app/actions/cockpit";
 import { IconArrowRight, IconPlay } from "@/components/cms/studio-icons";
+import { useCockpitSync } from "@/lib/hooks/use-cockpit-sync";
 import { cockpitPath } from "@/lib/grid/event-routes";
+import { queryKeys } from "@/lib/platform/query-keys";
 
 type EventCockpitShowProps = {
   inviteCode: string;
@@ -18,18 +20,24 @@ function statusLabel(status: string): string {
 }
 
 export function EventCockpitShow({ inviteCode }: EventCockpitShowProps) {
-  const [snapshot, setSnapshot] = useState<EventCockpitSnapshot | null>(null);
+  const queryClient = useQueryClient();
+  const { data: snapshot = null } = useQuery({
+    queryKey: queryKeys.cockpit.show(inviteCode),
+    queryFn: async () => {
+      const result = await getEventCockpitSnapshot(inviteCode);
+      if (!result.success) throw new Error(result.error);
+      return result.data!;
+    },
+    staleTime: 5_000,
+  });
 
-  const refresh = useCallback(async () => {
-    const result = await getEventCockpitSnapshot(inviteCode);
-    if (result.success) setSnapshot(result.data);
-  }, [inviteCode]);
-
-  useEffect(() => {
-    void refresh();
-    const interval = window.setInterval(() => void refresh(), 3000);
-    return () => window.clearInterval(interval);
-  }, [refresh]);
+  useCockpitSync({
+    inviteCode,
+    enabled: Boolean(snapshot),
+    onUpdate: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cockpit.show(inviteCode) });
+    },
+  });
 
   if (!snapshot) {
     return (
@@ -60,7 +68,7 @@ export function EventCockpitShow({ inviteCode }: EventCockpitShowProps) {
                 {snapshot.title}
               </h1>
               <p className="mt-1 text-sm text-slate-500">
-                {sortedTeams.length} Teams · Aktualisiert alle 3 Sekunden
+                {sortedTeams.length} Teams · Live via Realtime
               </p>
             </div>
           </div>

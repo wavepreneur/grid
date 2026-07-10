@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   deleteTasks,
   getTasksDeleteStatus,
@@ -33,9 +34,14 @@ import {
   StudioSelect,
   StudioSuccess,
 } from "@/components/cms/studio-ui";
+import {
+  useRefreshStudioTasksList,
+  useStudioTasksList,
+  useTasksUsageMeta,
+  type TaskWithUsage,
+} from "@/lib/hooks/use-studio-tasks";
+import { queryKeys } from "@/lib/platform/query-keys";
 import type { StudioTask } from "@/lib/cms/types";
-
-type TaskWithLive = StudioTask & { liveGameCount: number; gameLinkCount: number };
 
 type TaskSort = "updated" | "created" | "name" | "live";
 
@@ -46,7 +52,7 @@ const SORT_OPTIONS: Array<{ id: TaskSort; label: string }> = [
   { id: "live", label: "Live zuerst" },
 ];
 
-function sortTasks(list: TaskWithLive[], sort: TaskSort): TaskWithLive[] {
+function sortTasks(list: TaskWithUsage[], sort: TaskSort): TaskWithUsage[] {
   const next = [...list];
   switch (sort) {
     case "created":
@@ -73,11 +79,32 @@ function sortTasks(list: TaskWithLive[], sort: TaskSort): TaskWithLive[] {
 }
 
 type Props = {
-  tasks: TaskWithLive[];
+  initialTasks: StudioTask[];
 };
 
-export function TaskLibrary({ tasks }: Props) {
+export function TaskLibrary({ initialTasks }: Props) {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const refreshTasks = useRefreshStudioTasksList();
+  const { data: rawTasks = initialTasks } = useStudioTasksList(initialTasks);
+  const taskIds = useMemo(() => rawTasks.map((t) => t.id), [rawTasks]);
+  const { data: usageMeta = [] } = useTasksUsageMeta(taskIds);
+  const usageByTask = useMemo(
+    () => new Map(usageMeta.map((u) => [u.taskId, u])),
+    [usageMeta],
+  );
+  const tasks = useMemo<TaskWithUsage[]>(
+    () =>
+      rawTasks.map((task) => {
+        const usage = usageByTask.get(task.id);
+        return {
+          ...task,
+          liveGameCount: usage?.liveGameCount ?? 0,
+          gameLinkCount: usage?.totalGameCount ?? 0,
+        };
+      }),
+    [rawTasks, usageByTask],
+  );
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -86,11 +113,10 @@ export function TaskLibrary({ tasks }: Props) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteIds, setDeleteIds] = useState<string[]>([]);
   const [deleteStatuses, setDeleteStatuses] = useState<TaskDeleteStatus[]>([]);
-  const [deletePending, setDeletePending] = useState(false);
+  const [removeLivePending, setRemoveLivePending] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [duplicateIds, setDuplicateIds] = useState<string[]>([]);
-  const [duplicatePending, setDuplicatePending] = useState(false);
   const [sort, setSort] = useState<TaskSort>("updated");
 
   const tagFilter = searchParams.get("tag") ?? "";
@@ -158,7 +184,7 @@ export function TaskLibrary({ tasks }: Props) {
   }
 
   async function removeFromLiveGames() {
-    setDeletePending(true);
+    setRemoveLivePending(true);
     setDeleteError(null);
     try {
       const blockedIds = deleteStatuses
@@ -172,8 +198,9 @@ export function TaskLibrary({ tasks }: Props) {
       const refreshed = await getTasksDeleteStatus(deleteIds);
       if (refreshed.success) setDeleteStatuses(refreshed.data!);
       setMessage("Aufgaben aus laufenden Spielen entfernt — du kannst jetzt löschen.");
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
     } finally {
-      setDeletePending(false);
+      setRemoveLivePending(false);
     }
   }
 
@@ -182,75 +209,93 @@ export function TaskLibrary({ tasks }: Props) {
     setDuplicateOpen(true);
   }
 
-  async function confirmDuplicate(count: number) {
-    setDuplicatePending(true);
-    setError(null);
-    try {
-      const result = await duplicateTasks(duplicateIds, count);
-      if (!result.success) {
-        setError(result.error);
-        return;
-      }
-
-      const { createdCount } = result.data!;
+  const duplicateMutation = useMutation({
+    mutationFn: async ({ ids, count }: { ids: string[]; count: number }) => {
+      const result = await duplicateTasks(ids, count);
+      if (!result.success) throw new Error(result.error);
+      return result.data!;
+    },
+    onSuccess: async (data) => {
       setDuplicateOpen(false);
       setSelectedIds(new Set());
       setMessage(
-        createdCount === 1
+        data.createdCount === 1
           ? "Aufgabe dupliziert."
-          : `${createdCount} Aufgaben dupliziert.`,
+          : `${data.createdCount} Aufgaben dupliziert.`,
       );
-      router.refresh();
-    } finally {
-      setDuplicatePending(false);
-    }
+      await refreshTasks();
+    },
+    onError: (err) => {
+      setError(err instanceof Error ? err.message : "Duplizieren fehlgeschlagen.");
+    },
+  });
+
+  async function confirmDuplicate(count: number) {
+    setError(null);
+    duplicateMutation.mutate({ ids: duplicateIds, count });
   }
 
-  async function confirmDelete() {
-    setDeletePending(true);
-    setDeleteError(null);
-    try {
-      if (hasLiveBlockers) {
-        setDeleteError(
-          "Entferne die Aufgabe(n) zuerst aus laufenden Spielen oder nutze den Button unten.",
-        );
-        return;
-      }
-
-      const result = await deleteTasks(deleteIds);
-      if (!result.success) {
-        setDeleteError(result.error);
-        return;
-      }
-
-      const { deletedIds, failed } = result.data!;
+  const deleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const result = await deleteTasks(ids);
+      if (!result.success) throw new Error(result.error);
+      return result.data!;
+    },
+    onMutate: async (ids) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.tasks.list() });
+      const previous = queryClient.getQueryData<StudioTask[]>(queryKeys.tasks.list());
+      queryClient.setQueryData<StudioTask[]>(queryKeys.tasks.list(), (old) =>
+        (old ?? []).filter((task) => !ids.includes(task.id)),
+      );
+      return { previous };
+    },
+    onSuccess: (data, ids) => {
       setSelectedIds((prev) => {
         const next = new Set(prev);
-        for (const id of deletedIds) next.delete(id);
+        for (const id of data.deletedIds) next.delete(id);
         return next;
       });
 
-      if (failed.length > 0 && deletedIds.length === 0) {
-        setDeleteError(failed.map((f) => f.error).join(" · "));
+      if (data.failed.length > 0 && data.deletedIds.length === 0) {
+        setDeleteError(data.failed.map((f) => f.error).join(" · "));
         return;
       }
 
       setDeleteOpen(false);
-      if (deletedIds.length > 0) {
+      if (data.deletedIds.length > 0) {
         setMessage(
-          deletedIds.length === 1
+          data.deletedIds.length === 1
             ? "Aufgabe gelöscht."
-            : `${deletedIds.length} Aufgaben gelöscht.`,
+            : `${data.deletedIds.length} Aufgaben gelöscht.`,
         );
       }
-      if (failed.length > 0) {
-        setError(`${failed.length} Aufgabe(n) konnten nicht gelöscht werden.`);
+      if (data.failed.length > 0) {
+        setError(`${data.failed.length} Aufgabe(n) konnten nicht gelöscht werden.`);
       }
-      router.refresh();
-    } finally {
-      setDeletePending(false);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+    },
+    onError: (err, _ids, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.tasks.list(), context.previous);
+      }
+      setDeleteError(err instanceof Error ? err.message : "Löschen fehlgeschlagen.");
+    },
+  });
+
+  async function confirmDelete() {
+    if (hasLiveBlockers) {
+      setDeleteError(
+        "Entferne die Aufgabe(n) zuerst aus laufenden Spielen oder nutze den Button unten.",
+      );
+      return;
     }
+
+    setDeleteError(null);
+    deleteMutation.mutate(deleteIds);
   }
+
+  const deletePending = deleteMutation.isPending || removeLivePending;
+  const duplicatePending = duplicateMutation.isPending;
 
   const deleteWarnings = useMemo(() => {
     const live = deleteStatuses.filter((s) => s.liveGameLinks.length > 0);

@@ -7,6 +7,12 @@ export type RealtimeAccessToken = {
   playerId: string;
 };
 
+export type CockpitRealtimeAccessToken = {
+  accessToken: string;
+  expiresAt: string;
+  eventId: string;
+};
+
 export async function signPlayerAccessToken(input: {
   playerId: string;
   sessionId: string;
@@ -43,5 +49,42 @@ export async function signPlayerAccessToken(input: {
     expiresAt: expiresAt.toISOString(),
     teamId: input.teamId,
     playerId: input.playerId,
+  };
+}
+
+export async function signCockpitAccessToken(input: {
+  eventId: string;
+  inviteCode: string;
+}): Promise<CockpitRealtimeAccessToken> {
+  const secretValue = process.env.SUPABASE_JWT_SECRET;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!secretValue || !supabaseUrl) {
+    throw new Error(
+      "Missing SUPABASE_JWT_SECRET or NEXT_PUBLIC_SUPABASE_URL for Realtime auth.",
+    );
+  }
+
+  const secret = new TextEncoder().encode(secretValue);
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+  const subject = `cockpit:${input.eventId}`;
+
+  const accessToken = await new SignJWT({
+    role: "authenticated",
+    cockpit_event_id: input.eventId,
+    invite_code: input.inviteCode,
+  })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setSubject(subject)
+    .setAudience("authenticated")
+    .setIssuer(`${supabaseUrl}/auth/v1`)
+    .setIssuedAt()
+    .setExpirationTime(expiresAt)
+    .sign(secret);
+
+  return {
+    accessToken,
+    expiresAt: expiresAt.toISOString(),
+    eventId: input.eventId,
   };
 }

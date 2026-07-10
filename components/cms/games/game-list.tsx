@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   deleteGames,
   getGamesDeleteStatus,
@@ -16,10 +17,11 @@ import {
 import type { GameDeleteStatus } from "@/lib/cms/delete-status";
 import {
   useGamesLiveMeta,
-  useInvalidateStudioGames,
+  useRefreshStudioGamesList,
   useStudioGamesList,
   useStudioTemplates,
 } from "@/lib/hooks/use-studio-games";
+import { queryKeys } from "@/lib/platform/query-keys";
 import { StudioBadge } from "@/components/cms/admin-shell";
 import { GameStatusSwitch } from "@/components/cms/games/game-status-switch";
 import { StudioBulkBar, StudioSelectCheckbox } from "@/components/cms/shared/studio-bulk-bar";
@@ -90,7 +92,8 @@ type Props = {
 
 export function GameList({ initialGames, initialTemplates }: Props) {
   const router = useRouter();
-  const invalidateGames = useInvalidateStudioGames();
+  const queryClient = useQueryClient();
+  const refreshGames = useRefreshStudioGamesList();
   const { data: games = initialGames } = useStudioGamesList(initialGames);
   const { data: templates = initialTemplates } = useStudioTemplates(initialTemplates);
   const gameIds = useMemo(() => games.map((g) => g.id), [games]);
@@ -119,11 +122,9 @@ export function GameList({ initialGames, initialTemplates }: Props) {
   const [deleteIds, setDeleteIds] = useState<string[]>([]);
   const [deleteStatuses, setDeleteStatuses] = useState<GameDeleteStatus[]>([]);
   const [offlineConfirm, setOfflineConfirm] = useState(false);
-  const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [duplicateIds, setDuplicateIds] = useState<string[]>([]);
-  const [duplicatePending, setDuplicatePending] = useState(false);
   const [sort, setSort] = useState<GameSort>("updated");
 
   const sortedGames = useMemo(() => sortGames(gamesWithLive, sort), [gamesWithLive, sort]);
@@ -169,7 +170,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
           return;
         }
         setOpen(false);
-        invalidateGames();
+        await refreshGames();
         router.push(`/admin/games/${result.data.id}`);
         return;
       }
@@ -184,7 +185,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         return;
       }
       setOpen(false);
-      invalidateGames();
+      await refreshGames();
       router.push(`/admin/games/${result.data.id}`);
     } finally {
       setCreating(false);
@@ -222,92 +223,135 @@ export function GameList({ initialGames, initialTemplates }: Props) {
     setDuplicateOpen(true);
   }
 
-  async function confirmDuplicate(count: number) {
-    setDuplicatePending(true);
-    setError(null);
-    try {
-      const result = await duplicateGames(duplicateIds, count);
-      if (!result.success) {
-        setError(result.error);
-        return;
-      }
-
-      const { createdCount } = result.data!;
+  const duplicateMutation = useMutation({
+    mutationFn: async ({ ids, count }: { ids: string[]; count: number }) => {
+      const result = await duplicateGames(ids, count);
+      if (!result.success) throw new Error(result.error);
+      return result.data!;
+    },
+    onSuccess: async (data) => {
       setDuplicateOpen(false);
       setSelectedIds(new Set());
       setMessage(
-        createdCount === 1
+        data.createdCount === 1
           ? "Spiel dupliziert."
-          : `${createdCount} Spiele dupliziert.`,
+          : `${data.createdCount} Spiele dupliziert.`,
       );
-      invalidateGames();
-    } finally {
-      setDuplicatePending(false);
-    }
+      await refreshGames();
+    },
+    onError: (err) => {
+      setError(err instanceof Error ? err.message : "Duplizieren fehlgeschlagen.");
+    },
+  });
+
+  async function confirmDuplicate(count: number) {
+    setError(null);
+    duplicateMutation.mutate({ ids: duplicateIds, count });
   }
 
-  async function confirmDelete() {
-    setDeletePending(true);
-    setDeleteError(null);
-    try {
-      if (needsOffline && !offlineConfirm) {
-        setDeleteError("Bitte bestätige, dass laufende Live-Events beendet werden sollen.");
-        return;
+  const deleteMutation = useMutation({
+    mutationFn: async ({
+      ids,
+      offlineFirst,
+      offlineGameIds,
+    }: {
+      ids: string[];
+      offlineFirst: boolean;
+      offlineGameIds: string[];
+    }) => {
+      if (offlineFirst) {
+        const offlineResult = await takeGamesOffline(offlineGameIds);
+        if (!offlineResult.success) throw new Error(offlineResult.error);
       }
 
-      if (needsOffline && offlineConfirm) {
-        const offlineResult = await takeGamesOffline(
-          deleteStatuses
-            .filter((s) => s.liveEvents.length > 0 || s.activeTicketPools > 0)
-            .map((s) => s.gameId),
-        );
-        if (!offlineResult.success) {
-          setDeleteError(offlineResult.error);
-          return;
-        }
+      const refreshed = await getGamesDeleteStatus(ids);
+      if (!refreshed.success) throw new Error(refreshed.error);
+
+      const blocked = refreshed.data!.some(
+        (s) => s.liveEvents.length > 0 || s.activeTicketPools > 0,
+      );
+      if (blocked) {
+        throw new Error("Live-Events oder Ticket-Pools blockieren noch das Löschen.");
       }
 
-      const refreshed = await getGamesDeleteStatus(deleteIds);
-      if (!refreshed.success) {
-        setDeleteError(refreshed.error);
-        return;
-      }
-      setDeleteStatuses(refreshed.data!);
+      const result = await deleteGames(ids);
+      if (!result.success) throw new Error(result.error);
+      return result.data!;
+    },
+    onMutate: async ({ ids }) => {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: queryKeys.games.list() }),
+        queryClient.cancelQueries({ queryKey: queryKeys.games.templates() }),
+      ]);
 
-      const result = await deleteGames(deleteIds);
-      if (!result.success) {
-        setDeleteError(result.error);
-        return;
-      }
+      const previousGames = queryClient.getQueryData<StudioGame[]>(queryKeys.games.list());
+      const previousTemplates = queryClient.getQueryData<StudioGame[]>(
+        queryKeys.games.templates(),
+      );
 
-      const { deletedIds, failed } = result.data!;
+      queryClient.setQueryData<StudioGame[]>(queryKeys.games.list(), (old) =>
+        (old ?? []).filter((game) => !ids.includes(game.id)),
+      );
+      queryClient.setQueryData<StudioGame[]>(queryKeys.games.templates(), (old) =>
+        (old ?? []).filter((game) => !ids.includes(game.id)),
+      );
+
+      return { previousGames, previousTemplates };
+    },
+    onSuccess: (data) => {
       setSelectedIds((prev) => {
         const next = new Set(prev);
-        for (const id of deletedIds) next.delete(id);
+        for (const id of data.deletedIds) next.delete(id);
         return next;
       });
 
-      if (failed.length > 0 && deletedIds.length === 0) {
-        setDeleteError(failed.map((f) => f.error).join(" · "));
+      if (data.failed.length > 0 && data.deletedIds.length === 0) {
+        setDeleteError(data.failed.map((f) => f.error).join(" · "));
         return;
       }
 
       setDeleteOpen(false);
-      if (deletedIds.length > 0) {
+      if (data.deletedIds.length > 0) {
         setMessage(
-          deletedIds.length === 1
+          data.deletedIds.length === 1
             ? "Eintrag gelöscht."
-            : `${deletedIds.length} Einträge gelöscht.`,
+            : `${data.deletedIds.length} Einträge gelöscht.`,
         );
       }
-      if (failed.length > 0) {
-        setError(`${failed.length} Eintrag/Einträge konnten nicht gelöscht werden.`);
+      if (data.failed.length > 0) {
+        setError(`${data.failed.length} Eintrag/Einträge konnten nicht gelöscht werden.`);
       }
-      invalidateGames();
-    } finally {
-      setDeletePending(false);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.games.all });
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previousGames) {
+        queryClient.setQueryData(queryKeys.games.list(), context.previousGames);
+      }
+      if (context?.previousTemplates) {
+        queryClient.setQueryData(queryKeys.games.templates(), context.previousTemplates);
+      }
+      setDeleteError(err instanceof Error ? err.message : "Löschen fehlgeschlagen.");
+    },
+  });
+
+  async function confirmDelete() {
+    if (needsOffline && !offlineConfirm) {
+      setDeleteError("Bitte bestätige, dass laufende Live-Events beendet werden sollen.");
+      return;
     }
+
+    setDeleteError(null);
+    deleteMutation.mutate({
+      ids: deleteIds,
+      offlineFirst: needsOffline && offlineConfirm,
+      offlineGameIds: deleteStatuses
+        .filter((s) => s.liveEvents.length > 0 || s.activeTicketPools > 0)
+        .map((s) => s.gameId),
+    });
   }
+
+  const deletePending = deleteMutation.isPending;
+  const duplicatePending = duplicateMutation.isPending;
 
   const deleteWarnings = useMemo(() => {
     if (deleteStatuses.length === 0) return null;
