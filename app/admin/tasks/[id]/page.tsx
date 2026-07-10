@@ -19,7 +19,6 @@ export default async function EditTaskPage({ params, searchParams }: Props) {
 
   return (
     <StudioPage
-      activePath={returnTo?.startsWith("/admin/games") ? "/admin/games" : "/admin/tasks"}
       title={result.data.title}
       description={
         returnTo

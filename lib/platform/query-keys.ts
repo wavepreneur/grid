@@ -3,6 +3,10 @@ export const queryKeys = {
     all: ["grid", "org"] as const,
     slug: () => [...queryKeys.org.all, "slug"] as const,
   },
+  studio: {
+    all: ["grid", "studio"] as const,
+    dashboard: () => [...queryKeys.studio.all, "dashboard"] as const,
+  },
   games: {
     all: ["grid", "studio", "games"] as const,
     list: () => [...queryKeys.games.all, "list"] as const,
@@ -18,6 +22,10 @@ export const queryKeys = {
     usageMeta: (taskIds: string[]) =>
       [...queryKeys.tasks.all, "usage-meta", [...taskIds].sort().join(",")] as const,
     librarySearch: (query: string) => [...queryKeys.tasks.all, "library", query] as const,
+  },
+  tickets: {
+    all: ["grid", "studio", "tickets"] as const,
+    list: () => [...queryKeys.tickets.all, "list"] as const,
   },
   cockpit: {
     all: ["grid", "cockpit"] as const,

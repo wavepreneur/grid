@@ -1,19 +1,11 @@
-import { Suspense } from "react";
 import { StudioPage } from "@/components/cms/studio-page";
-import { TaskLibrary } from "@/components/cms/tasks/task-library";
+import { StudioTasksListSection } from "@/components/cms/studio-page-sections";
 import { StudioLinkButton } from "@/components/cms/studio-ui";
 import { IconPlus } from "@/components/cms/studio-icons";
-import { listTasks } from "@/app/actions/cms/tasks";
-import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
 
-export default async function AdminTasksPage() {
-  const orgId = await getStudioOrganizationId();
-  const result = await listTasks({ organizationId: orgId });
-  const tasks = result.success ? result.data! : [];
-
+export default function AdminTasksPage() {
   return (
     <StudioPage
-      activePath="/admin/tasks"
       title="Aufgaben"
       description="Deine Rätsel-Bibliothek — unabhängig von Spielen. Suche, Tags und Live-Status."
       actions={
@@ -22,9 +14,7 @@ export default async function AdminTasksPage() {
         </StudioLinkButton>
       }
     >
-      <Suspense fallback={<p className="text-sm text-slate-500">Lade Aufgaben…</p>}>
-        <TaskLibrary initialTasks={tasks} />
-      </Suspense>
+      <StudioTasksListSection />
     </StudioPage>
   );
 }

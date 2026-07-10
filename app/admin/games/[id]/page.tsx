@@ -24,7 +24,6 @@ export default async function AdminGameDetailPage({ params }: Props) {
 
   return (
     <StudioPage
-      activePath="/admin/games"
       title={game.name}
       description={
         game.is_template

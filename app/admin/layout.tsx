@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { listOrganizations, getStudioOrganizationSlug } from "@/app/actions/cms/organizations";
+import { StudioLayout } from "@/components/cms/studio-layout";
 import { StudioShellProvider } from "@/components/cms/studio-shell-provider";
 import { QueryProvider } from "@/components/platform/query-provider";
 
@@ -20,7 +21,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         organizations={orgsResult.success ? orgsResult.data! : []}
         orgSlug={orgSlug}
       >
-        {children}
+        <StudioLayout>{children}</StudioLayout>
       </StudioShellProvider>
     </QueryProvider>
   );
