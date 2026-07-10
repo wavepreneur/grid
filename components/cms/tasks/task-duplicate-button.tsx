@@ -6,6 +6,7 @@ import { duplicateTasks } from "@/app/actions/cms/tasks";
 import { StudioDuplicateModal } from "@/components/cms/shared/studio-duplicate-modal";
 import { IconCopy } from "@/components/cms/studio-icons";
 import { StudioButton } from "@/components/cms/studio-ui";
+import { useStudioCache } from "@/lib/platform/studio-cache";
 
 type Props = {
   taskId: string;
@@ -20,6 +21,7 @@ export function TaskDuplicateButton({
   className,
 }: Props) {
   const router = useRouter();
+  const cache = useStudioCache();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +44,7 @@ export function TaskDuplicateButton({
       } else {
         router.push(listPath);
       }
-      router.refresh();
+      cache.invalidateTasks();
     } finally {
       setPending(false);
     }

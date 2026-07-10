@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { publishGame, revertGameToDraft } from "@/app/actions/cms/games";
 import { StudioModal } from "@/components/cms/shared/studio-modal";
 import { StudioButton, StudioHint } from "@/components/cms/studio-ui";
+import { useStudioCache } from "@/lib/platform/studio-cache";
 import type { StudioGameStatus } from "@/lib/cms/types";
 
 type Props = {
@@ -24,7 +24,7 @@ export function GameStatusSwitch({
   compact = false,
   onStatusChange,
 }: Props) {
-  const router = useRouter();
+  const cache = useStudioCache();
   const [pending, startTransition] = useTransition();
   const [confirmDraft, setConfirmDraft] = useState(false);
   const [confirmPublish, setConfirmPublish] = useState(false);
@@ -39,8 +39,8 @@ export function GameStatusSwitch({
         return;
       }
       onStatusChange?.("draft");
+      cache.patchGame(gameId, { status: "draft" });
       setConfirmDraft(false);
-      router.refresh();
     });
   }
 
@@ -52,8 +52,11 @@ export function GameStatusSwitch({
         return;
       }
       onStatusChange?.("published");
+      cache.patchGame(gameId, {
+        status: "published",
+        published_version_number: result.data!.versionNumber,
+      });
       setConfirmPublish(false);
-      router.refresh();
     });
   }
 

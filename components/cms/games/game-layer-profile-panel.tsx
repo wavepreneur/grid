@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
 import { updateGameLayerProfile } from "@/app/actions/cms/games";
 import { StudioPanel } from "@/components/cms/admin-shell";
+import { useStudioCache } from "@/lib/platform/studio-cache";
 import {
   detectPresetFromLayers,
   isLayerActive,
@@ -30,7 +30,7 @@ type Props = {
 const ALL_LAYERS: StudioLayer[] = [1, 2, 3];
 
 export function GameLayerProfilePanel({ game }: Props) {
-  const router = useRouter();
+  const cache = useStudioCache();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -44,6 +44,12 @@ export function GameLayerProfilePanel({ game }: Props) {
   const [selectedPreset, setSelectedPreset] = useState(() =>
     detectPresetFromLayers(parseActiveLayers(game.active_layers)),
   );
+
+  useEffect(() => {
+    setActiveLayers(parseActiveLayers(game.active_layers));
+    setRuntimeProfiles(parseRuntimeProfiles(game.runtime_profiles));
+    setSelectedPreset(detectPresetFromLayers(parseActiveLayers(game.active_layers)));
+  }, [game.id, game.active_layers, game.runtime_profiles, game.updated_at]);
 
   function applyPreset(presetId: typeof LAYER_GAME_PRESETS[number]["id"]) {
     const preset = LAYER_GAME_PRESETS.find((p) => p.id === presetId);
@@ -77,8 +83,8 @@ export function GameLayerProfilePanel({ game }: Props) {
         setError(result.error);
         return;
       }
+      cache.setGame(result.data!);
       setMessage("Layer-Profil gespeichert.");
-      router.refresh();
     });
   }
 

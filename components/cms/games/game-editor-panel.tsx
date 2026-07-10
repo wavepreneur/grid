@@ -15,6 +15,7 @@ import { GameLogicPanel } from "@/components/cms/games/game-logic-panel";
 import { GameDeleteButton } from "@/components/cms/games/game-delete-button";
 import { GameDuplicateButton } from "@/components/cms/games/game-duplicate-button";
 import { GameStatusSwitch } from "@/components/cms/games/game-status-switch";
+import { useStudioCache } from "@/lib/platform/studio-cache";
 import {
   IconGamepad,
   IconPlay,
@@ -55,6 +56,7 @@ export function GameEditorPanel({
   liveEventCount = 0,
 }: Props) {
   const router = useRouter();
+  const cache = useStudioCache();
   const [game, setGame] = useState<GameEditorState>(() => toEditorState(initialGame));
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -82,8 +84,8 @@ export function GameEditorPanel({
         return;
       }
       setGame(toEditorState(result.data!));
+      cache.setGame(result.data!);
       setMessage("Einstellungen gespeichert — laufende Events bleiben unverändert.");
-      router.refresh();
     });
   }
 
@@ -100,8 +102,11 @@ export function GameEditorPanel({
         status: "published",
         published_version_number: result.data!.versionNumber,
       }));
+      cache.patchGame(game.id, {
+        status: "published",
+        published_version_number: result.data!.versionNumber,
+      });
       setMessage(`Version ${result.data!.versionNumber} veröffentlicht — bereit für Live-Events.`);
-      router.refresh();
     });
   }
 
@@ -113,8 +118,8 @@ export function GameEditorPanel({
         return;
       }
       setMessage('Als Vorlage gespeichert — findest du auf der Spiele-Seite unter „Meine Vorlagen".');
+      cache.invalidateGame(game.id);
       router.push("/admin/games#vorlagen");
-      router.refresh();
     });
   }
 
@@ -126,8 +131,8 @@ export function GameEditorPanel({
         return;
       }
       setGame((g) => ({ ...g, is_template: false }));
+      cache.patchGame(game.id, { is_template: false });
       setMessage('Vorlagen-Status entfernt — das Spiel erscheint wieder unter „Meine Spiele".');
-      router.refresh();
     });
   }
 

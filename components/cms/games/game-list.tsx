@@ -22,6 +22,7 @@ import {
   useStudioTemplates,
 } from "@/lib/hooks/use-studio-games";
 import { queryKeys } from "@/lib/platform/query-keys";
+import { prefetchStudioGame } from "@/lib/hooks/use-studio-game-detail";
 import { StudioBadge } from "@/components/cms/admin-shell";
 import { GameStatusSwitch } from "@/components/cms/games/game-status-switch";
 import { StudioBulkBar, StudioSelectCheckbox } from "@/components/cms/shared/studio-bulk-bar";
@@ -691,6 +692,8 @@ function GameRow({
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
+  const queryClient = useQueryClient();
+
   return (
     <div
       className={`flex flex-wrap items-center gap-3 rounded-2xl border bg-white p-5 shadow-sm transition ${
@@ -705,6 +708,9 @@ function GameRow({
 
       <Link
         href={`/admin/games/${game.id}`}
+        prefetch
+        onMouseEnter={() => void prefetchStudioGame(queryClient, game.id)}
+        onFocus={() => void prefetchStudioGame(queryClient, game.id)}
         className="group flex min-w-0 flex-1 flex-wrap items-center justify-between gap-4"
       >
         <div className="flex items-start gap-4">

@@ -10,6 +10,7 @@ import { TaskEditorPreview } from "@/components/cms/tasks/task-editor-preview";
 import { TaskScoringEditor, TaskTilesEditor } from "@/components/cms/tasks/task-tiles-editor";
 import { ImageUploadField } from "@/components/cms/shared/image-upload-field";
 import { StudioPanel } from "@/components/cms/admin-shell";
+import { useStudioCache } from "@/lib/platform/studio-cache";
 import { IconArrowRight, IconPlus, IconSave, IconTrash } from "@/components/cms/studio-icons";
 import {
   StudioButton,
@@ -39,6 +40,7 @@ type Props = {
 
 export function TaskEditor({ task, returnTo }: Props) {
   const router = useRouter();
+  const cache = useStudioCache();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -101,8 +103,8 @@ export function TaskEditor({ task, returnTo }: Props) {
         setError(result.error);
         return;
       }
+      cache.setTask(result.data!);
       router.push(returnTo ?? `/admin/tasks/${result.data!.id}`);
-      router.refresh();
     });
   }
 

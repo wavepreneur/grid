@@ -16,6 +16,7 @@ import {
 } from "@/lib/cms/logic-rules";
 import { isLayerActive, LAYER_DEFINITIONS, type StudioLayer } from "@/lib/cms/layer-model";
 import { useDebouncedValue, useTaskLibrarySearch } from "@/lib/hooks/use-task-library-search";
+import { prefetchStudioGame } from "@/lib/hooks/use-studio-game-detail";
 import { StudioPanel } from "@/components/cms/admin-shell";
 import { GameLayerColumn, GameTaskLibrarySidebar } from "@/components/cms/games/game-layer-columns";
 import { GameLogicFlowModal } from "@/components/cms/games/game-logic-flow-modal";
@@ -29,6 +30,7 @@ import {
   StudioSectionTitle,
   StudioSuccess,
 } from "@/components/cms/studio-ui";
+import { useStudioCache } from "@/lib/platform/studio-cache";
 import type { StudioGameTaskLink } from "@/lib/cms/types";
 
 type Props = {
@@ -50,6 +52,7 @@ export function GameLogicPanel({
   initialLinks,
   initialRules,
 }: Props) {
+  const cache = useStudioCache();
   const [links, setLinks] = useState(() => sortLinks(initialLinks));
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +80,12 @@ export function GameLogicPanel({
   useEffect(() => {
     setLinks(sortLinks(initialLinks));
   }, [initialLinks]);
+
+  function commitLinks(next: StudioGameTaskLink[]) {
+    const sorted = sortLinks(next);
+    setLinks(sorted);
+    cache.setGameTaskLinks(gameId, sorted);
+  }
 
   useEffect(() => {
     setFocusedLayer((current) =>
@@ -113,7 +122,7 @@ export function GameLogicPanel({
         return;
       }
       const next = sortLinks([...links, result.data!]);
-      setLinks(next);
+      commitLinks(next);
       if (layer === 2) await saveMissionFlow(next);
       setMessage(`Aufgabe zu ${LAYER_DEFINITIONS[layer].shortDe} hinzugefügt.`);
       setDraggingTaskId(null);
@@ -129,7 +138,7 @@ export function GameLogicPanel({
         return;
       }
       const next = links.filter((l) => l.id !== linkId);
-      setLinks(next);
+      commitLinks(next);
       setSelectedLink(null);
       await saveMissionFlow(next);
     });
@@ -152,7 +161,7 @@ export function GameLogicPanel({
     const reordered = layerLinks.map((l, i) => ({ ...l, sort_order: i }));
     const other = links.filter((l) => l.layer !== layer);
     const next = sortLinks([...other, ...reordered]);
-    setLinks(next);
+    commitLinks(next);
     startTransition(async () => {
       const result = await reorderGameTasksInLayer(
         gameId,
@@ -279,7 +288,7 @@ export function GameLogicPanel({
         pending={pending}
         onClose={() => setSelectedLink(null)}
         onUpdated={(link) => {
-          setLinks((prev) => prev.map((l) => (l.id === link.id ? link : l)));
+          commitLinks(links.map((l) => (l.id === link.id ? link : l)));
           setSelectedLink(link);
         }}
         onRemove={() => selectedLink && handleRemove(selectedLink.id)}

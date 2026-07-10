@@ -24,3 +24,26 @@ export function StudioOverviewSkeleton() {
     </div>
   );
 }
+
+export function StudioGameDetailSkeleton() {
+  return (
+    <div className="animate-pulse space-y-8">
+      <div className="h-72 rounded-2xl bg-slate-200/80" />
+      <div className="h-56 rounded-2xl bg-slate-200/80" />
+      <div className="h-96 rounded-2xl bg-slate-200/80" />
+    </div>
+  );
+}
+
+export function StudioTaskDetailSkeleton() {
+  return (
+    <div className="animate-pulse grid gap-8 xl:grid-cols-[1fr_320px]">
+      <div className="space-y-6">
+        <div className="h-48 rounded-2xl bg-slate-200/80" />
+        <div className="h-64 rounded-2xl bg-slate-200/80" />
+        <div className="h-80 rounded-2xl bg-slate-200/80" />
+      </div>
+      <div className="h-96 rounded-2xl bg-slate-200/80" />
+    </div>
+  );
+}

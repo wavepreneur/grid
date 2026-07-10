@@ -11,6 +11,7 @@ import type { GameDeleteStatus } from "@/lib/cms/delete-status";
 import { StudioDeleteModal } from "@/components/cms/shared/studio-delete-modal";
 import { IconTrash } from "@/components/cms/studio-icons";
 import { StudioButton, StudioError, StudioHint } from "@/components/cms/studio-ui";
+import { useStudioCache } from "@/lib/platform/studio-cache";
 
 type Props = {
   gameId: string;
@@ -26,6 +27,7 @@ export function GameDeleteButton({
   className,
 }: Props) {
   const router = useRouter();
+  const cache = useStudioCache();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,8 +74,8 @@ export function GameDeleteButton({
         return;
       }
       setOpen(false);
+      cache.invalidateGame(gameId);
       router.push(redirectTo);
-      router.refresh();
     } finally {
       setPending(false);
     }

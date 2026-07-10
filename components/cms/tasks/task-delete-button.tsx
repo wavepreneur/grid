@@ -12,6 +12,7 @@ import { TaskGameUsageList } from "@/components/cms/tasks/task-game-usage-modal"
 import { StudioDeleteModal } from "@/components/cms/shared/studio-delete-modal";
 import { IconTrash } from "@/components/cms/studio-icons";
 import { StudioButton, StudioError, StudioHint } from "@/components/cms/studio-ui";
+import { useStudioCache } from "@/lib/platform/studio-cache";
 
 type Props = {
   taskId: string;
@@ -27,6 +28,7 @@ export function TaskDeleteButton({
   className,
 }: Props) {
   const router = useRouter();
+  const cache = useStudioCache();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,8 +81,8 @@ export function TaskDeleteButton({
         return;
       }
       setOpen(false);
+      cache.invalidateTasks();
       router.push(redirectTo);
-      router.refresh();
     } finally {
       setPending(false);
     }

@@ -41,6 +41,7 @@ import {
   type TaskWithUsage,
 } from "@/lib/hooks/use-studio-tasks";
 import { queryKeys } from "@/lib/platform/query-keys";
+import { prefetchStudioTask } from "@/lib/hooks/use-studio-task-detail";
 import type { StudioTask } from "@/lib/cms/types";
 
 type TaskSort = "updated" | "created" | "name" | "live";
@@ -297,6 +298,10 @@ export function TaskLibrary({ initialTasks }: Props) {
   const deletePending = deleteMutation.isPending || removeLivePending;
   const duplicatePending = duplicateMutation.isPending;
 
+  function prefetchTask(taskId: string) {
+    void prefetchStudioTask(queryClient, taskId);
+  }
+
   const deleteWarnings = useMemo(() => {
     const live = deleteStatuses.filter((s) => s.liveGameLinks.length > 0);
     const allGames = deleteStatuses.flatMap((s) => s.games);
@@ -447,6 +452,9 @@ export function TaskLibrary({ initialTasks }: Props) {
 
                 <Link
                   href={`/admin/tasks/${task.id}`}
+                  prefetch
+                  onMouseEnter={() => prefetchTask(task.id)}
+                  onFocus={() => prefetchTask(task.id)}
                   className="group min-w-0 flex-1"
                 >
                   <div className="flex flex-wrap items-center gap-2">
@@ -475,6 +483,9 @@ export function TaskLibrary({ initialTasks }: Props) {
 
                 <Link
                   href={`/admin/tasks/${task.id}`}
+                  prefetch
+                  onMouseEnter={() => prefetchTask(task.id)}
+                  onFocus={() => prefetchTask(task.id)}
                   className="inline-flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700"
                 >
                   Bearbeiten

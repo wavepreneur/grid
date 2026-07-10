@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { activateTicketPool, createTicketPool } from "@/app/actions/cms/tickets";
 import { StudioBadge, StudioPanel } from "@/components/cms/admin-shell";
 import { IconPlus, IconTicket } from "@/components/cms/studio-icons";
+import { useStudioCache } from "@/lib/platform/studio-cache";
 import {
   StudioButton,
   StudioEmptyState,
@@ -22,6 +23,7 @@ type Props = {
 };
 
 export function TicketPoolsPanel({ pools, games }: Props) {
+  const cache = useStudioCache();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -45,14 +47,19 @@ export function TicketPoolsPanel({ pools, games }: Props) {
         return;
       }
       setOpen(false);
-      window.location.reload();
+      setName("");
+      cache.prependTicketPool(result.data!);
     });
   }
 
   function handleActivate(poolId: string) {
     startTransition(async () => {
-      await activateTicketPool(poolId);
-      window.location.reload();
+      const result = await activateTicketPool(poolId);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      cache.patchTicketPool(poolId, { status: "active" });
     });
   }
 

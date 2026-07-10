@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { updateGameTaskLinkConfig } from "@/app/actions/cms/games";
 import {
   BONUS_TRIGGER_OPTIONS,
@@ -26,6 +25,7 @@ import {
   StudioSelect,
   StudioSuccess,
 } from "@/components/cms/studio-ui";
+import { useStudioCache } from "@/lib/platform/studio-cache";
 import type { StudioGameTaskLink } from "@/lib/cms/types";
 
 type Props = {
@@ -64,7 +64,7 @@ export function TaskLinkModal({
   onUpdated,
   onRemove,
 }: Props) {
-  const router = useRouter();
+  const cache = useStudioCache();
   const [gpsDraft, setGpsDraft] = useState<GpsPin | null>(null);
   const [role, setRole] = useState<RoleAssignment>("team");
   const [triggerType, setTriggerType] = useState<BonusTriggerType>("game_start");
@@ -123,8 +123,8 @@ export function TaskLinkModal({
         return;
       }
       onUpdated(result.data!);
+      cache.patchGameTaskLink(gameId, result.data!);
       setMessage("Gespeichert.");
-      router.refresh();
     });
   }
 

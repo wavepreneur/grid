@@ -1,0 +1,44 @@
+---
+description: GRID Studio client architecture — persistent shell, React Query cache, no full-page refresh
+globs: app/admin/**/*,components/cms/**/*,lib/hooks/use-studio-*.ts,lib/platform/**
+alwaysApply: false
+---
+
+# GRID Studio — Enterprise Client Architecture
+
+Build GRID Studio for production SaaS quality, not MVP shortcuts.
+
+## Layout & Navigation
+
+- **Persistent shell in `app/admin/layout.tsx`**: sidebar, org switcher, product nav stay mounted across routes.
+- **Pages are thin shells**: render `StudioPage` + a `Studio*Section` client loader — no server `await` for list/detail data on navigation routes.
+- **Never mount `AdminShell` per page** — only swap content inside the layout shell.
+
+## Data Layer
+
+- **React Query is the client source of truth** for Studio lists and detail views.
+- Use `queryKeys` from `lib/platform/query-keys.ts` — add keys before new queries.
+- Use `useStudioCache()` from `lib/platform/studio-cache.ts` for mutations: `setGame`, `setTask`, `patchGameTaskLink`, `invalidateTickets`, etc.
+- **Never use `router.refresh()` or `window.location.reload()`** in Studio CMS — update cache with `setQueryData` or `invalidateQueries`.
+
+## Route Patterns
+
+```
+layout.tsx     → StudioLayout (persistent)
+page.tsx       → StudioPage + StudioGamesListSection | StudioGameDetailSection | …
+*Section.tsx   → useQuery + skeleton on first load; cached data on revisit
+```
+
+- Prefetch on nav hover: `prefetchStudioGame`, `prefetchStudioTask`, list queries in `studio-layout.tsx`.
+- Detail routes: `app/admin/games/[id]/loading.tsx` shows content skeleton only (sidebar stays).
+
+## Mutations
+
+- Optimistic UI for deletes; `setQueryData` for saves; invalidate related keys (list + dashboard + live meta).
+- Server actions may keep `revalidatePath` for SSR safety, but client must not depend on it for UX.
+
+## Quality Bar
+
+- Navigation must feel instant: sidebar stable, header updates, content from cache when possible.
+- No full-tree remounts for CRUD operations.
+- Match patterns already used in `game-list.tsx`, `task-library.tsx`, `studio-detail-sections.tsx`.
