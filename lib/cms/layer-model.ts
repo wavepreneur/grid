@@ -1,15 +1,18 @@
 /**
  * GRID Layer Model — content architecture for scalable games.
  * @see docs/GRID_LAYER_MODEL.md
+ * @see lib/grid/play-surface.ts
  */
 
 export const STUDIO_LAYERS = [1, 2, 3] as const;
 export type StudioLayer = (typeof STUDIO_LAYERS)[number];
 
-export const CONTENT_CONTEXTS = ["outdoor", "indoor", "any"] as const;
+/** Content authored for a specific surface (or any). */
+export const CONTENT_CONTEXTS = ["outdoor", "indoor", "online", "any"] as const;
 export type ContentContext = (typeof CONTENT_CONTEXTS)[number];
 
-export const CONTENT_MODES = ["outdoor", "indoor"] as const;
+/** Live runtime surface — what the player hub shows. */
+export const CONTENT_MODES = ["outdoor", "indoor", "online"] as const;
 export type ContentMode = (typeof CONTENT_MODES)[number];
 
 export const ROLE_ASSIGNMENTS = ["alpha", "beta", "gamma", "team", "none"] as const;
@@ -33,7 +36,7 @@ export const LAYER_DEFINITIONS: Record<StudioLayer, LayerDefinition> = {
     labelEn: "Layer 1 — Geo / Environment",
     shortDe: "Geo",
     descriptionDe:
-      "Standortbezogene Wegpunkte und Umgebungs-Quizzes. Pro Stadt unterschiedlich, per GPS oder Indoor-Fallback.",
+      "Standortbezogene Stops: Outdoor-GPS oder Indoor-Stationen mit Codes. Pro Stadt unterschiedlich.",
     gps: true,
     cityScoped: true,
     roleAware: false,
@@ -44,7 +47,7 @@ export const LAYER_DEFINITIONS: Record<StudioLayer, LayerDefinition> = {
     labelEn: "Layer 2 — Mission",
     shortDe: "Mission",
     descriptionDe:
-      "Globale Mission-Level nach dem Freischalten. In allen Städten identisch — Story, Rätselblatt, Tiles.",
+      "Globale Mission-Level (Tiles, Antwort) — einmal pflegen, Outdoor/Indoor/Online rendern.",
     gps: false,
     cityScoped: false,
     roleAware: false,
@@ -65,6 +68,7 @@ export const LAYER_DEFINITIONS: Record<StudioLayer, LayerDefinition> = {
 export type LayerGamePresetId =
   | "full"
   | "city_explorer"
+  | "indoor_escape"
   | "mission"
   | "micro_pulse"
   | "geo_only"
@@ -77,16 +81,20 @@ export type LayerGamePreset = {
   activeLayers: StudioLayer[];
   gpsEnabled: boolean;
   playMode: "sync_live" | "async_pulse";
+  defaultMode: ContentMode;
+  allowedFallbacks: ContentMode[];
 };
 
 export const LAYER_GAME_PRESETS: LayerGamePreset[] = [
   {
     id: "full",
     labelDe: "Vollständig (1 + 2 + 3)",
-    descriptionDe: "Exitmania-Standard: GPS → Mission freischalten → Bonus.",
+    descriptionDe: "Exitmania-Standard: Outdoor-GPS, Fallback Indoor oder Online.",
     activeLayers: [1, 2, 3],
     gpsEnabled: true,
     playMode: "sync_live",
+    defaultMode: "outdoor",
+    allowedFallbacks: ["indoor", "online"],
   },
   {
     id: "city_explorer",
@@ -95,6 +103,8 @@ export const LAYER_GAME_PRESETS: LayerGamePreset[] = [
     activeLayers: [1, 3],
     gpsEnabled: true,
     playMode: "sync_live",
+    defaultMode: "outdoor",
+    allowedFallbacks: ["indoor"],
   },
   {
     id: "geo_only",
@@ -103,14 +113,28 @@ export const LAYER_GAME_PRESETS: LayerGamePreset[] = [
     activeLayers: [1],
     gpsEnabled: true,
     playMode: "sync_live",
+    defaultMode: "outdoor",
+    allowedFallbacks: ["indoor"],
+  },
+  {
+    id: "indoor_escape",
+    labelDe: "Indoor-Escape (1 + 2 + 3)",
+    descriptionDe: "Venue mit Stationscodes — laufen ohne GPS, gleiche Missionen.",
+    activeLayers: [1, 2, 3],
+    gpsEnabled: false,
+    playMode: "sync_live",
+    defaultMode: "indoor",
+    allowedFallbacks: ["online"],
   },
   {
     id: "mission",
-    labelDe: "Mission (2 + 3)",
-    descriptionDe: "Story/Mission ohne GPS, mit Rollen-Bonus.",
+    labelDe: "Mission / Online (2 + 3)",
+    descriptionDe: "Tabbrain: remote am eigenen Gerät, Missions-Deck ohne GPS.",
     activeLayers: [2, 3],
     gpsEnabled: false,
     playMode: "sync_live",
+    defaultMode: "online",
+    allowedFallbacks: [],
   },
   {
     id: "micro_pulse",
@@ -119,33 +143,48 @@ export const LAYER_GAME_PRESETS: LayerGamePreset[] = [
     activeLayers: [3],
     gpsEnabled: false,
     playMode: "async_pulse",
+    defaultMode: "online",
+    allowedFallbacks: [],
   },
 ];
 
 export type RuntimeModeProfile = {
   active_layers: StudioLayer[];
-  layer_1_fallback?: "indoor_defaults" | "skip";
+  /** Indoor: use station pack; online: skip Layer-1 hub. */
+  layer_1_strategy?: "waypoints" | "stations" | "skip";
   layer_3_context?: ContentContext;
 };
 
 export type RuntimeProfiles = {
   default_mode: ContentMode;
+  /** Fallbacks the customer/operator may switch to at event time. */
+  allowed_fallbacks: ContentMode[];
+  /**
+   * @deprecated Use allowed_fallbacks.includes("indoor"). Kept for older JSON.
+   */
   indoor_one_click: boolean;
   profiles: Record<ContentMode, RuntimeModeProfile>;
 };
 
 export const DEFAULT_RUNTIME_PROFILES: RuntimeProfiles = {
   default_mode: "outdoor",
+  allowed_fallbacks: ["indoor", "online"],
   indoor_one_click: true,
   profiles: {
     outdoor: {
       active_layers: [1, 2, 3],
+      layer_1_strategy: "waypoints",
       layer_3_context: "any",
     },
     indoor: {
-      active_layers: [2, 3],
-      layer_1_fallback: "indoor_defaults",
+      active_layers: [1, 2, 3],
+      layer_1_strategy: "stations",
       layer_3_context: "indoor",
+    },
+    online: {
+      active_layers: [2, 3],
+      layer_1_strategy: "skip",
+      layer_3_context: "online",
     },
   },
 };
@@ -160,12 +199,17 @@ export const LAYER_FEATURE_CHECKLIST: LayerFeatureCheck[] = [
   { question: "Layer 1 pro Stadt schnell anpassbar?", layers: [1] },
   { question: "Layer 2 global konsistent?", layers: [2] },
   { question: "Layer 3 Rollen/Trigger abbildbar?", layers: [3] },
-  { question: "Runtime-Switch (Indoor, Sprache, Pulse)?", layers: [1, 2, 3] },
+  { question: "Runtime-Surface (Outdoor/Indoor/Online, Pulse)?", layers: [1, 2, 3] },
   { question: "Alpha/Beta/Gamma-Asymmetrie?", layers: [3] },
+  { question: "Player-Phasen Hub → Quiz → Level → Bonus?", layers: [1, 2, 3] },
 ];
 
 export function isStudioLayer(value: unknown): value is StudioLayer {
   return value === 1 || value === 2 || value === 3;
+}
+
+export function isContentMode(value: unknown): value is ContentMode {
+  return value === "outdoor" || value === "indoor" || value === "online";
 }
 
 export function parseActiveLayers(raw: unknown): StudioLayer[] {
@@ -175,8 +219,15 @@ export function parseActiveLayers(raw: unknown): StudioLayer[] {
 }
 
 export function parseContentContext(raw: unknown): ContentContext {
-  if (raw === "outdoor" || raw === "indoor" || raw === "any") return raw;
+  if (raw === "outdoor" || raw === "indoor" || raw === "online" || raw === "any") {
+    return raw;
+  }
   return "any";
+}
+
+export function parseContentMode(raw: unknown): ContentMode {
+  if (isContentMode(raw)) return raw;
+  return "outdoor";
 }
 
 export function parseRoleAssignment(raw: unknown): RoleAssignment {
@@ -192,25 +243,72 @@ export function parseRoleAssignment(raw: unknown): RoleAssignment {
   return "team";
 }
 
+function parseModeProfile(
+  raw: RuntimeModeProfile | undefined,
+  fallback: RuntimeModeProfile,
+): RuntimeModeProfile {
+  if (!raw) return fallback;
+  return {
+    active_layers: parseActiveLayers(raw.active_layers ?? fallback.active_layers),
+    layer_1_strategy:
+      raw.layer_1_strategy === "waypoints" ||
+      raw.layer_1_strategy === "stations" ||
+      raw.layer_1_strategy === "skip"
+        ? raw.layer_1_strategy
+        : fallback.layer_1_strategy,
+    layer_3_context: parseContentContext(raw.layer_3_context ?? fallback.layer_3_context),
+  };
+}
+
+function parseAllowedFallbacks(
+  raw: unknown,
+  defaultMode: ContentMode,
+  indoorOneClick: boolean,
+): ContentMode[] {
+  if (Array.isArray(raw)) {
+    return raw.filter((m): m is ContentMode => isContentMode(m) && m !== defaultMode);
+  }
+  // Legacy: indoor_one_click true → indoor allowed
+  if (indoorOneClick && defaultMode === "outdoor") return ["indoor", "online"];
+  if (indoorOneClick) return ["indoor"];
+  return [];
+}
+
 export function parseRuntimeProfiles(raw: unknown): RuntimeProfiles {
   if (!raw || typeof raw !== "object") return DEFAULT_RUNTIME_PROFILES;
-  const obj = raw as Partial<RuntimeProfiles>;
-  const outdoor = obj.profiles?.outdoor ?? DEFAULT_RUNTIME_PROFILES.profiles.outdoor;
-  const indoor = obj.profiles?.indoor ?? DEFAULT_RUNTIME_PROFILES.profiles.indoor;
+  const obj = raw as Partial<RuntimeProfiles> & {
+    profiles?: Partial<Record<ContentMode, RuntimeModeProfile>>;
+  };
+  const defaultMode = parseContentMode(obj.default_mode);
+  const indoorOneClick = obj.indoor_one_click !== false;
+  const outdoor = parseModeProfile(
+    obj.profiles?.outdoor,
+    DEFAULT_RUNTIME_PROFILES.profiles.outdoor,
+  );
+  const indoor = parseModeProfile(
+    obj.profiles?.indoor,
+    DEFAULT_RUNTIME_PROFILES.profiles.indoor,
+  );
+  const online = parseModeProfile(
+    obj.profiles?.online,
+    DEFAULT_RUNTIME_PROFILES.profiles.online,
+  );
+
+  // Migrate legacy indoor layer_1_fallback
+  const legacyIndoor = obj.profiles?.indoor as
+    | (RuntimeModeProfile & { layer_1_fallback?: string })
+    | undefined;
+  if (legacyIndoor?.layer_1_fallback === "skip" && !legacyIndoor.layer_1_strategy) {
+    indoor.layer_1_strategy = "skip";
+  } else if (legacyIndoor?.layer_1_fallback === "indoor_defaults" && !legacyIndoor.layer_1_strategy) {
+    indoor.layer_1_strategy = "stations";
+  }
+
   return {
-    default_mode: obj.default_mode === "indoor" ? "indoor" : "outdoor",
-    indoor_one_click: obj.indoor_one_click !== false,
-    profiles: {
-      outdoor: {
-        active_layers: parseActiveLayers(outdoor.active_layers),
-        layer_3_context: parseContentContext(outdoor.layer_3_context),
-      },
-      indoor: {
-        active_layers: parseActiveLayers(indoor.active_layers),
-        layer_1_fallback: indoor.layer_1_fallback === "skip" ? "skip" : "indoor_defaults",
-        layer_3_context: parseContentContext(indoor.layer_3_context ?? "indoor"),
-      },
-    },
+    default_mode: defaultMode,
+    allowed_fallbacks: parseAllowedFallbacks(obj.allowed_fallbacks, defaultMode, indoorOneClick),
+    indoor_one_click: indoorOneClick,
+    profiles: { outdoor, indoor, online },
   };
 }
 
@@ -260,8 +358,21 @@ export function contentContextLabel(ctx: ContentContext): string {
       return "Outdoor";
     case "indoor":
       return "Indoor";
+    case "online":
+      return "Online";
     case "any":
-      return "Outdoor & Indoor";
+      return "Alle Surfaces";
+  }
+}
+
+export function contentModeLabel(mode: ContentMode): string {
+  switch (mode) {
+    case "outdoor":
+      return "Outdoor (GPS)";
+    case "indoor":
+      return "Indoor (Stationen)";
+    case "online":
+      return "Online (Tabbrain)";
   }
 }
 
@@ -290,5 +401,6 @@ export function buildLayerSnapshotMeta(input: {
     active_layers: input.activeLayers,
     runtime_profiles: input.runtimeProfiles,
     layer_definitions: LAYER_DEFINITIONS,
+    player_phases: ["hub", "quiz", "level", "bonus"] as const,
   };
 }

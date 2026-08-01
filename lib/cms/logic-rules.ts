@@ -1,4 +1,4 @@
-import type { LevelDefinition, PlayerRole } from "@/lib/grid/level-types";
+import type { LevelDefinition, PlayerRole, StationKind } from "@/lib/grid/level-types";
 import type { StudioGame, StudioGameTaskLink, StudioTaskContent } from "@/lib/cms/types";
 import {
   groupLinksByLayerOnLink,
@@ -7,6 +7,11 @@ import {
   roleAssignmentToPlayerRole,
 } from "@/lib/cms/game-link-config";
 import { correctOptionIds, normalizeTaskContent } from "@/lib/cms/task-content";
+import {
+  arrivalQuizToRuntime,
+  buildGameSlots,
+  taskContentToBonus,
+} from "@/lib/cms/game-slots";
 
 /** When → Then rule (stored on studio_games.logic_rules). */
 export type LogicWhenType =
@@ -474,11 +479,71 @@ export function compileStudioGameToLevels(input: {
   links: StudioGameTaskLink[];
   rules: StudioLogicRule[];
 }): LevelDefinition[] {
+  const slots = buildGameSlots(input.links);
+
+  // Slot-based compile: one runtime level per Quiz→Level→Bonus stop
+  if (slots.length > 0) {
+    return slots.map((slot) => {
+      const level = linkToLevelDefinition(
+        slot.levelLink,
+        slot.index,
+        input.game,
+        input.rules,
+      );
+
+      const runtimeQuiz = slot.quiz ? arrivalQuizToRuntime(slot.quiz) : null;
+      if (runtimeQuiz) level.arrival_quiz = runtimeQuiz;
+
+      // Geo / GPS from paired Layer-1 link
+      if (slot.geoLink && input.game.gps_enabled) {
+        const geoOverrides = parseLinkOverrides(slot.geoLink.overrides);
+        const gps = geoOverrides.gps ?? geoOverrides.location;
+        if (gps) {
+          level.location = {
+            lat: gps.lat,
+            lng: gps.lng,
+            radius_meters: gps.radius_meters,
+          };
+          if (level.type !== "digital" || !level.answer) {
+            level.type = "gps";
+          }
+        }
+      }
+
+      const levelOverrides = parseLinkOverrides(slot.levelLink.overrides);
+      if (levelOverrides.station?.code) {
+        level.station = {
+          name: levelOverrides.station.name ?? level.title,
+          place: levelOverrides.station.place ?? "",
+          code: levelOverrides.station.code,
+          kind: (levelOverrides.station.kind as StationKind | undefined) ?? "logic",
+        };
+      }
+
+      if (slot.bonusLink) {
+        const bonusOverrides = parseLinkOverrides(slot.bonusLink.overrides);
+        const role = bonusOverrides.role ?? "gamma";
+        const bonus = taskContentToBonus(
+          slot.bonusLink.task,
+          role === "team" ? "team" : role === "alpha" || role === "beta" || role === "gamma" ? role : "gamma",
+        );
+        if (bonus) {
+          if (role === "team") bonus.for_team = true;
+          level.bonus = bonus;
+        }
+      }
+
+      level.triggers = { ...(level.triggers ?? {}), type: "sequential" };
+      return level;
+    });
+  }
+
+  // Legacy fallback: flat link order
   const sorted = orderLinksForCompile(input.links);
   const taskToLevel = new Map<string, number>();
   sorted.forEach((link, index) => taskToLevel.set(link.task_id, index + 1));
 
-  const levels = sorted.map((link, index) => {
+  return sorted.map((link, index) => {
     const level = linkToLevelDefinition(link, index + 1, input.game, input.rules);
 
     const unlockRule = input.rules.find(
@@ -501,18 +566,11 @@ export function compileStudioGameToLevels(input: {
     }
 
     if (index === 0) {
-      const startRule = input.rules.find(
-        (r) => r.enabled && r.when.type === "game_start" && r.then.target_task_id === link.task_id,
-      );
-      if (startRule || index === 0) {
-        level.triggers = { ...(level.triggers ?? {}), type: "sequential" };
-      }
+      level.triggers = { ...(level.triggers ?? {}), type: "sequential" };
     }
 
     return level;
   });
-
-  return levels;
 }
 
 export type CompiledGameLogic = {

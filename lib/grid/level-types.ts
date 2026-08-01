@@ -1,6 +1,8 @@
 import type { CompiledGameLogic } from "@/lib/cms/logic-rules";
+import type { ContentMode } from "@/lib/cms/layer-model";
+import type { PlayPhase, PlaySurface } from "@/lib/grid/play-surface";
 
-export type LevelType = "gps" | "digital" | "quiz";
+export type LevelType = "gps" | "digital" | "quiz" | "station";
 
 export type PlayerRole = "captain" | "solver" | "navigator" | "alpha" | "beta" | "gamma";
 
@@ -10,9 +12,46 @@ export type LevelLocation = {
   radius_meters: number;
 };
 
+/** Indoor Layer-1 stop — code replaces geofence. */
+export type StationKind = "puzzle" | "search" | "logic" | "team" | "finale";
+
+export type LevelStation = {
+  name: string;
+  place: string;
+  /** Default code on the physical sign; overridable per booking. */
+  code: string;
+  kind?: StationKind;
+  minutes?: number;
+  points?: number;
+};
+
 export type QuizOption = {
   id: string;
   label: string;
+};
+
+/** Multiple-choice unlock before the mission level (phase: quiz). */
+export type ArrivalQuiz = {
+  question: string;
+  options: QuizOption[];
+  /** Primary / single correct (always set for UI fallback). */
+  correct_option_id: string;
+  /** When set, all listed options must be selected. */
+  correct_option_ids?: string[];
+};
+
+/** Layer-3 bonus after mission solve — role or whole team. */
+export type BonusTask = {
+  for_role: "alpha" | "beta" | "gamma";
+  /** When true, every player sees/answers the bonus (for_role used as display only). */
+  for_team?: boolean;
+  title: string;
+  intro?: string;
+  question: string;
+  options: QuizOption[];
+  correct_option_id: string;
+  correct_option_ids?: string[];
+  reward: number;
 };
 
 export type LevelTileType =
@@ -78,6 +117,13 @@ export type LevelDefinition = {
   /** Up to 10 embed tiles (Cloudflare / iframe / mini-game links). */
   tiles?: LevelContentTile[];
   location?: LevelLocation;
+  /** Indoor hub entry for this slot (Layer 1 indoor). */
+  station?: LevelStation;
+  /**
+   * Unlock quiz before tiles (phase quiz).
+   * Outdoor/Indoor: environment quiz; Online: optional intro quiz.
+   */
+  arrival_quiz?: ArrivalQuiz;
   answer?: string;
   options?: QuizOption[];
   correct_option_id?: string;
@@ -87,6 +133,36 @@ export type LevelDefinition = {
   hints?: LevelHint[];
   triggers?: LevelTriggers;
   scoring?: LevelScoring;
+  /** Optional teaser shown on online missions hub. */
+  teaser?: string;
+  /** Online hub: how material is split across roles (display only until extras ship). */
+  role_split?: string;
+  /** Layer-3 bonus after this mission is solved. */
+  bonus?: BonusTask;
+};
+
+/**
+ * One stop as the player walks Hub → Quiz → Level → Bonus.
+ * Content loader may still emit flat `levels[]`; UI resolves phases from this shape.
+ */
+export type PlaySlot = {
+  index: number;
+  title: string;
+  /** Phase progress for this slot. */
+  phase: PlayPhase;
+  hub: {
+    surface: PlaySurface;
+    waypointName?: string;
+    location?: LevelLocation;
+    station?: LevelStation;
+    teaser?: string;
+    roleSplit?: string;
+  };
+  quiz?: ArrivalQuiz;
+  /** Layer-2 mission payload (tiles + answer). */
+  mission: LevelDefinition;
+  /** Layer-3 bonus task id / inline payload — resolved at runtime. */
+  bonusRole?: PlayerRole | null;
 };
 
 export type RouteTemplate = {
@@ -103,12 +179,21 @@ export type EventContentConfig = {
   city_slug?: string;
   /** Reference to a content pack in global_levels (e.g. berlin-classic). */
   content_pack_slug?: string;
-  /** Engine blueprint — exitmania (GPS) | tabbrain (digital/quiz only). */
+  /** Engine blueprint — exitmania (GPS/indoor) | tabbrain (online). */
   blueprint_slug?: "exitmania" | "tabbrain";
   /** Player UI module — exitmania | quiz | training (legacy fallback). */
   ui_layout?: "exitmania" | "quiz" | "training";
   show_live_score?: boolean;
   mission_duration_minutes?: number;
+  /**
+   * Active play surface for this event.
+   * outdoor | indoor | online — see docs/GRID_LAYER_MODEL.md § Surfaces.
+   */
+  content_mode?: ContentMode;
+  /** Surfaces the customer may switch to (subset of studio allowed_fallbacks). */
+  allowed_fallbacks?: ContentMode[];
+  /** Copied from studio game at booking/publish time when available. */
+  runtime_profiles?: unknown;
 };
 
 export type BlueprintCapabilities = {
@@ -116,8 +201,15 @@ export type BlueprintCapabilities = {
   navigatorRole: boolean;
 };
 
+/** Per-booking Layer-1 deltas — GPS and/or station codes. */
+export type StationRouteOverride = Partial<
+  Pick<LevelStation, "code" | "place" | "name">
+>;
+
 export type EventRouteOverride = {
   levels?: Record<string, Partial<LevelDefinition>>;
+  /** Indoor station overrides keyed by level number (string) or global_level id. */
+  stations?: Record<string, StationRouteOverride>;
 };
 
 export type ResolvedEventContent = {
@@ -131,6 +223,10 @@ export type ResolvedEventContent = {
   uiLayout: "exitmania" | "quiz" | "training";
   showLiveScore: boolean;
   missionDurationMinutes: number;
+  /** Active play surface for this event. */
+  contentMode: ContentMode;
+  /** Surfaces the operator may switch to. */
+  allowedFallbacks: ContentMode[];
   /** Studio publish snapshot — logic rules for bonus triggers at runtime. */
   compiledLogic?: CompiledGameLogic | null;
 };

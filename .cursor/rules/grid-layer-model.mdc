@@ -17,21 +17,25 @@ Read `docs/GRID_LAYER_MODEL.md` before any Studio CMS or content architecture wo
 
 Run the checklist in `lib/cms/layer-model.ts` → `LAYER_FEATURE_CHECKLIST`.
 
-If the feature does not serve Layer 1 city scaling, Layer 2 global mission, Layer 3 roles/triggers, or runtime switches (indoor, pulse, language) — **do not build it**.
+If the feature does not serve Layer 1 city scaling, Layer 2 global mission, Layer 3 roles/triggers, or runtime surfaces (outdoor/indoor/online, pulse, language) — **do not build it**.
 
 ## Layer mapping
 
 | Layer | Studio field | Runtime |
 |-------|--------------|---------|
-| 1 Geo | `studio_tasks.layer=1`, `city_slug`, GPS overrides | `local_waypoints` |
-| 2 Mission | `studio_tasks.layer=2` | `global_levels` |
+| 1 Geo | `studio_tasks.layer=1`, GPS / station overrides | `local_waypoints` + `local_stations` |
+| 2 Mission | `studio_tasks.layer=2` | `global_levels` (shared across surfaces) |
 | 3 Bonus | `studio_tasks.layer=3`, `role_assignment`, `logic_rules` | triggers + roles |
+
+## Play surfaces
+
+outdoor (GPS) · indoor (stations+codes) · online (Tabbrain). Phases: Hub → Quiz → Level → Bonus. Dual fallback via `allowed_fallbacks`. See `lib/grid/play-surface.ts`, `frontend_idee/`.
 
 ## Game profiles
 
-Presets in `LAYER_GAME_PRESETS`: full (1+2+3), city_explorer, mission (2+3), micro_pulse (3 only).
+Presets: full, city_explorer, indoor_escape, mission/online, micro_pulse.
 
-`studio_games.active_layers` + `runtime_profiles` define what runs; `content_mode` on events switches outdoor↔indoor.
+`studio_games.active_layers` + `runtime_profiles`; event `content_mode` = outdoor | indoor | online.
 
 ## Do not prioritize
 
@@ -43,5 +47,8 @@ Presets in `LAYER_GAME_PRESETS`: full (1+2+3), city_explorer, mission (2+3), mic
 ## Key paths
 
 - Layer model: `lib/cms/layer-model.ts`
+- Surfaces & phases: `lib/grid/play-surface.ts`
+- Stations: `lib/grid/stations.ts`, `local_stations`
 - Docs: `docs/GRID_LAYER_MODEL.md`
+- UI prototype: `frontend_idee/`
 - Layer profile UI: `components/cms/games/game-layer-profile-panel.tsx`

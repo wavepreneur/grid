@@ -1,4 +1,5 @@
 import { EXITMANIA_TOTAL_LEVELS, DEFAULT_STARTING_SCORE } from "@/lib/grid/level-types";
+import type { PlayPhase } from "@/lib/grid/play-surface";
 
 /** @deprecated Use EXITMANIA_TOTAL_LEVELS */
 export const PHASE2_DEMO_LEVELS = EXITMANIA_TOTAL_LEVELS;
@@ -23,6 +24,13 @@ export type TeamGameState = {
   version: number;
   total_levels: number;
   score: number;
+  /**
+   * Player phase within the active slot: hub → quiz → level → bonus.
+   * Older saves omit this; UI treats missing as "level" (legacy single screen).
+   */
+  current_phase?: PlayPhase;
+  /** After bonus: level index to open next (set when entering bonus phase). */
+  pending_next_level?: number | null;
   /** @deprecated Use purchased_tile_hints — kept for older saves. */
   hints_used: Record<string, number>;
   /** levelKey -> tileId -> revealed hint */
@@ -37,6 +45,8 @@ export type TeamGameState = {
       started_at?: string;
       completed_at?: string;
       completed_by?: string[];
+      /** Furthest phase reached in this slot (optional). */
+      phase?: PlayPhase;
     }
   >;
 };
@@ -85,6 +95,7 @@ export function createInitialGameState(
     version: 1,
     total_levels: totalLevels,
     score: DEFAULT_STARTING_SCORE,
+    current_phase: "hub",
     hints_used: {},
     purchased_tile_hints: {},
     purchased_level_hints: {},
@@ -99,10 +110,23 @@ export function parseTeamGameState(value: unknown): TeamGameState {
   }
 
   const candidate = value as Partial<TeamGameState>;
+  const phase =
+    candidate.current_phase === "hub" ||
+    candidate.current_phase === "quiz" ||
+    candidate.current_phase === "level" ||
+    candidate.current_phase === "bonus"
+      ? candidate.current_phase
+      : undefined;
+
   return {
     version: candidate.version ?? 1,
     total_levels: candidate.total_levels ?? EXITMANIA_TOTAL_LEVELS,
     score: candidate.score ?? DEFAULT_STARTING_SCORE,
+    current_phase: phase,
+    pending_next_level:
+      typeof candidate.pending_next_level === "number" || candidate.pending_next_level === null
+        ? candidate.pending_next_level
+        : undefined,
     hints_used: candidate.hints_used ?? {},
     purchased_tile_hints: candidate.purchased_tile_hints ?? {},
     purchased_level_hints: candidate.purchased_level_hints ?? {},

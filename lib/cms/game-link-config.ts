@@ -16,11 +16,31 @@ export type BonusTrigger = {
   delay_seconds?: number;
 };
 
+export type StudioArrivalQuizOverride = {
+  question: string;
+  options: Array<{ id: string; label: string; correct?: boolean }>;
+  correct_option_id?: string;
+  correct_option_ids?: string[];
+};
+
 export type GameLinkOverrides = {
   location?: { lat: number; lng: number; radius_meters: number };
   gps?: { lat: number; lng: number; radius_meters: number };
   role?: RoleAssignment;
   trigger?: BonusTrigger;
+  /** Opener quiz for this mission slot (Quiz → Level → Bonus). */
+  arrival_quiz?: StudioArrivalQuizOverride;
+  /** Optional Layer-1 geo task linked to this mission slot. */
+  geo_task_id?: string;
+  /** Optional Layer-3 bonus task for this mission slot. */
+  bonus_task_id?: string;
+  /** Indoor station fields when authored on the mission/geo link. */
+  station?: {
+    name?: string;
+    place?: string;
+    code?: string;
+    kind?: string;
+  };
 };
 
 export const BONUS_TRIGGER_OPTIONS: Array<{

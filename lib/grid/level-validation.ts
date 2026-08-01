@@ -5,10 +5,12 @@ import {
 } from "@/lib/grid/content-engine";
 import { isWithinGeofence } from "@/lib/grid/geofence";
 import type {
+  ArrivalQuiz,
   LevelDefinition,
   PlayerRole,
   SolveLevelPayload,
 } from "@/lib/grid/level-types";
+import { normalizeStationCode } from "@/lib/grid/stations";
 
 export type LevelValidationContext = {
   isCaptain: boolean;
@@ -77,7 +79,7 @@ export function validateLevelSolution(
     return { ok: true };
   }
 
-  if (level.type === "digital") {
+  if (level.type === "digital" || (level.type === "station" && level.answer)) {
     if (!payload.answer?.trim()) {
       return { ok: false, error: "Bitte eine Antwort eingeben." };
     }
@@ -90,7 +92,7 @@ export function validateLevelSolution(
     return { ok: true };
   }
 
-  if (level.type === "quiz") {
+  if (level.type === "quiz" || level.type === "station") {
     if (level.correct_option_ids?.length) {
       const selected = new Set(payload.selectedOptionIds ?? []);
       const required = new Set(level.correct_option_ids);
@@ -115,6 +117,47 @@ export function validateLevelSolution(
   }
 
   return { ok: false, error: "Unbekannter Level-Typ." };
+}
+
+export function validateArrivalQuiz(
+  quiz: ArrivalQuiz,
+  selectedOptionId: string | undefined,
+  selectedOptionIds?: string[],
+): { ok: true } | { ok: false; error: string } {
+  if (quiz.correct_option_ids?.length) {
+    const selected = new Set(selectedOptionIds ?? (selectedOptionId ? [selectedOptionId] : []));
+    const required = new Set(quiz.correct_option_ids);
+    if (selected.size !== required.size) {
+      return { ok: false, error: "Bitte alle richtigen Antworten auswählen." };
+    }
+    for (const id of required) {
+      if (!selected.has(id)) {
+        return { ok: false, error: "Nicht alle richtigen Antworten gewählt." };
+      }
+    }
+    return { ok: true };
+  }
+
+  if (!selectedOptionId) {
+    return { ok: false, error: "Bitte eine Antwort auswählen." };
+  }
+  if (selectedOptionId !== quiz.correct_option_id) {
+    return { ok: false, error: "Falsche Antwort. Versucht es erneut." };
+  }
+  return { ok: true };
+}
+
+export function validateStationCode(
+  level: LevelDefinition,
+  code: string,
+): { ok: true } | { ok: false; error: string } {
+  if (!level.station?.code) {
+    return { ok: false, error: "Diese Station hat keinen Code." };
+  }
+  if (normalizeStationCode(code) !== normalizeStationCode(level.station.code)) {
+    return { ok: false, error: "Falscher Stationscode." };
+  }
+  return { ok: true };
 }
 
 export { getLevelDefinition, requiresGps };

@@ -30,6 +30,8 @@ Rules: `.cursor/rules/ecosystem-exitmania-tabbrain.mdc`, `.cursor/rules/grid-lay
 | Area | Path |
 |------|------|
 | **Layer model (read first for Studio)** | `docs/GRID_LAYER_MODEL.md`, `lib/cms/layer-model.ts` |
+| Play surfaces & phases | `lib/grid/play-surface.ts`, `frontend_idee/` |
+| Indoor stations | `lib/grid/stations.ts`, `local_stations` |
 | Layer profile UI | `components/cms/games/game-layer-profile-panel.tsx` |
 | Blueprints | `lib/grid/blueprints.ts` |
 | Roles | `lib/grid/archetype-roles.ts` |

@@ -12,6 +12,8 @@ import {
   resolveBlueprint,
 } from "@/lib/grid/blueprints";
 import { DEFAULT_TEMPLATE_SLUG, EXITMANIA_TOTAL_LEVELS } from "@/lib/grid/level-types";
+import { resolveContentMode } from "@/lib/grid/play-slots";
+import { parseRuntimeProfiles } from "@/lib/cms/layer-model";
 
 export function parseLevelDefinitions(value: unknown): LevelDefinition[] {
   if (!Array.isArray(value)) return [];
@@ -45,26 +47,39 @@ export function mergeLevelOverrides(
   override: EventRouteOverride,
 ): LevelDefinition[] {
   const overrideLevels = override.levels ?? {};
+  const stationOverrides = override.stations ?? {};
 
   return baseLevels.map((level) => {
     const patch = overrideLevels[String(level.level)];
-    if (!patch) return level;
+    const stationPatch = stationOverrides[String(level.level)];
+    if (!patch && !stationPatch) return level;
 
-    const nextType = patch.type ?? level.type;
+    const nextType = patch?.type ?? level.type;
+    const mergedStation =
+      stationPatch || patch?.station
+        ? {
+            ...(level.station ?? { name: level.title, place: "", code: "" }),
+            ...level.station,
+            ...patch?.station,
+            ...stationPatch,
+          }
+        : level.station;
 
     return {
       ...level,
       ...patch,
       level: level.level,
       type: nextType,
-      options: patch.options ?? level.options,
-      tiles: patch.tiles ?? level.tiles,
-      hero_image_url: patch.hero_image_url ?? level.hero_image_url,
+      options: patch?.options ?? level.options,
+      tiles: patch?.tiles ?? level.tiles,
+      hero_image_url: patch?.hero_image_url ?? level.hero_image_url,
       location:
         nextType === "gps"
-          ? (patch.location ?? level.location)
-          : patch.location,
-      answer: patch.answer ?? level.answer,
+          ? (patch?.location ?? level.location)
+          : patch?.location,
+      answer: patch?.answer ?? level.answer,
+      arrival_quiz: patch?.arrival_quiz ?? level.arrival_quiz,
+      station: mergedStation,
     };
   });
 }
@@ -83,6 +98,15 @@ export function resolveEventContent(input: {
     blueprint,
   );
 
+  const profiles = parseRuntimeProfiles(contentConfig.runtime_profiles);
+  const contentMode = resolveContentMode({
+    contentMode: contentConfig.content_mode ?? profiles.default_mode,
+    blueprintSlug: contentConfig.blueprint_slug,
+  });
+  const allowedFallbacks =
+    contentConfig.allowed_fallbacks?.filter((m) => m !== contentMode) ??
+    profiles.allowed_fallbacks.filter((m) => m !== contentMode);
+
   return {
     templateSlug: contentConfig.template_slug ?? input.template.slug ?? DEFAULT_TEMPLATE_SLUG,
     templateName: input.template.name,
@@ -91,6 +115,8 @@ export function resolveEventContent(input: {
     ...buildResolvedBlueprintFields(contentConfig),
     showLiveScore: contentConfig.show_live_score ?? true,
     missionDurationMinutes: contentConfig.mission_duration_minutes ?? 90,
+    contentMode,
+    allowedFallbacks,
   };
 }
 

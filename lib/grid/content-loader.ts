@@ -12,7 +12,13 @@ import {
   resolveBlueprint,
 } from "@/lib/grid/blueprints";
 import { getCityIdBySlug } from "@/lib/grid/organizations";
-import type { LevelDefinition, ResolvedEventContent } from "@/lib/grid/level-types";
+import type {
+  ArrivalQuiz,
+  LevelDefinition,
+  LevelStation,
+  ResolvedEventContent,
+  StationKind,
+} from "@/lib/grid/level-types";
 import {
   DEFAULT_CITY_SLUG,
   DEFAULT_TEMPLATE_SLUG,
@@ -20,6 +26,14 @@ import {
 } from "@/lib/grid/level-types";
 import { parseLevelTiles } from "@/lib/grid/level-content";
 import { loadStudioVersionSnapshot } from "@/lib/cms/studio-snapshot";
+import {
+  parseContentMode,
+  parseRuntimeProfiles,
+  type ContentMode,
+} from "@/lib/cms/layer-model";
+import { resolveContentMode } from "@/lib/grid/play-slots";
+import { buildDefaultStation, normalizeStationCode } from "@/lib/grid/stations";
+import { parseBonusTask } from "@/lib/grid/bonus";
 
 type GlobalLevelRow = {
   level_number: number;
@@ -34,11 +48,54 @@ type WaypointRow = {
   intro_text: string | null;
 };
 
+type StationRow = {
+  global_level_id: string;
+  name: string;
+  place: string;
+  code: string;
+  kind: string;
+  minutes: number | null;
+  points: number | null;
+};
+
 type GlobalLevelWithId = GlobalLevelRow & { id: string };
+
+function parseArrivalQuiz(raw: unknown): ArrivalQuiz | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const q = raw as Partial<ArrivalQuiz> & { correct_option_ids?: string[] };
+  if (typeof q.question !== "string" || !Array.isArray(q.options)) return undefined;
+  const multi = Array.isArray(q.correct_option_ids) ? q.correct_option_ids.filter(Boolean) : [];
+  const single =
+    typeof q.correct_option_id === "string"
+      ? q.correct_option_id
+      : multi[0];
+  if (!single) return undefined;
+  return {
+    question: q.question,
+    options: q.options as ArrivalQuiz["options"],
+    correct_option_id: single,
+    ...(multi.length > 0 ? { correct_option_ids: multi } : {}),
+  };
+}
+
+function parseStationFromContent(raw: unknown): LevelStation | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const s = raw as Partial<LevelStation>;
+  if (typeof s.code !== "string" || typeof s.name !== "string") return undefined;
+  return {
+    name: s.name,
+    place: typeof s.place === "string" ? s.place : "",
+    code: s.code,
+    kind: s.kind as StationKind | undefined,
+    minutes: typeof s.minutes === "number" ? s.minutes : undefined,
+    points: typeof s.points === "number" ? s.points : undefined,
+  };
+}
 
 function assembleLevelDefinition(
   globalLevel: GlobalLevelRow,
   waypoint: WaypointRow | null,
+  station: StationRow | null,
 ): LevelDefinition | null {
   const content = globalLevel.content;
   const type = content.type;
@@ -56,6 +113,7 @@ function assembleLevelDefinition(
   };
 
   if (typeof content.answer === "string") level.answer = content.answer;
+  if (typeof content.question === "string") level.question = content.question;
   if (Array.isArray(content.options)) level.options = content.options as LevelDefinition["options"];
   if (typeof content.correct_option_id === "string") {
     level.correct_option_id = content.correct_option_id;
@@ -66,6 +124,9 @@ function assembleLevelDefinition(
   if (typeof content.hero_image_url === "string" && content.hero_image_url.trim()) {
     level.hero_image_url = content.hero_image_url.trim();
   }
+  if (typeof content.teaser === "string") level.teaser = content.teaser;
+  if (typeof content.role_split === "string") level.role_split = content.role_split;
+
   const tiles = parseLevelTiles(content.tiles);
   if (tiles) level.tiles = tiles;
   if (content.media && typeof content.media === "object") {
@@ -76,6 +137,26 @@ function assembleLevelDefinition(
   }
   if (content.triggers && typeof content.triggers === "object") {
     level.triggers = content.triggers as LevelDefinition["triggers"];
+  }
+
+  const arrivalQuiz = parseArrivalQuiz(content.arrival_quiz);
+  if (arrivalQuiz) level.arrival_quiz = arrivalQuiz;
+
+  const bonus = parseBonusTask(content.bonus);
+  if (bonus) level.bonus = bonus;
+
+  const contentStation = parseStationFromContent(content.station);
+  if (station) {
+    level.station = {
+      name: station.name,
+      place: station.place,
+      code: station.code,
+      kind: station.kind as StationKind,
+      minutes: station.minutes ?? undefined,
+      points: station.points ?? undefined,
+    };
+  } else if (contentStation) {
+    level.station = contentStation;
   }
 
   if (waypoint) {
@@ -109,14 +190,33 @@ async function loadLevelsFromGlobalSchema(cityId: string): Promise<LevelDefiniti
 
   if (waypointsError) throw new Error(waypointsError.message);
 
+  // Stations table may not exist until migration is applied — fail soft.
+  const { data: stations, error: stationsError } = await supabase
+    .from("local_stations")
+    .select("global_level_id, name, place, code, kind, minutes, points")
+    .eq("city_id", cityId);
+
+  if (stationsError && !/does not exist|schema cache/i.test(stationsError.message)) {
+    throw new Error(stationsError.message);
+  }
+
   const waypointByLevelId = new Map<string, WaypointRow>();
   for (const waypoint of waypoints ?? []) {
     waypointByLevelId.set(waypoint.global_level_id, waypoint as WaypointRow);
   }
 
+  const stationByLevelId = new Map<string, StationRow>();
+  for (const row of stations ?? []) {
+    stationByLevelId.set(row.global_level_id, row as StationRow);
+  }
+
   const levels: LevelDefinition[] = [];
   for (const row of (globalLevels ?? []) as GlobalLevelWithId[]) {
-    const assembled = assembleLevelDefinition(row, waypointByLevelId.get(row.id) ?? null);
+    const assembled = assembleLevelDefinition(
+      row,
+      waypointByLevelId.get(row.id) ?? null,
+      stationByLevelId.get(row.id) ?? null,
+    );
     if (assembled) levels.push(assembled);
   }
 
@@ -147,6 +247,83 @@ async function loadLevelsFromLegacyTemplate(templateSlug: string): Promise<{
   };
 }
 
+function ensureIndoorStations(levels: LevelDefinition[]): LevelDefinition[] {
+  return levels.map((level) => {
+    if (level.station?.code) {
+      return { ...level, type: level.type === "gps" ? "station" : level.type };
+    }
+    const generated = buildDefaultStation({
+      index1Based: level.level,
+      name: level.title,
+      place: level.description.slice(0, 80),
+    });
+    return {
+      ...level,
+      type: level.type === "gps" ? "station" : level.type,
+      station: generated,
+      location: undefined,
+    };
+  });
+}
+
+function applyContentModeToLevels(
+  levels: LevelDefinition[],
+  mode: ContentMode,
+): LevelDefinition[] {
+  if (mode === "indoor") {
+    return ensureIndoorStations(levels);
+  }
+
+  if (mode === "online") {
+    return levels.map((level) => ({
+      ...level,
+      type: level.type === "gps" || level.type === "station" ? "digital" : level.type,
+      location: undefined,
+      station: undefined,
+    }));
+  }
+
+  // outdoor: keep waypoints; drop station-only chrome unless also useful
+  return levels.map((level) => ({
+    ...level,
+    station: undefined,
+  }));
+}
+
+function resolveModeAndFallbacks(contentConfig: ReturnType<typeof parseContentConfig>): {
+  contentMode: ContentMode;
+  allowedFallbacks: ContentMode[];
+} {
+  const profiles = parseRuntimeProfiles(contentConfig.runtime_profiles);
+  const contentMode = resolveContentMode({
+    contentMode: contentConfig.content_mode ?? profiles.default_mode,
+    blueprintSlug: contentConfig.blueprint_slug,
+  });
+  const allowedFallbacks =
+    contentConfig.allowed_fallbacks?.filter(
+      (m): m is ContentMode => m === "outdoor" || m === "indoor" || m === "online",
+    ) ?? profiles.allowed_fallbacks;
+
+  return {
+    contentMode: parseContentMode(contentMode),
+    allowedFallbacks: allowedFallbacks.filter((m) => m !== contentMode),
+  };
+}
+
+function withSurfaceFields(
+  base: Omit<ResolvedEventContent, "contentMode" | "allowedFallbacks">,
+  contentConfig: ReturnType<typeof parseContentConfig>,
+  levels: LevelDefinition[],
+): ResolvedEventContent {
+  const { contentMode, allowedFallbacks } = resolveModeAndFallbacks(contentConfig);
+  return {
+    ...base,
+    contentMode,
+    allowedFallbacks,
+    levels: applyContentModeToLevels(levels, contentMode),
+  };
+}
+
 export async function loadResolvedEventContent(input: {
   eventId: string;
   organizationId: string;
@@ -166,6 +343,7 @@ export async function loadResolvedEventContent(input: {
         ...contentConfig,
         blueprint_slug: game.gps_enabled ? "exitmania" : "tabbrain",
         city_slug: game.city_slug ?? contentConfig.city_slug,
+        runtime_profiles: game.runtime_profiles ?? contentConfig.runtime_profiles,
       });
       const blueprint = resolveBlueprint(mergedConfig);
       const mergedLevels = applyBlueprintLevelConstraints(
@@ -174,33 +352,41 @@ export async function loadResolvedEventContent(input: {
       );
       const blueprintFields = buildResolvedBlueprintFields(mergedConfig);
 
-      return {
-        templateSlug: `cms:${game.slug}:v${game.published_version_number}`,
-        templateName: game.name,
-        city: game.city_slug,
-        levels: mergedLevels,
-        compiledLogic,
-        ...blueprintFields,
-        showLiveScore: contentConfig.show_live_score ?? true,
-        missionDurationMinutes:
-          game.duration_minutes ?? contentConfig.mission_duration_minutes ?? 90,
-      };
+      return withSurfaceFields(
+        {
+          templateSlug: `cms:${game.slug}:v${game.published_version_number}`,
+          templateName: game.name,
+          city: game.city_slug,
+          levels: mergedLevels,
+          compiledLogic,
+          ...blueprintFields,
+          showLiveScore: contentConfig.show_live_score ?? true,
+          missionDurationMinutes:
+            game.duration_minutes ?? contentConfig.mission_duration_minutes ?? 90,
+        },
+        mergedConfig,
+        mergedLevels,
+      );
     }
   }
 
   const blueprint = resolveBlueprint(contentConfig);
   const citySlug = contentConfig.city_slug ?? blueprint.defaultContent.city_slug ?? DEFAULT_CITY_SLUG;
+  const { contentMode } = resolveModeAndFallbacks(contentConfig);
 
   let baseLevels: LevelDefinition[];
   let templateName: string;
   let cityName: string | null = null;
   let templateSlug = contentConfig.template_slug ?? DEFAULT_TEMPLATE_SLUG;
 
-  const useGlobalSchema =
-    blueprint.capabilities.gps &&
-    Boolean(contentConfig.city_slug ?? blueprint.defaultContent.city_slug);
+  // Load city pack for outdoor/indoor (waypoints + stations). Online may still use city for branding.
+  const needsCityPack =
+    contentMode === "outdoor" ||
+    contentMode === "indoor" ||
+    (blueprint.capabilities.gps &&
+      Boolean(contentConfig.city_slug ?? blueprint.defaultContent.city_slug));
 
-  const resolvedCityId = useGlobalSchema
+  const resolvedCityId = needsCityPack
     ? (input.cityId ?? (await getCityIdBySlug(input.organizationId, citySlug)))
     : null;
 
@@ -226,15 +412,19 @@ export async function loadResolvedEventContent(input: {
 
   const blueprintFields = buildResolvedBlueprintFields(contentConfig);
 
-  return {
-    templateSlug,
-    templateName,
-    city: cityName,
-    levels: mergedLevels.slice(0, EXITMANIA_TOTAL_LEVELS),
-    ...blueprintFields,
-    showLiveScore: contentConfig.show_live_score ?? true,
-    missionDurationMinutes: contentConfig.mission_duration_minutes ?? 90,
-  };
+  return withSurfaceFields(
+    {
+      templateSlug,
+      templateName,
+      city: cityName,
+      levels: mergedLevels.slice(0, EXITMANIA_TOTAL_LEVELS),
+      ...blueprintFields,
+      showLiveScore: contentConfig.show_live_score ?? true,
+      missionDurationMinutes: contentConfig.mission_duration_minutes ?? 90,
+    },
+    contentConfig,
+    mergedLevels.slice(0, EXITMANIA_TOTAL_LEVELS),
+  );
 }
 
 export async function loadResolvedEventContentByEventId(
@@ -261,4 +451,15 @@ export async function loadResolvedEventContentByEventId(
     routeOverride: event.route_override,
     studioGameVersionId: event.studio_game_version_id,
   });
+}
+
+/** Find a level by indoor station code (normalized). */
+export function findLevelByStationCode(
+  levels: LevelDefinition[],
+  code: string,
+): LevelDefinition | null {
+  const normalized = normalizeStationCode(code);
+  return (
+    levels.find((l) => l.station && normalizeStationCode(l.station.code) === normalized) ?? null
+  );
 }

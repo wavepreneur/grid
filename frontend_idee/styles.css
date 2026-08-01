@@ -1,0 +1,211 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * City Games design system — hoch kontrastreich, große Flächen,
+ * für Spieler von 10 bis 90 Jahren. Alle Farben als oklch-Tokens.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 8px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+  --radius-2xl: calc(var(--radius) + 12px);
+  --radius-3xl: calc(var(--radius) + 20px);
+  --radius-4xl: calc(var(--radius) + 28px);
+
+  --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ink: var(--ink);
+  --color-ink-foreground: var(--ink-foreground);
+  --color-map: var(--map);
+  --color-map-road: var(--map-road);
+  --color-map-block: var(--map-block);
+  --color-map-water: var(--map-water);
+  --color-map-park: var(--map-park);
+
+  --shadow-soft: 0 2px 6px oklch(0.2 0.04 170 / 0.08);
+  --shadow-lift: 0 12px 32px -12px oklch(0.2 0.04 170 / 0.35);
+  --shadow-tile: 0 16px 36px -16px oklch(0.15 0.04 170 / 0.55);
+}
+
+:root {
+  --radius: 1.25rem;
+
+  --background: oklch(0.975 0.012 90);
+  --foreground: oklch(0.24 0.035 175);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.24 0.035 175);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.24 0.035 175);
+
+  --primary: oklch(0.46 0.093 178);
+  --primary-foreground: oklch(0.985 0.01 90);
+
+  --secondary: oklch(0.94 0.02 95);
+  --secondary-foreground: oklch(0.3 0.04 175);
+
+  --muted: oklch(0.945 0.014 95);
+  --muted-foreground: oklch(0.52 0.02 175);
+
+  --accent: oklch(0.76 0.16 68);
+  --accent-foreground: oklch(0.24 0.05 60);
+
+  --success: oklch(0.66 0.15 150);
+  --success-foreground: oklch(0.15 0.03 150);
+
+  --destructive: oklch(0.58 0.2 26);
+  --destructive-foreground: oklch(0.985 0.01 90);
+
+  --border: oklch(0.9 0.016 95);
+  --input: oklch(0.9 0.016 95);
+  --ring: oklch(0.46 0.093 178);
+
+  --ink: oklch(0.22 0.035 178);
+  --ink-foreground: oklch(0.97 0.012 90);
+
+  --map: oklch(0.955 0.014 100);
+  --map-road: oklch(1 0 0);
+  --map-block: oklch(0.905 0.015 100);
+  --map-water: oklch(0.86 0.055 220);
+  --map-park: oklch(0.9 0.06 145);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+@utility screen-shell {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 30rem;
+}
+
+@utility tap-lift {
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes rise-in {
+  0% {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes key-turn {
+  0% {
+    transform: rotate(-25deg) scale(0.8);
+    opacity: 0;
+  }
+  55% {
+    transform: rotate(15deg) scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes sheen {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+@utility animate-pop-in {
+  animation: pop-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+
+@utility animate-rise-in {
+  animation: rise-in 0.45s ease-out both;
+}
+
+@utility animate-key-turn {
+  animation: key-turn 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+@utility pulse-ring {
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+@utility sheen {
+  animation: sheen 1.6s ease-in-out infinite;
+}

@@ -2,6 +2,10 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAuditLog } from "@/lib/grid/audit-log";
+import {
+  computeAttemptDurations,
+  logPlayAttempt,
+} from "@/lib/grid/attempt-analytics";
 import { loadResolvedEventContent } from "@/lib/grid/content-loader";
 import {
   buildLevelCompletedModal,
@@ -19,7 +23,9 @@ import {
 import { computeLevelReward } from "@/lib/grid/level-scoring";
 import {
   getLevelDefinition,
+  validateArrivalQuiz,
   validateLevelSolution,
+  validateStationCode,
 } from "@/lib/grid/level-validation";
 import { HINT_POINT_COST, EXITMANIA_TOTAL_LEVELS } from "@/lib/grid/level-types";
 import type { PlayerRole, SolveLevelPayload } from "@/lib/grid/level-types";
@@ -29,6 +35,16 @@ import { parseContentConfig } from "@/lib/grid/content-engine";
 import { countActivePlayers } from "@/lib/grid/team-session";
 import { assertPlayerSession } from "@/lib/grid/session-auth";
 import type { ActionResult } from "@/lib/grid/types";
+import { findLevelByStationCode } from "@/lib/grid/content-loader";
+import {
+  buildPlaySlot,
+  initialPhaseForSurface,
+  usesPhasedPlay,
+} from "@/lib/grid/play-slots";
+import type { PlayPhase } from "@/lib/grid/play-surface";
+import { isWithinGeofence } from "@/lib/grid/geofence";
+import { isBonusForRole, resolveBonusTask } from "@/lib/grid/bonus";
+import { validateArrivalQuiz as validateBonusQuiz } from "@/lib/grid/level-validation";
 
 function buildRealtimeState(
   team: {
@@ -163,6 +179,30 @@ export async function solveCurrentLevel(input: {
     });
 
     if (!validation.ok) {
+      const durations = computeAttemptDurations({
+        levelStartedAt: levelState.started_at,
+        teamStartedAt: team.started_at,
+      });
+      await logPlayAttempt({
+        organizationId: event.organization_id,
+        eventId: event.id,
+        teamId: team.id,
+        playerId: player.id,
+        playerName: player.display_name,
+        playerRole: player.role,
+        level: currentLevel,
+        phase: "level",
+        correct: false,
+        answer: input.payload?.answer ?? null,
+        selectedOptionId: input.payload?.selectedOptionId ?? null,
+        selectedOptionIds: input.payload?.selectedOptionIds ?? null,
+        error: validation.error,
+        durationMs: durations.durationMs,
+        elapsedMissionMs: durations.elapsedMissionMs,
+        contentMode: content.contentMode,
+        levelTitle: levelDefinition.title ?? null,
+      });
+      // Legacy action name for existing consumers.
       await writeAuditLog({
         organizationId: event.organization_id,
         eventId: event.id,
@@ -172,7 +212,17 @@ export async function solveCurrentLevel(input: {
         payload: {
           level: currentLevel,
           level_type: levelDefinition.type,
+          level_title: levelDefinition.title ?? null,
           error: validation.error,
+          player_name: player.display_name,
+          player_role: player.role ?? null,
+          answer: input.payload?.answer ?? null,
+          selected_option_id: input.payload?.selectedOptionId ?? null,
+          selected_option_ids: input.payload?.selectedOptionIds ?? null,
+          duration_ms: durations.durationMs,
+          elapsed_mission_ms: durations.elapsedMissionMs,
+          content_mode: content.contentMode,
+          at: new Date().toISOString(),
         },
       });
       return { success: false, error: validation.error };
@@ -251,16 +301,32 @@ export async function solveCurrentLevel(input: {
 
     const pointsEarned = computeLevelReward(levelDefinition.scoring, levelState.started_at);
 
+    const bonus = resolveBonusTask(levelDefinition);
+    const enterBonus = Boolean(usesPhasedPlay(content) && bonus);
+
+    const nextSlot = getLevelDefinition(content, isFinished ? currentLevel : nextLevel);
+    const hubPhase: PlayPhase | undefined =
+      !isFinished && nextSlot && usesPhasedPlay(content)
+        ? initialPhaseForSurface(
+            content.contentMode,
+            buildPlaySlot(nextSlot, content.contentMode),
+          )
+        : undefined;
+
     const nextGameState: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
       total_levels: content.levels.length,
       score: gameState.score + pointsEarned,
-      modal: buildLevelCompletedModal({
-        level: currentLevel,
-        solvedBy,
-        pointsEarned,
-      }),
+      current_phase: enterBonus ? "bonus" : hubPhase ?? gameState.current_phase,
+      pending_next_level: enterBonus ? (isFinished ? null : nextLevel) : null,
+      modal: enterBonus
+        ? null
+        : buildLevelCompletedModal({
+            level: currentLevel,
+            solvedBy,
+            pointsEarned,
+          }),
       levels: progressionLevels,
     };
 
@@ -268,10 +334,10 @@ export async function solveCurrentLevel(input: {
     const { data: updatedTeam, error } = await supabase
       .from("teams")
       .update({
-        current_level: isFinished ? currentLevel : nextLevel,
+        current_level: enterBonus || isFinished ? currentLevel : nextLevel,
         game_state: nextGameState,
-        status: isFinished ? "finished" : "playing",
-        finished_at: isFinished ? new Date().toISOString() : null,
+        status: enterBonus ? "playing" : isFinished ? "finished" : "playing",
+        finished_at: enterBonus ? null : isFinished ? new Date().toISOString() : null,
       })
       .eq("id", team.id)
       .eq("status", "playing")
@@ -509,7 +575,19 @@ export async function initializeTeamGameState(
   );
   const startLevel = firstActive ? Number(firstActive[0]) : 1;
   const stampedState = activateLevelEntry(initialState.levels, String(startLevel));
-  const gameStateWithStart = { ...initialState, levels: stampedState };
+  const startDef = getLevelDefinition(content, startLevel);
+  const startPhase =
+    usesPhasedPlay(content) && startDef
+      ? initialPhaseForSurface(
+          content.contentMode,
+          buildPlaySlot(startDef, content.contentMode),
+        )
+      : undefined;
+  const gameStateWithStart = {
+    ...initialState,
+    levels: stampedState,
+    ...(startPhase ? { current_phase: startPhase } : {}),
+  };
 
   const supabase = createAdminClient();
   await supabase
@@ -531,4 +609,508 @@ export async function initializeTeamGameState(
       starting_score: gameStateWithStart.score,
     },
   });
+}
+
+async function persistPhaseState(input: {
+  teamId: string;
+  gameState: TeamGameState;
+  currentLevel: number;
+  player: { id: string; is_captain: boolean };
+}): Promise<ActionResult<TeamRealtimeState>> {
+  const supabase = createAdminClient();
+  const { data: updatedTeam, error } = await supabase
+    .from("teams")
+    .update({ game_state: input.gameState })
+    .eq("id", input.teamId)
+    .eq("status", "playing")
+    .select(
+      "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
+    )
+    .single();
+
+  if (error || !updatedTeam) {
+    return { success: false, error: error?.message ?? "Phasen-Update fehlgeschlagen." };
+  }
+
+  return { success: true, data: buildRealtimeState(updatedTeam, input.player) };
+}
+
+/**
+ * Advance Hub → Quiz (arrival: GPS near / station code / online start).
+ * Does not complete the level.
+ */
+export async function advanceFromHub(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  /** Outdoor: GPS sample for geofence. */
+  geolocation?: SolveLevelPayload["geolocation"];
+  /** Indoor: station code. */
+  stationCode?: string;
+  /** Jump to a specific level (indoor code match / online mission pick). */
+  targetLevel?: number;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    const { event, team, player } = await assertPlayerSession(input);
+    if (team.status !== "playing") {
+      return { success: false, error: "Das Spiel läuft noch nicht." };
+    }
+
+    const gameState = parseTeamGameState(team.game_state);
+    const content = await loadResolvedEventContent({
+      eventId: event.id,
+      organizationId: event.organization_id,
+      cityId: event.city_id,
+      contentConfig: event.content_config,
+      routeOverride: event.route_override,
+      studioGameVersionId: event.studio_game_version_id,
+    });
+
+    if (!usesPhasedPlay(content)) {
+      return { success: false, error: "Phasen-Flow ist für dieses Event nicht aktiv." };
+    }
+
+    let currentLevel = team.current_level || 1;
+    if (input.targetLevel && content.contentMode !== "outdoor") {
+      currentLevel = input.targetLevel;
+    }
+
+    if (input.stationCode) {
+      const byCode = findLevelByStationCode(content.levels, input.stationCode);
+      if (!byCode) {
+        return { success: false, error: "Diesen Code gibt es hier nicht." };
+      }
+      const codeLevelState = gameState.levels[String(byCode.level)];
+      if (codeLevelState?.status === "completed") {
+        return { success: false, error: "Diese Station ist schon gelöst." };
+      }
+      currentLevel = byCode.level;
+    }
+
+    const levelDefinition = getLevelDefinition(content, currentLevel);
+    if (!levelDefinition) {
+      return { success: false, error: "Level-Inhalt nicht gefunden." };
+    }
+
+    const levelKey = String(currentLevel);
+    const levelState = gameState.levels[levelKey];
+    if (!levelState || levelState.status === "locked") {
+      return { success: false, error: "Dieses Level ist noch gesperrt." };
+    }
+    if (levelState.status === "completed") {
+      return { success: false, error: "Dieses Level ist schon gelöst." };
+    }
+
+    if (content.contentMode === "outdoor" && levelDefinition.location) {
+      if (!input.geolocation) {
+        return { success: false, error: "GPS-Position erforderlich." };
+      }
+      if (!isWithinGeofence(input.geolocation, levelDefinition.location)) {
+        return {
+          success: false,
+          error: `Noch nicht am Wegpunkt (Radius: ${levelDefinition.location.radius_meters} m).`,
+        };
+      }
+    }
+
+    if (content.contentMode === "indoor") {
+      if (input.stationCode) {
+        const codeCheck = validateStationCode(levelDefinition, input.stationCode);
+        if (!codeCheck.ok) return { success: false, error: codeCheck.error };
+      } else if (!input.targetLevel) {
+        return { success: false, error: "Stationscode oder Station wählen." };
+      }
+    }
+
+    const slot = buildPlaySlot(levelDefinition, content.contentMode);
+    const nextPhase: PlayPhase = slot.quiz ? "quiz" : "level";
+
+    let levels = gameState.levels;
+    if (currentLevel !== team.current_level) {
+      levels = activateLevelEntry(levels, levelKey);
+    }
+
+    const nextGameState: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      current_phase: nextPhase,
+      levels,
+    };
+
+    const supabase = createAdminClient();
+    const { data: updatedTeam, error } = await supabase
+      .from("teams")
+      .update({
+        current_level: currentLevel,
+        game_state: nextGameState,
+      })
+      .eq("id", team.id)
+      .eq("status", "playing")
+      .select(
+        "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
+      )
+      .single();
+
+    if (error || !updatedTeam) {
+      return { success: false, error: error?.message ?? "Hub-Update fehlgeschlagen." };
+    }
+
+    return { success: true, data: buildRealtimeState(updatedTeam, player) };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Hub-Fortschritt fehlgeschlagen.",
+    };
+  }
+}
+
+/** Submit arrival/station/online unlock quiz → advance to level phase. */
+export async function submitArrivalQuiz(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  selectedOptionId?: string;
+  selectedOptionIds?: string[];
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    const { event, team, player } = await assertPlayerSession(input);
+    if (team.status !== "playing") {
+      return { success: false, error: "Das Spiel läuft noch nicht." };
+    }
+
+    const gameState = parseTeamGameState(team.game_state);
+    if (gameState.current_phase && gameState.current_phase !== "quiz") {
+      return { success: false, error: "Gerade ist kein Quiz aktiv." };
+    }
+
+    const content = await loadResolvedEventContent({
+      eventId: event.id,
+      organizationId: event.organization_id,
+      cityId: event.city_id,
+      contentConfig: event.content_config,
+      routeOverride: event.route_override,
+      studioGameVersionId: event.studio_game_version_id,
+    });
+
+    const currentLevel = team.current_level || 1;
+    const levelDefinition = getLevelDefinition(content, currentLevel);
+    if (!levelDefinition) {
+      return { success: false, error: "Level-Inhalt nicht gefunden." };
+    }
+
+    const slot = buildPlaySlot(levelDefinition, content.contentMode);
+    if (!slot.quiz) {
+      return { success: false, error: "Kein Freischalt-Quiz für dieses Level." };
+    }
+
+    const validation = validateArrivalQuiz(
+      slot.quiz,
+      input.selectedOptionId,
+      input.selectedOptionIds,
+    );
+    const levelState = gameState.levels[String(currentLevel)];
+    const durations = computeAttemptDurations({
+      levelStartedAt: levelState?.started_at,
+      teamStartedAt: team.started_at,
+    });
+    const attemptBase = {
+      organizationId: event.organization_id,
+      eventId: event.id,
+      teamId: team.id,
+      playerId: player.id,
+      playerName: player.display_name,
+      playerRole: player.role,
+      level: currentLevel,
+      phase: "arrival_quiz" as const,
+      selectedOptionId: input.selectedOptionId ?? null,
+      selectedOptionIds: input.selectedOptionIds ?? null,
+      durationMs: durations.durationMs,
+      elapsedMissionMs: durations.elapsedMissionMs,
+      contentMode: content.contentMode,
+      levelTitle: levelDefinition.title ?? null,
+    };
+
+    if (!validation.ok) {
+      await logPlayAttempt({
+        ...attemptBase,
+        correct: false,
+        error: validation.error,
+      });
+      return { success: false, error: validation.error };
+    }
+
+    await logPlayAttempt({
+      ...attemptBase,
+      correct: true,
+    });
+
+    const nextGameState: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      current_phase: "level",
+    };
+
+    return persistPhaseState({
+      teamId: team.id,
+      gameState: nextGameState,
+      currentLevel,
+      player,
+    });
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Quiz fehlgeschlagen.",
+    };
+  }
+}
+
+async function leaveBonusPhase(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  selectedOptionId?: string;
+  skip?: boolean;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  const { event, team, player } = await assertPlayerSession(input);
+  if (team.status !== "playing") {
+    return { success: false, error: "Das Spiel läuft noch nicht." };
+  }
+
+  const gameState = parseTeamGameState(team.game_state);
+  if (gameState.current_phase !== "bonus") {
+    return { success: false, error: "Keine Bonusphase aktiv." };
+  }
+
+  const content = await loadResolvedEventContent({
+    eventId: event.id,
+    organizationId: event.organization_id,
+    cityId: event.city_id,
+    contentConfig: event.content_config,
+    routeOverride: event.route_override,
+    studioGameVersionId: event.studio_game_version_id,
+  });
+
+  const bonusLevel = team.current_level || 1;
+  const levelDefinition = getLevelDefinition(content, bonusLevel);
+  const bonus = resolveBonusTask(levelDefinition);
+
+  let reward = 0;
+  if (!input.skip && bonus) {
+    const playerRole = (player.role ?? "gamma") as PlayerRole;
+    if (!isBonusForRole(bonus, playerRole)) {
+      return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
+    }
+    const validation = validateBonusQuiz(
+      {
+        question: bonus.question,
+        options: bonus.options,
+        correct_option_id: bonus.correct_option_id,
+      },
+      input.selectedOptionId,
+    );
+    if (!validation.ok) {
+      return { success: false, error: validation.error };
+    }
+    if (input.selectedOptionId === bonus.correct_option_id) {
+      reward = bonus.reward;
+    }
+  }
+
+  const pending = gameState.pending_next_level;
+  const isFinished =
+    pending === null ||
+    pending === undefined ||
+    pending > content.levels.length ||
+    Object.values(gameState.levels).every((entry) => entry.status === "completed");
+
+  const nextLevel = isFinished ? bonusLevel : (pending ?? bonusLevel + 1);
+  const nextSlot = getLevelDefinition(content, nextLevel);
+  const hubPhase: PlayPhase =
+    nextSlot && usesPhasedPlay(content)
+      ? initialPhaseForSurface(
+          content.contentMode,
+          buildPlaySlot(nextSlot, content.contentMode),
+        )
+      : "hub";
+
+  let levels = gameState.levels;
+  if (!isFinished) {
+    levels = activateLevelEntry(levels, String(nextLevel));
+  }
+
+  const nextGameState: TeamGameState = {
+    ...gameState,
+    version: gameState.version + 1,
+    score: gameState.score + reward,
+    current_phase: isFinished ? gameState.current_phase : hubPhase,
+    pending_next_level: null,
+    levels,
+  };
+
+  const supabase = createAdminClient();
+  const { data: updatedTeam, error } = await supabase
+    .from("teams")
+    .update({
+      current_level: nextLevel,
+      game_state: nextGameState,
+      status: isFinished ? "finished" : "playing",
+      finished_at: isFinished ? new Date().toISOString() : null,
+    })
+    .eq("id", team.id)
+    .eq("status", "playing")
+    .select(
+      "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
+    )
+    .single();
+
+  if (error || !updatedTeam) {
+    return { success: false, error: error?.message ?? "Bonus-Update fehlgeschlagen." };
+  }
+
+  return { success: true, data: buildRealtimeState(updatedTeam, player) };
+}
+
+/** Submit Layer-3 bonus answer (assigned role only). Wrong answers still continue. */
+export async function submitBonusAnswer(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  selectedOptionId: string;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    // Allow wrong answers to continue — validate only presence, award if correct
+    const { event, team, player } = await assertPlayerSession(input);
+    if (team.status !== "playing") {
+      return { success: false, error: "Das Spiel läuft noch nicht." };
+    }
+
+    const gameState = parseTeamGameState(team.game_state);
+    if (gameState.current_phase !== "bonus") {
+      return { success: false, error: "Keine Bonusphase aktiv." };
+    }
+
+    const content = await loadResolvedEventContent({
+      eventId: event.id,
+      organizationId: event.organization_id,
+      cityId: event.city_id,
+      contentConfig: event.content_config,
+      routeOverride: event.route_override,
+      studioGameVersionId: event.studio_game_version_id,
+    });
+
+    const bonusLevel = team.current_level || 1;
+    const levelDefinition = getLevelDefinition(content, bonusLevel);
+    const bonus = resolveBonusTask(levelDefinition);
+    if (!bonus) {
+      return leaveBonusPhase({ ...input, skip: true });
+    }
+
+    const playerRole = (player.role ?? "gamma") as PlayerRole;
+    if (!isBonusForRole(bonus, playerRole)) {
+      return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
+    }
+
+    if (!input.selectedOptionId) {
+      return { success: false, error: "Bitte eine Antwort auswählen." };
+    }
+
+    const correctIds =
+      bonus.correct_option_ids && bonus.correct_option_ids.length > 0
+        ? bonus.correct_option_ids
+        : [bonus.correct_option_id];
+    const correct = correctIds.includes(input.selectedOptionId);
+    const reward = correct ? bonus.reward : 0;
+    const levelState = gameState.levels[String(bonusLevel)];
+    const durations = computeAttemptDurations({
+      levelStartedAt: levelState?.started_at,
+      teamStartedAt: team.started_at,
+    });
+    await logPlayAttempt({
+      organizationId: event.organization_id,
+      eventId: event.id,
+      teamId: team.id,
+      playerId: player.id,
+      playerName: player.display_name,
+      playerRole: player.role,
+      level: bonusLevel,
+      phase: "bonus",
+      correct,
+      selectedOptionId: input.selectedOptionId,
+      error: correct ? null : "falsche_antwort",
+      durationMs: durations.durationMs,
+      elapsedMissionMs: durations.elapsedMissionMs,
+      contentMode: content.contentMode,
+      levelTitle: levelDefinition?.title ?? null,
+    });
+
+    const pending = gameState.pending_next_level;
+    const nextLevel =
+      pending === null || pending === undefined ? bonusLevel + 1 : pending;
+    const finished = nextLevel > content.levels.length;
+    const nextSlot = getLevelDefinition(content, finished ? bonusLevel : nextLevel);
+    const hubPhase: PlayPhase =
+      !finished && nextSlot && usesPhasedPlay(content)
+        ? initialPhaseForSurface(
+            content.contentMode,
+            buildPlaySlot(nextSlot, content.contentMode),
+          )
+        : "hub";
+
+    let levels = gameState.levels;
+    if (!finished) {
+      levels = activateLevelEntry(levels, String(nextLevel));
+    }
+
+    const nextGameState: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      score: gameState.score + reward,
+      current_phase: finished ? gameState.current_phase : hubPhase,
+      pending_next_level: null,
+      levels,
+    };
+
+    const supabase = createAdminClient();
+    const { data: updatedTeam, error } = await supabase
+      .from("teams")
+      .update({
+        current_level: finished ? bonusLevel : nextLevel,
+        game_state: nextGameState,
+        status: finished ? "finished" : "playing",
+        finished_at: finished ? new Date().toISOString() : null,
+      })
+      .eq("id", team.id)
+      .eq("status", "playing")
+      .select(
+        "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
+      )
+      .single();
+
+    if (error || !updatedTeam) {
+      return { success: false, error: error?.message ?? "Bonus-Update fehlgeschlagen." };
+    }
+
+    return { success: true, data: buildRealtimeState(updatedTeam, player) };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Bonus fehlgeschlagen.",
+    };
+  }
+}
+
+/** Skip bonus (non-assigned roles waiting, or empty bonus). Advances team to next hub. */
+export async function skipBonusPhase(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    return await leaveBonusPhase({ ...input, skip: true });
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Bonus überspringen fehlgeschlagen.",
+    };
+  }
 }

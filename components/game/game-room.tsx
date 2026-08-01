@@ -3,24 +3,38 @@
 import Link from "next/link";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import {
+  advanceFromHub,
   dismissSyncModal,
   purchaseHint,
+  skipBonusPhase,
   solveCurrentLevel,
+  submitArrivalQuiz,
+  submitBonusAnswer,
 } from "@/app/actions/game";
 import { usesMissionShell } from "@/lib/grid/blueprints";
+import { CityPlayShell } from "@/components/game/city/play-shell";
+import { BigButton } from "@/components/game/city/ui";
 import { ExitmaniaLevelView } from "@/components/game/exitmania-level-view";
 import { GameHud } from "@/components/game/game-hud";
 import { LevelPanel } from "@/components/game/level-panel";
+import { PlayPhaseFlow } from "@/components/game/play-phase-flow";
 import { SyncModal } from "@/components/game/sync-modal";
 import { IdentityBar } from "@/components/player/identity-bar";
 import { SessionHandoffScreen } from "@/components/player/session-handoff-screen";
 import { GridError } from "@/components/grid/grid-shell";
 import { cockpitShowPath } from "@/lib/grid/event-routes";
 import { useTeamSync } from "@/lib/hooks/use-team-sync";
+import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
 import { cacheTeamState } from "@/lib/grid/offline-state";
+import { archetypeRoleLabel } from "@/lib/grid/archetype-roles";
 import type { TeamGameState, TeamRealtimeState } from "@/lib/grid/game-state";
-import type { ResolvedEventContent, SolveLevelPayload } from "@/lib/grid/level-types";
+import type {
+  GeolocationSample,
+  ResolvedEventContent,
+  SolveLevelPayload,
+} from "@/lib/grid/level-types";
 import type { PlayerSession } from "@/lib/grid/types";
+import { usesPhasedPlay } from "@/lib/grid/play-slots";
 
 type GameRoomProps = {
   inviteCode: string;
@@ -144,6 +158,126 @@ export function GameRoom({
     });
   }
 
+  function applyTeamResult(result: { success: boolean; data?: TeamRealtimeState; error?: string }) {
+    if (!result.success || !result.data) {
+      setError(result.error ?? "Aktion fehlgeschlagen.");
+      return;
+    }
+    setTeamState(result.data);
+    cacheTeamState(result.data);
+  }
+
+  function handleArriveOutdoor(geolocation: GeolocationSample) {
+    setError(null);
+    startTransition(async () => {
+      applyTeamResult(
+        await advanceFromHub({
+          inviteCode,
+          joinCode,
+          sessionId: playerSession.sessionId,
+          geolocation,
+        }),
+      );
+    });
+  }
+
+  function handleSolveGpsCheckpoint(geolocation: GeolocationSample) {
+    handleSolveLevel({ geolocation });
+  }
+
+  function handleOpenStation(levelNumber: number) {
+    setError(null);
+    startTransition(async () => {
+      applyTeamResult(
+        await advanceFromHub({
+          inviteCode,
+          joinCode,
+          sessionId: playerSession.sessionId,
+          targetLevel: levelNumber,
+        }),
+      );
+    });
+  }
+
+  function handleSubmitStationCode(code: string) {
+    setError(null);
+    startTransition(async () => {
+      applyTeamResult(
+        await advanceFromHub({
+          inviteCode,
+          joinCode,
+          sessionId: playerSession.sessionId,
+          stationCode: code,
+        }),
+      );
+    });
+  }
+
+  function handleStartMission(levelNumber: number) {
+    setError(null);
+    startTransition(async () => {
+      applyTeamResult(
+        await advanceFromHub({
+          inviteCode,
+          joinCode,
+          sessionId: playerSession.sessionId,
+          targetLevel: levelNumber,
+        }),
+      );
+    });
+  }
+
+  function handleSubmitQuiz(payload: {
+    selectedOptionId?: string;
+    selectedOptionIds?: string[];
+  }) {
+    setError(null);
+    startTransition(async () => {
+      applyTeamResult(
+        await submitArrivalQuiz({
+          inviteCode,
+          joinCode,
+          sessionId: playerSession.sessionId,
+          selectedOptionId: payload.selectedOptionId,
+          selectedOptionIds: payload.selectedOptionIds,
+        }),
+      );
+    });
+  }
+
+  function handleSubmitBonus(selectedOptionId: string) {
+    setError(null);
+    startTransition(async () => {
+      applyTeamResult(
+        await submitBonusAnswer({
+          inviteCode,
+          joinCode,
+          sessionId: playerSession.sessionId,
+          selectedOptionId,
+        }),
+      );
+    });
+  }
+
+  function handleSkipBonus() {
+    setError(null);
+    startTransition(async () => {
+      applyTeamResult(
+        await skipBonusPhase({
+          inviteCode,
+          joinCode,
+          sessionId: playerSession.sessionId,
+        }),
+      );
+    });
+  }
+
+  const phased = usesPhasedPlay(eventContent);
+  const { remainingLabel } = useMissionCountdown(
+    teamState.startedAt,
+    eventContent.missionDurationMinutes,
+  );
+
   function handleDismissModal() {
     if (!modal) return;
     startTransition(async () => {
@@ -162,6 +296,113 @@ export function GameRoom({
     });
   }
 
+  const playBody = sessionSuperseded ? (
+    <SessionHandoffScreen
+      inviteCode={inviteCode}
+      joinCode={joinCode}
+      playerId={playerSession.playerId}
+      displayName={playerSession.displayName}
+    />
+  ) : isFinished ? (
+    <div className="space-y-4 px-5 py-8">
+      <p className="text-2xl font-bold text-[var(--cg-fg)]">Mission abgeschlossen!</p>
+      <p className="text-base text-[var(--cg-muted)]">
+        {teamName} · {eventContent.levels.length} Aufgaben ·{" "}
+        <span className="font-semibold text-[var(--cg-fg)]">
+          {teamState.gameState.score ?? 0} Punkte
+        </span>
+      </p>
+      {eventContent.showLiveScore ? (
+        <Link href={cockpitShowPath(inviteCode)}>
+          <BigButton variant="accent">Live-Ranking ansehen</BigButton>
+        </Link>
+      ) : null}
+    </div>
+  ) : currentLevelDefinition ? (
+    phased && usesMissionShell(eventContent) ? (
+      <PlayPhaseFlow
+        eventContent={eventContent}
+        gameState={teamState.gameState}
+        activeLevel={activeLevel}
+        teamName={teamName}
+        myName={playerSession.displayName}
+        myRole={playerSession.archetypeRole}
+        myRoleLabel={archetypeRoleLabel(playerSession.archetypeRole)}
+        timeLabel={remainingLabel}
+        purchasedHints={purchasedTileHints}
+        score={teamState.gameState.score ?? 0}
+        disabled={solveDisabled && teamState.gameState.current_phase !== "bonus"}
+        isPending={isPending || isHintPending}
+        canUnlockGps={isNavigator}
+        effectiveBeta={playerSession.effectiveBeta}
+        soloAlpha={soloAlpha}
+        levelStartedAt={levelStartedAt}
+        teamStartedAt={teamState.startedAt}
+        onArriveOutdoor={handleArriveOutdoor}
+        onSolveGpsCheckpoint={handleSolveGpsCheckpoint}
+        onOpenStation={handleOpenStation}
+        onSubmitStationCode={handleSubmitStationCode}
+        onStartMission={handleStartMission}
+        onSubmitQuiz={handleSubmitQuiz}
+        onSolveLevel={handleSolveLevel}
+        onPurchaseHint={handlePurchaseHint}
+        onSubmitBonus={handleSubmitBonus}
+        onSkipBonus={handleSkipBonus}
+      />
+    ) : usesMissionShell(eventContent) ? (
+      <ExitmaniaLevelView
+        level={currentLevelDefinition}
+        allLevels={eventContent.levels}
+        levelStatuses={teamState.gameState.levels}
+        purchasedHints={purchasedTileHints}
+        score={teamState.gameState.score ?? 0}
+        disabled={solveDisabled}
+        isPending={isPending || isHintPending}
+        canUnlockGps={isNavigator}
+        effectiveBeta={playerSession.effectiveBeta}
+        soloAlpha={soloAlpha}
+        gpsCapability={eventContent.capabilities.gps}
+        levelStartedAt={levelStartedAt}
+        teamStartedAt={teamState.startedAt}
+        onSubmit={handleSolveLevel}
+        onPurchaseHint={handlePurchaseHint}
+      />
+    ) : (
+      <LevelPanel
+        level={currentLevelDefinition}
+        disabled={solveDisabled}
+        isPending={isPending}
+        isNavigator={isNavigator}
+        onSubmit={handleSolveLevel}
+      />
+    )
+  ) : (
+    <GridError message="Level-Inhalt konnte nicht geladen werden." />
+  );
+
+  if (phased && usesMissionShell(eventContent)) {
+    return (
+      <>
+        <CityPlayShell mode={eventContent.contentMode}>
+          {playBody}
+          {realtimeError ? (
+            <div className="px-4 pb-4">
+              <GridError message={realtimeError} />
+            </div>
+          ) : null}
+          {error ? (
+            <div className="px-4 pb-4">
+              <GridError message={error} />
+            </div>
+          ) : null}
+        </CityPlayShell>
+        {modal && !sessionSuperseded ? (
+          <SyncModal modal={modal} onDismiss={handleDismissModal} isPending={isPending} />
+        ) : null}
+      </>
+    );
+  }
+
   return (
     <>
       <div className="flex min-w-0 flex-col gap-5 sm:gap-6">
@@ -171,84 +412,25 @@ export function GameRoom({
           session={playerSession}
           showCopyPlayLink
         />
-
-        {sessionSuperseded ? (
-          <SessionHandoffScreen
+        {!sessionSuperseded && !isFinished ? (
+          <GameHud
             inviteCode={inviteCode}
-            joinCode={joinCode}
-            playerId={playerSession.playerId}
-            displayName={playerSession.displayName}
+            teamName={teamName}
+            eventTitle={eventTitle}
+            currentLevel={activeLevel}
+            totalLevels={eventContent.levels.length}
+            completedLevels={completedLevels}
+            score={teamState.gameState.score ?? 0}
+            startedAt={teamState.startedAt}
+            missionDurationMinutes={eventContent.missionDurationMinutes}
+            showLiveScore={eventContent.showLiveScore}
+            isConnected={isConnected}
           />
-        ) : (
-          <>
-            <GameHud
-          inviteCode={inviteCode}
-          teamName={teamName}
-          eventTitle={eventTitle}
-          currentLevel={activeLevel}
-          totalLevels={eventContent.levels.length}
-          completedLevels={completedLevels}
-          score={teamState.gameState.score ?? 0}
-          startedAt={teamState.startedAt}
-          missionDurationMinutes={eventContent.missionDurationMinutes}
-          showLiveScore={eventContent.showLiveScore}
-          isConnected={isConnected}
-        />
-
-        {isFinished ? (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-6 text-sm text-emerald-900">
-            <p className="text-xl font-semibold text-emerald-800">Mission abgeschlossen!</p>
-            <p className="mt-2">
-              {teamName} · {eventContent.levels.length} Aufgaben ·{" "}
-              <span className="font-semibold">{teamState.gameState.score ?? 0} Punkte</span>
-            </p>
-            {eventContent.showLiveScore ? (
-              <Link
-                href={cockpitShowPath(inviteCode)}
-                className="mt-4 inline-block font-medium text-teal-600 underline-offset-2 hover:underline"
-              >
-                Live-Ranking ansehen →
-              </Link>
-            ) : null}
-          </div>
-        ) : currentLevelDefinition ? (
-          usesMissionShell(eventContent) ? (
-            <ExitmaniaLevelView
-              level={currentLevelDefinition}
-              allLevels={eventContent.levels}
-              levelStatuses={teamState.gameState.levels}
-              purchasedHints={purchasedTileHints}
-              score={teamState.gameState.score ?? 0}
-              disabled={solveDisabled}
-              isPending={isPending || isHintPending}
-              canUnlockGps={isNavigator}
-              effectiveBeta={playerSession.effectiveBeta}
-              soloAlpha={soloAlpha}
-              gpsCapability={eventContent.capabilities.gps}
-              levelStartedAt={levelStartedAt}
-              teamStartedAt={teamState.startedAt}
-              onSubmit={handleSolveLevel}
-              onPurchaseHint={handlePurchaseHint}
-            />
-          ) : (
-            <LevelPanel
-              level={currentLevelDefinition}
-              disabled={solveDisabled}
-              isPending={isPending}
-              isNavigator={isNavigator}
-              onSubmit={handleSolveLevel}
-            />
-          )
-        ) : (
-          <GridError message="Level-Inhalt konnte nicht geladen werden." />
-        )}
-
+        ) : null}
+        {playBody}
         {realtimeError ? <GridError message={realtimeError} /> : null}
         {error ? <GridError message={error} /> : null}
-          </>
-        )}
       </div>
-
       {modal && !sessionSuperseded ? (
         <SyncModal modal={modal} onDismiss={handleDismissModal} isPending={isPending} />
       ) : null}

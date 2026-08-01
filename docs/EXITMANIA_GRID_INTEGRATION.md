@@ -24,7 +24,7 @@ Loquiz wird **nur** durch GRID ersetzt — nicht Exitmanias Commerce-Schicht.
 | **2** | Mission/Rätselblatt nach Freischaltung | Global (`global_levels`) |
 | **3** | Bonus, Alpha/Beta/Gamma-Aufgaben | Trigger + Rollen |
 
-Spiele kombinieren Layer frei. Indoor-Fallback = `content_config.content_mode`. Kunden-Override Layer 1 = `route_override`.
+Spiele kombinieren Layer frei. Surfaces: `content_config.content_mode` = outdoor | indoor | online (Tabbrain). Dual-Fallback Indoor (Stationen/Codes) oder Online. Kunden-Override Layer 1 = `route_override` (GPS + `stations` Codes).
 
 ## Content — keine Duplikate
 

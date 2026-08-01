@@ -91,6 +91,9 @@ export function GameGate({
         uiLayout: contentResult.data.uiLayout,
         showLiveScore: contentResult.data.showLiveScore,
         missionDurationMinutes: contentResult.data.missionDurationMinutes,
+        contentMode: contentResult.data.contentMode,
+        allowedFallbacks: contentResult.data.allowedFallbacks,
+        compiledLogic: contentResult.data.compiledLogic,
       };
 
       cacheEventContent(contentResult.data.eventId, freshContent);
@@ -124,6 +127,9 @@ export function GameGate({
         uiLayout: contentResult.data.uiLayout,
         showLiveScore: contentResult.data.showLiveScore,
         missionDurationMinutes: contentResult.data.missionDurationMinutes,
+        contentMode: contentResult.data.contentMode,
+        allowedFallbacks: contentResult.data.allowedFallbacks,
+        compiledLogic: contentResult.data.compiledLogic,
       };
 
       cacheEventContent(contentResult.data.eventId, freshContent);

@@ -15,10 +15,11 @@ Read `docs/EXITMANIA_GRID_INTEGRATION.md` and `docs/GRID_LAYER_MODEL.md` before 
 
 ## Content (Layer model)
 
-- **Layer 1:** `local_waypoints` + city-scoped tasks (geo/env)
-- **Layer 2:** `global_levels` (global mission)
+- **Layer 1:** `local_waypoints` (outdoor GPS) + `local_stations` (indoor codes) + city-scoped tasks
+- **Layer 2:** `global_levels` (global mission — one content, all surfaces)
 - **Layer 3:** logic rules + role assignments (bonus, Micro-Pulse)
-- Per booking: `events.content_config` + `events.route_override` (Layer 1 deltas only)
+- Surfaces: outdoor | indoor | online (Tabbrain); dual fallback; phases Hub → Quiz → Level → Bonus
+- Per booking: `events.content_config` + `events.route_override` (GPS + station code deltas)
 - Never duplicate full route JSON per event
 - See `docs/GRID_LAYER_MODEL.md` for Studio priorities
 

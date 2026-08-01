@@ -12,6 +12,7 @@ import {
 import { StudioBadge, StudioPanel } from "@/components/cms/admin-shell";
 import { GameLayerProfilePanel } from "@/components/cms/games/game-layer-profile-panel";
 import { GameLogicPanel } from "@/components/cms/games/game-logic-panel";
+import { GameSlotsPanel } from "@/components/cms/games/game-slots-panel";
 import { GameDeleteButton } from "@/components/cms/games/game-delete-button";
 import { GameDuplicateButton } from "@/components/cms/games/game-duplicate-button";
 import { GameStatusSwitch } from "@/components/cms/games/game-status-switch";
@@ -34,7 +35,7 @@ import {
   StudioSuccess,
   StudioTextarea,
 } from "@/components/cms/studio-ui";
-import { parseActiveLayers } from "@/lib/cms/layer-model";
+import { parseActiveLayers, parseRuntimeProfiles } from "@/lib/cms/layer-model";
 import { parseLogicRules, type StudioLogicRule } from "@/lib/cms/logic-rules";
 import type { StudioGame, StudioGameTaskLink } from "@/lib/cms/types";
 
@@ -333,15 +334,33 @@ export function GameEditorPanel({
 
       <GameLayerProfilePanel game={game} />
 
-      <GameLogicPanel
+      <GameSlotsPanel
         gameId={game.id}
+        surface={parseRuntimeProfiles(game.runtime_profiles).default_mode}
         language={game.language}
-        gpsEnabled={game.gps_enabled}
-        citySlug={game.city_slug}
-        activeLayers={parseActiveLayers(game.active_layers)}
         initialLinks={taskLinks}
-        initialRules={game.logic_rules}
       />
+
+      <details className="group rounded-2xl border border-slate-200 bg-white open:shadow-sm">
+        <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-slate-800 marker:content-none [&::-webkit-details-marker]:hidden">
+          Erweitert: Layer-Spalten &amp; Logik-Regeln
+          <span className="mt-1 block text-xs font-normal text-slate-500">
+            Für GPS-Feinheiten, Bonus-Rollen und komplexe Trigger — der normale Ablauf liegt oben unter
+            „Spielablauf“.
+          </span>
+        </summary>
+        <div className="border-t border-slate-100 px-2 pb-4 pt-2 sm:px-4">
+          <GameLogicPanel
+            gameId={game.id}
+            language={game.language}
+            gpsEnabled={game.gps_enabled}
+            citySlug={game.city_slug}
+            activeLayers={parseActiveLayers(game.active_layers)}
+            initialLinks={taskLinks}
+            initialRules={game.logic_rules}
+          />
+        </div>
+      </details>
     </div>
   );
 }

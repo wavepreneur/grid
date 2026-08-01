@@ -227,14 +227,15 @@ Bei jedem Release prüfen:
 ## 5. Empfohlene Build-Reihenfolge
 
 1. **Layer-Modell im Studio** — Profil, Task-Layer, Publish-Snapshot (`docs/GRID_LAYER_MODEL.md`) ✅ Basis
-2. **Runtime content_mode** — Content-Loader filtert Layer 1/3 nach Outdoor/Indoor
-3. **Logic-Engine zur Laufzeit** — Layer-3-Trigger + Layer-2-Freischaltung (heute linear)
-4. **Kunden-Override UI** — Formular → `route_override` (Layer 1)
-5. **Micro-Pulse API** — Layer-3-only Sessions (REST)
-6. **Sprache pro Team** — Event-Level
-7. **Blueprint-Routing** — Archetyp-Registry formalisieren
-8. **activity_logs + Cockpit-Filter** — Analytics
-9. **TIME_DECAY_SPRINT / COOPERATIVE_COLLECTIVE** — weitere Archetypen
+2. **Surfaces + Phasen** — outdoor/indoor/online, Hub→Quiz→Level→Bonus (`play-surface.ts`, `frontend_idee/`)
+3. **local_stations + Loader content_mode** — Indoor Codes; Filter Layer 1/3 nach Surface
+4. **Player-UI Phasen** — Prototype verdrahten unter `/e/…`
+5. **Logic-Engine zur Laufzeit** — Layer-3-Trigger + Layer-2-Freischaltung (heute linear)
+6. **Kunden-Override UI** — GPS + Stationscodes → `route_override`
+7. **Online-Extras** — Ready/Board/Feed (später)
+8. **Micro-Pulse API** — Layer-3-only Sessions (REST)
+9. **Sprache pro Team** — Event-Level
+10. **activity_logs + Cockpit-Filter** — Analytics
 
 **Nicht in GRID bauen:** Content-Shop, Zahlungsabwicklung, Story-Editor, Loquiz-Klon-Features ohne Layer-Bezug — das bleibt Tabbrain/Exitmania bzw. ist bewusst out of scope.
 

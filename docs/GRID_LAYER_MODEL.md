@@ -3,7 +3,8 @@
 > **Für Agenten und Entwickler:** Diese Datei ist der Kompass für GRID Studio und Content-Architektur.
 > Vor jedem Studio-Feature lesen. Bei Abweichungen: Feature stoppen oder hier dokumentieren warum.
 
-Verwandt: [`GRID_ARCHITECTURE.md`](../GRID_ARCHITECTURE.md), [`docs/EXITMANIA_GRID_INTEGRATION.md`](./EXITMANIA_GRID_INTEGRATION.md)
+Verwandt: [`GRID_ARCHITECTURE.md`](../GRID_ARCHITECTURE.md), [`docs/EXITMANIA_GRID_INTEGRATION.md`](./EXITMANIA_GRID_INTEGRATION.md)  
+Spieler-Ziel-UI (Prototyp): [`frontend_idee/`](../frontend_idee/) — Outdoor / Indoor / Online.
 
 ---
 
@@ -14,14 +15,14 @@ Verwandt: [`GRID_ARCHITECTURE.md`](../GRID_ARCHITECTURE.md), [`docs/EXITMANIA_GR
 | Modell | Viele Partner erstellen viele Spiele | **Wenige Spiele**, maximale Skalierung |
 | Skalierung | Horizontal (mehr Creator) | Vertikal (mehr Städte, Events, Sprachen, Teams) |
 | Content | Monolith pro Spiel | **Modulare Layer** mit Verknüpfungen |
-| Studio-Ziel | Beliebige Spiele bauen | Layer pflegen, Runtime-Profile schalten |
+| Studio-Ziel | Beliebige Spiele bauen | Layer pflegen, Runtime-Surfaces schalten |
 
 **Leitfrage vor jedem Feature:**
 
 1. Hilft es, **Layer 1** (standortbezogen) pro Stadt schnell anzupassen?
 2. Hilft es, **Layer 2** (global/Mission) konsistent zu halten?
 3. Hilft es, **Layer 3** (Rollen, Bonus, Trigger) abzubilden?
-4. Hilft es, **Runtime-Switches** (Indoor, Sprache, Event vs. Pulse)?
+4. Hilft es, **Runtime-Surfaces** (Outdoor / Indoor / Online, Pulse)?
 5. Nutzt es **Alpha/Beta/Gamma**-Asymmetrie?
 
 Wenn **nein** → wahrscheinlich Loquiz-Noise, **nicht** bauen.
@@ -34,143 +35,208 @@ Layer sind **Bausteine**, kein festes 3-Stufen-Rezept. Spiele kombinieren sie fr
 
 ### Layer 1 — Geo / Umgebung (standortbezogen)
 
-**Was der Spieler erlebt:** Karte → Wegpunkt → Umgebungs-Quiz (Multiple Choice).
+**Was der Spieler erlebt:** Hub (Karte oder Stationen) → Ankunft → Umgebungs-Quiz (Multiple Choice).
 
 | Eigenschaft | Wert |
 |-------------|------|
-| Skalierung | Pro **Stadt** / Standort unterschiedlich |
-| GPS | Ja (Outdoor); Indoor-Fallback ohne GPS |
-| DB (Runtime) | `local_waypoints` + stadt-spezifische Studio-Tasks |
-| Studio-Feld | `studio_tasks.layer = 1`, `city_slug`, GPS in `overrides` |
+| Skalierung | Pro **Stadt** / Venue unterschiedlich |
+| Outdoor | GPS-Wegpunkte (`local_waypoints`) |
+| Indoor | Stationen + Stationscodes (`local_stations`) — laufen im Gebäude, ohne GPS |
+| Online | Kein Layer-1-Hub; Einstiegsquiz optional an der Mission |
+| Studio-Feld | `studio_tasks.layer = 1`, `city_slug`, GPS/`station` in overrides |
 
 **Typische Spiele:** Nur Layer 1 (+ optional Layer-3-Bonus) = Stadt-Entdecker.
 
 ### Layer 2 — Mission (global identisch)
 
-**Was der Spieler erlebt:** Quiz gelöst → Freischalt-Animation → Mission-Level (Rätselblatt, Tiles).
+**Was der Spieler erlebt:** Quiz gelöst → Mission-Level (Hero, Kacheln/Tiles, Antwort).
 
 | Eigenschaft | Wert |
 |-------------|------|
-| Skalierung | **Global gleich** in allen Städten |
-| GPS | Nein (digital/indoor) |
+| Skalierung | **Global gleich** in allen Städten / Surfaces |
+| GPS | Nein |
 | DB (Runtime) | `global_levels` + Studio-Tasks Layer 2 |
 | Studio-Feld | `studio_tasks.layer = 2` |
 
-**Typische Spiele:** Layer 2 + 3 = Story/Mission ohne GPS.
+**Wichtig:** Layer 2 wird **einmal** gepflegt und auf Outdoor, Indoor und Online gerendert. Keine drei Mission-Kopien.
 
 ### Layer 3 — Asymmetrie / Bonus (Rollen & Trigger)
 
-**Was der Spieler erlebt:** Bonusaufgaben, unterschiedliche Views pro Rolle, erzwungene Kommunikation.
+**Was der Spieler erlebt:** Bonusaufgaben nur für eine Rolle (Alpha/Beta/Gamma) oder Team.
 
 | Eigenschaft | Wert |
 |-------------|------|
-| Skalierung | Eigene Schicht, verknüpft mit 1/2 |
+| Skalierung | Eigene Schicht, verknüpft mit Slot 1/2 |
 | Rollen | Alpha, Beta, Gamma oder ganzes Team |
-| Trigger | Aufgabe gelöst, Punkte, Spielzeit, GPS erreicht |
+| Trigger | Aufgabe gelöst, Punkte, Spielzeit, GPS/Code erreicht |
+| Kontext | `content_context`: outdoor \| indoor \| online \| any |
 | DB (Runtime) | `logic_rules` + Studio-Tasks Layer 3 |
-| Studio-Feld | `studio_tasks.layer = 3`, `role_assignment` |
 
 **Typische Spiele:** Nur Layer 3 = **Micro-Pulse** (Slack, ~10 Min, REST).
 
 ---
 
-## 3. Spiel-Profile (Layer-Kombinationen)
+## 3. Play-Surfaces (Outdoor / Indoor / Online)
 
-| Profil | Layer | Use Case |
-|--------|-------|----------|
-| **Vollständig** | 1 + 2 + 3 | Exitmania Standard (GPS → Mission → Bonus) |
-| **Stadt-Entdecker** | 1 (+ 3 optional) | Orte entdecken, zwischendrin Bonus |
-| **Mission** | 2 + 3 | Indoor/Story ohne GPS |
-| **Micro-Pulse** | 3 | Slack/Teams, asymmetrische Kurzaufgaben |
-| **Minimal** | 1 oder 3 | Spezialfälle |
+Surfaces sind **Darstellung + Einstieg**, nicht drei getrennte Spiele.
 
-Im Studio: `studio_games.active_layers` (Array `[1,2,3]`).
+| Surface | Produkt | Hub | Ankunft | Shell |
+|---------|---------|-----|---------|-------|
+| **outdoor** | Exitmania | GPS-Karte / Wegpunkte | Geofence | Phone |
+| **indoor** | Exitmania | Stationsliste | Stationscode (oder Antippen) | Phone |
+| **online** | Tabbrain | Missions-Deck | gemeinsamer Start (Ready später) | Stage |
+
+Code: `lib/grid/play-surface.ts`, `lib/cms/layer-model.ts` → `CONTENT_MODES`.
+
+### Player-Phasen (verbindlich)
+
+Pro Stop / Slot, wie in `frontend_idee/`:
+
+```text
+Hub → Quiz → Level → Bonus (optional)
+```
+
+| Phase | Inhalt | Layer |
+|-------|--------|-------|
+| **Hub** | Karte / Stationen / Missionen | Surface-Chrome |
+| **Quiz** | Multiple-Choice als Schlüssel | Layer 1 (Outdoor/Indoor) oder Intro an Layer 2 (Online) |
+| **Level** | Tiles, Tipps, Antwort | Layer 2 |
+| **Bonus** | rollenspezifisch | Layer 3 |
+
+Runtime und Studio müssen Content so speichern, dass diese Phasen gefüttert werden — **kein** Monolith-Screen, der alles vermischt.
+
+### Ein Content-Stand, drei Renderings
+
+```text
+Slot N  (global_level_id)
+├── Layer 1 outdoor → waypoint N (lat/lng) + arrival quiz
+├── Layer 1 indoor  → station N (code, place) + station quiz
+├── Layer 2         → mission N (tiles, answer)  ← einmal
+└── Layer 3         → bonus nach Solve (optional, context-filter)
+```
+
+- **Exitmania Outdoor:** Hub = Waypoints, Fallback wählbar
+- **Exitmania Indoor (primär oder Fallback):** Hub = Stationen
+- **Tabbrain Online:** Hub = Missionen (= Layer-2-Liste), kein GPS/Code
+
+---
+
+## 4. Dual-Fallback (Kunde wählt)
+
+Gebucht oft als Outdoor. Bei Regen / Planänderung entscheidet der Kunde (oder Operator):
+
+| Fallback | Spieler-Erlebnis |
+|----------|------------------|
+| **indoor** | Im Gebäude laufen, Stationscodes finden |
+| **online** | Am Tisch / remote, jeder am eigenen Gerät (Tabbrain-Shell) |
+
+Studio-Definition:
+
+```json
+{
+  "default_mode": "outdoor",
+  "allowed_fallbacks": ["indoor", "online"],
+  "profiles": { "outdoor": {…}, "indoor": {…}, "online": {…} }
+}
+```
+
+Live: `events.content_config.content_mode` = `"outdoor"` \| `"indoor"` \| `"online"`.
+
+Content-Loader filtert Layer 1/3 nach Mode — **Loader-Filter: Roadmap**, Typen vorhanden.
+
+---
+
+## 5. Indoor-Stationen & Codes
+
+Indoor = GPS-Game **ohne GPS**: Teilnehmer laufen zu Objekten, Codes ersetzen den Geofence.
+
+| Feld | Bedeutung |
+|------|-----------|
+| `name` | Stationsname |
+| `place` | Raumhinweis („Saal A · Tisch 1“) |
+| `code` | Default-Code (z. B. `A1`) — auf Schild am Ort |
+| `kind` | puzzle \| search \| logic \| team \| finale |
+| `global_level_id` | Slot → dieselbe Layer-2-Mission |
+
+**Defaults:** Codes werden beim Content-Pack / Publish vergeben.  
+**Kunden-Override:** wie GPS — Deltas in `events.route_override.stations` (Code, Place), kein neues Spiel.
+
+DB: `local_stations` (parallel zu `local_waypoints`), Unique `(city_id, global_level_id)` und `(city_id, code)`.
+
+---
+
+## 6. Spiel-Profile (Layer-Kombinationen)
+
+| Profil | Layer | Surface-Default | Use Case |
+|--------|-------|-----------------|----------|
+| **Vollständig** | 1 + 2 + 3 | outdoor (+ Fallback indoor/online) | Exitmania Standard |
+| **Stadt-Entdecker** | 1 (+ 3) | outdoor | Orte entdecken |
+| **Indoor-Escape** | 1 + 2 + 3 | indoor | Museum/Venue mit Codes |
+| **Mission / Online** | 2 + 3 | online | Tabbrain remote |
+| **Micro-Pulse** | 3 | — | Slack/Teams, REST |
+
+Im Studio: `studio_games.active_layers` + `runtime_profiles`.
 
 Code: `lib/cms/layer-model.ts` → `LAYER_GAME_PRESETS`.
 
 ---
 
-## 4. Runtime-Profile (Outdoor ↔ Indoor)
-
-Gebucht: 3 Layer Outdoor. Es regnet → **ein Klick** auf Indoor.
-
-| Modus | Layer 1 | Layer 2 | Layer 3 |
-|-------|---------|---------|---------|
-| **Outdoor** | GPS-Wegpunkte + Outdoor-Quiz | Unverändert | Outdoor-Bonus (wenn `context=outdoor`) |
-| **Indoor** | Ersetzt durch **Indoor-Default-Tasks** (ohne GPS) | Unverändert | Indoor-Bonus (wenn `context=indoor`) |
-
-Speicherort:
-
-- **Studio (Definition):** `studio_games.runtime_profiles` (JSON)
-- **Live (Laufzeit):** `events.content_config.content_mode` = `"outdoor"` | `"indoor"`
-
-Content-Loader (`lib/grid/content-loader.ts`) muss Tasks nach `content_mode` filtern — **Runtime-Implementierung: Roadmap**.
-
----
-
-## 5. Weitere Skalierungs-Dimensionen
-
-Ein Game-Template skaliert über:
+## 7. Weitere Skalierungs-Dimensionen
 
 | Dimension | Mechanismus |
 |-----------|-------------|
-| **Städte** | Layer 1 pro `city_slug`; Layer 2 global |
-| **Indoor/Outdoor** | Runtime-Profile + `content_mode` |
-| **Sprache** | Pro Team andere Sprache im selben Event (`teams.language` — Roadmap) |
-| **Rollen** | Layer 3 + Alpha/Beta/Gamma Engine |
+| **Städte** | Layer 1 Waypoints/Stations pro `city_slug`; Layer 2 global |
+| **Surfaces** | `content_mode` + Dual-Fallback |
+| **Sprache** | Pro Team (`teams.language` — Roadmap) |
+| **Rollen** | Layer 3 + Alpha/Beta/Gamma |
 | **Multiplayer** | Viele Teams, ein Snapshot, WebSocket FSM |
-| **Telemetrie** | Qualitative Daten (Rollen-Handoffs, Latenz) — nicht nur Quiz-Scores |
+| **Online-Extras** | Ready-Check, Team-Board, Draft — **später** (nicht MVP) |
 
 ---
 
-## 6. Datenbank-Mapping
+## 8. Datenbank-Mapping
 
-### Runtime (bestehend)
+### Runtime
 
 ```text
 Layer 2  →  global_levels.content
-Layer 1  →  local_waypoints (GPS + intro_text) ⨝ global_level_id
-Layer 3  →  logic_rules (Studio) / triggers in level definitions
+Layer 1 outdoor →  local_waypoints (GPS + intro) ⨝ global_level_id
+Layer 1 indoor  →  local_stations (code + place) ⨝ global_level_id
+Layer 3  →  logic_rules / Studio Layer-3-Tasks
 
 events.content_config     → blueprint, city_slug, content_pack_slug, content_mode
-events.route_override     → Buchungs-Deltas (Kunden-Override Layer 1)
+events.route_override     → Deltas: levels (GPS/Quiz), stations (codes)
 events.studio_game_version_id  → eingefrorener Snapshot
 ```
 
-### Studio (neu / erweitert)
+### Studio
 
 ```text
 studio_tasks.layer              → 1 | 2 | 3
-studio_tasks.content_context    → outdoor | indoor | any
+studio_tasks.content_context    → outdoor | indoor | online | any
 studio_tasks.role_assignment    → alpha | beta | gamma | team | none
 
 studio_games.active_layers      → [1, 2, 3]
-studio_games.runtime_profiles   → outdoor/indoor Profile JSON
+studio_games.runtime_profiles   → Surfaces + allowed_fallbacks
 ```
 
-### Getrennte Daten, intelligente Verknüpfung
+---
 
-- Layer-2-Daten: einmal pflegen, überall gleich
-- Layer-1-Daten: eigene Schicht pro Stadt (eigene Tasks / Waypoints)
-- Layer-3-Daten: eigene Schicht mit Triggern und Rollen
-- **Verknüpfung** über Game-Snapshot + Logic Rules, nicht über Voll-Duplikate
+## 9. Kunden-Override (Layer 1)
+
+Vor dem Spiel (Formular / Booking-API):
+
+| Surface | Override |
+|---------|----------|
+| Outdoor | GPS-Koordinaten, Umgebungs-Quiz |
+| Indoor | Stationscodes, Place-Texte |
+| Online | typischerweise keine Layer-1-Overrides |
+
+Technisch: `events.route_override` — nur Deltas.
 
 ---
 
-## 7. Kunden-Override (Layer 1)
-
-Kunden, die ein Spiel gekauft haben, können **vor dem Spiel** per Formular:
-
-- GPS-Koordinaten überschreiben
-- Umgebungs-Quizzes anpassen
-
-Technisch: `events.route_override` (nur Deltas, kein neues Spiel).
-
-Exitmania/Tabbrain ruft Booking-API mit `route_override` auf — siehe Integrations-Doku.
-
----
-
-## 8. Deployment-Formen (Macro vs. Micro)
+## 10. Deployment-Formen (Macro vs. Micro)
 
 | Form | Layer | Transport | Dauer |
 |------|-------|-----------|-------|
@@ -181,78 +247,70 @@ Gleiche Engine, unterschiedliches Layer-Profil und Transport — kein separates 
 
 ---
 
-## 9. Studio-UI-Struktur (Soll-Zustand)
+## 11. Studio-UI-Struktur (Soll-Zustand)
 
 ```text
 Spiel-Editor
-├── Einstellungen (Name, Sprache, GPS-Flag)
-├── Layer-Profil          ← Welche Layer aktiv? Indoor-Fallback?
-├── Layer 1 — Geo         ← Karte, Wegpunkte, Stadt-Tasks
-├── Layer 2 — Mission     ← Globale Level-Reihenfolge
-└── Layer 3 — Bonus       ← Rollen-Aufgaben, Trigger (Logic Rules)
-
-Aufgaben-Bibliothek
-└── Neutrale Aufgaben (kein Layer) — gelten für alle Spiele
-
-Spiel-Editor
-├── Layer-Profil
-├── Drei Spalten: Geo | Mission | Bonus (Drag & Drop aus Bibliothek)
-│   └── Layer-Config am Spiel-Link (studio_game_tasks), nicht an der Aufgabe
-└── Logik-Vorschau (Modal)
+├── Einstellungen (Name, Sprache, Primary Surface)
+├── Layer-Profil          ← Layer + erlaubte Fallbacks (Indoor / Online)
+├── Layer 1 — Geo         ← Outdoor-Waypoints + Indoor-Stationen (gleicher Slot)
+├── Layer 2 — Mission     ← Globale Level (einmal)
+└── Layer 3 — Bonus       ← Rollen-Aufgaben, Trigger, content_context
 ```
 
-**Nicht priorisieren:** Loquiz-Flow-Modi (Rogain/Open) als Haupt-UX — nur wenn Layer-2-Sequenzierung sie braucht **und** Runtime-Engine sie unterstützt.
+**Nicht priorisieren:** Loquiz-Flow-Modi als Haupt-UX; Online Ready/Board/Feed vor Phasen-Runtime.
 
 ---
 
-## 10. Ist-Stand vs. Roadmap
+## 12. Ist-Stand vs. Roadmap
 
 | Feature | Status | Hinweis |
 |---------|--------|---------|
 | Alpha/Beta/Gamma Runtime | ✅ Live | `lib/grid/archetype-roles.ts` |
-| global_levels + local_waypoints | ✅ Live | Layer 1/2 Trennung in Runtime |
-| Studio Layer-Felder (DB) | ✅ Schema | Migration `20260710140000_studio_layers.sql` |
-| Studio Layer-UI | 🟡 Basis | Layer-Profil + gefilterte Panels |
-| Logic Rules kompilieren | ✅ Live | Publish-Snapshot |
-| Logic Rules **zur Laufzeit** | ⬜ Roadmap | Heute: linear `current_level + 1` |
-| content_mode Indoor-Switch | 🟡 Schema | `runtime_profiles` + `content_config` |
-| content_mode im Loader | ⬜ Roadmap | Filter Layer 1/3 nach Kontext |
-| Sprache pro Team | ⬜ Roadmap | — |
-| Kunden-Override Formular | ⬜ Roadmap | `route_override` API existiert |
-| Micro-Pulse REST API | ⬜ Roadmap | Schema vorhanden |
+| global_levels + local_waypoints | ✅ Live | Layer 1/2 Outdoor |
+| Surfaces-Typen (outdoor/indoor/online) | ✅ Typen | `play-surface.ts`, `layer-model` |
+| Player-Phasen Hub→Quiz→Level→Bonus | ✅ Basis | inkl. Bonus-Phase + City-UI (`frontend_idee`) |
+| local_stations + Code-Override | 🟡 Schema + Loader | Migration; Defaults wenn keine Rows |
+| Studio Layer-UI | 🟡 Basis | Dual-Fallback + Create-Surface + Spielablauf-Slots |
+| Logic Rules zur Laufzeit | ⬜ Roadmap | Heute: linear `current_level + 1` |
+| content_mode im Loader | ✅ Basis | Surface-Filter + Stationen |
+| Player-UI wie frontend_idee | 🟡 Basis | `PlayPhaseFlow` unter `/e/…` |
+| Online Ready/Board/Feed | ⬜ Später | bewusst nach MVP |
+| Micro-Pulse REST | ⬜ Roadmap | Schema vorhanden |
 
 ---
 
-## 11. Build-Reihenfolge (priorisiert)
+## 13. Build-Reihenfolge (priorisiert)
 
-1. **Layer-Modell im Studio** — Profil, Task-Layer, Publish-Snapshot mit Metadaten
-2. **Runtime content_mode** — Content-Loader filtert nach Outdoor/Indoor
-3. **Logic-Engine zur Laufzeit** — Layer-3-Trigger + Layer-2-Freischaltung
-4. **Kunden-Override UI** — Formular → `route_override`
-5. **Micro-Pulse API** — Layer-3-only Sessions
-6. **Sprache pro Team**
+1. **Surfaces + Phasen im Modell** — Typen, Docs, Studio-Fallback-Flags ✅ Basis
+2. **local_stations + route_override.stations** — Indoor Layer 1
+3. **Runtime content_mode** — Loader filtert nach Surface
+4. **Player-Phasen-UI** — Hub → Quiz → Level → Bonus (frontend_idee → `/e/…`)
+5. **Logic-Engine zur Laufzeit** — Layer-3-Trigger
+6. **Kunden-Override UI** — GPS + Stationscodes
+7. **Online-Extras** — Ready / Board / Feed
+8. **Micro-Pulse API** — Layer-3-only Sessions
 
 **Nicht bauen (ohne Layer-Bezug):**
 
-- Generische Loquiz-Klon-Features (Match, Tour-Galerie als Hauptprodukt)
+- Generische Loquiz-Klon-Features ohne Layer-Bezug
 - Partner-Self-Service CMS für beliebige Spiele
 - Checkout/Commerce in GRID
 
 ---
 
-## 12. Code-Referenzen
+## 14. Code-Referenzen
 
 | Bereich | Pfad |
 |---------|------|
+| Surfaces & Phasen | `lib/grid/play-surface.ts` |
 | Layer-Typen & Presets | `lib/cms/layer-model.ts` |
-| Studio-Typen | `lib/cms/types.ts` |
-| Logic Rules / Layer 3 | `lib/cms/logic-rules.ts` |
-| Layer-Profil UI | `components/cms/games/game-layer-profile-panel.tsx` |
-| Layer-Panels | `components/cms/games/game-logic-panel.tsx` |
+| Level / Config / Stations | `lib/grid/level-types.ts` |
+| UI-Prototyp | `frontend_idee/` |
+| Studio Layer-Profil | `components/cms/games/game-layer-profile-panel.tsx` |
 | Content Loader | `lib/grid/content-loader.ts` |
 | Rollen | `lib/grid/archetype-roles.ts` |
-| Migration | `supabase/migrations/20260710140000_studio_layers.sql` |
 
 ---
 
-*Zuletzt aktualisiert: Juli 2026.*
+*Zuletzt aktualisiert: August 2026.*

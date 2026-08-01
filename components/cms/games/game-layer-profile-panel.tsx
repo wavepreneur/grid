@@ -5,12 +5,14 @@ import { updateGameLayerProfile } from "@/app/actions/cms/games";
 import { StudioPanel } from "@/components/cms/admin-shell";
 import { useStudioCache } from "@/lib/platform/studio-cache";
 import {
+  contentModeLabel,
   detectPresetFromLayers,
   isLayerActive,
   LAYER_DEFINITIONS,
   LAYER_GAME_PRESETS,
   parseActiveLayers,
   parseRuntimeProfiles,
+  type ContentMode,
   type RuntimeProfiles,
   type StudioLayer,
 } from "@/lib/cms/layer-model";
@@ -28,6 +30,7 @@ type Props = {
 };
 
 const ALL_LAYERS: StudioLayer[] = [1, 2, 3];
+const FALLBACK_OPTIONS: ContentMode[] = ["indoor", "online"];
 
 export function GameLayerProfilePanel({ game }: Props) {
   const cache = useStudioCache();
@@ -51,11 +54,17 @@ export function GameLayerProfilePanel({ game }: Props) {
     setSelectedPreset(detectPresetFromLayers(parseActiveLayers(game.active_layers)));
   }, [game.id, game.active_layers, game.runtime_profiles, game.updated_at]);
 
-  function applyPreset(presetId: typeof LAYER_GAME_PRESETS[number]["id"]) {
+  function applyPreset(presetId: (typeof LAYER_GAME_PRESETS)[number]["id"]) {
     const preset = LAYER_GAME_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
     setSelectedPreset(presetId);
     setActiveLayers([...preset.activeLayers]);
+    setRuntimeProfiles((prev) => ({
+      ...prev,
+      default_mode: preset.defaultMode,
+      allowed_fallbacks: [...preset.allowedFallbacks],
+      indoor_one_click: preset.allowedFallbacks.includes("indoor"),
+    }));
   }
 
   function toggleLayer(layer: StudioLayer) {
@@ -69,6 +78,29 @@ export function GameLayerProfilePanel({ game }: Props) {
     });
   }
 
+  function toggleFallback(mode: ContentMode) {
+    if (mode === runtimeProfiles.default_mode) return;
+    setRuntimeProfiles((prev) => {
+      const has = prev.allowed_fallbacks.includes(mode);
+      const allowed_fallbacks = has
+        ? prev.allowed_fallbacks.filter((m) => m !== mode)
+        : [...prev.allowed_fallbacks, mode];
+      return {
+        ...prev,
+        allowed_fallbacks,
+        indoor_one_click: allowed_fallbacks.includes("indoor"),
+      };
+    });
+  }
+
+  function setDefaultMode(mode: ContentMode) {
+    setRuntimeProfiles((prev) => ({
+      ...prev,
+      default_mode: mode,
+      allowed_fallbacks: prev.allowed_fallbacks.filter((m) => m !== mode),
+    }));
+  }
+
   function handleSave() {
     setError(null);
     setMessage(null);
@@ -77,7 +109,8 @@ export function GameLayerProfilePanel({ game }: Props) {
         id: game.id,
         active_layers: activeLayers,
         runtime_profiles: runtimeProfiles,
-        gps_enabled: activeLayers.includes(1),
+        gps_enabled:
+          activeLayers.includes(1) && runtimeProfiles.default_mode === "outdoor",
       });
       if (!result.success) {
         setError(result.error);
@@ -92,7 +125,7 @@ export function GameLayerProfilePanel({ game }: Props) {
     <StudioPanel>
       <StudioSectionTitle
         title="Layer-Profil"
-        description="Welche Content-Layer dieses Spiel nutzt — Grundlage für Skalierung über Städte, Indoor/Outdoor und Micro-Pulse."
+        description="Content-Layer und Play-Surfaces — Outdoor, Indoor-Stationen oder Online (Tabbrain). Spieler-Flow: Hub → Quiz → Level → Bonus."
       />
 
       <div className="space-y-6">
@@ -156,38 +189,66 @@ export function GameLayerProfilePanel({ game }: Props) {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-sm font-semibold text-slate-800">Indoor-Fallback (1 Klick)</p>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            Bei Regen: Layer 1 GPS wird durch Indoor-Defaults ersetzt, Layer-3-Bonus wechselt auf
-            Indoor-Kontext. Runtime-Umschaltung über <code className="text-teal-700">content_mode</code>.
-          </p>
-          <label className="mt-3 flex items-center gap-3 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={runtimeProfiles.indoor_one_click}
-              disabled={pending}
-              onChange={(e) =>
-                setRuntimeProfiles((prev) => ({
-                  ...prev,
-                  indoor_one_click: e.target.checked,
-                }))
-              }
-              className="h-4 w-4 rounded border-slate-300 text-teal-600"
-            />
-            Indoor-Umschaltung erlauben
-          </label>
-          {runtimeProfiles.indoor_one_click ? (
-            <div className="mt-3">
-              <StudioHint tone="info">
-                Outdoor: Layer {runtimeProfiles.profiles.outdoor.active_layers.join(", ")} · Indoor: Layer{" "}
-                {runtimeProfiles.profiles.indoor.active_layers.join(", ")}
-                {runtimeProfiles.profiles.indoor.layer_1_fallback
-                  ? ` · L1-Fallback: ${runtimeProfiles.profiles.indoor.layer_1_fallback}`
-                  : null}
-              </StudioHint>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Primary Surface</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Standard-Hub beim Start. Layer 2 (Mission) bleibt immer derselbe Content.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(["outdoor", "indoor", "online"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => setDefaultMode(mode)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    runtimeProfiles.default_mode === mode
+                      ? "bg-teal-600 text-white"
+                      : "bg-white border border-slate-200 text-slate-700 hover:border-slate-300"
+                  }`}
+                >
+                  {contentModeLabel(mode)}
+                </button>
+              ))}
             </div>
-          ) : null}
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Fallback-Optionen</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Kunde/Operator kann zur Laufzeit umschalten: Indoor (Codes im Gebäude) und/oder
+              Online (am Tisch / remote, Tabbrain-Shell).
+            </p>
+            <div className="mt-3 space-y-2">
+              {FALLBACK_OPTIONS.filter((m) => m !== runtimeProfiles.default_mode).map(
+                (mode) => (
+                  <label
+                    key={mode}
+                    className="flex items-center gap-3 text-sm text-slate-700"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={runtimeProfiles.allowed_fallbacks.includes(mode)}
+                      disabled={pending}
+                      onChange={() => toggleFallback(mode)}
+                      className="h-4 w-4 rounded border-slate-300 text-teal-600"
+                    />
+                    {contentModeLabel(mode)} erlauben
+                  </label>
+                ),
+              )}
+            </div>
+          </div>
+
+          <StudioHint tone="info">
+            Default: {contentModeLabel(runtimeProfiles.default_mode)}
+            {runtimeProfiles.allowed_fallbacks.length > 0
+              ? ` · Fallback: ${runtimeProfiles.allowed_fallbacks.map(contentModeLabel).join(", ")}`
+              : " · keine Fallbacks"}
+            {" · "}
+            Outdoor: Waypoints · Indoor: Stationen+Codes · Online: Missions-Deck
+          </StudioHint>
         </div>
 
         {error ? <StudioError message={error} /> : null}

@@ -20,12 +20,14 @@ import {
 } from "@/lib/cms/layer-model";
 import type { BonusTrigger, GameLinkOverrides } from "@/lib/cms/game-link-config";
 import { parseLinkLayer } from "@/lib/cms/game-link-config";
+import { surfaceToPreset } from "@/lib/cms/game-slots";
 import {
   compileGameLogic,
   parseLogicRules,
   type StudioLogicRule,
 } from "@/lib/cms/logic-rules";
 import type { ActionResult } from "@/lib/grid/types";
+import type { ContentMode } from "@/lib/cms/layer-model";
 
 function normalizeGameRow(row: StudioGame): StudioGame {
   return {
@@ -86,6 +88,8 @@ export async function listTemplates(): Promise<ActionResult<StudioGame[]>> {
 
 export type CreateGameInput = {
   name: string;
+  /** Player surface chosen at create time. */
+  surface?: "outdoor" | "indoor" | "online";
 };
 
 async function ensureUniqueGameSlug(
@@ -114,6 +118,18 @@ export async function createGame(input: CreateGameInput): Promise<ActionResult<S
     const supabase = createAdminClient();
     const slug = await ensureUniqueGameSlug(supabase, orgId, input.name);
 
+    const surface: ContentMode =
+      input.surface === "indoor" || input.surface === "online" || input.surface === "outdoor"
+        ? input.surface
+        : "outdoor";
+    const preset = surfaceToPreset(surface);
+    const runtime_profiles = {
+      ...DEFAULT_RUNTIME_PROFILES,
+      default_mode: preset.defaultMode,
+      allowed_fallbacks: [...preset.allowedFallbacks],
+      indoor_one_click: preset.allowedFallbacks.includes("indoor"),
+    };
+
     const payload = {
       organization_id: orgId,
       blueprint_id: null,
@@ -121,9 +137,9 @@ export async function createGame(input: CreateGameInput): Promise<ActionResult<S
       name: input.name.trim(),
       description: "",
       language: "de" as const,
-      gps_enabled: false,
-      active_layers: [2, 3],
-      runtime_profiles: DEFAULT_RUNTIME_PROFILES,
+      gps_enabled: preset.gpsEnabled,
+      active_layers: [...preset.activeLayers],
+      runtime_profiles,
       feature_flags: {},
       logic_rules: [],
       status: "draft" as const,
@@ -456,6 +472,9 @@ export async function updateGameTaskLinkConfig(
     location?: { lat: number; lng: number; radius_meters: number } | null;
     role?: GameLinkOverrides["role"];
     trigger?: BonusTrigger | null;
+    arrival_quiz?: GameLinkOverrides["arrival_quiz"] | null;
+    bonus_task_id?: string | null;
+    geo_task_id?: string | null;
   },
 ): Promise<ActionResult<StudioGameTaskLink>> {
   try {
@@ -489,6 +508,18 @@ export async function updateGameTaskLinkConfig(
     if (patch.trigger !== undefined) {
       if (patch.trigger) overrides.trigger = patch.trigger;
       else delete overrides.trigger;
+    }
+    if (patch.arrival_quiz !== undefined) {
+      if (patch.arrival_quiz) overrides.arrival_quiz = patch.arrival_quiz;
+      else delete overrides.arrival_quiz;
+    }
+    if (patch.bonus_task_id !== undefined) {
+      if (patch.bonus_task_id) overrides.bonus_task_id = patch.bonus_task_id;
+      else delete overrides.bonus_task_id;
+    }
+    if (patch.geo_task_id !== undefined) {
+      if (patch.geo_task_id) overrides.geo_task_id = patch.geo_task_id;
+      else delete overrides.geo_task_id;
     }
 
     const { error: updateError } = await supabase

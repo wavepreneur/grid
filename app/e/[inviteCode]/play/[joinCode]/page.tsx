@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GameGate } from "@/components/game/game-gate";
-import { GameShell } from "@/components/game/game-shell";
 
 type EventPlayPageProps = {
   params: Promise<{ inviteCode: string; joinCode: string }>;
@@ -22,16 +21,11 @@ export default async function EventPlayPage({ params }: EventPlayPageProps) {
   if (!teamResult.success) notFound();
 
   return (
-    <GameShell
-      title={eventResult.data.title}
-      description={`Team ${teamResult.data.teamName}`}
-    >
-      <GameGate
-        inviteCode={normalizedInvite}
-        joinCode={normalizedJoin}
-        teamName={teamResult.data.teamName}
-        eventTitle={eventResult.data.title}
-      />
-    </GameShell>
+    <GameGate
+      inviteCode={normalizedInvite}
+      joinCode={normalizedJoin}
+      teamName={teamResult.data.teamName}
+      eventTitle={eventResult.data.title}
+    />
   );
 }

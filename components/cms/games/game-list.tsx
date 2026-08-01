@@ -48,11 +48,18 @@ import {
   StudioSuccess,
 } from "@/components/cms/studio-ui";
 import type { StudioGame } from "@/lib/cms/types";
+import type { ContentMode } from "@/lib/cms/layer-model";
+import {
+  surfaceDescriptionDe,
+  surfaceLabelDe,
+} from "@/lib/cms/game-slots";
 
 type GameWithLive = StudioGame & { liveEventCount: number };
 
 type GameSort = "updated" | "created" | "status" | "name";
 type CreateMode = "blank" | "template";
+
+const SURFACE_OPTIONS: ContentMode[] = ["outdoor", "indoor", "online"];
 
 const SORT_OPTIONS: Array<{ id: GameSort; label: string }> = [
   { id: "updated", label: "Zuletzt bearbeitet" },
@@ -114,6 +121,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
   const [open, setOpen] = useState(false);
   const [createMode, setCreateMode] = useState<CreateMode>("blank");
   const [name, setName] = useState("");
+  const [surface, setSurface] = useState<ContentMode>("outdoor");
   const [templateId, setTemplateId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -147,6 +155,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
     setOpen(true);
     setCreateMode(mode);
     setName("");
+    setSurface("outdoor");
     setTemplateId(presetTemplateId ?? templates[0]?.id ?? "");
     setError(null);
   }
@@ -176,7 +185,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         return;
       }
 
-      const result = await createGame({ name });
+      const result = await createGame({ name, surface });
       if (!result.success) {
         setError(result.error);
         return;
@@ -410,7 +419,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
           <StudioSectionTitle
             icon={<IconPlus size={18} />}
             title="Neues Spiel"
-            description="Leer starten oder eine gespeicherte Vorlage als Ausgangspunkt duplizieren."
+            description="Zuerst den Spielort wählen — dann Name. Ablauf später immer: Quiz → Level → Bonus."
           />
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
@@ -438,6 +447,33 @@ export function GameList({ initialGames, initialTemplates }: Props) {
                 Aus Vorlage
               </button>
             </div>
+
+            {createMode === "blank" ? (
+              <div>
+                <StudioLabel>Wo wird gespielt?</StudioLabel>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  {SURFACE_OPTIONS.map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setSurface(mode)}
+                      className={`rounded-xl border px-4 py-3 text-left transition ${
+                        surface === mode
+                          ? "border-teal-400 bg-teal-50/70 ring-1 ring-teal-200"
+                          : "border-slate-200 bg-white hover:border-slate-300"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold text-slate-900">
+                        {surfaceLabelDe(mode)}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        {surfaceDescriptionDe(mode)}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             {createMode === "template" && templates.length === 0 ? (
               <StudioHint tone="info">
@@ -472,6 +508,13 @@ export function GameList({ initialGames, initialTemplates }: Props) {
                   ))}
                 </StudioSelect>
               </div>
+            ) : null}
+
+            {createMode === "blank" ? (
+              <StudioHint tone="info">
+                Jeder Stop im Spiel: Quiz schaltet das Level frei → Level mit Kacheln → optional Bonus →
+                zurück zur Übersicht.
+              </StudioHint>
             ) : null}
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
