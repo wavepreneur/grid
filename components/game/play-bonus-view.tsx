@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
 import { IconCheck, IconGift, IconUser, IconX } from "@/components/game/city/icons";
 import { CityTeamBar } from "@/components/game/city/team-bar";
@@ -8,6 +8,7 @@ import type { BonusTask } from "@/lib/grid/level-types";
 import { roleLabelDe } from "@/lib/grid/bonus";
 import type { ContentMode } from "@/lib/cms/layer-model";
 import { hubMeta } from "@/lib/grid/play-slots";
+import { playPlaySfx } from "@/lib/grid/play-sfx";
 
 type Props = {
   bonus: BonusTask;
@@ -41,6 +42,11 @@ export function PlayBonusView({
   const correct = picked === bonus.correct_option_id;
   const show = picked !== null;
   const hub = hubMeta(mode);
+
+  useEffect(() => {
+    if (!show) return;
+    playPlaySfx(correct ? "correct" : "wrong");
+  }, [show, correct]);
 
   function finish() {
     if (!picked || submitted) return;

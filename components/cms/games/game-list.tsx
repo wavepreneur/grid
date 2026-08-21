@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createLiveEventFromGame } from "@/app/actions/cms/events";
 import {
   deleteGames,
   getGamesDeleteStatus,
@@ -22,6 +23,7 @@ import {
   useStudioTemplates,
 } from "@/lib/hooks/use-studio-games";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
+import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
 import { queryKeys } from "@/lib/platform/query-keys";
 import { prefetchStudioGame } from "@/lib/hooks/use-studio-game-detail";
 import { StudioBulkBar, StudioSelectCheckbox } from "@/components/cms/shared/studio-bulk-bar";
@@ -37,6 +39,7 @@ import {
   IconSearch,
   IconTemplate,
   IconTrash,
+  IconUsers,
 } from "@/components/cms/studio-icons";
 import { Chip, Empty, inputCls } from "@/components/cms/ui";
 import { GameStatusSwitch } from "@/components/cms/games/game-status-switch";
@@ -775,8 +778,42 @@ function GameRow({
   onDelete: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { confirm, alert } = useStudioConfirm();
+  const refreshGames = useRefreshStudioGamesList();
   const [testOpen, setTestOpen] = useState(false);
+  const [livePending, setLivePending] = useState(false);
   const canTest = game.status === "published" || game.status === "draft";
+  const canLive =
+    game.status === "published" && game.published_version_number >= 1 && !game.is_template;
+
+  async function handleStartLive() {
+    const ok = await confirm({
+      title: "Live-Event starten?",
+      description:
+        "Es wird ein Event aus der veröffentlichten Version erstellt. Teams können danach beitreten.",
+      confirmLabel: "Event erstellen",
+      cancelLabel: "Abbrechen",
+    });
+    if (!ok) return;
+    setLivePending(true);
+    try {
+      const result = await createLiveEventFromGame(game.id);
+      if (!result.success) {
+        await alert({ title: "Live-Event fehlgeschlagen", description: result.error });
+        return;
+      }
+      refreshGames();
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const joinUrl = `${origin}${result.data!.joinPath}`;
+      await alert({
+        title: "Live-Event gestartet",
+        description: `Code ${result.data!.inviteCode}. Link: ${joinUrl}`,
+      });
+    } finally {
+      setLivePending(false);
+    }
+  }
+
   const surfaceChip = (() => {
     const mode = parseRuntimeProfiles(game.runtime_profiles).default_mode;
     if (mode === "outdoor") return "Outdoor";
@@ -838,6 +875,21 @@ function GameRow({
           onClick={() => setTestOpen(true)}
         >
           Testen
+        </StudioButton>
+        <StudioButton
+          type="button"
+          size="sm"
+          variant="secondary"
+          icon={<IconUsers size={16} />}
+          disabled={!canLive || livePending}
+          title={
+            canLive
+              ? "Live-Event aus veröffentlichter Version starten"
+              : "Erst veröffentlichen, dann Live-Event starten"
+          }
+          onClick={() => void handleStartLive()}
+        >
+          {livePending ? "…" : "Live-Event"}
         </StudioButton>
         <StudioButton
           type="button"

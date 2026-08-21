@@ -1,0 +1,12 @@
+Game SFX — Kenney.nl (CC0 1.0 Public Domain)
+https://kenney.nl/assets/interface-sounds
+Attribution optional. https://creativecommons.org/publicdomain/zero/1.0/
+
+Mapped files:
+- correct.wav  ← confirmation_002
+- wrong.wav    ← error_003
+- unlock.wav   ← glass_006 (key opens puzzle)
+- success.wav  ← confirmation_004
+- complete.wav ← maximize_008 (mission complete)
+- arrive.wav   ← maximize_002
+- ping.wav     ← tick_002

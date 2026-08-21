@@ -1,11 +1,44 @@
 /**
- * Lightweight game feedback sounds via Web Audio (no asset files).
- * Safe to call from click/submit handlers — resumes AudioContext on gesture.
+ * Player feedback sounds — Kenney Interface Sounds (CC0) under /public/sfx.
+ * Falls back to Web Audio tones if a file fails to load.
+ * Safe to call from click/submit handlers (unlocks autoplay after gesture).
  */
 
-export type PlaySfxKind = "wrong" | "correct" | "success" | "ping" | "arrive";
+import { hapticCorrect, hapticWrong, hapticUnlock, hapticComplete, hapticArrive } from "@/lib/grid/haptics";
+
+export type PlaySfxKind =
+  | "wrong"
+  | "correct"
+  | "success"
+  | "unlock"
+  | "complete"
+  | "ping"
+  | "arrive";
+
+const SFX_SRC: Record<PlaySfxKind, string> = {
+  correct: "/sfx/correct.wav",
+  wrong: "/sfx/wrong.wav",
+  success: "/sfx/success.wav",
+  unlock: "/sfx/unlock.wav",
+  complete: "/sfx/complete.wav",
+  ping: "/sfx/ping.wav",
+  arrive: "/sfx/arrive.wav",
+};
+
+const VOLUME: Partial<Record<PlaySfxKind, number>> = {
+  ping: 0.45,
+  arrive: 0.7,
+  unlock: 0.85,
+  complete: 0.9,
+};
 
 let sharedCtx: AudioContext | null = null;
+const cache = new Map<PlaySfxKind, HTMLAudioElement>();
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 function getCtx(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -51,15 +84,7 @@ function tone(
   osc.stop(start + duration + 0.02);
 }
 
-function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
-
-/** Fire-and-forget SFX. No-ops when AudioContext unavailable. */
-export function playPlaySfx(kind: PlaySfxKind): void {
-  if (prefersReducedMotion()) return;
-
+function playSynthFallback(kind: PlaySfxKind): void {
   try {
     const ctx = getCtx();
     if (!ctx) return;
@@ -78,30 +103,23 @@ export function playPlaySfx(kind: PlaySfxKind): void {
       });
       return;
     }
-
     if (kind === "ping") {
-      // Soft outdoor reminder while walking — short high blip
       tone(ctx, { frequency: 880, start: t0, duration: 0.08, type: "sine", gain: 0.09 });
-      tone(ctx, { frequency: 1320, start: t0 + 0.07, duration: 0.12, type: "triangle", gain: 0.07 });
       return;
     }
-
-    if (kind === "arrive") {
-      // Louder confirmation when radius / walk goal is reached
+    if (kind === "arrive" || kind === "unlock") {
       tone(ctx, { frequency: 523.25, start: t0, duration: 0.1, type: "sine", gain: 0.12 });
       tone(ctx, { frequency: 784, start: t0 + 0.09, duration: 0.14, type: "triangle", gain: 0.11 });
       tone(ctx, { frequency: 1046.5, start: t0 + 0.2, duration: 0.28, type: "sine", gain: 0.1 });
       return;
     }
-
-    if (kind === "correct") {
+    if (kind === "correct" || kind === "success") {
       tone(ctx, { frequency: 523.25, start: t0, duration: 0.12, type: "sine", gain: 0.1 });
       tone(ctx, { frequency: 659.25, start: t0 + 0.1, duration: 0.14, type: "sine", gain: 0.1 });
       tone(ctx, { frequency: 783.99, start: t0 + 0.2, duration: 0.22, type: "triangle", gain: 0.09 });
       return;
     }
-
-    // success — short fanfare for the post-solve note screen
+    // complete
     tone(ctx, { frequency: 392, start: t0, duration: 0.14, type: "triangle", gain: 0.1 });
     tone(ctx, { frequency: 523.25, start: t0 + 0.12, duration: 0.14, type: "triangle", gain: 0.1 });
     tone(ctx, { frequency: 659.25, start: t0 + 0.24, duration: 0.16, type: "sine", gain: 0.11 });
@@ -114,6 +132,60 @@ export function playPlaySfx(kind: PlaySfxKind): void {
       gain: 0.08,
     });
   } catch {
-    // Autoplay / unsupported — ignore
+    // ignore
+  }
+}
+
+function getAudio(kind: PlaySfxKind): HTMLAudioElement | null {
+  if (typeof window === "undefined") return null;
+  let audio = cache.get(kind);
+  if (audio) return audio;
+  audio = new Audio(SFX_SRC[kind]);
+  audio.preload = "auto";
+  cache.set(kind, audio);
+  return audio;
+}
+
+function playHapticFor(kind: PlaySfxKind): void {
+  if (kind === "wrong") hapticWrong();
+  else if (kind === "correct") hapticCorrect();
+  else if (kind === "unlock") hapticUnlock();
+  else if (kind === "complete" || kind === "success") hapticComplete();
+  else if (kind === "arrive") hapticArrive();
+}
+
+/** Fire-and-forget SFX (+ matching haptic). No-ops when reduced-motion. */
+export function playPlaySfx(kind: PlaySfxKind): void {
+  if (prefersReducedMotion()) return;
+  playHapticFor(kind);
+
+  try {
+    const audio = getAudio(kind);
+    if (!audio) {
+      playSynthFallback(kind);
+      return;
+    }
+    audio.volume = VOLUME[kind] ?? 0.75;
+    audio.currentTime = 0;
+    const playResult = audio.play();
+    if (playResult && typeof playResult.catch === "function") {
+      playResult.catch(() => playSynthFallback(kind));
+    }
+  } catch {
+    playSynthFallback(kind);
+  }
+}
+
+/** Warm the AudioContext + preload files after first user gesture. */
+export function unlockPlayAudio(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const ctx = getCtx();
+    void ctx?.resume();
+    (Object.keys(SFX_SRC) as PlaySfxKind[]).forEach((kind) => {
+      getAudio(kind);
+    });
+  } catch {
+    // ignore
   }
 }

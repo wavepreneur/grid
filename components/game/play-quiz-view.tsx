@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
 import { IconCheck, IconKey, IconX } from "@/components/game/city/icons";
 import type { ArrivalQuiz } from "@/lib/grid/level-types";
+import { playPlaySfx } from "@/lib/grid/play-sfx";
 
 type Props = {
   title: string;
@@ -75,9 +76,15 @@ export function PlayQuizView({
     setRevealed(true);
   }
 
+  useEffect(() => {
+    if (!revealed) return;
+    playPlaySfx(correct ? "correct" : "wrong");
+  }, [revealed, correct]);
+
   function openPuzzle() {
     if (opening || disabled || isPending) return;
     setOpening(true);
+    playPlaySfx("unlock");
     if (multi) {
       onSubmit({ selectedOptionIds: pickedMulti, selectedOptionId: pickedMulti[0] });
     } else if (picked) {
@@ -167,8 +174,14 @@ export function PlayQuizView({
       ) : null}
 
       {show ? (
-        <div className="cg-animate-rise-in mt-6 space-y-4">
-          <p className="text-center text-base font-semibold text-[var(--cg-fg)]">
+        <div
+          className={`mt-6 space-y-4 ${correct ? "cg-animate-rise-in" : "cg-animate-shake"}`}
+        >
+          <p
+            className={`text-center text-base font-semibold ${
+              correct ? "text-[var(--cg-success)]" : "text-[var(--cg-destructive)]"
+            }`}
+          >
             {correct
               ? points > 0
                 ? `Richtig! +${points} Punkte — der Schlüssel passt.`

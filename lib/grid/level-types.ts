@@ -257,6 +257,8 @@ export type ResolvedEventContent = {
   routeOrder?: "linear" | "free";
   /** Studio publish snapshot — logic rules for bonus triggers at runtime. */
   compiledLogic?: CompiledGameLogic | null;
+  /** Optional game-wide briefing shown from the play menu. */
+  briefingText?: string | null;
 };
 
 export type GeolocationSample = {

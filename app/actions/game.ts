@@ -710,14 +710,23 @@ export async function advanceFromHub(input: {
     }
 
     if (content.contentMode === "outdoor" && levelDefinition.location) {
-      if (!input.geolocation) {
-        return { success: false, error: "GPS-Position erforderlich." };
-      }
-      if (!isWithinGeofence(input.geolocation, levelDefinition.location)) {
-        return {
-          success: false,
-          error: `Noch nicht am Wegpunkt (Radius: ${levelDefinition.location.radius_meters} m).`,
-        };
+      const distanceUnlock =
+        levelDefinition.triggers?.type === "distance" &&
+        Boolean(levelDefinition.triggers.after_meters && levelDefinition.triggers.after_meters > 0);
+      const timeUnlock =
+        levelDefinition.triggers?.type === "time" &&
+        Boolean(levelDefinition.triggers.after_minutes && levelDefinition.triggers.after_minutes > 0);
+      // Walk/time unlocks are not geofenced — a leftover GPS pin must not block opening.
+      if (!distanceUnlock && !timeUnlock) {
+        if (!input.geolocation) {
+          return { success: false, error: "GPS-Position erforderlich." };
+        }
+        if (!isWithinGeofence(input.geolocation, levelDefinition.location)) {
+          return {
+            success: false,
+            error: `Noch nicht am Wegpunkt (Radius: ${levelDefinition.location.radius_meters} m).`,
+          };
+        }
       }
     }
 

@@ -5,6 +5,12 @@ import { CityStatusHud } from "@/components/game/city/status-hud";
 import { CityTeamBar } from "@/components/game/city/team-bar";
 import { PlayBonusView } from "@/components/game/play-bonus-view";
 import { PlayHubView } from "@/components/game/play-hub-view";
+import {
+  PauseBanner,
+  PlayMoreSheet,
+  PlayMoreTrigger,
+  type PlayMorePanel,
+} from "@/components/game/play-more-sheet";
 import { PlayQuizView } from "@/components/game/play-quiz-view";
 import { isBonusForRole, resolveBonusTask, roleLabelDe } from "@/lib/grid/bonus";
 import type { PurchasedTileHint, TeamGameState } from "@/lib/grid/game-state";
@@ -16,6 +22,8 @@ import type {
 } from "@/lib/grid/level-types";
 import { buildPlaySlot, missionFromLevel } from "@/lib/grid/play-slots";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
+
+type Teammate = { id: string; name: string; roleLabel: string };
 
 type Props = {
   eventContent: ResolvedEventContent;
@@ -36,6 +44,16 @@ type Props = {
   levelStartedAt?: string | null;
   teamStartedAt?: string | null;
   solveFeedback?: SolveFeedbackState | null;
+  walkStorageKey?: string | null;
+  morePanel: PlayMorePanel;
+  onMorePanel: (panel: PlayMorePanel) => void;
+  paused: boolean;
+  onTogglePause: () => void;
+  isAlpha: boolean;
+  teammates: Teammate[];
+  onTransferAlpha?: (playerId: string) => void;
+  transferPending?: boolean;
+  onReclaimSession?: () => void;
   onArriveOutdoor: (geolocation: GeolocationSample, targetLevel?: number) => void;
   onSolveGpsCheckpoint: (geolocation: GeolocationSample) => void;
   onOpenStation: (levelNumber: number) => void;
@@ -70,6 +88,16 @@ export function PlayPhaseFlow({
   levelStartedAt,
   teamStartedAt,
   solveFeedback = null,
+  walkStorageKey = null,
+  morePanel,
+  onMorePanel,
+  paused,
+  onTogglePause,
+  isAlpha,
+  teammates,
+  onTransferAlpha,
+  transferPending,
+  onReclaimSession,
   onArriveOutdoor,
   onSolveGpsCheckpoint,
   onOpenStation,
@@ -86,18 +114,44 @@ export function PlayPhaseFlow({
   const level = eventContent.levels.find((l) => l.level === activeLevel);
   const slot = level ? buildPlaySlot(level, mode, phase) : null;
   const completed = Object.values(gameState.levels).filter((e) => e.status === "completed").length;
-  const remaining = Math.max(0, eventContent.levels.length - completed);
+  const total = eventContent.levels.length;
 
   const chrome = (
     <div className="space-y-3 px-4 pb-2 pt-5">
-      <CityTeamBar teamName={teamName} meName={myName} meRoleLabel={myRoleLabel} compact />
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <CityTeamBar teamName={teamName} meName={myName} meRoleLabel={myRoleLabel} compact />
+        </div>
+        <PlayMoreTrigger onClick={() => onMorePanel("menu")} />
+      </div>
       <CityStatusHud
         mode={mode}
-        remaining={remaining}
-        timeLabel={timeLabel}
+        completed={completed}
+        total={total}
+        timeLabel={paused ? "Pause" : timeLabel}
         score={score}
       />
     </div>
+  );
+
+  const sheets = (
+    <>
+      {paused ? <PauseBanner onResume={onTogglePause} /> : null}
+      <PlayMoreSheet
+        open={morePanel}
+        onOpen={onMorePanel}
+        onClose={() => onMorePanel(null)}
+        briefingText={eventContent.briefingText}
+        crispWebsiteId={process.env.NEXT_PUBLIC_CRISP_WEBSITE_ID}
+        paused={paused}
+        onTogglePause={onTogglePause}
+        isAlpha={isAlpha}
+        teammates={teammates}
+        onTransferAlpha={onTransferAlpha}
+        transferPending={transferPending}
+        onReclaimSession={onReclaimSession}
+      />
+    </>
   );
 
   if (phase === "bonus" && level) {
@@ -106,6 +160,7 @@ export function PlayPhaseFlow({
       return (
         <>
           {chrome}
+          {sheets}
           <PlayBonusView
             bonus={bonus}
             mode={mode}
@@ -128,6 +183,7 @@ export function PlayPhaseFlow({
     return (
       <>
         {chrome}
+        {sheets}
         <PlayHubView
           mode={mode}
           levels={eventContent.levels}
@@ -135,8 +191,9 @@ export function PlayPhaseFlow({
           activeLevel={activeLevel}
           routeOrder={eventContent.routeOrder ?? "linear"}
           canUnlockGps={canUnlockGps}
-          disabled={disabled}
+          disabled={disabled || paused}
           isPending={isPending}
+          walkStorageKey={walkStorageKey}
           onArriveOutdoor={onArriveOutdoor}
           onSolveGpsCheckpoint={onSolveGpsCheckpoint}
           onOpenStation={onOpenStation}
@@ -151,6 +208,7 @@ export function PlayPhaseFlow({
     return (
       <>
         {chrome}
+        {sheets}
         <PlayQuizView
           title={level.title}
           spotLabel={
@@ -162,7 +220,7 @@ export function PlayPhaseFlow({
           }
           mode={mode}
           quiz={slot.quiz}
-          disabled={disabled}
+          disabled={disabled || paused}
           isPending={isPending}
           onSubmit={onSubmitQuiz}
         />
@@ -175,6 +233,7 @@ export function PlayPhaseFlow({
   return (
     <>
       {chrome}
+      {sheets}
       <div className="px-4 pb-6">
         <ExitmaniaLevelView
           level={mission}
@@ -182,7 +241,7 @@ export function PlayPhaseFlow({
           levelStatuses={gameState.levels}
           purchasedHints={purchasedHints}
           score={score}
-          disabled={disabled}
+          disabled={disabled || paused}
           isPending={isPending}
           canUnlockGps={canUnlockGps}
           effectiveBeta={effectiveBeta}

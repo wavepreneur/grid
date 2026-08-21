@@ -40,7 +40,7 @@ export function SyncModal({ modal, onDismiss, isPending }: SyncModalProps) {
           className="pointer-events-none absolute -bottom-10 -right-6 h-36 w-36 rounded-full bg-[var(--cg-accent)]/25 blur-2xl"
         />
 
-        <span className="cg-animate-key-turn relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[var(--cg-success)] text-white shadow-[var(--cg-shadow-lift)]">
+        <span className="cg-animate-celebrate relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[var(--cg-success)] text-white shadow-[var(--cg-shadow-lift)]">
           <PartyPopper className="h-10 w-10" strokeWidth={2} />
         </span>
 

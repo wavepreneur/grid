@@ -396,6 +396,7 @@ export async function loadResolvedEventContent(input: {
           showLiveScore: contentConfig.show_live_score ?? true,
           missionDurationMinutes:
             game.duration_minutes ?? contentConfig.mission_duration_minutes ?? 90,
+          briefingText: game.description?.trim() || null,
         },
         mergedConfig,
         mergedLevels,
@@ -431,6 +432,7 @@ export async function loadResolvedEventContent(input: {
           showLiveScore: contentConfig.show_live_score ?? true,
           missionDurationMinutes:
             game.duration_minutes ?? contentConfig.mission_duration_minutes ?? 90,
+          briefingText: game.description?.trim() || null,
         },
         mergedConfig,
         mergedLevels,

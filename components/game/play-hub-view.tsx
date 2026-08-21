@@ -13,7 +13,6 @@ import { useGeolocation } from "@/lib/hooks/use-geolocation";
 import { useWalkedDistance } from "@/lib/hooks/use-walked-distance";
 import type { ContentMode } from "@/lib/cms/layer-model";
 import { isWithinGeofence } from "@/lib/grid/geofence";
-import { hapticArrive } from "@/lib/grid/haptics";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 import type { GameLevelStatus } from "@/lib/grid/game-state";
 import type { LevelDefinition, GeolocationSample } from "@/lib/grid/level-types";
@@ -28,6 +27,8 @@ type Props = {
   canUnlockGps: boolean;
   disabled: boolean;
   isPending: boolean;
+  /** Persist outdoor walk progress across remounts. */
+  walkStorageKey?: string | null;
   onArriveOutdoor: (geolocation: GeolocationSample, targetLevel?: number) => void;
   onSolveGpsCheckpoint: (geolocation: GeolocationSample) => void;
   onOpenStation: (levelNumber: number) => void;
@@ -44,6 +45,7 @@ export function PlayHubView({
   canUnlockGps,
   disabled,
   isPending,
+  walkStorageKey = null,
   onArriveOutdoor,
   onSolveGpsCheckpoint,
   onOpenStation,
@@ -80,6 +82,7 @@ export function PlayHubView({
         canUnlockGps={canUnlockGps}
         disabled={disabled}
         isPending={isPending}
+        walkStorageKey={walkStorageKey}
         onArrive={
           gpsOnly
             ? (geo) => onSolveGpsCheckpoint(geo)
@@ -272,6 +275,7 @@ function OutdoorHub({
   canUnlockGps,
   disabled,
   isPending,
+  walkStorageKey,
   onArrive,
 }: {
   levels: LevelDefinition[];
@@ -281,6 +285,7 @@ function OutdoorHub({
   canUnlockGps: boolean;
   disabled: boolean;
   isPending: boolean;
+  walkStorageKey?: string | null;
   onArrive: (geolocation: GeolocationSample, targetLevel?: number) => void;
 }) {
   const isWalkMode =
@@ -293,7 +298,15 @@ function OutdoorHub({
 
   const gpsEnabled = (isGpsMode || isWalkMode) && canUnlockGps;
   const { sample } = useGeolocation(gpsEnabled && isGpsMode);
-  const walk = useWalkedDistance(Boolean(gpsEnabled && isWalkMode));
+  const levelWalkKey =
+    walkStorageKey && isWalkMode
+      ? `${walkStorageKey}:L${current.level}`
+      : isWalkMode
+        ? `grid:walk:L${current.level}`
+        : null;
+  const walk = useWalkedDistance(Boolean(gpsEnabled && isWalkMode), {
+    storageKey: levelWalkKey,
+  });
   const [simBonus, setSimBonus] = useState(0);
   const arrivedPingRef = useRef(false);
 
@@ -325,7 +338,6 @@ function OutdoorHub({
       if (!arrivedPingRef.current) {
         arrivedPingRef.current = true;
         playPlaySfx("arrive");
-        hapticArrive();
       }
       return;
     }
@@ -337,20 +349,14 @@ function OutdoorHub({
   ).length;
 
   const targetMeters = current.triggers?.after_meters ?? 100;
-  const walkedMeters = walk.meters + simBonus;
+  const walkedMeters = walk.displayMeters + simBonus;
 
   function openWithSample(geo?: GeolocationSample | null, level?: number) {
     const position =
       geo ??
       walk.sample ??
       sample ??
-      (targetLevel.location
-        ? {
-            lat: targetLevel.location.lat,
-            lng: targetLevel.location.lng,
-            accuracy: 5,
-          }
-        : { lat: 0, lng: 0, accuracy: 50 });
+      ({ lat: 0, lng: 0, accuracy: 50 } satisfies GeolocationSample);
     onArrive(position, level);
   }
 
@@ -370,10 +376,15 @@ function OutdoorHub({
           disabled={disabled}
           isPending={isPending}
           onOpen={() => openWithSample(walk.sample, current.level)}
-          onSimulateWalk={() => setSimBonus((m) => m + 25)}
+          onSimulateWalk={() => setSimBonus((m) => m + 1)}
         />
         {walk.error ? (
           <p className="px-5 pb-6 text-center text-sm text-[var(--cg-destructive)]">{walk.error}</p>
+        ) : null}
+        {!canUnlockGps ? (
+          <p className="px-5 pb-6 text-center text-sm text-[var(--cg-muted)]">
+            Nur Alpha / GPS-Leiter kann die Strecke tracken — bitte Gerät mit Freigabe nutzen.
+          </p>
         ) : null}
       </section>
     );
@@ -522,7 +533,6 @@ function OutdoorTimeWait({
     if (ready && !pinged.current) {
       pinged.current = true;
       playPlaySfx("arrive");
-      hapticArrive();
     }
   }, [ready]);
 

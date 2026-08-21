@@ -6,7 +6,6 @@ import { TaskEditor } from "@/components/cms/tasks/task-editor";
 import { StudioGameDetailSkeleton, StudioTaskDetailSkeleton } from "@/components/cms/studio-list-skeletons";
 import {
   useStudioGame,
-  useStudioGameLiveMeta,
   useStudioGameTaskLinks,
 } from "@/lib/hooks/use-studio-game-detail";
 import { useStudioTask } from "@/lib/hooks/use-studio-task-detail";
@@ -14,7 +13,6 @@ import { useStudioTask } from "@/lib/hooks/use-studio-task-detail";
 export function StudioGameDetailSection({ gameId }: { gameId: string }) {
   const gameQuery = useStudioGame(gameId);
   const linksQuery = useStudioGameTaskLinks(gameId);
-  const liveMetaQuery = useStudioGameLiveMeta(gameId);
 
   const game = gameQuery.data;
   const isInitialLoad = gameQuery.isPending && !game;
@@ -43,14 +41,10 @@ export function StudioGameDetailSection({ gameId }: { gameId: string }) {
       description={
         game.is_template
           ? "Vorlage bearbeiten — Aufgaben, Layer und Logik werden beim Erstellen neuer Spiele dupliziert."
-          : "Einstellungen, Layer-Profil und Content-Layer — Änderungen betreffen nur den Entwurf."
+          : "Einstellungen und Aufgaben — Veröffentlichen und Live-Events steuerst du in der Spiele-Liste."
       }
     >
-      <GameEditorPanel
-        game={game}
-        taskLinks={linksQuery.data ?? []}
-        liveEventCount={liveMetaQuery.data?.liveEvents?.length ?? 0}
-      />
+      <GameEditorPanel game={game} taskLinks={linksQuery.data ?? []} />
     </StudioPage>
   );
 }

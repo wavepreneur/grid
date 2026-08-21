@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function formatCountdown(totalSeconds: number): string {
   if (totalSeconds <= 0) return "00:00";
@@ -17,30 +17,52 @@ function formatCountdown(totalSeconds: number): string {
 export function useMissionCountdown(
   startedAt: string | null | undefined,
   durationMinutes: number,
+  paused = false,
 ): { remainingLabel: string; isExpired: boolean } {
   const [remainingSeconds, setRemainingSeconds] = useState(() =>
-    computeRemaining(startedAt, durationMinutes),
+    computeRemaining(startedAt, durationMinutes, 0),
   );
+  const pausedMsRef = useRef(0);
+  const pauseStartedRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setRemainingSeconds(computeRemaining(startedAt, durationMinutes));
-    const interval = window.setInterval(() => {
-      setRemainingSeconds(computeRemaining(startedAt, durationMinutes));
-    }, 1000);
+    if (paused) {
+      pauseStartedRef.current = Date.now();
+      return;
+    }
+    if (pauseStartedRef.current != null) {
+      pausedMsRef.current += Date.now() - pauseStartedRef.current;
+      pauseStartedRef.current = null;
+    }
+  }, [paused]);
+
+  useEffect(() => {
+    const tick = () => {
+      const extraPause =
+        paused && pauseStartedRef.current != null
+          ? Date.now() - pauseStartedRef.current
+          : 0;
+      setRemainingSeconds(
+        computeRemaining(startedAt, durationMinutes, pausedMsRef.current + extraPause),
+      );
+    };
+    tick();
+    const interval = window.setInterval(tick, 1000);
     return () => window.clearInterval(interval);
-  }, [startedAt, durationMinutes]);
+  }, [startedAt, durationMinutes, paused]);
 
   return {
     remainingLabel: formatCountdown(remainingSeconds),
-    isExpired: remainingSeconds <= 0,
+    isExpired: remainingSeconds <= 0 && !paused,
   };
 }
 
 function computeRemaining(
   startedAt: string | null | undefined,
   durationMinutes: number,
+  pausedMs: number,
 ): number {
   if (!startedAt) return durationMinutes * 60;
-  const endMs = new Date(startedAt).getTime() + durationMinutes * 60 * 1000;
+  const endMs = new Date(startedAt).getTime() + durationMinutes * 60 * 1000 + pausedMs;
   return Math.max(0, Math.floor((endMs - Date.now()) / 1000));
 }

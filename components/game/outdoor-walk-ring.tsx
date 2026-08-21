@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { BigButton } from "@/components/game/city/ui";
-import { hapticArrive, hapticWalkProgress } from "@/lib/grid/haptics";
+import { hapticWalkProgress } from "@/lib/grid/haptics";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 
 type Props = {
@@ -31,27 +31,33 @@ export function OutdoorWalkRing({
   onSimulateWalk,
 }: Props) {
   const progress = Math.min(1, walkedMeters / Math.max(1, targetMeters));
-  const remaining = Math.max(0, Math.ceil(targetMeters - walkedMeters));
-  const complete = progress >= 1;
+  const remaining = Math.max(0, Math.ceil(targetMeters - walkedMeters - 0.001));
+  const complete = walkedMeters >= targetMeters - 0.05;
   const arrivedRef = useRef(false);
   const lastPulseRef = useRef(0);
+  const lastPingBucketRef = useRef(-1);
 
   useEffect(() => {
     if (complete) {
       if (!arrivedRef.current) {
         arrivedRef.current = true;
         playPlaySfx("arrive");
-        hapticArrive();
       }
       return;
     }
     arrivedRef.current = false;
     const now = Date.now();
-    // Soft haptic while walking — interval shortens slightly as the ring fills
-    const interval = Math.round(1400 - progress * 500);
-    if (progress > 0.03 && now - lastPulseRef.current > interval) {
+    // Pulses get more frequent as the ring fills (every ~1.2s → ~0.55s)
+    const interval = Math.round(1200 - progress * 650);
+    if (progress > 0.02 && now - lastPulseRef.current > interval) {
       lastPulseRef.current = now;
       hapticWalkProgress(progress);
+    }
+    // Soft audio tick every ~20% of the walk (0, 20, 40, 60, 80 %)
+    const bucket = Math.floor(progress * 5);
+    if (bucket > 0 && bucket !== lastPingBucketRef.current && progress < 1) {
+      lastPingBucketRef.current = bucket;
+      playPlaySfx("ping");
     }
   }, [complete, progress, walkedMeters]);
 
@@ -88,7 +94,9 @@ export function OutdoorWalkRing({
             strokeLinecap="round"
             strokeDasharray={CIRC}
             strokeDashoffset={dashOffset}
-            style={{ transition: "stroke-dashoffset 0.35s ease-out" }}
+            style={{
+              transition: "stroke-dashoffset 0.2s linear, stroke 0.3s ease",
+            }}
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">

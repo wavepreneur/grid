@@ -5,18 +5,20 @@ import type { ContentMode } from "@/lib/cms/layer-model";
 
 type Props = {
   mode: ContentMode;
-  remaining: number;
+  /** Completed / total for a clear progress read. */
+  completed: number;
+  total: number;
   timeLabel: string;
   score: number;
 };
 
-export function CityStatusHud({ mode, remaining, timeLabel, score }: Props) {
+export function CityStatusHud({ mode, completed, total, timeLabel, score }: Props) {
   const label =
-    mode === "indoor" ? "Stationen übrig" : mode === "online" ? "Missionen übrig" : "Level übrig";
+    mode === "indoor" ? "Stationen" : mode === "online" ? "Missionen" : "Level";
 
   return (
     <div className="grid grid-cols-3 gap-2 rounded-2xl bg-[var(--cg-card)] p-2 shadow-[var(--cg-shadow-soft)]">
-      <Stat icon={<IconFlag size={20} />} value={`${remaining}`} label={label} />
+      <Stat icon={<IconFlag size={20} />} value={`${completed}/${total}`} label={label} />
       <Stat icon={<IconClock size={20} />} value={timeLabel} label="Zeit" />
       <Stat icon={<IconStar size={20} />} value={`${score}`} label="Punkte" />
     </div>

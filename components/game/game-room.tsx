@@ -18,16 +18,19 @@ import { ExitmaniaLevelView } from "@/components/game/exitmania-level-view";
 import { GameHud } from "@/components/game/game-hud";
 import { LevelPanel } from "@/components/game/level-panel";
 import { PlayPhaseFlow } from "@/components/game/play-phase-flow";
+import type { PlayMorePanel } from "@/components/game/play-more-sheet";
 import { SyncModal } from "@/components/game/sync-modal";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 import { IdentityBar } from "@/components/player/identity-bar";
 import { SessionHandoffScreen } from "@/components/player/session-handoff-screen";
 import { GridError } from "@/components/grid/grid-shell";
 import { cockpitShowPath } from "@/lib/grid/event-routes";
+import { transferCaptain } from "@/app/actions/lobby";
 import { useTeamSync } from "@/lib/hooks/use-team-sync";
 import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
 import { cacheTeamState } from "@/lib/grid/offline-state";
 import { archetypeRoleLabel } from "@/lib/grid/archetype-roles";
+import { clearWalkedDistanceStorage } from "@/lib/hooks/use-walked-distance";
 import type { TeamGameState, TeamRealtimeState } from "@/lib/grid/game-state";
 import type {
   GeolocationSample,
@@ -36,6 +39,7 @@ import type {
 } from "@/lib/grid/level-types";
 import type { PlayerSession } from "@/lib/grid/types";
 import { usesPhasedPlay } from "@/lib/grid/play-slots";
+import { playPlaySfx, unlockPlayAudio } from "@/lib/grid/play-sfx";
 
 type GameRoomProps = {
   inviteCode: string;
@@ -66,6 +70,9 @@ export function GameRoom({
   const [sessionSuperseded, setSessionSuperseded] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isHintPending, startHintTransition] = useTransition();
+  const [morePanel, setMorePanel] = useState<PlayMorePanel>(null);
+  const [paused, setPaused] = useState(false);
+  const [transferPending, setTransferPending] = useState(false);
 
   const handleStateUpdate = useCallback((gameState: TeamGameState, currentLevel: number) => {
     setTeamState((current) => {
@@ -106,6 +113,21 @@ export function GameRoom({
   useEffect(() => {
     setSolveFeedback(null);
   }, [activeLevel]);
+
+  useEffect(() => {
+    const unlock = () => unlockPlayAudio();
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isFinished) return;
+    playPlaySfx("complete");
+  }, [isFinished]);
 
   const currentLevelDefinition =
     eventContent.levels.find((level) => Number(level.level) === activeLevel) ??
@@ -199,15 +221,21 @@ export function GameRoom({
   function handleArriveOutdoor(geolocation: GeolocationSample, targetLevel?: number) {
     setError(null);
     startTransition(async () => {
-      applyTeamResult(
-        await advanceFromHub({
-          inviteCode,
-          joinCode,
-          sessionId: playerSession.sessionId,
-          geolocation,
-          targetLevel,
-        }),
-      );
+      const result = await advanceFromHub({
+        inviteCode,
+        joinCode,
+        sessionId: playerSession.sessionId,
+        geolocation,
+        targetLevel,
+      });
+      if (!result.success || !result.data) {
+        setError(result.error ?? "Aktion fehlgeschlagen.");
+        return;
+      }
+      const levelKey = targetLevel ?? activeLevel;
+      clearWalkedDistanceStorage(`grid:walk:${inviteCode}:${joinCode}:L${levelKey}`);
+      setTeamState(result.data);
+      cacheTeamState(result.data);
     });
   }
 
@@ -306,7 +334,29 @@ export function GameRoom({
   const { remainingLabel } = useMissionCountdown(
     teamState.startedAt,
     eventContent.missionDurationMinutes,
+    paused,
   );
+  const walkStorageKey = `grid:walk:${inviteCode}:${joinCode}`;
+  const isAlpha = Boolean(playerSession.isAlpha || teamState.isCaptain);
+
+  function handleTransferAlpha(targetPlayerId: string) {
+    setTransferPending(true);
+    startTransition(async () => {
+      const result = await transferCaptain({
+        inviteCode,
+        joinCode,
+        sessionId: playerSession.sessionId,
+        targetPlayerId,
+      });
+      setTransferPending(false);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      setMorePanel(null);
+      setError(null);
+    });
+  }
 
   function handleDismissModal() {
     if (!modal) return;
@@ -334,21 +384,29 @@ export function GameRoom({
       displayName={playerSession.displayName}
     />
   ) : isFinished ? (
-    <div className="space-y-6 px-5 py-10">
+    <div className="cg-animate-rise-in space-y-6 px-5 py-10">
       <div className="space-y-2 text-center">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--cg-muted)]">
+        <span
+          aria-hidden
+          className="cg-animate-celebrate mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[var(--cg-success)] text-4xl text-white shadow-[var(--cg-shadow-lift)]"
+        >
+          ✓
+        </span>
+        <p className="mt-4 text-sm font-semibold uppercase tracking-[0.2em] text-[var(--cg-muted)]">
           Game Over
         </p>
-        <p className="text-3xl font-bold text-[var(--cg-fg)]">Mission abgeschlossen!</p>
+        <p className="cg-animate-pop-in text-3xl font-bold text-[var(--cg-fg)]">
+          Mission abgeschlossen!
+        </p>
         <p className="text-base text-[var(--cg-muted)]">
           {teamName} · {eventContent.levels.length} Aufgaben
         </p>
       </div>
-      <div className="rounded-3xl border-2 border-[var(--cg-border)] bg-[var(--cg-card)] px-5 py-6 text-center shadow-[var(--cg-shadow-lift)]">
+      <div className="cg-animate-pop-in rounded-3xl border-2 border-[var(--cg-success)]/35 bg-[var(--cg-card)] px-5 py-6 text-center shadow-[var(--cg-shadow-lift)]">
         <p className="text-sm font-semibold uppercase tracking-wide text-[var(--cg-muted)]">
           Eure Punkte
         </p>
-        <p className="mt-2 text-5xl font-extrabold tabular-nums text-[var(--cg-fg)]">
+        <p className="cg-animate-score-pop mt-2 text-5xl font-extrabold tabular-nums text-[var(--cg-fg)]">
           {teamState.gameState.score ?? 0}
         </p>
       </div>
@@ -383,6 +441,16 @@ export function GameRoom({
         levelStartedAt={levelStartedAt}
         teamStartedAt={teamState.startedAt}
         solveFeedback={solveFeedback}
+        walkStorageKey={walkStorageKey}
+        morePanel={morePanel}
+        onMorePanel={setMorePanel}
+        paused={paused}
+        onTogglePause={() => setPaused((p) => !p)}
+        isAlpha={isAlpha}
+        teammates={[]}
+        onTransferAlpha={handleTransferAlpha}
+        transferPending={transferPending}
+        onReclaimSession={() => setSessionSuperseded(true)}
         onArriveOutdoor={handleArriveOutdoor}
         onSolveGpsCheckpoint={handleSolveGpsCheckpoint}
         onOpenStation={handleOpenStation}

@@ -2,9 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createLiveEventFromGame } from "@/app/actions/cms/events";
 import {
-  publishGame,
   removeGameTemplate,
   saveGameAsTemplate,
   updateGame,
@@ -16,24 +14,19 @@ import { GameLogicPanel } from "@/components/cms/games/game-logic-panel";
 import { GameSlotsPanel } from "@/components/cms/games/game-slots-panel";
 import { GameDeleteButton } from "@/components/cms/games/game-delete-button";
 import { GameDuplicateButton } from "@/components/cms/games/game-duplicate-button";
-import { GameStatusSwitch } from "@/components/cms/games/game-status-switch";
 import { ImageUploadField } from "@/components/cms/shared/image-upload-field";
-import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
 import { useStudioCache } from "@/lib/platform/studio-cache";
 import {
   IconDevices,
   IconGamepad,
   IconKeyRound,
   IconMapPin,
-  IconPlay,
   IconSave,
   IconTemplate,
-  IconUpload,
 } from "@/components/cms/studio-icons";
 import {
   StudioButton,
   StudioError,
-  StudioHint,
   StudioInput,
   StudioLabel,
   StudioSectionTitle,
@@ -57,7 +50,6 @@ import type { StudioGame, StudioGameTaskLink } from "@/lib/cms/types";
 type Props = {
   game: StudioGame;
   taskLinks: StudioGameTaskLink[];
-  liveEventCount?: number;
 };
 
 type GameEditorState = Omit<StudioGame, "logic_rules"> & { logic_rules: StudioLogicRule[] };
@@ -78,15 +70,12 @@ function SurfaceIcon({ mode, active }: { mode: ContentMode; active: boolean }) {
 export function GameEditorPanel({
   game: initialGame,
   taskLinks,
-  liveEventCount = 0,
 }: Props) {
   const router = useRouter();
   const cache = useStudioCache();
-  const { confirm } = useStudioConfirm();
   const [game, setGame] = useState<GameEditorState>(() => toEditorState(initialGame));
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [liveLink, setLiveLink] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const surface = parseRuntimeProfiles(game.runtime_profiles).default_mode;
@@ -147,27 +136,6 @@ export function GameEditorPanel({
     });
   }
 
-  function handlePublish() {
-    setError(null);
-    startTransition(async () => {
-      const result = await publishGame(game.id);
-      if (!result.success) {
-        setError(result.error);
-        return;
-      }
-      setGame((g) => ({
-        ...g,
-        status: "published",
-        published_version_number: result.data!.versionNumber,
-      }));
-      cache.patchGame(game.id, {
-        status: "published",
-        published_version_number: result.data!.versionNumber,
-      });
-      setMessage(`Version ${result.data!.versionNumber} veröffentlicht.`);
-    });
-  }
-
   function handleSaveTemplate() {
     startTransition(async () => {
       const result = await saveGameAsTemplate(game.id);
@@ -192,30 +160,6 @@ export function GameEditorPanel({
       cache.patchGame(game.id, { is_template: false });
       setMessage("Wieder als normales Spiel.");
     });
-  }
-
-  function handleStartLiveEvent() {
-    void (async () => {
-      const ok = await confirm({
-        title: "Live-Event starten?",
-        description:
-          "Es wird ein Event aus der veröffentlichten Version erstellt. Teams können danach beitreten.",
-        confirmLabel: "Event erstellen",
-        cancelLabel: "Abbrechen",
-      });
-      if (!ok) return;
-      setError(null);
-      setLiveLink(null);
-      startTransition(async () => {
-        const result = await createLiveEventFromGame(game.id);
-        if (!result.success) {
-          setError(result.error);
-          return;
-        }
-        setLiveLink(result.data!.joinPath);
-        setMessage(`Live-Event erstellt — Code ${result.data!.inviteCode}.`);
-      });
-    })();
   }
 
   return (
@@ -271,22 +215,18 @@ export function GameEditorPanel({
           />
 
           <div className="mb-6 flex flex-wrap items-center gap-3">
-            <GameStatusSwitch
-              gameId={game.id}
-              status={game.status}
-              publishedVersionNumber={game.published_version_number}
-              liveEventCount={liveEventCount}
-              onStatusChange={(next, meta) =>
-                setGame((g) => ({
-                  ...g,
-                  status: next,
-                  published_version_number:
-                    meta?.publishedVersionNumber ?? g.published_version_number,
-                }))
-              }
-            />
+            <StudioBadge tone={game.status === "published" ? "live" : "draft"}>
+              {game.status === "published"
+                ? "Veröffentlicht"
+                : game.status === "archived"
+                  ? "Archiviert"
+                  : "Entwurf"}
+            </StudioBadge>
             {game.is_template ? <StudioBadge tone="draft">Vorlage</StudioBadge> : null}
             <StudioBadge>{surfaceLabelDe(surface)}</StudioBadge>
+            <p className="text-xs text-muted-foreground">
+              Veröffentlichen und Live-Events steuerst du in der Spiele-Liste.
+            </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -422,24 +362,6 @@ export function GameEditorPanel({
               <>
                 <StudioButton
                   type="button"
-                  variant="secondary"
-                  disabled={pending}
-                  icon={<IconUpload size={16} />}
-                  onClick={handlePublish}
-                >
-                  Veröffentlichen
-                </StudioButton>
-                <StudioButton
-                  type="button"
-                  variant="secondary"
-                  disabled={pending || game.published_version_number < 1}
-                  icon={<IconPlay size={16} />}
-                  onClick={handleStartLiveEvent}
-                >
-                  Live-Event starten
-                </StudioButton>
-                <StudioButton
-                  type="button"
                   variant="ghost"
                   disabled={pending}
                   icon={<IconTemplate size={16} />}
@@ -462,28 +384,6 @@ export function GameEditorPanel({
             )}
             <GameDeleteButton gameId={game.id} gameName={game.name} />
           </div>
-
-          {!game.is_template && game.published_version_number < 1 ? (
-            <div className="mt-4">
-              <StudioHint tone="warn">
-                Zuerst veröffentlichen, bevor du ein Live-Event starten kannst.
-              </StudioHint>
-            </div>
-          ) : null}
-
-          {liveLink ? (
-            <div className="mt-4 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3">
-              <p className="text-xs font-medium text-teal-800">Einladungslink</p>
-              <a
-                href={liveLink}
-                className="mt-1 block text-sm font-medium text-teal-700 underline-offset-2 hover:underline"
-                target="_blank"
-                rel="noreferrer"
-              >
-                {liveLink}
-              </a>
-            </div>
-          ) : null}
         </StudioPanel>
       </form>
 
