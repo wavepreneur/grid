@@ -26,6 +26,7 @@ import {
 } from "@/lib/grid/level-types";
 import { parseLevelTiles } from "@/lib/grid/level-content";
 import { loadStudioVersionSnapshot } from "@/lib/cms/studio-snapshot";
+import { loadLiveStudioGameSnapshot } from "@/lib/cms/studio-live-content";
 import {
   parseContentMode,
   parseRuntimeProfiles,
@@ -364,6 +365,43 @@ export async function loadResolvedEventContent(input: {
 }): Promise<ResolvedEventContent> {
   const contentConfig = mergeContentConfigWithBlueprint(parseContentConfig(input.contentConfig));
   const routeOverride = parseRouteOverride(input.routeOverride);
+
+  // Studio test sessions always compile from the live editor state so „Testen“
+  // reflects saved changes without requiring a new publish.
+  if (contentConfig.is_studio_test && contentConfig.cms_game_id) {
+    const live = await loadLiveStudioGameSnapshot(contentConfig.cms_game_id);
+    if (live && live.levels.length > 0) {
+      const { game, levels, compiledLogic } = live;
+      const mergedConfig = mergeContentConfigWithBlueprint({
+        ...contentConfig,
+        blueprint_slug: game.gps_enabled ? "exitmania" : "tabbrain",
+        city_slug: game.city_slug ?? contentConfig.city_slug,
+        runtime_profiles: game.runtime_profiles ?? contentConfig.runtime_profiles,
+      });
+      const blueprint = resolveBlueprint(mergedConfig);
+      const mergedLevels = applyBlueprintLevelConstraints(
+        mergeLevelOverrides(levels, routeOverride),
+        blueprint,
+      );
+      const blueprintFields = buildResolvedBlueprintFields(mergedConfig);
+
+      return withSurfaceFields(
+        {
+          templateSlug: `cms:${game.slug}:live`,
+          templateName: game.name,
+          city: game.city_slug,
+          levels: mergedLevels,
+          compiledLogic,
+          ...blueprintFields,
+          showLiveScore: contentConfig.show_live_score ?? true,
+          missionDurationMinutes:
+            game.duration_minutes ?? contentConfig.mission_duration_minutes ?? 90,
+        },
+        mergedConfig,
+        mergedLevels,
+      );
+    }
+  }
 
   if (input.studioGameVersionId) {
     const snapshot = await loadStudioVersionSnapshot(input.studioGameVersionId);

@@ -90,7 +90,7 @@ async function createTestEventAndTeam(input: {
   gpsEnabled: boolean;
   citySlug: string | null;
   publishedVersionNumber: number;
-  versionId: string;
+  versionId: string | null;
   durationMinutes: number | null;
   runtimeProfiles: unknown;
 }): Promise<StudioTestSession> {
@@ -192,16 +192,15 @@ async function resolveGameForTest(gameId: string) {
   if (game.is_template) {
     return { ok: false as const, error: "Vorlagen können nicht getestet werden." };
   }
-  if (game.status !== "published" || game.published_version_number < 1) {
-    return {
-      ok: false as const,
-      error: "Nur veröffentlichte Spiele können getestet werden.",
-    };
+  if (game.status === "archived") {
+    return { ok: false as const, error: "Archivierte Spiele können nicht getestet werden." };
   }
-  const version = await loadPublishedVersion(gameId, game.published_version_number);
-  if (!version) {
-    return { ok: false as const, error: "Veröffentlichte Version nicht gefunden." };
+
+  let version: { id: string; snapshot: unknown } | null = null;
+  if (game.published_version_number >= 1) {
+    version = await loadPublishedVersion(gameId, game.published_version_number);
   }
+
   return { ok: true as const, orgId, game, version };
 }
 
@@ -221,35 +220,33 @@ export async function getOrCreateStudioTestSession(
     if (existing) {
       const team = await loadTestTeam(existing.id);
       if (team) {
-        if (existing.studio_game_version_id !== version.id) {
-          const supabase = createAdminClient();
-          const { data: fullEvent } = await supabase
-            .from("events")
-            .select("content_config")
-            .eq("id", existing.id)
-            .maybeSingle();
-          const prevConfig =
-            fullEvent?.content_config && typeof fullEvent.content_config === "object"
-              ? (fullEvent.content_config as Record<string, unknown>)
-              : {};
-          await supabase
-            .from("events")
-            .update({
-              studio_game_version_id: version.id,
-              title: `[Test] ${game.name}`,
-              content_config: {
-                ...prevConfig,
-                cms_game_id: game.id,
-                cms_version_number: game.published_version_number,
-                mission_duration_minutes: game.duration_minutes ?? 90,
-                content_mode: game.runtime_profiles?.default_mode,
-                runtime_profiles: game.runtime_profiles ?? undefined,
-                allowed_fallbacks: game.runtime_profiles?.allowed_fallbacks,
-                is_studio_test: true,
-              },
-            })
-            .eq("id", existing.id);
-        }
+        const supabase = createAdminClient();
+        const { data: fullEvent } = await supabase
+          .from("events")
+          .select("content_config")
+          .eq("id", existing.id)
+          .maybeSingle();
+        const prevConfig =
+          fullEvent?.content_config && typeof fullEvent.content_config === "object"
+            ? (fullEvent.content_config as Record<string, unknown>)
+            : {};
+        await supabase
+          .from("events")
+          .update({
+            studio_game_version_id: version?.id ?? null,
+            title: `[Test] ${game.name}`,
+            content_config: {
+              ...prevConfig,
+              cms_game_id: game.id,
+              cms_version_number: game.published_version_number,
+              mission_duration_minutes: game.duration_minutes ?? 90,
+              content_mode: game.runtime_profiles?.default_mode,
+              runtime_profiles: game.runtime_profiles ?? undefined,
+              allowed_fallbacks: game.runtime_profiles?.allowed_fallbacks,
+              is_studio_test: true,
+            },
+          })
+          .eq("id", existing.id);
         return {
           success: true,
           data: toSessionPayload({
@@ -269,7 +266,7 @@ export async function getOrCreateStudioTestSession(
       gpsEnabled: game.gps_enabled,
       citySlug: game.city_slug,
       publishedVersionNumber: game.published_version_number,
-      versionId: version.id,
+      versionId: version?.id ?? null,
       durationMinutes: game.duration_minutes,
       runtimeProfiles: game.runtime_profiles,
     });
@@ -317,7 +314,7 @@ export async function regenerateStudioTestSession(
       gpsEnabled: game.gps_enabled,
       citySlug: game.city_slug,
       publishedVersionNumber: game.published_version_number,
-      versionId: version.id,
+      versionId: version?.id ?? null,
       durationMinutes: game.duration_minutes,
       runtimeProfiles: game.runtime_profiles,
     });

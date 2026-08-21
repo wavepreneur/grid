@@ -205,6 +205,12 @@ export type EventContentConfig = {
   ui_layout?: "exitmania" | "quiz" | "training";
   show_live_score?: boolean;
   mission_duration_minutes?: number;
+  /** Studio game id — used by Studio test sessions to load live editor content. */
+  cms_game_id?: string;
+  /** Published version number at booking/test time (informational). */
+  cms_version_number?: number;
+  /** Studio playtest event — prefer live CMS compile over frozen snapshot. */
+  is_studio_test?: boolean;
   /**
    * Active play surface for this event.
    * outdoor | indoor | online — see docs/GRID_LAYER_MODEL.md § Surfaces.

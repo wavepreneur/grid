@@ -776,7 +776,7 @@ function GameRow({
 }) {
   const queryClient = useQueryClient();
   const [testOpen, setTestOpen] = useState(false);
-  const canTest = game.status === "published" && game.published_version_number >= 1;
+  const canTest = game.status === "published" || game.status === "draft";
   const surfaceChip = (() => {
     const mode = parseRuntimeProfiles(game.runtime_profiles).default_mode;
     if (mode === "outdoor") return "Outdoor";
@@ -832,8 +832,8 @@ function GameRow({
           disabled={!canTest}
           title={
             canTest
-              ? "Testlink öffnen"
-              : "Erst veröffentlichen, dann testen"
+              ? "Testen mit aktuellem Editor-Stand"
+              : "Archivierte Spiele können nicht getestet werden"
           }
           onClick={() => setTestOpen(true)}
         >

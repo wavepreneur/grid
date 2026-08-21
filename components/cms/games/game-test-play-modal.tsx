@@ -7,7 +7,7 @@ import {
   type StudioTestSession,
 } from "@/app/actions/cms/events";
 import { StudioModal } from "@/components/cms/shared/studio-modal";
-import { IconCopy, IconRefresh } from "@/components/cms/studio-icons";
+import { IconCopy, IconInfo, IconRefresh } from "@/components/cms/studio-icons";
 import { StudioButton, StudioError } from "@/components/cms/studio-ui";
 
 type Props = {
@@ -17,6 +17,9 @@ type Props = {
   gameName: string;
   publishedVersionNumber: number;
 };
+
+const REGENERATE_INFO =
+  "Neu generieren beendet die aktuelle Testsession — Fortschritt geht verloren. Der Inhalt kommt immer aus dem gespeicherten Editor-Stand.";
 
 export function GameTestPlayModal({
   open,
@@ -51,13 +54,6 @@ export function GameTestPlayModal({
   }, [open, gameId]);
 
   function handleRegenerate() {
-    if (
-      !window.confirm(
-        "Neuen Testlink erzeugen? Die aktuelle Testsession wird beendet — Fortschritt geht verloren.",
-      )
-    ) {
-      return;
-    }
     setError(null);
     setCopied(false);
     startTransition(async () => {
@@ -140,15 +136,34 @@ export function GameTestPlayModal({
       ) : null}
 
       <p className="text-sm leading-relaxed text-muted-foreground">
-        Link auf jedem Gerät öffnen. Ohne „Neu generieren“ geht es dort weiter, wo du aufgehört hast.
-        Neu generieren = frischer Neustart.
+        Testet den aktuellen gespeicherten Editor-Stand (kein separates Veröffentlichen nötig).
+        Link auf jedem Gerät öffnen. Ohne „Neu generieren“ geht der Fortschritt weiter — nach
+        größeren Inhaltsänderungen besser neu generieren.
       </p>
 
       {playUrl ? (
         <div className="mt-4 rounded-2xl border border-border bg-secondary/50 px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Testlink
-          </p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Testlink
+            </p>
+            <span className="group relative inline-flex">
+              <button
+                type="button"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition hover:bg-background hover:text-foreground"
+                aria-label={REGENERATE_INFO}
+                title={REGENERATE_INFO}
+              >
+                <IconInfo className="h-3.5 w-3.5" />
+              </button>
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute left-0 top-full z-30 mt-2 w-64 rounded-xl border border-border bg-card px-3 py-2 text-left text-xs leading-5 text-muted-foreground opacity-0 shadow-sm transition group-hover:opacity-100 group-focus-within:opacity-100"
+              >
+                {REGENERATE_INFO}
+              </span>
+            </span>
+          </div>
           <a
             href={playUrl}
             target="_blank"
