@@ -59,7 +59,7 @@ async function fetchTasksGameLinks(taskIds: string[]): Promise<{
 
   if (linksError) throw new Error(linksError.message);
 
-  // Einstiegsfragen: config.opener_task_id — org-scoped scan (JSONB filter is fragile in PostgREST)
+  // Einstiegsfragen: overrides.opener_task_id — org-scoped scan
   const openerRows: Array<{
     id: string;
     game_id: string;
@@ -77,19 +77,19 @@ async function fetchTasksGameLinks(taskIds: string[]): Promise<{
 
     const orgGameIds = (orgGames ?? []).map((g) => g.id as string);
     if (orgGameIds.length > 0) {
-      const { data: configLinks, error: configError } = await supabase
+      const { data: overrideLinks, error: overrideError } = await supabase
         .from("studio_game_tasks")
         .select(
-          "id, game_id, config, studio_games(id, name, status, published_version_number, organization_id)",
+          "id, game_id, overrides, studio_games(id, name, status, published_version_number, organization_id)",
         )
         .in("game_id", orgGameIds);
-      if (configError) throw new Error(configError.message);
+      if (overrideError) throw new Error(overrideError.message);
 
       const wanted = new Set(taskIds);
-      for (const row of configLinks ?? []) {
-        const config = row.config as { opener_task_id?: unknown } | null;
+      for (const row of overrideLinks ?? []) {
+        const overrides = row.overrides as { opener_task_id?: unknown } | null;
         const openerId =
-          typeof config?.opener_task_id === "string" ? config.opener_task_id : null;
+          typeof overrides?.opener_task_id === "string" ? overrides.opener_task_id : null;
         if (!openerId || !wanted.has(openerId)) continue;
         openerRows.push({
           id: row.id as string,
@@ -467,10 +467,14 @@ export async function getTasksGameUsage(taskIds: string[]): Promise<ActionResult
       const liveGameCount = [...uniqueGameIds].filter((gameId) =>
         games.some((g) => g.gameId === gameId && g.liveEvents.length > 0),
       ).length;
+      const publishedGameCount = [...uniqueGameIds].filter((gameId) =>
+        games.some((g) => g.gameId === gameId && g.gameStatus === "published"),
+      ).length;
       return {
         taskId,
         games,
         liveGameCount,
+        publishedGameCount,
         totalGameCount: uniqueGameIds.size,
       };
     });

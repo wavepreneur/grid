@@ -13,6 +13,7 @@ type Props = {
   taskId: string;
   taskTitle: string;
   gameCount: number;
+  publishedGameCount?: number;
   liveGameCount: number;
   className?: string;
 };
@@ -21,6 +22,7 @@ export function TaskGameUsageButton({
   taskId,
   taskTitle,
   gameCount,
+  publishedGameCount = 0,
   liveGameCount,
   className,
 }: Props) {
@@ -45,10 +47,16 @@ export function TaskGameUsageButton({
 
   if (gameCount === 0) return null;
 
-  const label =
-    liveGameCount > 0
-      ? `In ${gameCount} Spiel${gameCount === 1 ? "" : "en"} · ${liveGameCount} live`
-      : `In ${gameCount} Spiel${gameCount === 1 ? "" : "en"}`;
+  const parts = [`In ${gameCount} Spiel${gameCount === 1 ? "" : "en"}`];
+  if (publishedGameCount > 0) {
+    parts.push(
+      `${publishedGameCount} veröffentlicht`,
+    );
+  }
+  if (liveGameCount > 0) {
+    parts.push(`${liveGameCount} Live-Event`);
+  }
+  const label = parts.join(" · ");
 
   return (
     <>
@@ -67,6 +75,10 @@ export function TaskGameUsageButton({
         {liveGameCount > 0 ? (
           <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] uppercase text-emerald-800">
             Live
+          </span>
+        ) : publishedGameCount > 0 ? (
+          <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[10px] uppercase text-teal-800">
+            Pub
           </span>
         ) : null}
         {label}

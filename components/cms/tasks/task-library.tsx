@@ -46,7 +46,7 @@ const SORT_OPTIONS: Array<{ id: TaskSort; label: string }> = [
   { id: "updated", label: "Zuletzt bearbeitet" },
   { id: "created", label: "Zuletzt erstellt" },
   { id: "name", label: "Name (A–Z)" },
-  { id: "live", label: "Live zuerst" },
+  { id: "live", label: "Veröffentlicht zuerst" },
 ];
 
 function sortTasks(list: TaskWithUsage[], sort: TaskSort): TaskWithUsage[] {
@@ -62,9 +62,11 @@ function sortTasks(list: TaskWithUsage[], sort: TaskSort): TaskWithUsage[] {
       );
     case "live":
       return next.sort((a, b) => {
-        const diff = b.liveGameCount - a.liveGameCount;
-        return diff !== 0
-          ? diff
+        const pubDiff = b.publishedGameCount - a.publishedGameCount;
+        if (pubDiff !== 0) return pubDiff;
+        const liveDiff = b.liveGameCount - a.liveGameCount;
+        return liveDiff !== 0
+          ? liveDiff
           : new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
       });
     case "updated":
@@ -98,6 +100,7 @@ export function TaskLibrary({ initialTasks }: Props) {
         return {
           ...task,
           liveGameCount: usage?.liveGameCount ?? 0,
+          publishedGameCount: usage?.publishedGameCount ?? 0,
           gameLinkCount: usage?.totalGameCount ?? 0,
         };
       }),
@@ -128,8 +131,8 @@ export function TaskLibrary({ initialTasks }: Props) {
     const q = search.trim().toLowerCase();
     return tasks.filter((task) => {
       if (tagFilter && !task.tags.includes(tagFilter)) return false;
-      if (liveFilter === "live" && task.liveGameCount === 0) return false;
-      if (liveFilter === "offline" && task.liveGameCount > 0) return false;
+      if (liveFilter === "live" && task.publishedGameCount === 0) return false;
+      if (liveFilter === "offline" && task.publishedGameCount > 0) return false;
       if (!q) return true;
       return (
         task.title.toLowerCase().includes(q) ||
@@ -334,8 +337,8 @@ export function TaskLibrary({ initialTasks }: Props) {
           {(
             [
               ["", "Alle"],
-              ["live", "In Live-Spielen"],
-              ["offline", "Nicht live"],
+              ["live", "In veröffentlichten Spielen"],
+              ["offline", "Nicht veröffentlicht"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -443,8 +446,11 @@ export function TaskLibrary({ initialTasks }: Props) {
                   <div className="flex min-w-0 items-center gap-2">
                     <TaskTilePreview title={task.title} content={task.content} compact />
                     <h2 className="truncate text-base font-bold">{task.title || "Ohne Titel"}</h2>
+                    {task.publishedGameCount > 0 ? (
+                      <Chip tone="bg-success/20 text-success-foreground">Veröffentlicht</Chip>
+                    ) : null}
                     {task.liveGameCount > 0 ? (
-                      <Chip tone="bg-success/20 text-success-foreground">Live</Chip>
+                      <Chip tone="bg-primary/12 text-primary">Live-Event</Chip>
                     ) : null}
                   </div>
                   <p className="truncate text-sm text-muted-foreground">
@@ -462,6 +468,7 @@ export function TaskLibrary({ initialTasks }: Props) {
                       taskId={task.id}
                       taskTitle={task.title}
                       gameCount={task.gameLinkCount}
+                      publishedGameCount={task.publishedGameCount}
                       liveGameCount={task.liveGameCount}
                     />
                     {task.tags.slice(0, 3).map((tag) => (

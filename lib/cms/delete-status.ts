@@ -32,7 +32,10 @@ export type TaskLiveGameLink = {
 export type TaskGameUsage = {
   taskId: string;
   games: TaskLiveGameLink[];
+  /** Games with at least one running live event (lobby/active). */
   liveGameCount: number;
+  /** Games with status published (Studio „veröffentlicht”). */
+  publishedGameCount: number;
   totalGameCount: number;
 };
 

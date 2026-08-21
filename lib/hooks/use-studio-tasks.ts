@@ -9,6 +9,7 @@ import type { StudioTask } from "@/lib/cms/types";
 
 export type TaskWithUsage = StudioTask & {
   liveGameCount: number;
+  publishedGameCount: number;
   gameLinkCount: number;
 };
 
