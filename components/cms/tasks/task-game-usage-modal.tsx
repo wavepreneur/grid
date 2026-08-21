@@ -109,6 +109,9 @@ export function TaskGameUsageButton({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium text-slate-900">{game.gameName}</p>
+                      <StudioBadge>
+                        {game.usageKind === "opener" ? "Einstiegsfrage" : "Aufgabe"}
+                      </StudioBadge>
                       {game.liveEvents.length > 0 ? (
                         <StudioBadge tone="live">Live</StudioBadge>
                       ) : null}
@@ -162,7 +165,12 @@ export function TaskGameUsageList({
             href={`/admin/games/${game.gameId}`}
             className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm transition hover:border-teal-200 hover:bg-teal-50/50"
           >
-            <span className="font-medium text-slate-800">{game.gameName}</span>
+            <span className="font-medium text-slate-800">
+              {game.gameName}
+              <span className="ml-2 text-xs font-normal text-slate-500">
+                {game.usageKind === "opener" ? "Einstiegsfrage" : "Aufgabe"}
+              </span>
+            </span>
             <span className="inline-flex items-center gap-1 text-teal-600">
               {game.liveEvents.length > 0 ? "Live · " : ""}
               Öffnen <IconArrowRight size={12} />

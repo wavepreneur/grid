@@ -25,6 +25,8 @@ export type TaskLiveGameLink = {
   gameStatus: "draft" | "published" | "archived";
   publishedVersionNumber: number;
   liveEvents: LiveEventSummary[];
+  /** slot = Aufgabe im Spiel; opener = Einstiegsfrage an einem Slot */
+  usageKind: "slot" | "opener";
 };
 
 export type TaskGameUsage = {
@@ -144,17 +146,26 @@ export function buildTaskDeleteStatus(
     .filter((g) => g.liveEvents.length === 0)
     .map((g) => g.gameName);
 
-  if (liveGameLinks.length > 0) {
-    const names = liveGameLinks.map((l) => l.gameName).join(", ");
+  if (games.length > 0) {
+    const names = [...new Set(games.map((l) => l.gameName))].join(", ");
+    const hasOpener = games.some((g) => g.usageKind === "opener");
+    const hasSlot = games.some((g) => g.usageKind === "slot");
+    const kindHint =
+      hasOpener && hasSlot
+        ? "als Aufgabe und Einstiegsfrage"
+        : hasOpener
+          ? "als Einstiegsfrage"
+          : "als Aufgabe";
     return {
       taskId,
       draftGameNames,
       liveGameLinks,
       games,
       canDelete: false,
-      blockReason: `Diese Aufgabe ist in laufenden Spielen enthalten (${names}). Entferne sie dort zuerst.`,
+      blockReason: `Diese Aufgabe wird ${kindHint} in Spiel(en) verwendet (${names}). Lösche zuerst diese Spiele (oder entferne die Verknüpfung dort), danach kannst du die Aufgabe löschen.`,
     };
   }
+
   return {
     taskId,
     draftGameNames,

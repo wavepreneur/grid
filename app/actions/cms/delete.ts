@@ -38,21 +38,82 @@ function asJoinedGame(raw: unknown): JoinedGame | null {
 }
 
 async function fetchTasksGameLinks(taskIds: string[]): Promise<{
-  linksByTask: Map<string, Array<{ id: string; game_id: string; task_id: string; studio_games: unknown }>>;
+  linksByTask: Map<
+    string,
+    Array<{
+      id: string;
+      game_id: string;
+      task_id: string;
+      studio_games: unknown;
+      usageKind: "slot" | "opener";
+    }>
+  >;
   liveEventsByGame: Map<string, Array<{ id: string; title: string; invite_code: string; status: string }>>;
 }> {
   const supabase = createAdminClient();
 
-  const { data: links, error: linksError } = await supabase
+  const { data: slotLinks, error: linksError } = await supabase
     .from("studio_game_tasks")
     .select("id, game_id, task_id, studio_games(id, name, status, published_version_number, organization_id)")
     .in("task_id", taskIds);
 
   if (linksError) throw new Error(linksError.message);
 
+  // Einstiegsfragen: opener_task_id in config JSON (nicht als task_id der Zeile)
+  const openerOr =
+    taskIds.length === 0
+      ? ""
+      : taskIds.map((id) => `config->>opener_task_id.eq.${id}`).join(",");
+
+  const { data: openerLinks, error: openerError } = openerOr
+    ? await supabase
+        .from("studio_game_tasks")
+        .select(
+          "id, game_id, task_id, config, studio_games(id, name, status, published_version_number, organization_id)",
+        )
+        .or(openerOr)
+    : { data: [], error: null };
+
+  if (openerError) throw new Error(openerError.message);
+
+  type LinkRow = {
+    id: string;
+    game_id: string;
+    task_id: string;
+    studio_games: unknown;
+    usageKind: "slot" | "opener";
+    openerTaskId?: string;
+  };
+
+  const normalized: LinkRow[] = [
+    ...(slotLinks ?? []).map((row) => ({
+      id: row.id as string,
+      game_id: row.game_id as string,
+      task_id: row.task_id as string,
+      studio_games: row.studio_games,
+      usageKind: "slot" as const,
+    })),
+    ...(openerLinks ?? []).flatMap((row) => {
+      const config = row.config as { opener_task_id?: unknown } | null;
+      const openerId =
+        typeof config?.opener_task_id === "string" ? config.opener_task_id : null;
+      if (!openerId || !taskIds.includes(openerId)) return [];
+      return [
+        {
+          id: row.id as string,
+          game_id: row.game_id as string,
+          task_id: openerId,
+          studio_games: row.studio_games,
+          usageKind: "opener" as const,
+          openerTaskId: openerId,
+        },
+      ];
+    }),
+  ];
+
   const gameIds = [
     ...new Set(
-      (links ?? []).map((row) => asJoinedGame(row.studio_games)?.id).filter(Boolean) as string[],
+      normalized.map((row) => asJoinedGame(row.studio_games)?.id).filter(Boolean) as string[],
     ),
   ];
 
@@ -77,7 +138,10 @@ async function fetchTasksGameLinks(taskIds: string[]): Promise<{
 
   if (liveError) throw new Error(liveError.message);
 
-  const liveEventsByGame = new Map<string, Array<{ id: string; title: string; invite_code: string; status: string }>>();
+  const liveEventsByGame = new Map<
+    string,
+    Array<{ id: string; title: string; invite_code: string; status: string }>
+  >();
   for (const row of liveRows ?? []) {
     if (isStudioTestBookingReference(row.booking_reference as string | null)) continue;
     const gameId = versionToGame.get(row.studio_game_version_id as string);
@@ -92,9 +156,9 @@ async function fetchTasksGameLinks(taskIds: string[]): Promise<{
     liveEventsByGame.set(gameId, list);
   }
 
-  const linksByTask = new Map<string, typeof links>();
-  for (const row of links ?? []) {
-    const taskId = row.task_id as string;
+  const linksByTask = new Map<string, LinkRow[]>();
+  for (const row of normalized) {
+    const taskId = row.task_id;
     const list = linksByTask.get(taskId) ?? [];
     list.push(row);
     linksByTask.set(taskId, list);
@@ -104,24 +168,31 @@ async function fetchTasksGameLinks(taskIds: string[]): Promise<{
 }
 
 function buildTaskGamesFromLinks(
-  taskLinks: Array<{ id: string; studio_games: unknown }>,
+  taskLinks: Array<{
+    id: string;
+    studio_games: unknown;
+    usageKind: "slot" | "opener";
+  }>,
   liveEventsByGame: Map<string, Array<{ id: string; title: string; invite_code: string; status: string }>>,
 ): TaskLiveGameLink[] {
-  const games: TaskLiveGameLink[] = [];
+  const byKey = new Map<string, TaskLiveGameLink>();
   for (const row of taskLinks) {
     const game = asJoinedGame(row.studio_games);
     if (!game) continue;
+    const key = `${game.id}:${row.usageKind}`;
+    if (byKey.has(key)) continue;
     const liveEvents = liveEventsByGame.get(game.id) ?? [];
-    games.push({
-      linkId: row.id as string,
+    byKey.set(key, {
+      linkId: `${row.usageKind}:${row.id}`,
       gameId: game.id,
       gameName: game.name,
       gameStatus: game.status,
       publishedVersionNumber: game.published_version_number,
       liveEvents,
+      usageKind: row.usageKind,
     });
   }
-  return games.sort((a, b) => {
+  return [...byKey.values()].sort((a, b) => {
     const liveDiff = b.liveEvents.length - a.liveEvents.length;
     if (liveDiff !== 0) return liveDiff;
     return a.gameName.localeCompare(b.gameName, "de", { sensitivity: "base" });

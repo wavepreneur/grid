@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   deleteTasks,
   getTasksDeleteStatus,
-  removeTasksFromLiveGames,
 } from "@/app/actions/cms/delete";
 import type { TaskDeleteStatus } from "@/lib/cms/delete-status";
 import { TaskGameUsageList } from "@/components/cms/tasks/task-game-usage-modal";
@@ -23,7 +22,7 @@ type Props = {
 
 export function TaskDeleteButton({
   taskId,
-  taskTitle,
+  taskTitle: _taskTitle,
   redirectTo = "/admin/tasks",
   className,
 }: Props) {
@@ -34,7 +33,7 @@ export function TaskDeleteButton({
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<TaskDeleteStatus | null>(null);
 
-  const hasLiveBlockers = (status?.liveGameLinks.length ?? 0) > 0;
+  const isBlocked = Boolean(status && !status.canDelete);
 
   async function openModal() {
     setError(null);
@@ -47,28 +46,12 @@ export function TaskDeleteButton({
     setOpen(true);
   }
 
-  async function removeFromLive() {
-    setPending(true);
-    setError(null);
-    try {
-      const result = await removeTasksFromLiveGames([taskId]);
-      if (!result.success) {
-        setError(result.error);
-        return;
-      }
-      const refreshed = await getTasksDeleteStatus([taskId]);
-      if (refreshed.success) setStatus(refreshed.data![0] ?? null);
-    } finally {
-      setPending(false);
-    }
-  }
-
   async function confirmDelete() {
     setPending(true);
     setError(null);
     try {
-      if (hasLiveBlockers) {
-        setError("Entferne die Aufgabe zuerst aus laufenden Spielen.");
+      if (isBlocked) {
+        setError(status?.blockReason ?? "Aufgabe ist noch in Spielen eingebunden.");
         return;
       }
       const result = await deleteTasks([taskId]);
@@ -92,12 +75,7 @@ export function TaskDeleteButton({
     if (!status) return null;
     return (
       <>
-        {status.liveGameLinks.length > 0 ? (
-          <StudioHint tone="warn">
-            „{taskTitle}" ist in laufenden Spielen:{" "}
-            {status.liveGameLinks.map((l) => l.gameName).join(", ")}
-          </StudioHint>
-        ) : null}
+        {status.blockReason ? <StudioHint tone="warn">{status.blockReason}</StudioHint> : null}
         {status.games.length > 0 ? (
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -109,7 +87,7 @@ export function TaskDeleteButton({
         {error ? <StudioError message={error} /> : null}
       </>
     );
-  }, [status, taskTitle, error]);
+  }, [status, error]);
 
   return (
     <>
@@ -130,19 +108,8 @@ export function TaskDeleteButton({
         count={1}
         itemLabel="Aufgabe"
         pending={pending}
+        confirmDisabled={isBlocked}
         warnings={warnings}
-        extraActions={
-          hasLiveBlockers ? (
-            <StudioButton
-              type="button"
-              variant="secondary"
-              disabled={pending}
-              onClick={removeFromLive}
-            >
-              Aus laufenden Spielen entfernen
-            </StudioButton>
-          ) : undefined
-        }
         onConfirm={confirmDelete}
       />
     </>

@@ -7,7 +7,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   deleteTasks,
   getTasksDeleteStatus,
-  removeTasksFromLiveGames,
 } from "@/app/actions/cms/delete";
 import { duplicateTasks } from "@/app/actions/cms/tasks";
 import type { TaskDeleteStatus } from "@/lib/cms/delete-status";
@@ -112,7 +111,6 @@ export function TaskLibrary({ initialTasks }: Props) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteIds, setDeleteIds] = useState<string[]>([]);
   const [deleteStatuses, setDeleteStatuses] = useState<TaskDeleteStatus[]>([]);
-  const [removeLivePending, setRemoveLivePending] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [duplicateIds, setDuplicateIds] = useState<string[]>([]);
@@ -148,7 +146,7 @@ export function TaskLibrary({ initialTasks }: Props) {
     sortedTasks.length > 0 && sortedTasks.every((t) => selectedIds.has(t.id));
   const someSelected =
     sortedTasks.some((t) => selectedIds.has(t.id)) && !allSelected;
-  const hasLiveBlockers = deleteStatuses.some((s) => s.liveGameLinks.length > 0);
+  const hasDeleteBlockers = deleteStatuses.some((s) => !s.canDelete);
 
   function pushFilter(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -180,27 +178,6 @@ export function TaskLibrary({ initialTasks }: Props) {
     }
     setDeleteStatuses(result.data!);
     setDeleteOpen(true);
-  }
-
-  async function removeFromLiveGames() {
-    setRemoveLivePending(true);
-    setDeleteError(null);
-    try {
-      const blockedIds = deleteStatuses
-        .filter((s) => s.liveGameLinks.length > 0)
-        .map((s) => s.taskId);
-      const result = await removeTasksFromLiveGames(blockedIds);
-      if (!result.success) {
-        setDeleteError(result.error);
-        return;
-      }
-      const refreshed = await getTasksDeleteStatus(deleteIds);
-      if (refreshed.success) setDeleteStatuses(refreshed.data!);
-      setMessage("Aufgaben aus laufenden Spielen entfernt — du kannst jetzt löschen.");
-      void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
-    } finally {
-      setRemoveLivePending(false);
-    }
   }
 
   function openDuplicateModal(ids: string[]) {
@@ -282,9 +259,9 @@ export function TaskLibrary({ initialTasks }: Props) {
   });
 
   async function confirmDelete() {
-    if (hasLiveBlockers) {
+    if (hasDeleteBlockers) {
       setDeleteError(
-        "Entferne die Aufgabe(n) zuerst aus laufenden Spielen oder nutze den Button unten.",
+        "Lösche zuerst die Spiele, in denen die Aufgabe noch eingebunden ist (auch als Einstiegsfrage).",
       );
       return;
     }
@@ -293,7 +270,7 @@ export function TaskLibrary({ initialTasks }: Props) {
     deleteMutation.mutate(deleteIds);
   }
 
-  const deletePending = deleteMutation.isPending || removeLivePending;
+  const deletePending = deleteMutation.isPending;
   const duplicatePending = duplicateMutation.isPending;
 
   function prefetchTask(taskId: string) {
@@ -301,18 +278,18 @@ export function TaskLibrary({ initialTasks }: Props) {
   }
 
   const deleteWarnings = useMemo(() => {
-    const live = deleteStatuses.filter((s) => s.liveGameLinks.length > 0);
+    const blocked = deleteStatuses.filter((s) => !s.canDelete);
     const allGames = deleteStatuses.flatMap((s) => s.games);
-    const uniqueGames = [...new Map(allGames.map((g) => [g.gameId, g])).values()];
+    const uniqueGames = [...new Map(allGames.map((g) => [g.linkId, g])).values()];
 
     return (
       <>
-        {live.length > 0 ? (
+        {blocked.length > 0 ? (
           <StudioHint tone="warn">
-            {live.length === 1
-              ? "1 Aufgabe ist in einem laufenden Spiel."
-              : `${live.length} Aufgaben sind in laufenden Spielen.`}{" "}
-            Entferne sie im jeweiligen Spiel unter Spiellogik.
+            {blocked.length === 1
+              ? "Diese Aufgabe ist noch in Spielen eingebunden (Aufgabe oder Einstiegsfrage)."
+              : `${blocked.length} Aufgaben sind noch in Spielen eingebunden.`}{" "}
+            Lösche zuerst die betroffenen Spiele — danach ist endgültiges Löschen möglich.
           </StudioHint>
         ) : null}
         {uniqueGames.length > 0 ? (
@@ -545,23 +522,12 @@ export function TaskLibrary({ initialTasks }: Props) {
         count={deleteIds.length}
         itemLabel={deleteIds.length === 1 ? "Aufgabe" : "Aufgaben"}
         pending={deletePending}
+        confirmDisabled={hasDeleteBlockers}
         warnings={
           <>
             {deleteWarnings}
             {deleteError ? <StudioError message={deleteError} /> : null}
           </>
-        }
-        extraActions={
-          hasLiveBlockers ? (
-            <StudioButton
-              type="button"
-              variant="secondary"
-              disabled={deletePending}
-              onClick={removeFromLiveGames}
-            >
-              Aus laufenden Spielen entfernen
-            </StudioButton>
-          ) : undefined
         }
         onConfirm={confirmDelete}
       />

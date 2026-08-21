@@ -11,6 +11,7 @@ type Props = {
   count: number;
   itemLabel: string;
   pending?: boolean;
+  confirmDisabled?: boolean;
   warnings?: ReactNode;
   extraActions?: ReactNode;
   offlineSwitch?: {
@@ -29,6 +30,7 @@ export function StudioDeleteModal({
   count,
   itemLabel,
   pending,
+  confirmDisabled,
   warnings,
   extraActions,
   offlineSwitch,
@@ -49,7 +51,12 @@ export function StudioDeleteModal({
       }
       footer={
         <div className="flex flex-wrap gap-2">
-          <StudioButton type="button" variant="danger" disabled={pending} onClick={onConfirm}>
+          <StudioButton
+            type="button"
+            variant="danger"
+            disabled={pending || confirmDisabled}
+            onClick={onConfirm}
+          >
             {pending ? "Wird gelöscht…" : confirmLabel}
           </StudioButton>
           <StudioButton type="button" variant="secondary" disabled={pending} onClick={onClose}>
