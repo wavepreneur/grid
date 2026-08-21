@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { TileHintModal } from "@/components/game/tile-hint-modal";
+import { SectionLabel } from "@/components/game/city/ui";
+import { mediaTypeLucideIcon } from "@/components/game/city/level-screen-blocks";
 import type { PurchasedTileHint } from "@/lib/grid/game-state";
 import type { LevelContentTile } from "@/lib/grid/level-types";
-import { HINT_POINT_COST } from "@/lib/grid/level-types";
-import { tileTypeIcon, tileTypeLabel } from "@/lib/grid/level-content";
+import { tileTypeLabel } from "@/lib/grid/level-content";
 
 type ContentTileGridProps = {
   tiles: LevelContentTile[];
@@ -16,211 +15,138 @@ type ContentTileGridProps = {
   disabled?: boolean;
   isPending?: boolean;
   layout?: "inline" | "sidebar";
+  cityStyle?: boolean;
+  soloAlpha?: boolean;
 };
 
-type TileCardProps = {
-  tile: LevelContentTile;
-  label: string;
-  purchased?: PurchasedTileHint;
-  hintCost: number;
-  disabled: boolean;
-  isPending: boolean;
-  onOpen: (tile: LevelContentTile) => void;
-  onHintClick: (tile: LevelContentTile, event: React.MouseEvent) => void;
-};
-
-function TileCard({
-  tile,
-  label,
-  purchased,
-  hintCost,
-  disabled,
-  isPending,
-  onOpen,
-  onHintClick,
-}: TileCardProps) {
-  const hasHint = Boolean(tile.hint);
-
-  return (
-    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      {purchased ? (
-        <span
-          className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"
-          aria-hidden
-        >
-          ✓
-        </span>
-      ) : null}
-
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => onOpen(tile)}
-        className="relative flex aspect-square w-full overflow-hidden transition hover:opacity-95 active:opacity-90 disabled:opacity-50"
-      >
-        {tile.cover_image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={tile.cover_image_url}
-            alt={label}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <span className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#1a4d52] px-3 py-4 text-white">
-            <span className="text-4xl leading-none" aria-hidden>
-              {tileTypeIcon(tile.type)}
-            </span>
-            <span className="text-center text-[11px] font-semibold uppercase tracking-wide">
-              {label}
-            </span>
-          </span>
-        )}
-      </button>
-
-      {hasHint ? (
-        <button
-          type="button"
-          disabled={disabled || isPending}
-          onClick={(event) => onHintClick(tile, event)}
-          className={`border-t border-slate-100 px-2 py-2.5 text-center text-[10px] font-medium uppercase tracking-wide transition disabled:opacity-50 ${
-            purchased
-              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-              : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-          }`}
-        >
-          {purchased ? "Tipp ansehen" : `Tipp · ${hintCost}P`}
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
+/** Kachel-Raster — Tipps liegen im Medien-Sheet, nicht als Badge auf der Kachel. */
 export function ContentTileGrid({
   tiles,
-  purchasedHints,
-  score,
   onOpen,
-  onPurchaseHint,
   disabled = false,
-  isPending = false,
   layout = "inline",
+  cityStyle = false,
+  soloAlpha = false,
 }: ContentTileGridProps) {
-  const [confirmTile, setConfirmTile] = useState<LevelContentTile | null>(null);
-  const [viewHintTile, setViewHintTile] = useState<LevelContentTile | null>(null);
   const isSidebar = layout === "sidebar";
-
-  useEffect(() => {
-    if (!confirmTile) return;
-    if (purchasedHints[confirmTile.id]) {
-      setConfirmTile(null);
-      setViewHintTile(confirmTile);
-    }
-  }, [confirmTile, purchasedHints]);
+  const single = tiles.length === 1;
 
   if (tiles.length === 0) return null;
 
-  function handleHintClick(tile: LevelContentTile, event: React.MouseEvent) {
-    event.stopPropagation();
-    if (purchasedHints[tile.id]) {
-      setViewHintTile(tile);
-      return;
-    }
-    setConfirmTile(tile);
-  }
-
-  function handleConfirmPurchase() {
-    if (!confirmTile) return;
-    onPurchaseHint(confirmTile.id);
-  }
-
-  const showSwipeHint = !isSidebar && tiles.length > 1;
+  const heading = single ? "Rätselkachel" : `${tiles.length} Rätselkacheln`;
 
   return (
-    <>
-      <div className={isSidebar ? "flex min-h-0 flex-col" : "min-w-0 w-full"}>
+    <div className={isSidebar ? "flex min-h-0 flex-col" : "min-w-0 w-full"}>
+      {cityStyle ? (
+        <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
+          <div>
+            <SectionLabel>{heading}</SectionLabel>
+          </div>
+          <span className="shrink-0 text-xs font-semibold text-[var(--cg-muted)]">
+            Antippen zum Öffnen
+          </span>
+        </div>
+      ) : (
         <div className="mb-3 flex shrink-0 items-end justify-between gap-2">
           <p className="text-sm font-medium text-slate-700">Hinweise & Medien</p>
-          {showSwipeHint ? (
-            <p className="text-[10px] text-slate-400 sm:hidden">Wischen →</p>
-          ) : null}
         </div>
+      )}
 
-        {isSidebar ? (
+      <div
+        className={
+          cityStyle
+            ? single
+              ? "flex justify-center"
+              : "flex items-start snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            : single
+              ? "flex justify-center"
+              : isSidebar
+                ? "min-h-0 flex-1 overflow-y-auto"
+                : "game-panel-bleed"
+        }
+      >
+        {cityStyle ? (
+          tiles.map((tile) => {
+            const label = tile.label ?? tileTypeLabel(tile.type);
+            const size = single
+              ? "h-40 w-40 max-w-full"
+              : "h-36 w-36 snap-center sm:h-40 sm:w-40";
+            const cover = tile.cover_image_url?.trim() || "";
+            const hasCover = cover.length > 0;
+
+            return (
+              <div key={tile.id} className={`relative flex-none ${size}`}>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onOpen(tile)}
+                  aria-label={label}
+                  className={`cg-tap-lift absolute inset-0 overflow-hidden rounded-[1.35rem] shadow-[var(--cg-shadow-tile)] disabled:opacity-50 ${
+                    hasCover ? "" : "bg-[var(--cg-secondary)]"
+                  }`}
+                >
+                  {hasCover ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={cover}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-2 text-[var(--cg-muted)]">
+                      {mediaTypeLucideIcon(tile.type)}
+                      <span className="max-w-full truncate text-sm font-semibold text-[var(--cg-fg)]">
+                        {label}
+                      </span>
+                    </span>
+                  )}
+                </button>
+              </div>
+            );
+          })
+        ) : (
           <ul
-            className={`grid max-h-[min(70vh,calc(100dvh-11rem))] gap-3 overflow-y-auto overscroll-contain pr-1 ${
-              tiles.length === 1 ? "grid-cols-1 place-items-center" : "grid-cols-2"
-            }`}
+            className={single ? "grid w-full max-w-[11rem]" : "tile-slider"}
+            aria-label="Hinweise und Medien"
           >
             {tiles.map((tile) => {
               const label = tile.label ?? tileTypeLabel(tile.type);
               return (
-                <li key={tile.id} className="min-w-0">
-                  <TileCard
-                    tile={tile}
-                    label={label}
-                    purchased={purchasedHints[tile.id]}
-                    hintCost={tile.hint?.point_cost ?? HINT_POINT_COST}
+                <li
+                  key={tile.id}
+                  className="w-[42vw] max-w-[11rem] min-w-[9.5rem] shrink-0 snap-start sm:w-44 sm:max-w-[12rem]"
+                >
+                  <button
+                    type="button"
                     disabled={disabled}
-                    isPending={isPending}
-                    onOpen={onOpen}
-                    onHintClick={handleHintClick}
-                  />
+                    onClick={() => onOpen(tile)}
+                    className="relative flex aspect-square w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm disabled:opacity-50"
+                  >
+                    {tile.cover_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={tile.cover_image_url}
+                        alt={label}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center bg-slate-100 text-sm font-semibold text-slate-600">
+                        {label}
+                      </span>
+                    )}
+                  </button>
                 </li>
               );
             })}
           </ul>
-        ) : (
-          <div className={tiles.length === 1 ? "flex justify-center" : "game-panel-bleed"}>
-            <ul
-              className={tiles.length === 1 ? "grid w-full max-w-[11rem]" : "tile-slider"}
-              aria-label="Hinweise und Medien"
-            >
-              {tiles.map((tile) => {
-                const label = tile.label ?? tileTypeLabel(tile.type);
-                return (
-                  <li
-                    key={tile.id}
-                    className="w-[42vw] max-w-[11rem] min-w-[9.5rem] shrink-0 snap-start sm:w-44 sm:max-w-[12rem]"
-                  >
-                    <TileCard
-                      tile={tile}
-                      label={label}
-                      purchased={purchasedHints[tile.id]}
-                      hintCost={tile.hint?.point_cost ?? HINT_POINT_COST}
-                      disabled={disabled}
-                      isPending={isPending}
-                      onOpen={onOpen}
-                      onHintClick={handleHintClick}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
         )}
       </div>
 
-      <TileHintModal
-        open={Boolean(confirmTile) && !purchasedHints[confirmTile?.id ?? ""]}
-        mode="confirm"
-        label={confirmTile ? (confirmTile.label ?? tileTypeLabel(confirmTile.type)) : ""}
-        hintCost={confirmTile?.hint?.point_cost ?? HINT_POINT_COST}
-        score={score}
-        isPending={isPending}
-        canAfford={score >= (confirmTile?.hint?.point_cost ?? HINT_POINT_COST)}
-        onConfirm={handleConfirmPurchase}
-        onClose={() => setConfirmTile(null)}
-      />
-
-      <TileHintModal
-        open={Boolean(viewHintTile)}
-        mode="view"
-        label={viewHintTile ? (viewHintTile.label ?? tileTypeLabel(viewHintTile.type)) : ""}
-        hintText={viewHintTile ? purchasedHints[viewHintTile.id]?.text : undefined}
-        hintCost={viewHintTile?.hint?.point_cost ?? HINT_POINT_COST}
-        score={score}
-        onClose={() => setViewHintTile(null)}
-      />
-    </>
+      {cityStyle && soloAlpha ? (
+        <p className="mt-2 text-center text-xs text-[var(--cg-muted)]">
+          Solo-Modus: Du siehst alle Medien auf deinem Gerät.
+        </p>
+      ) : null}
+    </div>
   );
 }

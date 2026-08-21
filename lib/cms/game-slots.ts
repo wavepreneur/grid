@@ -10,26 +10,35 @@ import {
 } from "@/lib/cms/game-link-config";
 import type { ContentMode } from "@/lib/cms/layer-model";
 import { LAYER_GAME_PRESETS, type LayerGamePreset } from "@/lib/cms/layer-model";
-import type { StudioGameTaskLink, StudioTaskContent } from "@/lib/cms/types";
+import type { StudioGameTaskLink, StudioTask, StudioTaskContent } from "@/lib/cms/types";
 import type { ArrivalQuiz, BonusTask, QuizOption } from "@/lib/grid/level-types";
 import { normalizeTaskContent } from "@/lib/cms/task-content";
 
 export type StudioArrivalQuiz = {
+  title?: string;
+  image_url?: string;
+  description?: string;
   question: string;
   options: Array<{ id: string; label: string; correct?: boolean }>;
   /** Single correct (classic). */
   correct_option_id?: string;
   /** Multi correct. */
   correct_option_ids?: string[];
+  /** Bonus points for a correct opener answer. */
+  points?: number;
+  /** Side-fact after answer. */
+  side_fact?: string;
 };
 
 export type GameSlot = {
   index: number;
   /** Mission / game level (Layer 2, or Layer 1 if no missions). */
   levelLink: StudioGameTaskLink;
-  /** Opener quiz — from overrides or linked geo task. */
+  /** Opener quiz — from pool task snapshot or legacy override. */
   quiz: StudioArrivalQuiz | null;
-  quizSource: "override" | "geo_task" | "none";
+  quizSource: "opener_task" | "override" | "geo_task" | "none";
+  /** Pool task id when Einstiegsfrage is bound. */
+  openerTaskId: string | null;
   geoLink: StudioGameTaskLink | null;
   bonusLink: StudioGameTaskLink | null;
 };
@@ -47,22 +56,33 @@ export function surfaceToPreset(surface: ContentMode): LayerGamePreset {
 export function surfaceLabelDe(surface: ContentMode): string {
   switch (surface) {
     case "outdoor":
-      return "Outdoor (GPS-Karte)";
+      return "Outdoor";
     case "indoor":
-      return "Indoor (Stationen)";
+      return "Indoor";
     case "online":
-      return "Online (Tabbrain)";
+      return "Online";
+  }
+}
+
+export function surfaceTaglineDe(surface: ContentMode): string {
+  switch (surface) {
+    case "outdoor":
+      return "GPS · unterwegs";
+    case "indoor":
+      return "Codes · vor Ort";
+    case "online":
+      return "Cross-Device · remote";
   }
 }
 
 export function surfaceDescriptionDe(surface: ContentMode): string {
   switch (surface) {
     case "outdoor":
-      return "Spieler laufen draußen zur Karte. Quiz öffnet das Level, danach zurück zur Karte.";
+      return "GPS-Spiel draußen: Aufgaben starten an festen Wegpunkten oder nachdem das Team eine bestimmte Distanz gelaufen ist.";
     case "indoor":
-      return "Spieler laufen im Gebäude zu Stationen mit Codes. Kein GPS nötig.";
+      return "Im Raum: An Stationen hängen 4-stellige Codes. Wer den Code findet und eingibt, aktiviert die Aufgabe — ohne GPS.";
     case "online":
-      return "Jeder spielt am eigenen Gerät. Missionen der Reihe nach — ideal für Tabbrain.";
+      return "Gemeinsam an PC, Tablet und Smartphone, ohne Laufen. Die UI zeigt, wer im Team ist und wer was eingegeben hat.";
   }
 }
 
@@ -84,10 +104,21 @@ function contentToArrivalQuiz(content: StudioTaskContent): StudioArrivalQuiz | n
     })),
   };
 
+  if (normalized.hero_image_url?.trim()) {
+    quiz.image_url = normalized.hero_image_url.trim();
+  }
+  const sideParts = [normalized.success_title?.trim(), normalized.success_info?.trim()].filter(
+    Boolean,
+  );
+  if (sideParts.length > 0) {
+    quiz.side_fact = sideParts.join(" — ");
+  }
+
   if (normalized.answer_type === "multi_choice") {
     const ids = normalized.options.filter((o) => o.correct).map((o) => o.id);
     if (ids.length === 0) return null;
     quiz.correct_option_ids = ids;
+    quiz.correct_option_id = ids[0];
   } else {
     const match =
       normalized.options.find((o) => o.correct) ??
@@ -99,6 +130,35 @@ function contentToArrivalQuiz(content: StudioTaskContent): StudioArrivalQuiz | n
   return quiz;
 }
 
+/** Build rich opener quiz from a pool task (choice / multi_choice). */
+export function taskToOpenerArrivalQuiz(
+  task: Pick<StudioTask, "title" | "description" | "content">,
+  pointsOverride?: number | null,
+): StudioArrivalQuiz | null {
+  const quiz = contentToArrivalQuiz(task.content);
+  if (!quiz) return null;
+
+  quiz.title = task.title.trim() || undefined;
+  const desc = task.description?.trim();
+  if (desc) quiz.description = desc;
+
+  const scoringPoints = normalizeTaskContent(task.content).scoring?.points;
+  const points =
+    typeof pointsOverride === "number"
+      ? Math.max(0, Math.round(pointsOverride))
+      : typeof scoringPoints === "number"
+        ? Math.max(0, Math.round(scoringPoints))
+        : 0;
+  quiz.points = points;
+
+  return quiz;
+}
+
+export function isQuizPoolTask(task: Pick<StudioTask, "content">): boolean {
+  const type = normalizeTaskContent(task.content).answer_type;
+  return type === "choice" || type === "multi_choice";
+}
+
 export function parseArrivalQuizOverride(raw: unknown): StudioArrivalQuiz | null {
   if (!raw || typeof raw !== "object") return null;
   const q = raw as StudioArrivalQuiz;
@@ -106,21 +166,37 @@ export function parseArrivalQuizOverride(raw: unknown): StudioArrivalQuiz | null
     return null;
   }
   return {
+    title: typeof q.title === "string" ? q.title : undefined,
+    image_url: typeof q.image_url === "string" ? q.image_url : undefined,
+    description: typeof q.description === "string" ? q.description : undefined,
     question: q.question,
     options: q.options,
     correct_option_id: q.correct_option_id,
     correct_option_ids: q.correct_option_ids,
+    points: typeof q.points === "number" ? Math.max(0, q.points) : undefined,
+    side_fact: typeof q.side_fact === "string" ? q.side_fact : undefined,
   };
 }
 
 export function arrivalQuizToRuntime(quiz: StudioArrivalQuiz): ArrivalQuiz | null {
   const options: QuizOption[] = quiz.options.map((o) => ({ id: o.id, label: o.label }));
+  const points =
+    typeof quiz.points === "number" && quiz.points > 0 ? Math.round(quiz.points) : undefined;
+  const rich = {
+    ...(quiz.title?.trim() ? { title: quiz.title.trim() } : {}),
+    ...(quiz.image_url?.trim() ? { image_url: quiz.image_url.trim() } : {}),
+    ...(quiz.description?.trim() ? { description: quiz.description.trim() } : {}),
+    ...(quiz.side_fact?.trim() ? { side_fact: quiz.side_fact.trim() } : {}),
+    ...(points !== undefined ? { points } : {}),
+  };
+
   if (quiz.correct_option_ids?.length) {
     return {
       question: quiz.question,
       options,
       correct_option_id: quiz.correct_option_ids[0]!,
       correct_option_ids: quiz.correct_option_ids,
+      ...rich,
     };
   }
   if (quiz.correct_option_id) {
@@ -128,6 +204,7 @@ export function arrivalQuizToRuntime(quiz: StudioArrivalQuiz): ArrivalQuiz | nul
       question: quiz.question,
       options,
       correct_option_id: quiz.correct_option_id,
+      ...rich,
     };
   }
   const correct = quiz.options.find((o) => o.correct);
@@ -136,6 +213,7 @@ export function arrivalQuizToRuntime(quiz: StudioArrivalQuiz): ArrivalQuiz | nul
     question: quiz.question,
     options,
     correct_option_id: correct.id,
+    ...rich,
   };
 }
 
@@ -202,6 +280,11 @@ export function buildGameSlots(links: StudioGameTaskLink[]): GameSlot[] {
   return levelLinks.map((levelLink, index) => {
     const overrides = parseLinkOverrides(levelLink.overrides);
     const fromOverride = parseArrivalQuizOverride(overrides.arrival_quiz);
+    const openerTaskId =
+      typeof overrides.opener_task_id === "string" && overrides.opener_task_id
+        ? overrides.opener_task_id
+        : null;
+
     const geoLink =
       missions.length > 0
         ? (geos[index] ??
@@ -211,16 +294,15 @@ export function buildGameSlots(links: StudioGameTaskLink[]): GameSlot[] {
         : null;
 
     let quiz: StudioArrivalQuiz | null = fromOverride;
-    let quizSource: GameSlot["quizSource"] = fromOverride ? "override" : "none";
+    let quizSource: GameSlot["quizSource"] = fromOverride
+      ? openerTaskId
+        ? "opener_task"
+        : "override"
+      : "none";
 
     if (!quiz && geoLink) {
       quiz = contentToArrivalQuiz(geoLink.task.content);
       if (quiz) quizSource = "geo_task";
-    }
-
-    if (!quiz && missions.length === 0) {
-      // Level itself is geo/quiz-only slot — opener can be inline override only
-      quiz = fromOverride;
     }
 
     const bonusTaskId = overrides.bonus_task_id;
@@ -230,7 +312,6 @@ export function buildGameSlots(links: StudioGameTaskLink[]): GameSlot[] {
         : null) ?? null;
 
     if (!bonusLink) {
-      // Bonus with trigger after this mission
       bonusLink =
         bonuses.find((b) => {
           const t = parseLinkOverrides(b.overrides).trigger;
@@ -238,7 +319,6 @@ export function buildGameSlots(links: StudioGameTaskLink[]): GameSlot[] {
         }) ?? null;
     }
 
-    // Fallback: bonus by same index
     if (!bonusLink && bonuses[index] && !bonusTaskId) {
       const candidate = bonuses[index]!;
       const t = parseLinkOverrides(candidate.overrides).trigger;
@@ -252,6 +332,7 @@ export function buildGameSlots(links: StudioGameTaskLink[]): GameSlot[] {
       levelLink,
       quiz,
       quizSource,
+      openerTaskId,
       geoLink,
       bonusLink,
     };

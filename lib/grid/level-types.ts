@@ -32,12 +32,22 @@ export type QuizOption = {
 
 /** Multiple-choice unlock before the mission level (phase: quiz). */
 export type ArrivalQuiz = {
+  /** City-tour headline (from pool task title). */
+  title?: string;
+  /** Hero image for outdoor briefing. */
+  image_url?: string;
+  /** Short briefing under the title. */
+  description?: string;
   question: string;
   options: QuizOption[];
   /** Primary / single correct (always set for UI fallback). */
   correct_option_id: string;
   /** When set, all listed options must be selected. */
   correct_option_ids?: string[];
+  /** Bonus points when answered correctly (wrong still unlocks with 0). */
+  points?: number;
+  /** Side-fact after answer (city tour note). */
+  side_fact?: string;
 };
 
 /** Layer-3 bonus after mission solve — role or whole team. */
@@ -85,6 +95,8 @@ export type LevelScoring = {
   countdown_seconds?: number | null;
   decay_enabled?: boolean;
   decay_floor?: number;
+  /** Reveal solution + complete for 0 points (manual or countdown expiry). */
+  allow_reveal_solution?: boolean;
 };
 
 export type LevelMedia = {
@@ -128,6 +140,10 @@ export type LevelDefinition = {
   options?: QuizOption[];
   correct_option_id?: string;
   correct_option_ids?: string[];
+  /** How the player enters the solution for digital levels. */
+  input_mode?: "text" | "number" | "boxes" | "confirm";
+  /** Boxes for input_mode "boxes" / legacy "number" (1–4). */
+  number_fields?: 1 | 2 | 3 | 4;
   role_required?: PlayerRole | null;
   media?: LevelMedia;
   hints?: LevelHint[];
@@ -139,6 +155,10 @@ export type LevelDefinition = {
   role_split?: string;
   /** Layer-3 bonus after this mission is solved. */
   bonus?: BonusTask;
+  /** Success overlay headline (with success_info). */
+  success_title?: string;
+  /** Note shown after solve — omit/empty = no success window. */
+  success_info?: string;
 };
 
 /**
@@ -227,6 +247,8 @@ export type ResolvedEventContent = {
   contentMode: ContentMode;
   /** Surfaces the operator may switch to. */
   allowedFallbacks: ContentMode[];
+  /** linear = sequential target; free = all active waypoints/stations. */
+  routeOrder?: "linear" | "free";
   /** Studio publish snapshot — logic rules for bonus triggers at runtime. */
   compiledLogic?: CompiledGameLogic | null;
 };
@@ -242,6 +264,8 @@ export type SolveLevelPayload = {
   selectedOptionId?: string;
   selectedOptionIds?: string[];
   geolocation?: GeolocationSample;
+  /** Skip after revealing solution — awards 0 points when scoring allows it. */
+  revealSolution?: boolean;
 };
 
 export const EXITMANIA_TOTAL_LEVELS = 10;

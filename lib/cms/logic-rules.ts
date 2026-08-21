@@ -6,13 +6,13 @@ import {
   parseLinkOverrides,
   roleAssignmentToPlayerRole,
 } from "@/lib/cms/game-link-config";
-import { correctOptionIds, normalizeTaskContent } from "@/lib/cms/task-content";
+import { charsToCodeBoxAnswer, correctOptionIds, normalizeTaskContent } from "@/lib/cms/task-content";
 import {
   arrivalQuizToRuntime,
   buildGameSlots,
   taskContentToBonus,
 } from "@/lib/cms/game-slots";
-
+import { parseRuntimeProfiles } from "@/lib/cms/layer-model";
 /** When → Then rule (stored on studio_games.logic_rules). */
 export type LogicWhenType =
   | "game_start"
@@ -362,7 +362,24 @@ function linkToLevelDefinition(
     level.question = content.question.trim();
   }
 
-  if (content.answer) level.answer = content.answer;
+  if (content.answer_type === "confirm") {
+    level.input_mode = "confirm";
+    level.answer = "ok";
+  } else if (content.answer_type === "text" && content.code_boxes) {
+    level.input_mode = "boxes";
+    const boxed = charsToCodeBoxAnswer(content.answer ?? "");
+    level.number_fields = boxed.number_fields;
+    if (boxed.answer) level.answer = boxed.answer;
+  } else if (content.answer_type === "number") {
+    // Legacy path if any caller still passes number
+    level.input_mode = "boxes";
+    const boxed = charsToCodeBoxAnswer(content.answer ?? "");
+    level.number_fields = boxed.number_fields;
+    if (boxed.answer) level.answer = boxed.answer;
+  } else if (content.answer) {
+    level.input_mode = "text";
+    level.answer = content.answer;
+  }
 
   if (content.options?.length) {
     level.options = content.options.map((o) => ({ id: o.id, label: o.label }));
@@ -403,7 +420,13 @@ function linkToLevelDefinition(
       countdown_seconds: content.scoring.countdown_seconds ?? null,
       decay_enabled: content.scoring.decay_enabled,
       decay_floor: content.scoring.decay_floor ?? 0,
+      allow_reveal_solution: Boolean(content.scoring.allow_reveal_solution),
     };
+  }
+
+  if (content.success_info?.trim()) {
+    level.success_info = content.success_info.trim();
+    level.success_title = content.success_title?.trim() || "Notiert euch das";
   }
 
   const overridesParsed = parseLinkOverrides(link.overrides);
@@ -520,6 +543,37 @@ export function compileStudioGameToLevels(input: {
         };
       }
 
+      const visibleTo = levelOverrides.visible_to ?? levelOverrides.role;
+      if (visibleTo === "alpha" || visibleTo === "beta" || visibleTo === "gamma") {
+        level.role_required = visibleTo;
+      }
+
+      const unlock = levelOverrides.unlock;
+      if (unlock?.type === "elapsed_minutes" && unlock.minutes) {
+        level.triggers = { type: "time", after_minutes: unlock.minutes };
+      } else if (unlock?.type === "after_task_delay") {
+        const sourceLevel = unlock.source_task_id
+          ? slots.findIndex((s) => s.levelLink.task_id === unlock.source_task_id) + 1
+          : slot.index - 1;
+        if (unlock.meters && unlock.meters > 0) {
+          level.triggers = {
+            type: "distance",
+            after_meters: unlock.meters,
+            after_level: sourceLevel > 0 ? sourceLevel : undefined,
+          };
+        } else if (unlock.minutes && unlock.minutes > 0) {
+          level.triggers = {
+            type: "time",
+            after_minutes: unlock.minutes,
+            after_level: sourceLevel > 0 ? sourceLevel : undefined,
+          };
+        } else {
+          level.triggers = { type: "sequential" };
+        }
+      } else {
+        level.triggers = { ...(level.triggers ?? {}), type: "sequential" };
+      }
+
       if (slot.bonusLink) {
         const bonusOverrides = parseLinkOverrides(slot.bonusLink.overrides);
         const role = bonusOverrides.role ?? "gamma";
@@ -533,7 +587,6 @@ export function compileStudioGameToLevels(input: {
         }
       }
 
-      level.triggers = { ...(level.triggers ?? {}), type: "sequential" };
       return level;
     });
   }
@@ -588,10 +641,17 @@ export function compileGameLogic(input: {
   links: StudioGameTaskLink[];
   rules: StudioLogicRule[];
 }): CompiledGameLogic {
-  const bonusRules = buildBonusRulesFromLinks(input.links);
-  const mergedRules = [...input.rules, ...bonusRules];
-  const rules = mergedRules.filter((r) => r.enabled);
   const orderedLinks = orderLinksForCompile(input.links);
+  const routeOrder = parseRuntimeProfiles(input.game.runtime_profiles).route_order;
+  const flowRules = buildFlowRules(routeOrder === "free" ? "open" : "linear", orderedLinks);
+  const bonusRules = buildBonusRulesFromLinks(input.links);
+  const authoredExtras = parseLogicRules(input.rules).filter((r) => {
+    if (r.then.type === "end_game") return true;
+    if (r.when.type === "team_points_at_least") return true;
+    return false;
+  });
+  const mergedRules = [...flowRules, ...bonusRules, ...authoredExtras];
+  const rules = mergedRules.filter((r) => r.enabled);
   const levels = compileStudioGameToLevels({ ...input, links: orderedLinks, rules });
 
   const task_id_by_level: Record<number, string> = {};

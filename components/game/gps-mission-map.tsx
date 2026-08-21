@@ -122,7 +122,7 @@ export function GpsMissionMap({
           radius: 9,
           color: "#ffffff",
           weight: 3,
-          fillColor: "#3b82f6",
+          fillColor: "#166534",
           fillOpacity: 1,
         }).addTo(map);
         overlayRef.current.push(player);
@@ -130,12 +130,48 @@ export function GpsMissionMap({
         if (playerPosition.accuracy && playerPosition.accuracy > 0) {
           const accuracy = L.circle([playerPosition.lat, playerPosition.lng], {
             radius: playerPosition.accuracy,
-            color: "#3b82f6",
+            color: "#166534",
             weight: 1,
-            fillColor: "#3b82f6",
-            fillOpacity: 0.12,
+            fillColor: "#22c55e",
+            fillOpacity: 0.1,
           }).addTo(map);
           overlayRef.current.push(accuracy);
+        }
+
+        if (target) {
+          const route = L.polyline(
+            [
+              [playerPosition.lat, playerPosition.lng],
+              [target.lat, target.lng],
+            ],
+            {
+              color: withinRadius ? "#16a34a" : "#166534",
+              weight: 4,
+              opacity: 0.85,
+              dashArray: withinRadius ? undefined : "10 10",
+              lineCap: "round",
+            },
+          ).addTo(map);
+          overlayRef.current.push(route);
+
+          if (distanceToTarget !== null) {
+            const midLat = (playerPosition.lat + target.lat) / 2;
+            const midLng = (playerPosition.lng + target.lng) / 2;
+            const label = L.marker([midLat, midLng], {
+              interactive: false,
+              icon: L.divIcon({
+                className: "cg-map-distance-label",
+                html: `<div style="
+                  background:#0f172a;color:#fff;font:600 12px/1.2 system-ui,sans-serif;
+                  padding:6px 10px;border-radius:999px;white-space:nowrap;
+                  box-shadow:0 8px 20px rgba(15,23,42,.25);
+                ">noch ${Math.round(distanceToTarget)} m</div>`,
+                iconSize: [0, 0],
+                iconAnchor: [0, 0],
+              }),
+            }).addTo(map);
+            overlayRef.current.push(label);
+          }
         }
 
         boundsPoints.push([playerPosition.lat, playerPosition.lng]);
@@ -147,30 +183,43 @@ export function GpsMissionMap({
         map.setView([target.lat, target.lng], 15);
       }
     });
-  }, [waypoints, activeLevel, playerPosition, showPlayer, target]);
+  }, [waypoints, activeLevel, playerPosition, showPlayer, target, distanceToTarget, withinRadius]);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="relative overflow-hidden rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-card)] shadow-[var(--cg-shadow-soft)]">
       <div ref={containerRef} className="h-[min(52vh,360px)] w-full sm:h-[320px] lg:h-[280px]" />
+      {showPlayer && target && distanceToTarget !== null ? (
+        <div className="pointer-events-none absolute left-1/2 top-3 z-[500] -translate-x-1/2">
+          <span
+            className={`rounded-full px-4 py-2 text-sm font-bold shadow-[var(--cg-shadow-lift)] ${
+              withinRadius
+                ? "bg-[var(--cg-success)] text-white"
+                : "bg-[var(--cg-fg)] text-[var(--cg-bg)]"
+            }`}
+          >
+            {withinRadius ? "Am Ziel" : `noch ${Math.round(distanceToTarget)} m`}
+          </span>
+        </div>
+      ) : null}
       {showPlayer && target ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3 text-sm">
-          <p className="text-slate-600">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--cg-border)] bg-[var(--cg-secondary)]/60 px-4 py-3 text-sm">
+          <p className="text-[var(--cg-muted)]">
             Entfernung zum Ziel:{" "}
-            <span className="font-semibold text-slate-900">
+            <span className="font-semibold text-[var(--cg-fg)]">
               {distanceToTarget !== null ? formatDistance(distanceToTarget) : "—"}
             </span>
           </p>
           <p>
             {withinRadius ? (
-              <span className="font-medium text-emerald-700">Am Wegpunkt</span>
+              <span className="font-medium text-[var(--cg-success)]">Am Wegpunkt</span>
             ) : (
-              <span className="text-amber-700">Unterwegs</span>
+              <span className="text-[var(--cg-accent)]">Unterwegs — folgt der Linie</span>
             )}
           </p>
         </div>
       ) : (
-        <div className="border-t border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-          Kartenübersicht — der Team-Leiter navigiert zum grün markierten Wegpunkt.
+        <div className="border-t border-[var(--cg-border)] bg-[var(--cg-secondary)]/60 px-4 py-3 text-sm text-[var(--cg-muted)]">
+          Kartenübersicht — der Team-Leiter navigiert zum hervorgehobenen Wegpunkt.
         </div>
       )}
     </div>

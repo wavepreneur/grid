@@ -1,74 +1,112 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Lightbulb } from "lucide-react";
+import { ContentMediaSheet } from "@/components/game/city/content-media-sheet";
+import { BigButton } from "@/components/game/city/ui";
+import { TileHintModal } from "@/components/game/tile-hint-modal";
+import type { PurchasedTileHint } from "@/lib/grid/game-state";
 import type { LevelContentTile } from "@/lib/grid/level-types";
+import { HINT_POINT_COST } from "@/lib/grid/level-types";
 import { tileTypeLabel } from "@/lib/grid/level-content";
 
 type MediaModalProps = {
   tile: LevelContentTile | null;
   onClose: () => void;
+  purchasedHints?: Record<string, PurchasedTileHint>;
+  score?: number;
+  isPending?: boolean;
+  onPurchaseHint?: (tileId: string) => void;
 };
 
-export function MediaModal({ tile, onClose }: MediaModalProps) {
+export function MediaModal({
+  tile,
+  onClose,
+  purchasedHints = {},
+  score = 0,
+  isPending = false,
+  onPurchaseHint,
+}: MediaModalProps) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [viewHintOpen, setViewHintOpen] = useState(false);
+
   useEffect(() => {
-    if (!tile) return;
+    setConfirmOpen(false);
+    setViewHintOpen(false);
+  }, [tile?.id]);
 
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+  useEffect(() => {
+    if (!tile || !confirmOpen) return;
+    if (purchasedHints[tile.id]) {
+      setConfirmOpen(false);
+      setViewHintOpen(true);
     }
-
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      document.body.style.overflow = "";
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [tile, onClose]);
+  }, [tile, confirmOpen, purchasedHints]);
 
   if (!tile) return null;
 
+  const purchased = purchasedHints[tile.id];
+  const hasHint = Boolean(tile.hint?.text?.trim());
+  const hintCost = tile.hint?.point_cost ?? HINT_POINT_COST;
   const title = tile.label ?? tileTypeLabel(tile.type);
-  const useImageTag = tile.type === "image";
+
+  const tipSlot = hasHint ? (
+    <div className="space-y-2">
+      {purchased || viewHintOpen ? (
+        <>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--cg-success)]">
+            Tipp freigeschaltet
+          </p>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap text-[var(--cg-fg)]">
+            {purchased?.text ?? tile.hint?.text}
+          </p>
+          <BigButton variant="ghost" onClick={onClose}>
+            Schließen
+          </BigButton>
+        </>
+      ) : (
+        <>
+          <BigButton
+            variant="accent"
+            icon={<Lightbulb className="h-5 w-5" />}
+            disabled={isPending || !onPurchaseHint}
+            onClick={() => setConfirmOpen(true)}
+          >
+            Tipp freischalten (−{hintCost} P)
+          </BigButton>
+          <BigButton variant="ghost" onClick={onClose}>
+            Schließen
+          </BigButton>
+        </>
+      )}
+    </div>
+  ) : undefined;
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-black/95 backdrop-blur-sm">
-      <div className="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3 sm:px-6">
-        <p className="truncate text-sm font-medium text-white">{title}</p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-full border border-white/20 px-3 py-1 text-sm text-white hover:bg-white/10"
-          aria-label="Schließen"
-        >
-          ✕
-        </button>
-      </div>
+    <>
+      <ContentMediaSheet
+        open
+        title={title}
+        mediaType={tile.type === "image" ? "image" : "iframe"}
+        mediaUrl={tile.url}
+        onClose={onClose}
+        tipSlot={tipSlot}
+      />
 
-      <div className="relative min-h-0 flex-1">
-        {useImageTag ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={tile.url}
-            alt={title}
-            className="mx-auto h-full max-h-[calc(100vh-4rem)] w-full object-contain p-4"
-          />
-        ) : (
-          <iframe
-            src={tile.url}
-            title={title}
-            className="h-full w-full border-0"
-            allow={
-              tile.type === "video" || tile.type === "minigame"
-                ? "autoplay; fullscreen; encrypted-media"
-                : tile.type === "panorama_360"
-                  ? "fullscreen; gyroscope; accelerometer"
-                  : "autoplay"
-            }
-            allowFullScreen
-          />
-        )}
-      </div>
-    </div>
+      <TileHintModal
+        open={confirmOpen && !purchased}
+        mode="confirm"
+        label={title}
+        hintCost={hintCost}
+        score={score}
+        isPending={isPending}
+        canAfford={score >= hintCost}
+        onConfirm={() => {
+          if (!onPurchaseHint) return;
+          onPurchaseHint(tile.id);
+        }}
+        onClose={() => setConfirmOpen(false)}
+      />
+    </>
   );
 }

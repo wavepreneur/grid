@@ -75,6 +75,17 @@ function parseArrivalQuiz(raw: unknown): ArrivalQuiz | undefined {
     options: q.options as ArrivalQuiz["options"],
     correct_option_id: single,
     ...(multi.length > 0 ? { correct_option_ids: multi } : {}),
+    ...(typeof q.title === "string" && q.title.trim() ? { title: q.title.trim() } : {}),
+    ...(typeof q.image_url === "string" && q.image_url.trim()
+      ? { image_url: q.image_url.trim() }
+      : {}),
+    ...(typeof q.description === "string" && q.description.trim()
+      ? { description: q.description.trim() }
+      : {}),
+    ...(typeof q.side_fact === "string" && q.side_fact.trim()
+      ? { side_fact: q.side_fact.trim() }
+      : {}),
+    ...(typeof q.points === "number" && q.points > 0 ? { points: Math.round(q.points) } : {}),
   };
 }
 
@@ -117,6 +128,22 @@ function assembleLevelDefinition(
   if (Array.isArray(content.options)) level.options = content.options as LevelDefinition["options"];
   if (typeof content.correct_option_id === "string") {
     level.correct_option_id = content.correct_option_id;
+  }
+  if (
+    content.input_mode === "text" ||
+    content.input_mode === "number" ||
+    content.input_mode === "boxes" ||
+    content.input_mode === "confirm"
+  ) {
+    level.input_mode = content.input_mode;
+  }
+  if (
+    content.number_fields === 1 ||
+    content.number_fields === 2 ||
+    content.number_fields === 3 ||
+    content.number_fields === 4
+  ) {
+    level.number_fields = content.number_fields;
   }
   if (typeof content.role_required === "string") {
     level.role_required = content.role_required as LevelDefinition["role_required"];
@@ -293,6 +320,7 @@ function applyContentModeToLevels(
 function resolveModeAndFallbacks(contentConfig: ReturnType<typeof parseContentConfig>): {
   contentMode: ContentMode;
   allowedFallbacks: ContentMode[];
+  routeOrder: "linear" | "free";
 } {
   const profiles = parseRuntimeProfiles(contentConfig.runtime_profiles);
   const contentMode = resolveContentMode({
@@ -307,19 +335,21 @@ function resolveModeAndFallbacks(contentConfig: ReturnType<typeof parseContentCo
   return {
     contentMode: parseContentMode(contentMode),
     allowedFallbacks: allowedFallbacks.filter((m) => m !== contentMode),
+    routeOrder: profiles.route_order,
   };
 }
 
 function withSurfaceFields(
-  base: Omit<ResolvedEventContent, "contentMode" | "allowedFallbacks">,
+  base: Omit<ResolvedEventContent, "contentMode" | "allowedFallbacks" | "routeOrder">,
   contentConfig: ReturnType<typeof parseContentConfig>,
   levels: LevelDefinition[],
 ): ResolvedEventContent {
-  const { contentMode, allowedFallbacks } = resolveModeAndFallbacks(contentConfig);
+  const { contentMode, allowedFallbacks, routeOrder } = resolveModeAndFallbacks(contentConfig);
   return {
     ...base,
     contentMode,
     allowedFallbacks,
+    routeOrder,
     levels: applyContentModeToLevels(levels, contentMode),
   };
 }

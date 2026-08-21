@@ -66,8 +66,8 @@ export function StudioDuplicateModal({
     >
       <p className="text-sm leading-6 text-slate-600">
         Wie oft soll{selectedCount === 1 ? "" : " jedes Element"} dupliziert werden? Jede Kopie
-        erhält eine Nummer vor dem Titel (z. B. „1 Mein Spiel“, „2 Mein Spiel“), die du später
-        anpassen kannst.
+        erhält „COPY“ und eine Nummer vor dem Titel (z. B. „COPY 1 Mein Spiel“, „COPY 2 Mein
+        Spiel“), die du später anpassen kannst.
       </p>
       <div className="mt-4">
         <StudioLabel hint="Zwischen 1 und 100">Anzahl</StudioLabel>

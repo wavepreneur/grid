@@ -20,7 +20,9 @@ export type StudioTicketPoolStatus = "draft" | "active" | "paused" | "closed";
 
 export type TaskTileMediaType = "image" | "audio" | "video" | "iframe";
 
-export type TaskAnswerType = "text" | "choice" | "multi_choice";
+export type TaskAnswerType = "text" | "choice" | "multi_choice" | "confirm" | "number";
+
+export type TaskNumberFieldCount = 1 | 2 | 3 | 4;
 
 export type TaskContentTile = {
   id: string;
@@ -37,10 +39,17 @@ export type TaskContentTile = {
 export type TaskScoring = {
   /** Reward on solve — negative values subtract from team score. */
   points: number;
+  /** Soft time limit (seconds). Point decay uses this same window when enabled. */
   countdown_seconds?: number | null;
+  /** Linear decay from `points` → `decay_floor` over `countdown_seconds` (no separate decay duration). */
   decay_enabled?: boolean;
   /** Minimum reachable points when decay is on (usually 0). */
   decay_floor?: number;
+  /**
+   * Team may reveal the solution and skip for 0 points.
+   * Same path when the countdown expires (if a countdown is set).
+   */
+  allow_reveal_solution?: boolean;
 };
 
 export type StudioTaskContent = {
@@ -48,9 +57,20 @@ export type StudioTaskContent = {
   question?: string;
   answer?: string;
   answer_type: TaskAnswerType;
+  /**
+   * Freitext: show one box per character (letters/digits/mix), max 4.
+   * Field count follows answer length.
+   */
+  code_boxes?: boolean;
+  /** How many code boxes (1–4) when code_boxes is on. */
+  number_fields?: TaskNumberFieldCount;
   options?: Array<{ id: string; label: string; correct?: boolean }>;
   tiles?: TaskContentTile[];
   scoring?: TaskScoring;
+  /** Success screen headline after solve (shown only with success_info). */
+  success_title?: string;
+  /** Team note after solve — empty = no success window. */
+  success_info?: string;
 };
 
 export type StudioTask = {
@@ -159,6 +179,7 @@ export const DEFAULT_TASK_CONTENT: StudioTaskContent = {
     countdown_seconds: null,
     decay_enabled: false,
     decay_floor: 0,
+    allow_reveal_solution: false,
   },
 };
 

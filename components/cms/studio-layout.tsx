@@ -3,194 +3,385 @@
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ReactNode } from "react";
-import { OrgSwitcher } from "@/components/cms/org-switcher";
-import { ProductNav } from "@/components/platform/product-nav";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import type { LucideProps } from "lucide-react";
 import {
-  IconCode,
-  IconGamepad,
-  IconHome,
-  IconPuzzle,
-  IconTicket,
-} from "@/components/cms/studio-icons";
+  Activity,
+  ArrowLeft,
+  BarChart3,
+  Code2,
+  LayoutGrid,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Puzzle,
+  Ticket,
+} from "lucide-react";
+import { OrgSwitcher } from "@/components/cms/org-switcher";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { listGames, listTemplates } from "@/app/actions/cms/games";
 import { listTasks } from "@/app/actions/cms/tasks";
-import { listTicketPools } from "@/app/actions/cms/tickets";
-import { getStudioDashboardStats } from "@/app/actions/cms/tickets";
+import { listTicketPools, getStudioDashboardStats } from "@/app/actions/cms/tickets";
 import { queryKeys } from "@/lib/platform/query-keys";
 
-const NAV: Array<{
+const SIDEBAR_COLLAPSED_KEY = "grid.studio.sidebarCollapsed";
+
+type NavIcon = ComponentType<LucideProps>;
+
+type NavItem = {
   href: string;
   label: string;
-  exact?: boolean;
-  icon: ReactNode;
-}> = [
-  { href: "/admin", label: "Übersicht", exact: true, icon: <IconHome size={18} /> },
-  { href: "/admin/games", label: "Spiele", icon: <IconGamepad size={18} /> },
-  { href: "/admin/tasks", label: "Aufgaben", icon: <IconPuzzle size={18} /> },
-  { href: "/admin/tickets", label: "Tickets", icon: <IconTicket size={18} /> },
-  { href: "/admin/dev", label: "Entwicklung", icon: <IconCode size={18} /> },
+  note: string;
+  icon: NavIcon;
+  group?: string;
+  match: (pathname: string) => boolean;
+};
+
+const NAV: NavItem[] = [
+  {
+    href: "/admin",
+    label: "Übersicht",
+    note: "Alles auf einen Blick",
+    icon: LayoutGrid,
+    match: (p) => p === "/admin" || p === "/admin/",
+  },
+  {
+    href: "/admin/tasks",
+    label: "1. Aufgaben",
+    note: "Bibliothek · einmal anlegen",
+    icon: Puzzle,
+    group: "GRID Studio",
+    match: (p) => p.startsWith("/admin/tasks"),
+  },
+  {
+    href: "/admin/games",
+    label: "2. Spiele",
+    note: "Aufgaben zu Layern verknüpfen",
+    icon: LayoutGrid,
+    match: (p) => p.startsWith("/admin/games"),
+  },
+  {
+    href: "/admin/tickets",
+    label: "Tickets",
+    note: "Zugänge & Aktivierungen",
+    icon: Ticket,
+    match: (p) => p.startsWith("/admin/tickets"),
+  },
+  {
+    href: "/cockpit",
+    label: "GRID Cockpit",
+    note: "Live-Events",
+    icon: Activity,
+    group: "Betrieb",
+    match: (p) => p.startsWith("/cockpit"),
+  },
+  {
+    href: "/data",
+    label: "GRID Data",
+    note: "Team Intelligence",
+    icon: BarChart3,
+    match: (p) => p.startsWith("/data"),
+  },
+  {
+    href: "/admin/dev",
+    label: "Entwicklung",
+    note: "Debug & Tools",
+    icon: Code2,
+    match: (p) => p.startsWith("/admin/dev"),
+  },
 ];
 
-function isNavActive(pathname: string, href: string, exact?: boolean): boolean {
-  if (exact) return pathname === href;
-  return pathname === href || pathname.startsWith(`${href}/`);
+function prefetchForHref(
+  queryClient: ReturnType<typeof useQueryClient>,
+  href: string,
+  orgSlug: string,
+) {
+  if (href === "/admin") {
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.studio.dashboard(orgSlug),
+      queryFn: async () => {
+        const result = await getStudioDashboardStats();
+        if (!result.success) throw new Error(result.error);
+        return result.data!;
+      },
+    });
+    return;
+  }
+  if (href === "/admin/games") {
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.games.list(orgSlug),
+      queryFn: async () => {
+        const result = await listGames();
+        if (!result.success) throw new Error(result.error);
+        return result.data!;
+      },
+    });
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.games.templates(orgSlug),
+      queryFn: async () => {
+        const result = await listTemplates();
+        if (!result.success) throw new Error(result.error);
+        return result.data!;
+      },
+    });
+    return;
+  }
+  if (href === "/admin/tasks") {
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.tasks.list(orgSlug),
+      queryFn: async () => {
+        const result = await listTasks();
+        if (!result.success) throw new Error(result.error);
+        return result.data!;
+      },
+    });
+    return;
+  }
+  if (href === "/admin/tickets") {
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.tickets.list(orgSlug),
+      queryFn: async () => {
+        const result = await listTicketPools();
+        if (!result.success) throw new Error(result.error);
+        return result.data!;
+      },
+    });
+  }
 }
 
 function StudioNavLink({
-  href,
-  label,
-  icon,
+  item,
   active,
-  mobile,
+  compact,
+  collapsed,
+  orgSlug,
 }: {
-  href: string;
-  label: string;
-  icon: ReactNode;
+  item: NavItem;
   active: boolean;
-  mobile?: boolean;
+  compact?: boolean;
+  collapsed?: boolean;
+  orgSlug: string;
 }) {
   const queryClient = useQueryClient();
+  const Icon = item.icon;
 
-  function prefetchRoute() {
-    if (href === "/admin") {
-      void queryClient.prefetchQuery({
-        queryKey: queryKeys.studio.dashboard(),
-        queryFn: async () => {
-          const result = await getStudioDashboardStats();
-          if (!result.success) throw new Error(result.error);
-          return result.data!;
-        },
-      });
-      return;
-    }
-    if (href === "/admin/games") {
-      void queryClient.prefetchQuery({
-        queryKey: queryKeys.games.list(),
-        queryFn: async () => {
-          const result = await listGames();
-          if (!result.success) throw new Error(result.error);
-          return result.data!;
-        },
-      });
-      void queryClient.prefetchQuery({
-        queryKey: queryKeys.games.templates(),
-        queryFn: async () => {
-          const result = await listTemplates();
-          if (!result.success) throw new Error(result.error);
-          return result.data!;
-        },
-      });
-      return;
-    }
-    if (href === "/admin/tasks") {
-      void queryClient.prefetchQuery({
-        queryKey: queryKeys.tasks.list(),
-        queryFn: async () => {
-          const result = await listTasks();
-          if (!result.success) throw new Error(result.error);
-          return result.data!;
-        },
-      });
-      return;
-    }
-    if (href === "/admin/tickets") {
-      void queryClient.prefetchQuery({
-        queryKey: queryKeys.tickets.list(),
-        queryFn: async () => {
-          const result = await listTicketPools();
-          if (!result.success) throw new Error(result.error);
-          return result.data!;
-        },
-      });
-    }
-  }
-
-  if (mobile) {
+  if (compact) {
     return (
       <Link
-        href={href}
+        href={item.href}
         prefetch
-        onMouseEnter={prefetchRoute}
-        onFocus={prefetchRoute}
-        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
+        onMouseEnter={() => prefetchForHref(queryClient, item.href, orgSlug)}
+        onFocus={() => prefetchForHref(queryClient, item.href, orgSlug)}
+        className={`tap-lift shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold ${
           active
-            ? "border-teal-200 bg-teal-50 text-teal-700"
-            : "border-slate-200 bg-white text-slate-600"
+            ? "bg-primary text-primary-foreground"
+            : "bg-secondary text-secondary-foreground"
         }`}
       >
-        {icon}
-        {label}
+        {item.label}
+      </Link>
+    );
+  }
+
+  if (collapsed) {
+    return (
+      <Link
+        href={item.href}
+        prefetch
+        title={`${item.label} — ${item.note}`}
+        onMouseEnter={() => prefetchForHref(queryClient, item.href, orgSlug)}
+        onFocus={() => prefetchForHref(queryClient, item.href, orgSlug)}
+        className={`tap-lift flex h-11 w-11 items-center justify-center rounded-2xl ${
+          active
+            ? "bg-primary text-primary-foreground shadow-soft"
+            : "text-foreground hover:bg-secondary"
+        }`}
+      >
+        <Icon className="h-5 w-5 shrink-0" strokeWidth={2} />
+        <span className="sr-only">{item.label}</span>
       </Link>
     );
   }
 
   return (
     <Link
-      href={href}
+      href={item.href}
       prefetch
-      onMouseEnter={prefetchRoute}
-      onFocus={prefetchRoute}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+      onMouseEnter={() => prefetchForHref(queryClient, item.href, orgSlug)}
+      onFocus={() => prefetchForHref(queryClient, item.href, orgSlug)}
+      className={`tap-lift flex items-center gap-3 rounded-2xl px-3 py-3 ${
         active
-          ? "bg-teal-50 text-teal-700"
-          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+          ? "bg-primary text-primary-foreground shadow-soft"
+          : "text-foreground hover:bg-secondary"
       }`}
     >
-      <span className={active ? "text-teal-600" : "text-slate-400"}>{icon}</span>
-      <span className="flex-1">{label}</span>
-      <NavPendingDot />
+      <Icon className="h-5 w-5 shrink-0" strokeWidth={2} />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold">{item.label}</span>
+        <span className="block truncate text-xs opacity-70">{item.note}</span>
+      </span>
+      <NavPendingDot active={active} />
     </Link>
   );
 }
 
-function NavPendingDot() {
+function NavPendingDot({ active }: { active: boolean }) {
   const { pending } = useLinkStatus();
   if (!pending) return null;
   return (
-    <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-teal-500" aria-hidden />
+    <span
+      className={`h-1.5 w-1.5 shrink-0 animate-pulse rounded-full ${
+        active ? "bg-primary-foreground" : "bg-primary"
+      }`}
+      aria-hidden
+    />
   );
 }
 
 export function StudioLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { organizations, orgSlug } = useStudioShell();
+  const [collapsed, setCollapsed] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      setCollapsed(window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1");
+    } catch {
+      /* ignore */
+    }
+    setHydrated(true);
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
 
   return (
-    <div className="studio-shell min-h-screen bg-slate-50 text-slate-900">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1600px]">
-        <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
-          <div className="border-b border-slate-100 px-5 py-6">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-600 text-sm font-bold text-white">
-                G
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-slate-900">GRID Studio</p>
-                <p className="text-xs text-slate-500">Inhalte verwalten</p>
-              </div>
+    <div className="studio-shell min-h-screen bg-background text-foreground">
+      {/* Mobile top + pills */}
+      <div className="lg:hidden">
+        <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
+          <p className="text-xl font-bold">GRID</p>
+          <Link href="/" className="text-sm font-semibold text-primary">
+            Spieleransicht
+          </Link>
+        </div>
+        <div className="flex gap-2 overflow-x-auto border-b border-border bg-card px-4 py-2">
+          {NAV.map((item) => (
+            <StudioNavLink
+              key={item.href}
+              item={item}
+              active={item.match(pathname)}
+              compact
+              orgSlug={orgSlug}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="mx-auto flex min-h-screen w-full max-w-[100rem]">
+        <aside
+          className={`studio-sidebar hidden shrink-0 border-r border-border bg-card transition-[width] duration-200 ease-out lg:block ${
+            hydrated && collapsed ? "w-[4.5rem]" : "w-[17rem]"
+          }`}
+        >
+          <div
+            className={`sticky top-0 flex h-screen flex-col ${
+              hydrated && collapsed ? "items-center p-3" : "p-5"
+            }`}
+          >
+            <div
+              className={`mb-4 flex w-full ${
+                hydrated && collapsed ? "flex-col items-center gap-2" : "items-start justify-between gap-2"
+              }`}
+            >
+              <Link
+                href="/admin"
+                className={hydrated && collapsed ? "block text-center" : "min-w-0 flex-1"}
+                title="GRID Backoffice"
+              >
+                {hydrated && collapsed ? (
+                  <p className="text-lg font-bold leading-none">G</p>
+                ) : (
+                  <>
+                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground">
+                      Backoffice
+                    </p>
+                    <p className="text-2xl font-bold">GRID</p>
+                  </>
+                )}
+              </Link>
+              <button
+                type="button"
+                onClick={toggleCollapsed}
+                title={collapsed ? "Seitenleiste ausklappen" : "Seitenleiste einklappen"}
+                aria-label={collapsed ? "Seitenleiste ausklappen" : "Seitenleiste einklappen"}
+                aria-expanded={!collapsed}
+                className="tap-lift flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground"
+              >
+                {hydrated && collapsed ? (
+                  <PanelLeftOpen className="h-5 w-5" strokeWidth={2} />
+                ) : (
+                  <PanelLeftClose className="h-5 w-5" strokeWidth={2} />
+                )}
+              </button>
             </div>
-          </div>
 
-          <div className="px-3 pb-2">
-            <ProductNav active="studio" compact />
-          </div>
+            <nav
+              className={`overflow-y-auto ${
+                hydrated && collapsed ? "flex flex-col items-center gap-1.5" : "space-y-1.5"
+              }`}
+            >
+              {NAV.map((item) => (
+                <div key={item.href} className={hydrated && collapsed ? "" : undefined}>
+                  {item.group && !(hydrated && collapsed) ? (
+                    <p className="mb-1 mt-4 px-3 text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                      {item.group}
+                    </p>
+                  ) : item.group && hydrated && collapsed ? (
+                    <div className="my-2 h-px w-6 bg-border" aria-hidden />
+                  ) : null}
+                  <StudioNavLink
+                    item={item}
+                    active={item.match(pathname)}
+                    collapsed={hydrated && collapsed}
+                    orgSlug={orgSlug}
+                  />
+                </div>
+              ))}
+            </nav>
 
-          <nav className="flex flex-1 flex-col gap-0.5 px-3 py-4">
-            {NAV.map((item) => (
-              <StudioNavLink
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                icon={item.icon}
-                active={isNavActive(pathname, item.href, item.exact)}
-              />
-            ))}
-          </nav>
-
-          <div className="border-t border-slate-100 p-4">
-            <OrgSwitcher organizations={organizations} currentSlug={orgSlug} />
+            <div
+              className={`mt-auto w-full space-y-3 pt-6 ${
+                hydrated && collapsed ? "flex flex-col items-center" : ""
+              }`}
+            >
+              {!(hydrated && collapsed) ? (
+                <OrgSwitcher organizations={organizations} currentSlug={orgSlug} />
+              ) : null}
+              <Link
+                href="/"
+                title="Zur Spieleransicht"
+                className={`tap-lift flex items-center rounded-2xl bg-secondary text-sm font-semibold ${
+                  hydrated && collapsed
+                    ? "h-11 w-11 justify-center"
+                    : "gap-2 px-3 py-3"
+                }`}
+              >
+                <ArrowLeft className="h-4 w-4" strokeWidth={2} />
+                {!(hydrated && collapsed) ? <span>Zur Spieleransicht</span> : (
+                  <span className="sr-only">Zur Spieleransicht</span>
+                )}
+              </Link>
+            </div>
           </div>
         </aside>
 
@@ -200,21 +391,7 @@ export function StudioLayout({ children }: { children: ReactNode }) {
   );
 }
 
+/** @deprecated Mobile nav lives in StudioLayout; kept for StudioPage compatibility. */
 export function StudioMobileNav() {
-  const pathname = usePathname();
-
-  return (
-    <nav className="mt-4 flex gap-2 overflow-x-auto lg:hidden">
-      {NAV.map((item) => (
-        <StudioNavLink
-          key={item.href}
-          href={item.href}
-          label={item.label}
-          icon={item.icon}
-          active={isNavActive(pathname, item.href, item.exact)}
-          mobile
-        />
-      ))}
-    </nav>
-  );
+  return null;
 }

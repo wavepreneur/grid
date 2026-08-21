@@ -1,8 +1,10 @@
 "use client";
 
+import { Timer } from "lucide-react";
 import { formatCountdown } from "@/lib/grid/level-scoring";
 import { useLevelScoringTimer } from "@/lib/hooks/use-level-scoring-timer";
 import type { LevelScoring } from "@/lib/grid/level-types";
+import { LevelScoreHud, ScorePill } from "@/components/game/city/level-screen-blocks";
 
 type Props = {
   scoring: LevelScoring;
@@ -11,6 +13,9 @@ type Props = {
   compact?: boolean;
 };
 
+/**
+ * Gamer-HUD: erreichbare Punkte, optional Countdown + Decay — sofort lesbar.
+ */
 export function LevelScoringBar({
   scoring,
   startedAt,
@@ -19,81 +24,71 @@ export function LevelScoringBar({
 }: Props) {
   const snapshot = useLevelScoringTimer(scoring, startedAt, fallbackStartedAt);
 
-  if (!snapshot) return null;
+  if (!snapshot) {
+    if (scoring.points === 0) return null;
+    return (
+      <LevelScoreHud>
+        <ScorePill tone="accent">
+          {scoring.points >= 0 ? "+" : ""}
+          {scoring.points} P
+        </ScorePill>
+        <ScorePill>Lösung möglich</ScorePill>
+      </LevelScoreHud>
+    );
+  }
 
   const showCountdown = snapshot.hasCountdown && snapshot.remainingSeconds !== null;
   const showDecay = snapshot.hasDecay;
   const urgent =
     showCountdown && snapshot.remainingSeconds !== null && snapshot.remainingSeconds <= 30;
 
+  if (!showCountdown && !showDecay && snapshot.maxPoints === 0) return null;
+
   const decayProgress =
     showDecay && scoring.countdown_seconds
       ? Math.min(1, snapshot.elapsedSeconds / scoring.countdown_seconds)
       : 0;
 
-  if (!showCountdown && !showDecay && snapshot.maxPoints === 0) return null;
-
   return (
-    <div
-      className={`rounded-2xl border ${
-        urgent ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50"
-      } ${compact ? "p-3" : "p-4"}`}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-            Erreichbare Punkte
-          </p>
-          <p
-            className={`mt-0.5 font-semibold tabular-nums text-slate-900 ${
-              compact ? "text-lg" : "text-2xl"
-            }`}
-          >
-            {snapshot.currentPoints >= 0 ? "+" : ""}
-            {snapshot.currentPoints}
-            {showDecay && snapshot.currentPoints !== snapshot.maxPoints ? (
-              <span className="ml-2 text-sm font-normal text-slate-400 line-through">
-                {snapshot.maxPoints >= 0 ? "+" : ""}
-                {snapshot.maxPoints}
-              </span>
-            ) : null}
-          </p>
-        </div>
+    <div className={compact ? "space-y-2" : "space-y-3"}>
+      <LevelScoreHud>
+        <ScorePill tone={showDecay && !snapshot.isExpired ? "accent" : "default"}>
+          {snapshot.currentPoints >= 0 ? "+" : ""}
+          {snapshot.currentPoints} P
+          {showDecay && snapshot.currentPoints !== snapshot.maxPoints ? (
+            <span className="font-semibold opacity-50 line-through">
+              {snapshot.maxPoints >= 0 ? "+" : ""}
+              {snapshot.maxPoints}
+            </span>
+          ) : null}
+        </ScorePill>
 
         {showCountdown ? (
-          <div className="text-right">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-              Countdown
-            </p>
-            <p
-              className={`mt-0.5 font-mono font-bold tabular-nums ${
-                urgent ? "text-amber-700" : "text-slate-900"
-              } ${compact ? "text-xl" : "text-2xl"}`}
-            >
-              {formatCountdown(snapshot.remainingSeconds ?? 0)}
-            </p>
-          </div>
-        ) : null}
-      </div>
+          <ScorePill tone={urgent ? "urgent" : "default"}>
+            <Timer className="h-3.5 w-3.5" />
+            {formatCountdown(snapshot.remainingSeconds ?? 0)}
+          </ScorePill>
+        ) : (
+          <ScorePill tone="success">Lösung möglich</ScorePill>
+        )}
+      </LevelScoreHud>
 
       {showDecay ? (
-        <div className="mt-3">
-          <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+        <div className="px-1">
+          <div className="h-1.5 overflow-hidden rounded-full bg-[var(--cg-secondary)]">
             <div
-              className={`h-full transition-all duration-1000 ${
-                urgent ? "bg-amber-500" : "bg-teal-500"
+              className={`h-full rounded-full transition-all duration-1000 ${
+                urgent ? "bg-amber-500" : "bg-[var(--cg-primary)]"
               }`}
-              style={{ width: `${Math.round(decayProgress * 100)}%` }}
+              style={{ width: `${Math.round((1 - decayProgress) * 100)}%` }}
             />
           </div>
-          <p className="mt-1.5 text-[11px] text-slate-600">
+          <p className="mt-1.5 text-center text-[11px] font-medium text-[var(--cg-muted)]">
             {snapshot.isExpired
-              ? `Zeit abgelaufen — nur noch ${snapshot.floorPoints} Punkte möglich.`
-              : `Schnell lösen — Punkte sinken bis ${snapshot.floorPoints}.`}
+              ? `Zeit ab — noch ${snapshot.floorPoints} P möglich`
+              : `Punkte sinken bis ${snapshot.floorPoints} P`}
           </p>
         </div>
-      ) : showCountdown && snapshot.isExpired ? (
-        <p className="mt-2 text-[11px] font-medium text-amber-800">Countdown abgelaufen.</p>
       ) : null}
     </div>
   );

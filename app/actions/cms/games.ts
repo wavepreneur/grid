@@ -20,7 +20,8 @@ import {
 } from "@/lib/cms/layer-model";
 import type { BonusTrigger, GameLinkOverrides } from "@/lib/cms/game-link-config";
 import { parseLinkLayer } from "@/lib/cms/game-link-config";
-import { surfaceToPreset } from "@/lib/cms/game-slots";
+import { surfaceToPreset, taskToOpenerArrivalQuiz } from "@/lib/cms/game-slots";
+import { normalizeTaskContent } from "@/lib/cms/task-content";
 import {
   compileGameLogic,
   parseLogicRules,
@@ -473,11 +474,17 @@ export async function updateGameTaskLinkConfig(
     role?: GameLinkOverrides["role"];
     trigger?: BonusTrigger | null;
     arrival_quiz?: GameLinkOverrides["arrival_quiz"] | null;
+    opener_task_id?: string | null;
+    opener_points?: number | null;
     bonus_task_id?: string | null;
     geo_task_id?: string | null;
+    unlock?: GameLinkOverrides["unlock"] | null;
+    visible_to?: GameLinkOverrides["visible_to"] | null;
+    station?: GameLinkOverrides["station"] | null;
   },
 ): Promise<ActionResult<StudioGameTaskLink>> {
   try {
+    const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
     const { data: existing, error: fetchError } = await supabase
       .from("studio_game_tasks")
@@ -509,9 +516,84 @@ export async function updateGameTaskLinkConfig(
       if (patch.trigger) overrides.trigger = patch.trigger;
       else delete overrides.trigger;
     }
-    if (patch.arrival_quiz !== undefined) {
+    if (patch.arrival_quiz !== undefined && patch.opener_task_id === undefined) {
       if (patch.arrival_quiz) overrides.arrival_quiz = patch.arrival_quiz;
       else delete overrides.arrival_quiz;
+    }
+    if (patch.opener_task_id !== undefined) {
+      if (patch.opener_task_id) {
+        const { data: openerTask, error: openerError } = await supabase
+          .from("studio_tasks")
+          .select("id, title, description, content, organization_id")
+          .eq("id", patch.opener_task_id)
+          .eq("is_active", true)
+          .or(`organization_id.eq.${orgId},organization_id.is.null`)
+          .maybeSingle();
+
+        if (openerError) throw new Error(openerError.message);
+        if (!openerTask) {
+          return { success: false, error: "Einstiegs-Aufgabe nicht gefunden." };
+        }
+
+        const pointsOverride =
+          patch.opener_points !== undefined
+            ? patch.opener_points
+            : (overrides.opener_points ?? null);
+
+        const quiz = taskToOpenerArrivalQuiz(
+          {
+            title: openerTask.title as string,
+            description: (openerTask.description as string) ?? "",
+            content: normalizeTaskContent(openerTask.content),
+          },
+          pointsOverride,
+        );
+        if (!quiz) {
+          return {
+            success: false,
+            error:
+              "Einstiegs-Aufgabe muss Multiple Choice sein (eine oder mehrere richtige Antworten).",
+          };
+        }
+
+        overrides.opener_task_id = patch.opener_task_id;
+        overrides.arrival_quiz = quiz;
+        if (typeof pointsOverride === "number") {
+          overrides.opener_points = Math.max(0, Math.round(pointsOverride));
+        } else {
+          delete overrides.opener_points;
+        }
+      } else {
+        delete overrides.opener_task_id;
+        delete overrides.opener_points;
+        delete overrides.arrival_quiz;
+      }
+    } else if (patch.opener_points !== undefined && overrides.opener_task_id) {
+      const { data: openerTask, error: openerError } = await supabase
+        .from("studio_tasks")
+        .select("id, title, description, content")
+        .eq("id", overrides.opener_task_id)
+        .maybeSingle();
+
+      if (openerError) throw new Error(openerError.message);
+      if (openerTask) {
+        const quiz = taskToOpenerArrivalQuiz(
+          {
+            title: openerTask.title as string,
+            description: (openerTask.description as string) ?? "",
+            content: normalizeTaskContent(openerTask.content),
+          },
+          patch.opener_points,
+        );
+        if (quiz) {
+          overrides.arrival_quiz = quiz;
+          if (typeof patch.opener_points === "number") {
+            overrides.opener_points = Math.max(0, Math.round(patch.opener_points));
+          } else {
+            delete overrides.opener_points;
+          }
+        }
+      }
     }
     if (patch.bonus_task_id !== undefined) {
       if (patch.bonus_task_id) overrides.bonus_task_id = patch.bonus_task_id;
@@ -520,6 +602,18 @@ export async function updateGameTaskLinkConfig(
     if (patch.geo_task_id !== undefined) {
       if (patch.geo_task_id) overrides.geo_task_id = patch.geo_task_id;
       else delete overrides.geo_task_id;
+    }
+    if (patch.unlock !== undefined) {
+      if (patch.unlock) overrides.unlock = patch.unlock;
+      else delete overrides.unlock;
+    }
+    if (patch.visible_to !== undefined) {
+      if (patch.visible_to) overrides.visible_to = patch.visible_to;
+      else delete overrides.visible_to;
+    }
+    if (patch.station !== undefined) {
+      if (patch.station) overrides.station = patch.station;
+      else delete overrides.station;
     }
 
     const { error: updateError } = await supabase
@@ -932,7 +1026,7 @@ export async function duplicateGames(
       if (!source) continue;
 
       for (let i = 1; i <= copies; i += 1) {
-        const copy = await copyGameWithLinks(supabase, orgId, source, `${i} ${source.name}`);
+        const copy = await copyGameWithLinks(supabase, orgId, source, `COPY ${i} ${source.name}`);
         createdIds.push(copy.id);
       }
     }

@@ -15,6 +15,7 @@ import type {
   SolveLevelPayload,
 } from "@/lib/grid/level-types";
 import { buildPlaySlot, missionFromLevel } from "@/lib/grid/play-slots";
+import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 
 type Props = {
   eventContent: ResolvedEventContent;
@@ -34,7 +35,8 @@ type Props = {
   soloAlpha?: boolean;
   levelStartedAt?: string | null;
   teamStartedAt?: string | null;
-  onArriveOutdoor: (geolocation: GeolocationSample) => void;
+  solveFeedback?: SolveFeedbackState | null;
+  onArriveOutdoor: (geolocation: GeolocationSample, targetLevel?: number) => void;
   onSolveGpsCheckpoint: (geolocation: GeolocationSample) => void;
   onOpenStation: (levelNumber: number) => void;
   onSubmitStationCode: (code: string) => void;
@@ -67,6 +69,7 @@ export function PlayPhaseFlow({
   soloAlpha,
   levelStartedAt,
   teamStartedAt,
+  solveFeedback = null,
   onArriveOutdoor,
   onSolveGpsCheckpoint,
   onOpenStation,
@@ -130,6 +133,7 @@ export function PlayPhaseFlow({
           levels={eventContent.levels}
           levelStatuses={gameState.levels}
           activeLevel={activeLevel}
+          routeOrder={eventContent.routeOrder ?? "linear"}
           canUnlockGps={canUnlockGps}
           disabled={disabled}
           isPending={isPending}
@@ -153,9 +157,10 @@ export function PlayPhaseFlow({
             mode === "indoor"
               ? "Station geöffnet"
               : mode === "online"
-                ? "Mission gestartet"
+                ? "Mission gestartet · alle gleichzeitig"
                 : "Wegpunkt erreicht"
           }
+          mode={mode}
           quiz={slot.quiz}
           disabled={disabled}
           isPending={isPending}
@@ -187,6 +192,7 @@ export function PlayPhaseFlow({
           teamStartedAt={teamStartedAt}
           onSubmit={onSolveLevel}
           onPurchaseHint={onPurchaseHint}
+          feedback={solveFeedback}
         />
       </div>
     </>

@@ -1,10 +1,12 @@
 "use client";
 
 import { useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { Building2 } from "lucide-react";
 import { setStudioOrganization } from "@/app/actions/cms/organizations";
-import { IconBuilding } from "@/components/cms/studio-icons";
-import { StudioLabel, StudioSelect } from "@/components/cms/studio-ui";
+import { inputCls } from "@/components/cms/ui";
+import { queryKeys } from "@/lib/platform/query-keys";
 import type { StudioOrganization } from "@/lib/cms/types";
 
 type Props = {
@@ -12,25 +14,46 @@ type Props = {
   currentSlug: string;
 };
 
+/** Detail/Neu-Routen gehören zum alten Projekt — nach Switch auf die Liste. */
+function listPathAfterOrgSwitch(pathname: string): string | null {
+  if (pathname.startsWith("/admin/tasks/")) return "/admin/tasks";
+  if (pathname.startsWith("/admin/games/")) return "/admin/games";
+  return null;
+}
+
 export function OrgSwitcher({ organizations, currentSlug }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
+  const queryClient = useQueryClient();
   const [pending, startTransition] = useTransition();
 
   return (
-    <div>
-      <StudioLabel>
-        <span className="inline-flex items-center gap-1.5">
-          <IconBuilding size={14} className="text-slate-400" />
-          Projekt
-        </span>
-      </StudioLabel>
-      <StudioSelect
+    <label className="block">
+      <span className="mb-1.5 flex items-center gap-1.5 text-[0.65rem] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+        <Building2 className="h-3.5 w-3.5" strokeWidth={2} />
+        Projekt
+      </span>
+      <select
         value={currentSlug}
-        disabled={pending}
+        disabled={pending || organizations.length === 0}
+        className={`${inputCls} mt-0 py-2 text-sm disabled:opacity-50`}
         onChange={(event) => {
           const slug = event.target.value;
+          if (slug === currentSlug) return;
           startTransition(async () => {
-            await setStudioOrganization(slug);
+            const result = await setStudioOrganization(slug);
+            if (!result.success) {
+              console.error(result.error);
+              return;
+            }
+            // Drop cached Studio lists — keys were org-agnostic and showed the old project.
+            await queryClient.cancelQueries({ queryKey: queryKeys.studio.all });
+            queryClient.removeQueries({ queryKey: queryKeys.studio.all });
+
+            const listPath = listPathAfterOrgSwitch(pathname);
+            if (listPath) {
+              router.replace(listPath);
+            }
             router.refresh();
           });
         }}
@@ -40,7 +63,7 @@ export function OrgSwitcher({ organizations, currentSlug }: Props) {
             {org.name}
           </option>
         ))}
-      </StudioSelect>
-    </div>
+      </select>
+    </label>
   );
 }

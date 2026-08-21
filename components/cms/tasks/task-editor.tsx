@@ -23,6 +23,8 @@ import {
   StudioTextarea,
 } from "@/components/cms/studio-ui";
 import {
+  charsToCodeBoxAnswer,
+  codeBoxChars,
   createTaskOptionId,
   defaultTaskScoring,
   normalizeTaskContent,
@@ -111,8 +113,8 @@ export function TaskEditor({ task, returnTo }: Props) {
   const scoring = content.scoring ?? defaultTaskScoring();
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-8 xl:grid-cols-[1fr_320px]">
-      <div className="space-y-6">
+    <form onSubmit={handleSubmit} className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
+      <div className="min-w-0 space-y-6">
         {error ? <StudioError message={error} /> : null}
 
         <StudioPanel>
@@ -154,7 +156,7 @@ export function TaskEditor({ task, returnTo }: Props) {
         <StudioPanel>
           <StudioSectionTitle
             title="Punkte & Zeit"
-            description="Belohnung, optionaler Countdown und Punkte-Verfall"
+            description="Countdown setzt das Zeitfenster. Punkte-Verfall senkt die Punkte linear über genau diese Zeit."
           />
           <TaskScoringEditor scoring={scoring} onChange={patchScoring} />
         </StudioPanel>
@@ -194,32 +196,124 @@ export function TaskEditor({ task, returnTo }: Props) {
                 value={content.answer_type}
                 onChange={(e) => {
                   const answer_type = e.target.value as StudioTaskContent["answer_type"];
-                  patchContent({
-                    answer_type,
-                    options:
-                      answer_type === "text"
-                        ? undefined
-                        : content.options?.length
+                  if (answer_type === "text") {
+                    patchContent({
+                      answer_type,
+                      options: undefined,
+                      code_boxes: content.code_boxes,
+                      number_fields: content.code_boxes
+                        ? charsToCodeBoxAnswer(content.answer ?? "").number_fields
+                        : undefined,
+                    });
+                  } else if (answer_type === "confirm") {
+                    patchContent({
+                      answer_type,
+                      options: undefined,
+                      number_fields: undefined,
+                      code_boxes: undefined,
+                      answer: undefined,
+                    });
+                  } else {
+                    patchContent({
+                      answer_type,
+                      number_fields: undefined,
+                      code_boxes: undefined,
+                      options:
+                        content.options?.length
                           ? content.options
                           : [{ id: createTaskOptionId(), label: "", correct: true }],
-                  });
+                    });
+                  }
                 }}
               >
                 <option value="text">Freitext-Eingabe</option>
                 <option value="choice">Multiple Choice (eine richtig)</option>
                 <option value="multi_choice">Mehrfachauswahl (mehrere richtig)</option>
+                <option value="confirm">Keine Eingabe (nur OK)</option>
               </StudioSelect>
             </div>
 
             {content.answer_type === "text" ? (
-              <div>
-                <StudioLabel>Richtige Antwort</StudioLabel>
-                <StudioInput
-                  value={content.answer ?? ""}
-                  onChange={(e) => patchContent({ answer: e.target.value })}
-                  placeholder="Lösung"
-                />
+              <div className="space-y-4">
+                <div>
+                  <StudioLabel>
+                    {content.code_boxes ? "Richtiger Code" : "Richtige Antwort"}
+                  </StudioLabel>
+                  <StudioInput
+                    value={
+                      content.code_boxes
+                        ? codeBoxChars(content.answer)
+                        : (content.answer ?? "")
+                    }
+                    maxLength={content.code_boxes ? 4 : undefined}
+                    className={
+                      content.code_boxes
+                        ? "text-center text-2xl font-bold tracking-[0.35em]"
+                        : undefined
+                    }
+                    onChange={(e) => {
+                      if (content.code_boxes) {
+                        const next = charsToCodeBoxAnswer(e.target.value);
+                        patchContent({
+                          answer: next.answer,
+                          number_fields: next.number_fields,
+                        });
+                        return;
+                      }
+                      patchContent({ answer: e.target.value });
+                    }}
+                    placeholder={content.code_boxes ? "z. B. A3B4 oder 0364" : "Lösung"}
+                  />
+                  {content.code_boxes ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {(content.number_fields ?? 1) === 1
+                        ? "Vorschau: 1 Kästchen"
+                        : `Vorschau: ${content.number_fields} Kästchen`}
+                    </p>
+                  ) : null}
+                </div>
+
+                <section className="rounded-3xl bg-secondary/60 p-4 sm:p-5">
+                  <p className="text-base font-bold text-foreground">Code-Box</p>
+                  <label className="mt-3 flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 accent-primary"
+                      checked={Boolean(content.code_boxes)}
+                      onChange={(e) => {
+                        const on = e.target.checked;
+                        if (!on) {
+                          patchContent({
+                            code_boxes: false,
+                            number_fields: undefined,
+                            answer: codeBoxChars(content.answer) || content.answer,
+                          });
+                          return;
+                        }
+                        const next = charsToCodeBoxAnswer(content.answer ?? "");
+                        patchContent({
+                          code_boxes: true,
+                          answer: next.answer,
+                          number_fields: next.number_fields,
+                        });
+                      }}
+                    />
+                    <span>
+                      <span className="block text-base font-bold text-foreground">
+                        Getrenntes Kästchen pro Zeichen
+                      </span>
+                      <span className="mt-0.5 block text-sm text-muted-foreground">
+                        Max. 4 Zeichen — Zahlen, Buchstaben oder Mix
+                      </span>
+                    </span>
+                  </label>
+                </section>
               </div>
+            ) : content.answer_type === "confirm" ? (
+              <p className="rounded-2xl bg-secondary px-4 py-3 text-sm text-muted-foreground">
+                Spieler tippen nur auf „OK“ — keine Antwort eingeben. Ideal, wenn die Kacheln
+                schon alles zeigen.
+              </p>
             ) : (
               <div className="space-y-3">
                 <StudioLabel>
@@ -268,6 +362,52 @@ export function TaskEditor({ task, returnTo }: Props) {
           </div>
         </StudioPanel>
 
+        <StudioPanel>
+          <StudioSectionTitle
+            title="Nach der Lösung"
+            description={
+              content.answer_type === "choice" || content.answer_type === "multi_choice"
+                ? "Als Mission: Erfolgs-Hinweis. Als Einstiegsfrage im Spiel: Side-Fact nach der Antwort (Stadttour)."
+                : "Nur bei korrekter Lösung — nicht bei Skip oder abgelaufenem Countdown."
+            }
+          />
+          <div className="space-y-4">
+            <div>
+              <StudioLabel hint="Steht groß über der Info im Erfolgs-Screen">Überschrift</StudioLabel>
+              <StudioInput
+                value={content.success_title ?? ""}
+                onChange={(e) =>
+                  patchContent({
+                    success_title: e.target.value,
+                  })
+                }
+                placeholder="Notiert euch das"
+              />
+            </div>
+            <div>
+              <StudioLabel
+                hint={
+                  content.answer_type === "choice" || content.answer_type === "multi_choice"
+                    ? "Bei Einstiegsfragen: erscheint nach der Antwort als „Wusstet ihr?“. Bei normalen Missionen: nur nach korrekter Lösung."
+                    : "Erscheint im Erfolgs-Screen, nachdem die Aufgabe richtig gelöst wurde. Leer lassen, wenn es nichts zu notieren gibt."
+                }
+              >
+                Info für das Team
+              </StudioLabel>
+              <StudioTextarea
+                value={content.success_info ?? ""}
+                onChange={(e) =>
+                  patchContent({
+                    success_info: e.target.value,
+                  })
+                }
+                placeholder="z. B. Der Brunnen steht seit 1732 — früher war hier der Marktplatz."
+                rows={3}
+              />
+            </div>
+          </div>
+        </StudioPanel>
+
         <div className="flex flex-wrap gap-3">
           <StudioButton type="submit" disabled={pending} icon={<IconSave size={16} />}>
             {pending ? "Speichern…" : task ? "Aufgabe speichern" : "Aufgabe erstellen"}
@@ -302,8 +442,8 @@ export function TaskEditor({ task, returnTo }: Props) {
         </div>
       </div>
 
-      <aside className="xl:sticky xl:top-8 xl:self-start">
-        <StudioPanel>
+      <aside className="min-w-0 xl:sticky xl:top-8 xl:self-start">
+        <StudioPanel className="overflow-hidden">
           <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Vorschau (Spieler-Ansicht)
           </p>

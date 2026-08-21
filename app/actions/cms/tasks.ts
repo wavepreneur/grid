@@ -15,7 +15,6 @@ import {
   type TaskFilterInput,
 } from "@/lib/cms/types";
 import type { ActionResult } from "@/lib/grid/types";
-
 import { normalizeTaskContent } from "@/lib/cms/task-content";
 
 function normalizeTaskRow(row: StudioTask): StudioTask {
@@ -31,18 +30,14 @@ function normalizeTaskRow(row: StudioTask): StudioTask {
 
 export async function listTasks(filters: TaskFilterInput = {}): Promise<ActionResult<StudioTask[]>> {
   try {
+    const orgId = filters.organizationId ?? (await getStudioOrganizationId());
     const supabase = createAdminClient();
     let query = supabase
       .from("studio_tasks")
       .select("*")
       .eq("is_active", true)
+      .or(`organization_id.eq.${orgId},organization_id.is.null`)
       .order("updated_at", { ascending: false });
-
-    if (filters.organizationId) {
-      query = query.or(
-        `organization_id.eq.${filters.organizationId},organization_id.is.null`,
-      );
-    }
 
     if (filters.language) query = query.eq("language", filters.language);
     if (filters.citySlug) query = query.eq("city_slug", filters.citySlug);
@@ -74,25 +69,30 @@ export type TaskLibraryItem = {
   title: string;
   slug: string;
   tags: string[];
+  answer_type?: string;
 };
 
 /** Lightweight task search for the game logic sidebar — no full content payload. */
 export async function searchTaskLibrary(input: {
   query?: string;
   limit?: number;
+  /** Only choice / multi_choice tasks (Einstiegsfrage). */
+  quizOnly?: boolean;
 }): Promise<ActionResult<TaskLibraryItem[]>> {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
     const limit = Math.min(50, Math.max(1, input.limit ?? 30));
+    // Over-fetch when filtering to quiz types client-side.
+    const fetchLimit = input.quizOnly ? Math.min(80, limit * 3) : limit;
 
     let query = supabase
       .from("studio_tasks")
-      .select("id, title, slug, tags")
+      .select("id, title, slug, tags, content")
       .eq("is_active", true)
       .or(`organization_id.eq.${orgId},organization_id.is.null`)
       .order("updated_at", { ascending: false })
-      .limit(limit);
+      .limit(fetchLimit);
 
     const q = input.query?.trim();
     if (q) {
@@ -102,14 +102,26 @@ export async function searchTaskLibrary(input: {
     const { data, error } = await query;
     if (error) throw new Error(error.message);
 
-    return {
-      success: true,
-      data: (data ?? []).map((row) => ({
+    let items = (data ?? []).map((row) => {
+      const content = row.content as { answer_type?: string } | null;
+      return {
         id: row.id as string,
         title: row.title as string,
         slug: row.slug as string,
         tags: (row.tags as string[]) ?? [],
-      })),
+        answer_type: content?.answer_type,
+      };
+    });
+
+    if (input.quizOnly) {
+      items = items
+        .filter((t) => t.answer_type === "choice" || t.answer_type === "multi_choice")
+        .slice(0, limit);
+    }
+
+    return {
+      success: true,
+      data: items,
     };
   } catch (error) {
     return {
@@ -278,7 +290,7 @@ export async function duplicateTasks(
       if (!source) continue;
 
       for (let i = 1; i <= copies; i += 1) {
-        const title = `${i} ${source.title}`;
+        const title = `COPY ${i} ${source.title}`;
         const slug = await ensureUniqueTaskSlug(supabase, source.organization_id ?? orgId, title);
 
         const { data, error } = await supabase

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { StudioPanel } from "@/components/cms/admin-shell";
+import { Panel, Stat } from "@/components/cms/ui";
 import {
   IconArrowRight,
   IconGamepad,
@@ -14,13 +14,35 @@ import {
   IconTicket,
 } from "@/components/cms/studio-icons";
 import { StudioOverviewSkeleton } from "@/components/cms/studio-list-skeletons";
-import { StudioSectionTitle } from "@/components/cms/studio-ui";
+import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { getStudioDashboardStats } from "@/app/actions/cms/tickets";
 import { queryKeys } from "@/lib/platform/query-keys";
 
+const areas = [
+  {
+    href: "/admin/games",
+    icon: IconGamepad,
+    name: "Spiele",
+    text: "Spiele in Layern zusammenstellen, duplizieren und veröffentlichen.",
+  },
+  {
+    href: "/admin/tasks",
+    icon: IconPuzzle,
+    name: "Aufgaben",
+    text: "Rätsel einmal anlegen und mit beliebig vielen Spielen verknüpfen.",
+  },
+  {
+    href: "/admin/tickets",
+    icon: IconTicket,
+    name: "Tickets",
+    text: "Zugänge und Aktivierungen für Live-Events verwalten.",
+  },
+];
+
 export function StudioOverviewSection() {
+  const { orgSlug } = useStudioShell();
   const { data: stats, isPending } = useQuery({
-    queryKey: queryKeys.studio.dashboard(),
+    queryKey: queryKeys.studio.dashboard(orgSlug),
     queryFn: async () => {
       const result = await getStudioDashboardStats();
       if (!result.success) throw new Error(result.error);
@@ -33,121 +55,94 @@ export function StudioOverviewSection() {
   }
 
   return (
-    <>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricCard
-          label="Aufgaben"
-          value={stats.tasks}
-          href="/admin/tasks"
-          icon={<IconPuzzle size={20} />}
-        />
-        <MetricCard
-          label="Spiele"
-          value={stats.games}
-          href="/admin/games"
-          icon={<IconGamepad size={20} />}
-        />
-        <MetricCard
-          label="Vorlagen"
-          value={stats.templates}
-          href="/admin/games#vorlagen"
-          icon={<IconTemplate size={20} />}
-        />
-        <MetricCard
-          label="Aktive Pools"
-          value={stats.activePools}
-          href="/admin/tickets"
-          icon={<IconTicket size={20} />}
-        />
-        <MetricCard
+    <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat label="Aufgaben" value={String(stats.tasks)} note="in der Bibliothek" />
+        <Stat label="Spiele" value={String(stats.games)} note={`${stats.templates} Vorlagen`} />
+        <Stat label="Aktive Pools" value={String(stats.activePools)} note="Ticket-Pools" />
+        <Stat
           label="Aktivierungen"
-          value={stats.totalActivations}
-          href="/admin/tickets"
-          icon={<IconTicket size={20} />}
+          value={String(stats.totalActivations)}
+          note="gesamt"
         />
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <StudioPanel>
-          <StudioSectionTitle
-            icon={<IconRoute size={18} />}
-            title="So funktioniert's"
-            description="In drei Schritten vom Entwurf zum Live-Spiel"
-          />
-          <ol className="space-y-4">
-            <WorkflowStep
+      <div className="grid gap-4 lg:grid-cols-3">
+        {areas.map((a) => (
+          <Link
+            key={a.href}
+            href={a.href}
+            prefetch
+            className="tap-lift group rounded-3xl bg-card p-5 shadow-soft"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary">
+              <a.icon className="h-6 w-6 text-primary" />
+            </span>
+            <h2 className="mt-4 text-xl font-bold">{a.name}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{a.text}</p>
+            <span className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-primary">
+              Öffnen <IconArrowRight className="h-4 w-4" />
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Panel title="So funktioniert's" subtitle="In drei Schritten vom Entwurf zum Live-Spiel">
+          <ul className="space-y-2">
+            <WorkflowRow
               step={1}
               title="Aufgaben anlegen"
-              text="Erstelle Rätsel in der Aufgaben-Bibliothek — unabhängig von Spielen."
+              text="Rätsel in der Bibliothek — unabhängig von Spielen."
               href="/admin/tasks"
             />
-            <WorkflowStep
+            <WorkflowRow
               step={2}
               title="Spiel zusammenstellen"
-              text="Füge Aufgaben hinzu, sortiere den Ablauf und veröffentliche eine Version."
+              text="Ablauf sortieren und Version veröffentlichen."
               href="/admin/games"
             />
-            <WorkflowStep
+            <WorkflowRow
               step={3}
               title="Live-Event starten"
-              text="Teams treten über den Einladungslink bei — der Inhalt bleibt stabil."
+              text="Teams treten über den Einladungslink bei."
               href="/admin/games"
             />
-          </ol>
-        </StudioPanel>
-
-        <StudioPanel>
-          <StudioSectionTitle icon={<IconLayers size={18} />} title="Wichtig zu wissen" />
-          <ul className="space-y-3 text-sm leading-6 text-slate-600">
-            <li className="flex gap-2">
-              <span className="font-semibold text-slate-900">Entwurf</span>
-              <span>— jederzeit bearbeitbar, ohne laufende Events zu beeinflussen</span>
-            </li>
-            <li className="flex gap-2">
-              <span className="font-semibold text-slate-900">Version</span>
-              <span>— eingefrorener Snapshot beim Veröffentlichen</span>
-            </li>
-            <li className="flex gap-2">
-              <span className="font-semibold text-slate-900">Live-Event</span>
-              <span>— Teams spielen synchron mit Rollen &amp; Echtzeit-Sync</span>
-            </li>
           </ul>
-        </StudioPanel>
+        </Panel>
+
+        <Panel
+          title="Wichtig zu wissen"
+          action={
+            <Link href="/admin/games" className="text-sm font-bold text-primary">
+              Zu den Spielen
+            </Link>
+          }
+        >
+          <div className="grid gap-2 sm:grid-cols-3">
+            <InfoTile
+              icon={<IconPuzzle className="h-4 w-4 text-primary" />}
+              title="Entwurf"
+              text="Jederzeit bearbeitbar"
+            />
+            <InfoTile
+              icon={<IconLayers className="h-4 w-4 text-primary" />}
+              title="Version"
+              text="Eingefrorener Snapshot"
+            />
+            <InfoTile
+              icon={<IconRoute className="h-4 w-4 text-primary" />}
+              title="Live-Event"
+              text="Synchron mit Rollen"
+            />
+          </div>
+        </Panel>
       </div>
-    </>
+    </div>
   );
 }
 
-function MetricCard({
-  label,
-  value,
-  href,
-  icon,
-}: {
-  label: string;
-  value: number;
-  href: string;
-  icon: ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      prefetch
-      className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-200 hover:shadow-md"
-    >
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-500">{label}</span>
-        <span className="text-slate-300 transition group-hover:text-teal-500">{icon}</span>
-      </div>
-      <p className="mt-2 text-3xl font-semibold text-slate-900">{value}</p>
-      <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-teal-600 opacity-0 transition group-hover:opacity-100">
-        Öffnen <IconArrowRight size={14} />
-      </span>
-    </Link>
-  );
-}
-
-function WorkflowStep({
+function WorkflowRow({
   step,
   title,
   text,
@@ -159,21 +154,40 @@ function WorkflowStep({
   href: string;
 }) {
   return (
-    <li className="flex gap-4">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-100 text-sm font-semibold text-teal-700">
-        {step}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="font-medium text-slate-900">{title}</p>
-        <p className="mt-0.5 text-sm text-slate-500">{text}</p>
-        <Link
-          href={href}
-          prefetch
-          className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700"
-        >
-          Loslegen <IconArrowRight size={14} />
-        </Link>
-      </div>
+    <li>
+      <Link
+        href={href}
+        prefetch
+        className="tap-lift grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-secondary px-4 py-3"
+      >
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">
+          {step}
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate font-bold">{title}</span>
+          <span className="block text-xs text-muted-foreground">{text}</span>
+        </span>
+        <IconArrowRight className="h-4 w-4 text-primary" />
+      </Link>
     </li>
+  );
+}
+
+function InfoTile({
+  icon,
+  title,
+  text,
+}: {
+  icon: ReactNode;
+  title: string;
+  text: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-secondary px-4 py-3">
+      <p className="flex items-center gap-2 text-sm font-bold">
+        {icon} {title}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">{text}</p>
+    </div>
   );
 }

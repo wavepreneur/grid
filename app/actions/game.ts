@@ -299,7 +299,9 @@ export async function solveCurrentLevel(input: {
       }
     }
 
-    const pointsEarned = computeLevelReward(levelDefinition.scoring, levelState.started_at);
+    const pointsEarned = input.payload?.revealSolution
+      ? 0
+      : computeLevelReward(levelDefinition.scoring, levelState.started_at);
 
     const bonus = resolveBonusTask(levelDefinition);
     const enterBonus = Boolean(usesPhasedPlay(content) && bonus);
@@ -320,12 +322,15 @@ export async function solveCurrentLevel(input: {
       score: gameState.score + pointsEarned,
       current_phase: enterBonus ? "bonus" : hubPhase ?? gameState.current_phase,
       pending_next_level: enterBonus ? (isFinished ? null : nextLevel) : null,
-      modal: enterBonus
-        ? null
-        : buildLevelCompletedModal({
+      modal: buildLevelCompletedModal({
             level: currentLevel,
             solvedBy,
             pointsEarned,
+            successTitle: levelDefinition.success_title,
+            // Skip / countdown expiry: no post-solve note
+            successInfo: input.payload?.revealSolution
+              ? null
+              : levelDefinition.success_info,
           }),
       levels: progressionLevels,
     };
@@ -361,6 +366,7 @@ export async function solveCurrentLevel(input: {
         level_type: levelDefinition.type,
         score: nextGameState.score,
         points_earned: pointsEarned,
+        reveal_solution: Boolean(input.payload?.revealSolution),
       },
     });
 
@@ -375,6 +381,8 @@ export async function solveCurrentLevel(input: {
         level_type: levelDefinition.type,
         solved_by: solvedBy,
         score: nextGameState.score,
+        points_earned: pointsEarned,
+        reveal_solution: Boolean(input.payload?.revealSolution),
       },
     });
 
@@ -671,7 +679,7 @@ export async function advanceFromHub(input: {
     }
 
     let currentLevel = team.current_level || 1;
-    if (input.targetLevel && content.contentMode !== "outdoor") {
+    if (input.targetLevel) {
       currentLevel = input.targetLevel;
     }
 
@@ -830,23 +838,20 @@ export async function submitArrivalQuiz(input: {
       levelTitle: levelDefinition.title ?? null,
     };
 
-    if (!validation.ok) {
-      await logPlayAttempt({
-        ...attemptBase,
-        correct: false,
-        error: validation.error,
-      });
-      return { success: false, error: validation.error };
-    }
-
+    const correct = validation.ok;
     await logPlayAttempt({
       ...attemptBase,
-      correct: true,
+      correct,
+      error: correct ? null : validation.error,
     });
+
+    // Wrong answer still unlocks the mission — only correct answers earn opener points.
+    const quizPoints = correct && slot.quiz.points ? Math.max(0, Math.round(slot.quiz.points)) : 0;
 
     const nextGameState: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
+      score: gameState.score + quizPoints,
       current_phase: "level",
     };
 

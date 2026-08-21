@@ -11,7 +11,7 @@ type Props = {
 export function ProductNav({ active, compact = false }: Props) {
   return (
     <nav
-      className={`flex gap-1 rounded-xl bg-slate-100 p-1 ${compact ? "w-full" : ""}`}
+      className={`flex gap-1 rounded-2xl bg-secondary p-1 ${compact ? "w-full" : ""}`}
       aria-label="GRID Produkte"
     >
       {GRID_PRODUCTS.map((product) => {
@@ -21,12 +21,12 @@ export function ProductNav({ active, compact = false }: Props) {
             key={product.id}
             href={product.available ? product.href : "#"}
             aria-current={isActive ? "page" : undefined}
-            className={`flex-1 rounded-lg px-3 py-2 text-center text-xs font-semibold transition ${
+            className={`tap-lift flex-1 rounded-xl px-3 py-2 text-center text-xs font-bold transition ${
               isActive
-                ? "bg-white text-teal-700 shadow-sm"
+                ? "bg-card text-primary shadow-soft"
                 : product.available
-                  ? "text-slate-600 hover:text-slate-900"
-                  : "cursor-not-allowed text-slate-400"
+                  ? "text-muted-foreground hover:text-foreground"
+                  : "cursor-not-allowed text-muted-foreground/50"
             }`}
             title={product.description}
           >

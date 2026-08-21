@@ -21,24 +21,28 @@ import {
   useStudioGamesList,
   useStudioTemplates,
 } from "@/lib/hooks/use-studio-games";
+import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { queryKeys } from "@/lib/platform/query-keys";
 import { prefetchStudioGame } from "@/lib/hooks/use-studio-game-detail";
-import { StudioBadge } from "@/components/cms/admin-shell";
-import { GameStatusSwitch } from "@/components/cms/games/game-status-switch";
 import { StudioBulkBar, StudioSelectCheckbox } from "@/components/cms/shared/studio-bulk-bar";
 import { StudioDeleteModal } from "@/components/cms/shared/studio-delete-modal";
 import { StudioDuplicateModal } from "@/components/cms/shared/studio-duplicate-modal";
 import {
-  IconArrowRight,
   IconCopy,
-  IconGamepad,
+  IconDevices,
+  IconKeyRound,
+  IconMapPin,
+  IconPlay,
   IconPlus,
+  IconSearch,
   IconTemplate,
   IconTrash,
 } from "@/components/cms/studio-icons";
+import { Chip, Empty, inputCls } from "@/components/cms/ui";
+import { GameStatusSwitch } from "@/components/cms/games/game-status-switch";
+import { GameTestPlayModal } from "@/components/cms/games/game-test-play-modal";
 import {
   StudioButton,
-  StudioEmptyState,
   StudioError,
   StudioHint,
   StudioInput,
@@ -48,10 +52,11 @@ import {
   StudioSuccess,
 } from "@/components/cms/studio-ui";
 import type { StudioGame } from "@/lib/cms/types";
-import type { ContentMode } from "@/lib/cms/layer-model";
+import { parseRuntimeProfiles, type ContentMode } from "@/lib/cms/layer-model";
 import {
   surfaceDescriptionDe,
   surfaceLabelDe,
+  surfaceTaglineDe,
 } from "@/lib/cms/game-slots";
 
 type GameWithLive = StudioGame & { liveEventCount: number };
@@ -101,13 +106,15 @@ type Props = {
 export function GameList({ initialGames, initialTemplates }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { orgSlug } = useStudioShell();
   const refreshGames = useRefreshStudioGamesList();
   const { data: games = initialGames } = useStudioGamesList(initialGames);
   const { data: templates = initialTemplates } = useStudioTemplates(initialTemplates);
   const gameIds = useMemo(() => games.map((g) => g.id), [games]);
-  const { data: liveMeta = [] } = useGamesLiveMeta(gameIds);
+  const { data: liveMetaData } = useGamesLiveMeta(gameIds);
+  const liveMeta = Array.isArray(liveMetaData) ? liveMetaData : [];
   const liveCountByGame = useMemo(
-    () => new Map(liveMeta.map((s) => [s.gameId, s.liveEvents.length])),
+    () => new Map(liveMeta.map((s) => [s.gameId, s.liveEvents?.length ?? 0])),
     [liveMeta],
   );
   const gamesWithLive = useMemo(
@@ -135,8 +142,27 @@ export function GameList({ initialGames, initialTemplates }: Props) {
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [duplicateIds, setDuplicateIds] = useState<string[]>([]);
   const [sort, setSort] = useState<GameSort>("updated");
+  const [statusTab, setStatusTab] = useState<"alle" | "draft" | "published" | "archived">("alle");
+  const [query, setQuery] = useState("");
 
-  const sortedGames = useMemo(() => sortGames(gamesWithLive, sort), [gamesWithLive, sort]);
+  const filteredGames = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return gamesWithLive.filter((g) => {
+      if (statusTab === "alle") {
+        if (g.status === "archived") return false;
+      } else if (g.status !== statusTab) {
+        return false;
+      }
+      if (!q) return true;
+      return (
+        g.name.toLowerCase().includes(q) ||
+        g.slug.toLowerCase().includes(q) ||
+        (g.city_slug ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [gamesWithLive, statusTab, query]);
+
+  const sortedGames = useMemo(() => sortGames(filteredGames, sort), [filteredGames, sort]);
   const sortedTemplates = useMemo(
     () => sortGames(templates, "updated"),
     [templates],
@@ -290,19 +316,19 @@ export function GameList({ initialGames, initialTemplates }: Props) {
     },
     onMutate: async ({ ids }) => {
       await Promise.all([
-        queryClient.cancelQueries({ queryKey: queryKeys.games.list() }),
-        queryClient.cancelQueries({ queryKey: queryKeys.games.templates() }),
+        queryClient.cancelQueries({ queryKey: queryKeys.games.list(orgSlug) }),
+        queryClient.cancelQueries({ queryKey: queryKeys.games.templates(orgSlug) }),
       ]);
 
-      const previousGames = queryClient.getQueryData<StudioGame[]>(queryKeys.games.list());
+      const previousGames = queryClient.getQueryData<StudioGame[]>(queryKeys.games.list(orgSlug));
       const previousTemplates = queryClient.getQueryData<StudioGame[]>(
-        queryKeys.games.templates(),
+        queryKeys.games.templates(orgSlug),
       );
 
-      queryClient.setQueryData<StudioGame[]>(queryKeys.games.list(), (old) =>
+      queryClient.setQueryData<StudioGame[]>(queryKeys.games.list(orgSlug), (old) =>
         (old ?? []).filter((game) => !ids.includes(game.id)),
       );
-      queryClient.setQueryData<StudioGame[]>(queryKeys.games.templates(), (old) =>
+      queryClient.setQueryData<StudioGame[]>(queryKeys.games.templates(orgSlug), (old) =>
         (old ?? []).filter((game) => !ids.includes(game.id)),
       );
 
@@ -335,10 +361,10 @@ export function GameList({ initialGames, initialTemplates }: Props) {
     },
     onError: (err, _vars, context) => {
       if (context?.previousGames) {
-        queryClient.setQueryData(queryKeys.games.list(), context.previousGames);
+        queryClient.setQueryData(queryKeys.games.list(orgSlug), context.previousGames);
       }
       if (context?.previousTemplates) {
-        queryClient.setQueryData(queryKeys.games.templates(), context.previousTemplates);
+        queryClient.setQueryData(queryKeys.games.templates(orgSlug), context.previousTemplates);
       }
       setDeleteError(err instanceof Error ? err.message : "Löschen fehlgeschlagen.");
     },
@@ -407,29 +433,26 @@ export function GameList({ initialGames, initialTemplates }: Props) {
   }, [deleteStatuses]);
 
   return (
-    <div className="space-y-10 pb-24">
+    <div className="space-y-7 pb-24">
       {error ? <StudioError message={error} /> : null}
       {message ? <StudioSuccess message={message} /> : null}
 
       {open ? (
-        <form
-          onSubmit={handleCreate}
-          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-        >
+        <form onSubmit={handleCreate} className="rounded-3xl bg-card p-5 shadow-soft">
           <StudioSectionTitle
             icon={<IconPlus size={18} />}
             title="Neues Spiel"
-            description="Zuerst den Spielort wählen — dann Name. Ablauf später immer: Quiz → Level → Bonus."
+            description="Spielort wählen — Ablauf später: Quiz → Level → Bonus."
           />
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setCreateMode("blank")}
-                className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition ${
+                className={`tap-lift rounded-2xl px-4 py-2.5 text-sm font-bold ${
                   createMode === "blank"
-                    ? "border-teal-300 bg-teal-50 text-teal-800"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground"
                 }`}
               >
                 Leer starten
@@ -438,10 +461,10 @@ export function GameList({ initialGames, initialTemplates }: Props) {
                 type="button"
                 onClick={() => setCreateMode("template")}
                 disabled={templates.length === 0}
-                className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`tap-lift rounded-2xl px-4 py-2.5 text-sm font-bold disabled:opacity-40 ${
                   createMode === "template"
-                    ? "border-teal-300 bg-teal-50 text-teal-800"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground"
                 }`}
               >
                 Aus Vorlage
@@ -452,25 +475,38 @@ export function GameList({ initialGames, initialTemplates }: Props) {
               <div>
                 <StudioLabel>Wo wird gespielt?</StudioLabel>
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                  {SURFACE_OPTIONS.map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setSurface(mode)}
-                      className={`rounded-xl border px-4 py-3 text-left transition ${
-                        surface === mode
-                          ? "border-teal-400 bg-teal-50/70 ring-1 ring-teal-200"
-                          : "border-slate-200 bg-white hover:border-slate-300"
-                      }`}
-                    >
-                      <p className="text-sm font-semibold text-slate-900">
-                        {surfaceLabelDe(mode)}
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">
-                        {surfaceDescriptionDe(mode)}
-                      </p>
-                    </button>
-                  ))}
+                  {SURFACE_OPTIONS.map((mode) => {
+                    const active = surface === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setSurface(mode)}
+                        className={`tap-lift rounded-2xl px-3 py-3 text-left ${
+                          active
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-secondary-foreground"
+                        }`}
+                      >
+                        <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-black/10">
+                          {mode === "outdoor" ? (
+                            <IconMapPin size={18} />
+                          ) : mode === "indoor" ? (
+                            <IconKeyRound size={18} />
+                          ) : (
+                            <IconDevices size={18} />
+                          )}
+                        </span>
+                        <p className="text-sm font-bold">{surfaceLabelDe(mode)}</p>
+                        <p className={`mt-0.5 text-[11px] font-semibold uppercase tracking-wide ${active ? "opacity-90" : "opacity-70"}`}>
+                          {surfaceTaglineDe(mode)}
+                        </p>
+                        <p className="mt-1.5 text-xs leading-5 opacity-80">
+                          {surfaceDescriptionDe(mode)}
+                        </p>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ) : null}
@@ -509,13 +545,6 @@ export function GameList({ initialGames, initialTemplates }: Props) {
                 </StudioSelect>
               </div>
             ) : null}
-
-            {createMode === "blank" ? (
-              <StudioHint tone="info">
-                Jeder Stop im Spiel: Quiz schaltet das Level frei → Level mit Kacheln → optional Bonus →
-                zurück zur Übersicht.
-              </StudioHint>
-            ) : null}
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
             <StudioButton type="submit" disabled={creating} icon={<IconPlus size={16} />}>
@@ -530,29 +559,56 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         <button
           type="button"
           onClick={() => openCreateForm("blank")}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 bg-white px-6 py-10 text-sm font-medium text-teal-600 transition hover:border-teal-300 hover:bg-teal-50/50"
+          className="tap-lift flex w-full items-center justify-center gap-2 rounded-3xl border border-dashed border-border bg-card px-6 py-8 text-sm font-bold text-primary shadow-soft"
         >
           <IconPlus size={18} />
           Neues Spiel erstellen
         </button>
       )}
 
-      <section>
-        <StudioSectionTitle
-          icon={<IconGamepad size={18} />}
-          title="Meine Spiele"
-          description="Entwürfe und veröffentlichte Spiele für Live-Events."
-        />
-
-        {gamesWithLive.length === 0 ? (
-          <StudioEmptyState
-            icon={<IconGamepad size={32} />}
-            title="Noch keine Spiele"
-            description="Erstelle dein erstes Spiel — leer oder aus einer gespeicherten Vorlage."
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+        <div className="relative">
+          <IconSearch className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Spiel oder Stadt suchen…"
+            className={`${inputCls} mt-0 pl-11`}
           />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["alle", "Aktiv"],
+              ["published", "Veröffentlicht"],
+              ["draft", "Entwurf"],
+              ["archived", "Archiv"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setStatusTab(id)}
+              className={`tap-lift rounded-full px-4 py-2 text-sm font-bold ${
+                statusTab === id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <section>
+        {gamesWithLive.length === 0 ? (
+          <Empty>Noch keine Spiele. Lege oben ein neues an.</Empty>
+        ) : sortedGames.length === 0 ? (
+          <Empty>Keine Treffer für diese Filter.</Empty>
         ) : (
           <>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-2.5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <StudioSelectCheckbox
                   checked={allSelected}
@@ -560,32 +616,27 @@ export function GameList({ initialGames, initialTemplates }: Props) {
                   onChange={toggleAll}
                   label="Alle auf dieser Seite auswählen"
                 />
-                <span className="text-sm text-slate-600">
+                <span className="text-sm text-muted-foreground">
                   {selectedIds.size > 0
                     ? `${selectedIds.size} ausgewählt`
-                    : "Alle auf dieser Seite auswählen"}
+                    : `${sortedGames.length} Spiele`}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <label htmlFor="game-sort" className="text-xs font-medium text-slate-500">
-                  Sortieren
-                </label>
-                <StudioSelect
-                  id="game-sort"
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value as GameSort)}
-                  className="w-auto min-w-[220px] py-2 text-sm"
-                >
-                  {SORT_OPTIONS.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </StudioSelect>
-              </div>
+              <StudioSelect
+                id="game-sort"
+                value={sort}
+                onChange={(e) => setSort(e.target.value as GameSort)}
+                className="mt-0 w-auto min-w-[200px] py-2 text-sm"
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </StudioSelect>
             </div>
 
-            <div className="grid gap-3">
+            <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
               {sortedGames.map((game) => (
                 <GameRow
                   key={game.id}
@@ -601,58 +652,46 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         )}
       </section>
 
-      <section id="vorlagen">
+      <section id="vorlagen" className="space-y-3">
         <StudioSectionTitle
           icon={<IconTemplate size={18} />}
           title="Meine Vorlagen"
-          description="Spiele, die du als Ausgangspunkt für neue Projekte speicherst — nicht für Live-Events."
+          description="Ausgangspunkte für neue Projekte — nicht für Live-Events."
         />
 
         {templates.length === 0 ? (
-          <StudioEmptyState
-            icon={<IconTemplate size={32} />}
-            title="Noch keine Vorlagen"
-            description='Speichere ein Spiel über „Als Vorlage" im Spiel-Editor — es erscheint dann hier.'
-          />
+          <Empty>Noch keine Vorlagen. Speichere ein Spiel im Editor als Vorlage.</Empty>
         ) : (
-          <div className="grid gap-3">
+          <div className="space-y-2">
             {sortedTemplates.map((template) => (
               <div
                 key={template.id}
-                className="flex flex-wrap items-center gap-3 rounded-2xl border border-violet-200 bg-violet-50/30 p-5 shadow-sm"
+                className="flex flex-wrap items-center gap-3 rounded-2xl bg-card p-3 shadow-soft"
               >
                 <Link
                   href={`/admin/games/${template.id}`}
                   className="group flex min-w-0 flex-1 flex-wrap items-center justify-between gap-4"
                 >
-                  <div className="flex items-start gap-4">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-secondary text-primary">
                       <IconTemplate size={20} />
                     </span>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-semibold text-slate-900">{template.name}</h3>
-                        <StudioBadge tone="draft">Vorlage</StudioBadge>
-                        {template.gps_enabled ? (
-                          <StudioBadge>GPS</StudioBadge>
-                        ) : (
-                          <StudioBadge>Indoor</StudioBadge>
-                        )}
+                        <h3 className="truncate text-base font-bold">{template.name}</h3>
+                        <Chip tone="bg-accent/30 text-accent-foreground">Vorlage</Chip>
                       </div>
-                      <p className="mt-1 text-sm text-slate-500">
+                      <p className="truncate text-sm text-muted-foreground">
                         {template.description?.trim() || template.slug}
                       </p>
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1 text-sm font-medium text-teal-600">
-                    Bearbeiten
-                    <IconArrowRight size={16} className="transition group-hover:translate-x-0.5" />
-                  </span>
                 </Link>
 
                 <StudioButton
                   type="button"
-                  variant="secondary"
+                  variant="ghost"
+                  size="sm"
                   icon={<IconPlus size={14} />}
                   onClick={() => openCreateForm("template", template.id)}
                 >
@@ -663,7 +702,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
                   type="button"
                   aria-label={`${template.name} löschen`}
                   onClick={() => openDeleteModal([template.id])}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                  className="tap-lift flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-muted-foreground hover:text-destructive"
                 >
                   <IconTrash size={16} />
                 </button>
@@ -736,71 +775,99 @@ function GameRow({
   onDelete: () => void;
 }) {
   const queryClient = useQueryClient();
+  const [testOpen, setTestOpen] = useState(false);
+  const canTest = game.status === "published" && game.published_version_number >= 1;
+  const surfaceChip = (() => {
+    const mode = parseRuntimeProfiles(game.runtime_profiles).default_mode;
+    if (mode === "outdoor") return "Outdoor";
+    if (mode === "online") return "Online";
+    return "Indoor";
+  })();
 
   return (
-    <div
-      className={`flex flex-wrap items-center gap-3 rounded-2xl border bg-white p-5 shadow-sm transition ${
-        selected ? "border-teal-300 bg-teal-50/20" : "border-slate-200 hover:border-slate-300"
+    <article
+      className={`rounded-3xl bg-card p-5 shadow-soft transition ${
+        selected ? "ring-2 ring-primary/40" : ""
       }`}
     >
-      <StudioSelectCheckbox
-        checked={selected}
-        onChange={onToggle}
-        label={`${game.name} auswählen`}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <StudioSelectCheckbox
+          checked={selected}
+          onChange={onToggle}
+          label={`${game.name} auswählen`}
+        />
+        <Chip tone="bg-primary/12 text-primary">{surfaceChip}</Chip>
+        {game.liveEventCount > 0 ? (
+          <Chip tone="bg-success/20 text-success-foreground">Live</Chip>
+        ) : null}
+        <GameStatusSwitch
+          gameId={game.id}
+          status={game.status}
+          publishedVersionNumber={game.published_version_number}
+          liveEventCount={game.liveEventCount}
+          compact
+        />
+      </div>
 
-      <Link
-        href={`/admin/games/${game.id}`}
-        prefetch
-        onMouseEnter={() => void prefetchStudioGame(queryClient, game.id)}
-        onFocus={() => void prefetchStudioGame(queryClient, game.id)}
-        className="group flex min-w-0 flex-1 flex-wrap items-center justify-between gap-4"
-      >
-        <div className="flex items-start gap-4">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition group-hover:bg-teal-50 group-hover:text-teal-600">
-            <IconGamepad size={20} />
-          </span>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-lg font-semibold text-slate-900">{game.name}</h3>
-              {game.liveEventCount > 0 ? <StudioBadge tone="live">Live</StudioBadge> : null}
-              <GameStatusSwitch
-                gameId={game.id}
-                status={game.status}
-                publishedVersionNumber={game.published_version_number}
-                liveEventCount={game.liveEventCount}
-                compact
-              />
-              {game.gps_enabled ? <StudioBadge>GPS</StudioBadge> : <StudioBadge>Indoor</StudioBadge>}
-            </div>
-            <p className="mt-1 text-sm text-slate-500">
-              Version {game.published_version_number} · {game.slug}
-            </p>
-          </div>
-        </div>
-        <span className="inline-flex items-center gap-1 text-sm font-medium text-teal-600">
-          Bearbeiten
-          <IconArrowRight size={16} className="transition group-hover:translate-x-0.5" />
-        </span>
-      </Link>
+      <h2 className="mt-3 text-xl font-bold">{game.name}</h2>
+      <p className="text-sm text-muted-foreground">
+        Version {game.published_version_number} · {game.slug}
+      </p>
 
-      <button
-        type="button"
-        aria-label={`${game.name} duplizieren`}
-        onClick={onDuplicate}
-        className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-600"
-      >
-        <IconCopy size={16} />
-      </button>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link
+          href={`/admin/games/${game.id}`}
+          prefetch
+          onMouseEnter={() => void prefetchStudioGame(queryClient, game.id)}
+          onFocus={() => void prefetchStudioGame(queryClient, game.id)}
+          className="tap-lift rounded-2xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+        >
+          Öffnen
+        </Link>
+        <StudioButton
+          type="button"
+          size="sm"
+          variant="secondary"
+          icon={<IconPlay size={16} />}
+          disabled={!canTest}
+          title={
+            canTest
+              ? "Testlink öffnen"
+              : "Erst veröffentlichen, dann testen"
+          }
+          onClick={() => setTestOpen(true)}
+        >
+          Testen
+        </StudioButton>
+        <StudioButton
+          type="button"
+          size="sm"
+          variant="ghost"
+          icon={<IconCopy size={16} />}
+          onClick={onDuplicate}
+        >
+          Duplizieren
+        </StudioButton>
+        <StudioButton
+          type="button"
+          size="sm"
+          variant="outline"
+          icon={<IconTrash size={16} />}
+          onClick={onDelete}
+        >
+          Löschen
+        </StudioButton>
+      </div>
 
-      <button
-        type="button"
-        aria-label={`${game.name} löschen`}
-        onClick={onDelete}
-        className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
-      >
-        <IconTrash size={16} />
-      </button>
-    </div>
+      {canTest ? (
+        <GameTestPlayModal
+          open={testOpen}
+          onClose={() => setTestOpen(false)}
+          gameId={game.id}
+          gameName={game.name}
+          publishedVersionNumber={game.published_version_number}
+        />
+      ) : null}
+    </article>
   );
 }

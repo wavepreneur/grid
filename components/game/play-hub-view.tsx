@@ -1,15 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   buildGpsWaypoints,
   computeTargetDistance,
   GpsMissionMap,
 } from "@/components/game/gps-mission-map";
+import { OutdoorWalkRing } from "@/components/game/outdoor-walk-ring";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
 import { IconCheck, IconLock } from "@/components/game/city/icons";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
+import { useWalkedDistance } from "@/lib/hooks/use-walked-distance";
 import type { ContentMode } from "@/lib/cms/layer-model";
+import { isWithinGeofence } from "@/lib/grid/geofence";
+import { hapticArrive } from "@/lib/grid/haptics";
+import { playPlaySfx } from "@/lib/grid/play-sfx";
 import type { GameLevelStatus } from "@/lib/grid/game-state";
 import type { LevelDefinition, GeolocationSample } from "@/lib/grid/level-types";
 import { hubMeta } from "@/lib/grid/play-slots";
@@ -19,10 +24,11 @@ type Props = {
   levels: LevelDefinition[];
   levelStatuses: Record<string, { status: GameLevelStatus }>;
   activeLevel: number;
+  routeOrder?: "linear" | "free";
   canUnlockGps: boolean;
   disabled: boolean;
   isPending: boolean;
-  onArriveOutdoor: (geolocation: GeolocationSample) => void;
+  onArriveOutdoor: (geolocation: GeolocationSample, targetLevel?: number) => void;
   onSolveGpsCheckpoint: (geolocation: GeolocationSample) => void;
   onOpenStation: (levelNumber: number) => void;
   onSubmitStationCode: (code: string) => void;
@@ -34,6 +40,7 @@ export function PlayHubView({
   levels,
   levelStatuses,
   activeLevel,
+  routeOrder = "linear",
   canUnlockGps,
   disabled,
   isPending,
@@ -47,7 +54,16 @@ export function PlayHubView({
   const current = levels.find((l) => l.level === activeLevel) ?? levels[0];
   const [code, setCode] = useState("");
 
-  if (mode === "outdoor" && current) {
+  // Outdoor GPS pin OR walk/time trigger → dedicated outdoor hub.
+  const outdoorTriggered =
+    mode === "outdoor" &&
+    Boolean(
+      current?.location ||
+        current?.triggers?.type === "distance" ||
+        current?.triggers?.type === "time",
+    );
+
+  if (outdoorTriggered && current) {
     const gpsOnly =
       current.type === "gps" &&
       !current.arrival_quiz &&
@@ -60,10 +76,15 @@ export function PlayHubView({
         levels={levels}
         levelStatuses={levelStatuses}
         current={current}
+        routeOrder={routeOrder}
         canUnlockGps={canUnlockGps}
         disabled={disabled}
         isPending={isPending}
-        onArrive={gpsOnly ? onSolveGpsCheckpoint : onArriveOutdoor}
+        onArrive={
+          gpsOnly
+            ? (geo) => onSolveGpsCheckpoint(geo)
+            : (geo, level) => onArriveOutdoor(geo, level)
+        }
       />
     );
   }
@@ -81,6 +102,7 @@ export function PlayHubView({
           </h1>
           <p className="mt-2 text-sm text-[var(--cg-muted)]">
             Tippt eine Station an oder gebt den Stationscode ein, der dort aushängt.
+            {routeOrder === "free" ? " Freie Reihenfolge — jede offene Station ist wählbar." : ""}
           </p>
         </header>
 
@@ -204,12 +226,12 @@ export function PlayHubView({
   return (
     <section className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pb-10 pt-5">
       <header>
-        <SectionLabel>{meta.hubLabelDe} · Tabbrain</SectionLabel>
+        <SectionLabel>{meta.hubLabelDe}</SectionLabel>
         <h1 className="mt-1 text-xl font-bold text-[var(--cg-fg)] sm:text-2xl">
           Mission {next?.level ?? "—"} von {levels.length}
         </h1>
         <p className="mt-2 text-sm text-[var(--cg-muted)]">
-          {doneCount} gelöst · gemeinsamer Start auf allen Geräten
+          {doneCount} gelöst · Tippt auf Start, um Quiz und Level zu öffnen.
         </p>
       </header>
 
@@ -246,6 +268,7 @@ function OutdoorHub({
   levels,
   levelStatuses,
   current,
+  routeOrder,
   canUnlockGps,
   disabled,
   isPending,
@@ -254,22 +277,121 @@ function OutdoorHub({
   levels: LevelDefinition[];
   levelStatuses: Record<string, { status: GameLevelStatus }>;
   current: LevelDefinition;
+  routeOrder: "linear" | "free";
   canUnlockGps: boolean;
   disabled: boolean;
   isPending: boolean;
-  onArrive: (geolocation: GeolocationSample) => void;
+  onArrive: (geolocation: GeolocationSample, targetLevel?: number) => void;
 }) {
-  const gpsEnabled = Boolean(current.location) && canUnlockGps;
-  const { sample } = useGeolocation(gpsEnabled);
+  const isWalkMode =
+    current.triggers?.type === "distance" &&
+    Boolean(current.triggers.after_meters && current.triggers.after_meters > 0);
+  const isTimeMode =
+    current.triggers?.type === "time" &&
+    Boolean(current.triggers.after_minutes && current.triggers.after_minutes > 0);
+  const isGpsMode = Boolean(current.location) && !isWalkMode;
+
+  const gpsEnabled = (isGpsMode || isWalkMode) && canUnlockGps;
+  const { sample } = useGeolocation(gpsEnabled && isGpsMode);
+  const walk = useWalkedDistance(Boolean(gpsEnabled && isWalkMode));
+  const [simBonus, setSimBonus] = useState(0);
+  const arrivedPingRef = useRef(false);
+
   const waypoints = useMemo(
     () => buildGpsWaypoints(levels, levelStatuses),
     [levels, levelStatuses],
   );
-  const distanceToTarget = computeTargetDistance(sample, current.location);
+
+  const targetLevel = useMemo(() => {
+    if (!isGpsMode || routeOrder !== "free" || !sample) return current;
+    const hit = levels.find((level) => {
+      if (!level.location) return false;
+      const status = levelStatuses[String(level.level)]?.status ?? "locked";
+      if (status === "locked" || status === "completed") return false;
+      return isWithinGeofence(sample, level.location);
+    });
+    return hit ?? current;
+  }, [isGpsMode, routeOrder, sample, levels, levelStatuses, current]);
+
+  const distanceToTarget = computeTargetDistance(sample, targetLevel.location);
   const withinRadius =
-    sample && current.location && distanceToTarget !== null
-      ? distanceToTarget <= current.location.radius_meters
+    sample && targetLevel.location && distanceToTarget !== null
+      ? distanceToTarget <= targetLevel.location.radius_meters
       : false;
+
+  useEffect(() => {
+    if (!isGpsMode) return;
+    if (withinRadius) {
+      if (!arrivedPingRef.current) {
+        arrivedPingRef.current = true;
+        playPlaySfx("arrive");
+        hapticArrive();
+      }
+      return;
+    }
+    arrivedPingRef.current = false;
+  }, [isGpsMode, withinRadius]);
+
+  const openCount = levels.filter(
+    (l) => (levelStatuses[String(l.level)]?.status ?? "locked") !== "completed",
+  ).length;
+
+  const targetMeters = current.triggers?.after_meters ?? 100;
+  const walkedMeters = walk.meters + simBonus;
+
+  function openWithSample(geo?: GeolocationSample | null, level?: number) {
+    const position =
+      geo ??
+      walk.sample ??
+      sample ??
+      (targetLevel.location
+        ? {
+            lat: targetLevel.location.lat,
+            lng: targetLevel.location.lng,
+            accuracy: 5,
+          }
+        : { lat: 0, lng: 0, accuracy: 50 });
+    onArrive(position, level);
+  }
+
+  if (isWalkMode) {
+    return (
+      <section className="flex min-h-[70vh] flex-col">
+        <div className="space-y-1 px-4 pb-2 pt-5">
+          <SectionLabel>Stadtjagd · Strecke</SectionLabel>
+          <h1 className="text-xl font-bold text-[var(--cg-fg)]">
+            Wegpunkt {current.level} von {levels.length}
+          </h1>
+        </div>
+        <OutdoorWalkRing
+          title={current.title}
+          targetMeters={targetMeters}
+          walkedMeters={walkedMeters}
+          disabled={disabled}
+          isPending={isPending}
+          onOpen={() => openWithSample(walk.sample, current.level)}
+          onSimulateWalk={() => setSimBonus((m) => m + 25)}
+        />
+        {walk.error ? (
+          <p className="px-5 pb-6 text-center text-sm text-[var(--cg-destructive)]">{walk.error}</p>
+        ) : null}
+      </section>
+    );
+  }
+
+  if (isTimeMode) {
+    return (
+      <OutdoorTimeWait
+        title={current.title}
+        levelIndex={current.level}
+        total={levels.length}
+        minutes={current.triggers?.after_minutes ?? 1}
+        disabled={disabled}
+        isPending={isPending}
+        onOpen={() => openWithSample(sample, current.level)}
+      />
+    );
+  }
 
   return (
     <section className="flex min-h-[70vh] flex-col">
@@ -277,17 +399,24 @@ function OutdoorHub({
         <header>
           <SectionLabel>Stadtjagd</SectionLabel>
           <h1 className="text-xl font-bold text-[var(--cg-fg)]">
-            Wegpunkt {current.level} von {levels.length}
+            {routeOrder === "free"
+              ? `${openCount} von ${levels.length} Wegpunkten offen`
+              : `Wegpunkt ${current.level} von ${levels.length}`}
           </h1>
+          <p className="mt-1 text-sm text-[var(--cg-muted)]">
+            {routeOrder === "free"
+              ? "Alle offenen Punkte sind anlaufbar — Marker und Linie zeigen euer Ziel."
+              : "Folgt der Linie zum hervorgehobenen Ziel. Die Distanz aktualisiert sich live."}
+          </p>
         </header>
       </div>
 
-      <div className="relative min-h-[280px] flex-1">
+      <div className="relative min-h-[280px] flex-1 px-4">
         {waypoints.length > 0 ? (
           <GpsMissionMap
             waypoints={waypoints}
-            activeLevel={current.level}
-            target={current.location}
+            activeLevel={targetLevel.level}
+            target={targetLevel.location}
             playerPosition={sample}
             showPlayer={gpsEnabled}
             distanceToTarget={distanceToTarget}
@@ -300,7 +429,7 @@ function OutdoorHub({
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <div className="min-w-0">
             <SectionLabel>Euer Ziel</SectionLabel>
-            <p className="truncate text-lg font-bold text-[var(--cg-fg)]">{current.title}</p>
+            <p className="truncate text-lg font-bold text-[var(--cg-fg)]">{targetLevel.title}</p>
           </div>
           {distanceToTarget !== null ? (
             <span className="shrink-0 rounded-full bg-[var(--cg-secondary)] px-3 py-1.5 text-sm font-semibold">
@@ -317,7 +446,10 @@ function OutdoorHub({
             <BigButton
               variant="accent"
               disabled={disabled || isPending || !sample}
-              onClick={() => sample && onArrive(sample)}
+              onClick={() => {
+                playPlaySfx("ping");
+                openWithSample(sample, routeOrder === "free" ? targetLevel.level : undefined);
+              }}
             >
               Wegpunkt öffnen
             </BigButton>
@@ -325,19 +457,22 @@ function OutdoorHub({
         ) : (
           <>
             <p className="text-center text-sm text-[var(--cg-muted)]">
-              Lauft zum Wegpunkt. Bei ca. {current.location?.radius_meters ?? 10} m Entfernung
-              startet das Level.
+              Lauft zum Wegpunkt. Bei ca. {targetLevel.location?.radius_meters ?? 10} m piept es und
+              ihr könnt öffnen.
             </p>
-            {process.env.NODE_ENV === "development" && current.location ? (
+            {process.env.NODE_ENV === "development" && targetLevel.location ? (
               <BigButton
                 variant="outline"
                 disabled={disabled || isPending}
                 onClick={() =>
-                  onArrive({
-                    lat: current.location!.lat,
-                    lng: current.location!.lng,
-                    accuracy: 5,
-                  })
+                  openWithSample(
+                    {
+                      lat: targetLevel.location!.lat,
+                      lng: targetLevel.location!.lng,
+                      accuracy: 5,
+                    },
+                    routeOrder === "free" ? targetLevel.level : undefined,
+                  )
                 }
               >
                 Ankunft simulieren (Dev)
@@ -346,6 +481,81 @@ function OutdoorHub({
           </>
         )}
       </div>
+    </section>
+  );
+}
+
+function OutdoorTimeWait({
+  title,
+  levelIndex,
+  total,
+  minutes,
+  disabled,
+  isPending,
+  onOpen,
+}: {
+  title: string;
+  levelIndex: number;
+  total: number;
+  minutes: number;
+  disabled: boolean;
+  isPending: boolean;
+  onOpen: () => void;
+}) {
+  const totalMs = Math.max(1, minutes) * 60_000;
+  const started = useRef(Date.now());
+  const [elapsed, setElapsed] = useState(0);
+  const pinged = useRef(false);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setElapsed(Date.now() - started.current);
+    }, 250);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const progress = Math.min(1, elapsed / totalMs);
+  const ready = progress >= 1;
+  const remainingSec = Math.max(0, Math.ceil((totalMs - elapsed) / 1000));
+
+  useEffect(() => {
+    if (ready && !pinged.current) {
+      pinged.current = true;
+      playPlaySfx("arrive");
+      hapticArrive();
+    }
+  }, [ready]);
+
+  return (
+    <section className="flex min-h-[70vh] flex-col px-5 pb-8 pt-5">
+      <SectionLabel>Stadtjagd · Wartezeit</SectionLabel>
+      <h1 className="mt-1 text-xl font-bold text-[var(--cg-fg)]">
+        Wegpunkt {levelIndex} von {total}
+      </h1>
+      <p className="mt-6 text-center text-lg font-bold text-[var(--cg-fg)]">{title}</p>
+      <p className="mt-8 text-center text-4xl font-bold tabular-nums text-[var(--cg-fg)]">
+        {ready
+          ? "Bereit"
+          : `${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, "0")}`}
+      </p>
+      <div className="mx-auto mt-6 h-2 w-full max-w-sm overflow-hidden rounded-full bg-[var(--cg-secondary)]">
+        <div
+          className="h-full rounded-full bg-[var(--cg-primary)] transition-[width] duration-300"
+          style={{ width: `${progress * 100}%` }}
+        />
+      </div>
+      <p className="mt-4 text-center text-sm text-[var(--cg-muted)]">
+        {ready
+          ? "Zeit abgelaufen — öffnet die Aufgabe."
+          : `Noch ca. ${minutes} Min. nach der vorherigen Aufgabe warten.`}
+      </p>
+      {ready ? (
+        <div className="cg-animate-pop-in mt-8">
+          <BigButton variant="accent" disabled={disabled || isPending} onClick={onOpen}>
+            Aufgabe öffnen
+          </BigButton>
+        </div>
+      ) : null}
     </section>
   );
 }

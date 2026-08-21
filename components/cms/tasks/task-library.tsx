@@ -11,26 +11,22 @@ import {
 } from "@/app/actions/cms/delete";
 import { duplicateTasks } from "@/app/actions/cms/tasks";
 import type { TaskDeleteStatus } from "@/lib/cms/delete-status";
-import { StudioBadge, StudioPanel } from "@/components/cms/admin-shell";
 import { TaskGameUsageButton, TaskGameUsageList } from "@/components/cms/tasks/task-game-usage-modal";
 import { TaskTilePreview } from "@/components/cms/tasks/task-tile-preview";
 import { StudioBulkBar, StudioSelectCheckbox } from "@/components/cms/shared/studio-bulk-bar";
 import { StudioDeleteModal } from "@/components/cms/shared/studio-delete-modal";
 import { StudioDuplicateModal } from "@/components/cms/shared/studio-duplicate-modal";
 import {
-  IconArrowRight,
   IconCopy,
-  IconPuzzle,
+  IconLayers,
   IconSearch,
   IconTrash,
 } from "@/components/cms/studio-icons";
+import { Chip, Empty, inputCls } from "@/components/cms/ui";
 import {
   StudioButton,
-  StudioEmptyState,
   StudioError,
   StudioHint,
-  StudioInput,
-  StudioLabel,
   StudioSelect,
   StudioSuccess,
 } from "@/components/cms/studio-ui";
@@ -40,6 +36,7 @@ import {
   useTasksUsageMeta,
   type TaskWithUsage,
 } from "@/lib/hooks/use-studio-tasks";
+import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { queryKeys } from "@/lib/platform/query-keys";
 import { prefetchStudioTask } from "@/lib/hooks/use-studio-task-detail";
 import type { StudioTask } from "@/lib/cms/types";
@@ -86,6 +83,7 @@ type Props = {
 export function TaskLibrary({ initialTasks }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { orgSlug } = useStudioShell();
   const refreshTasks = useRefreshStudioTasksList();
   const { data: rawTasks = initialTasks } = useStudioTasksList(initialTasks);
   const taskIds = useMemo(() => rawTasks.map((t) => t.id), [rawTasks]);
@@ -243,9 +241,9 @@ export function TaskLibrary({ initialTasks }: Props) {
       return result.data!;
     },
     onMutate: async (ids) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.tasks.list() });
-      const previous = queryClient.getQueryData<StudioTask[]>(queryKeys.tasks.list());
-      queryClient.setQueryData<StudioTask[]>(queryKeys.tasks.list(), (old) =>
+      await queryClient.cancelQueries({ queryKey: queryKeys.tasks.list(orgSlug) });
+      const previous = queryClient.getQueryData<StudioTask[]>(queryKeys.tasks.list(orgSlug));
+      queryClient.setQueryData<StudioTask[]>(queryKeys.tasks.list(orgSlug), (old) =>
         (old ?? []).filter((task) => !ids.includes(task.id)),
       );
       return { previous };
@@ -277,7 +275,7 @@ export function TaskLibrary({ initialTasks }: Props) {
     },
     onError: (err, _ids, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(queryKeys.tasks.list(), context.previous);
+        queryClient.setQueryData(queryKeys.tasks.list(orgSlug), context.previous);
       }
       setDeleteError(err instanceof Error ? err.message : "Löschen fehlgeschlagen.");
     },
@@ -332,47 +330,66 @@ export function TaskLibrary({ initialTasks }: Props) {
   const hasActiveFilters = Boolean(tagFilter || liveFilter || search.trim());
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-7 pb-24">
       {error ? <StudioError message={error} /> : null}
       {message ? <StudioSuccess message={message} /> : null}
 
-      <StudioPanel>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="sm:col-span-2">
-            <StudioLabel>Suche</StudioLabel>
-            <div className="relative">
-              <IconSearch
-                size={16}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <StudioInput
-                className="pl-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Titel, Slug oder Tag…"
-              />
-            </div>
-          </div>
-          <div>
-            <StudioLabel>Tag</StudioLabel>
-            <StudioSelect value={tagFilter} onChange={(e) => pushFilter("tag", e.target.value)}>
-              <option value="">Alle</option>
-              {allTags.map((tag) => (
-                <option key={tag} value={tag}>
-                  {tag}
-                </option>
-              ))}
-            </StudioSelect>
-          </div>
-          <div>
-            <StudioLabel>Live-Status</StudioLabel>
-            <StudioSelect value={liveFilter} onChange={(e) => pushFilter("live", e.target.value)}>
-              <option value="">Alle</option>
-              <option value="live">In Live-Spielen</option>
-              <option value="offline">Nicht live</option>
-            </StudioSelect>
-          </div>
+      <div className="space-y-3">
+        <div className="relative max-w-xl">
+          <IconSearch className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Aufgabe, Frage oder Schlagwort suchen…"
+            className={`${inputCls} mt-0 pl-11`}
+          />
         </div>
+
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["", "Alle"],
+              ["live", "In Live-Spielen"],
+              ["offline", "Nicht live"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id || "all"}
+              type="button"
+              onClick={() => pushFilter("live", id)}
+              className={`tap-lift rounded-full px-4 py-2 text-sm font-bold ${
+                liveFilter === id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {allTags.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              Schlagworte
+            </span>
+            {allTags.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => pushFilter("tag", tagFilter === t ? "" : t)}
+                className={`tap-lift rounded-full px-3 py-1 text-xs font-bold ${
+                  tagFilter === t
+                    ? "bg-foreground text-background"
+                    : "bg-secondary text-secondary-foreground"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         {hasActiveFilters ? (
           <button
             type="button"
@@ -380,26 +397,22 @@ export function TaskLibrary({ initialTasks }: Props) {
               setSearch("");
               router.push("/admin/tasks");
             }}
-            className="mt-4 text-sm font-medium text-teal-600 hover:text-teal-700"
+            className="text-sm font-bold text-primary"
           >
             Filter zurücksetzen
           </button>
         ) : null}
-      </StudioPanel>
+      </div>
 
       {sortedTasks.length === 0 ? (
-        <StudioEmptyState
-          icon={<IconPuzzle size={32} />}
-          title={tasks.length === 0 ? "Noch keine Aufgaben" : "Keine Treffer"}
-          description={
-            tasks.length === 0
-              ? "Erstelle dein erstes Rätsel für die Bibliothek."
-              : "Passe die Filter an oder setze sie zurück."
-          }
-        />
+        <Empty>
+          {tasks.length === 0
+            ? "Keine Aufgabe gefunden. Lege oben eine neue an."
+            : "Keine Treffer für diese Filter."}
+        </Empty>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <StudioSelectCheckbox
                 checked={allSelected}
@@ -407,39 +420,32 @@ export function TaskLibrary({ initialTasks }: Props) {
                 onChange={toggleAll}
                 label="Alle auf dieser Seite auswählen"
               />
-              <span className="text-sm text-slate-600">
+              <span className="text-sm text-muted-foreground">
                 {selectedIds.size > 0
                   ? `${selectedIds.size} ausgewählt`
                   : `${sortedTasks.length} Aufgaben`}
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <label htmlFor="task-sort" className="text-xs font-medium text-slate-500">
-                Sortieren
-              </label>
-              <StudioSelect
-                id="task-sort"
-                value={sort}
-                onChange={(e) => setSort(e.target.value as TaskSort)}
-                className="w-auto min-w-[200px] py-2 text-sm"
-              >
-                {SORT_OPTIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </StudioSelect>
-            </div>
+            <StudioSelect
+              id="task-sort"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as TaskSort)}
+              className="mt-0 w-auto min-w-[200px] py-2 text-sm"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </StudioSelect>
           </div>
 
-          <div className="grid gap-3">
+          <div className="space-y-2">
             {sortedTasks.map((task) => (
-              <div
+              <article
                 key={task.id}
-                className={`flex flex-wrap items-center gap-3 rounded-2xl border bg-white p-4 shadow-sm transition sm:p-5 ${
-                  selectedIds.has(task.id)
-                    ? "border-teal-300 bg-teal-50/20"
-                    : "border-slate-200 hover:border-slate-300"
+                className={`flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-card p-3 shadow-soft ${
+                  selectedIds.has(task.id) ? "ring-2 ring-primary/40" : ""
                 }`}
               >
                 <StudioSelectCheckbox
@@ -448,19 +454,25 @@ export function TaskLibrary({ initialTasks }: Props) {
                   label={`${task.title} auswählen`}
                 />
 
-                <TaskTilePreview title={task.title} content={task.content} compact />
-
-                <Link
-                  href={`/admin/tasks/${task.id}`}
-                  prefetch
-                  onMouseEnter={() => prefetchTask(task.id)}
-                  onFocus={() => prefetchTask(task.id)}
-                  className="group min-w-0 flex-1"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold text-slate-900 group-hover:text-teal-700">
-                      {task.title}
-                    </h3>
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <TaskTilePreview title={task.title} content={task.content} compact />
+                    <h2 className="truncate text-base font-bold">{task.title || "Ohne Titel"}</h2>
+                    {task.liveGameCount > 0 ? (
+                      <Chip tone="bg-success/20 text-success-foreground">Live</Chip>
+                    ) : null}
+                  </div>
+                  <p className="truncate text-sm text-muted-foreground">
+                    {task.description || task.slug || "Noch keine Beschreibung."}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <IconLayers className="h-3.5 w-3.5" />{" "}
+                      {Array.isArray((task.content as { tiles?: unknown[] } | null)?.tiles)
+                        ? ((task.content as { tiles: unknown[] }).tiles.length)
+                        : 0}{" "}
+                      Kacheln
+                    </span>
                     <TaskGameUsageButton
                       taskId={task.id}
                       taskTitle={task.title}
@@ -468,48 +480,41 @@ export function TaskLibrary({ initialTasks }: Props) {
                       liveGameCount={task.liveGameCount}
                     />
                     {task.tags.slice(0, 3).map((tag) => (
-                      <StudioBadge key={tag}>{tag}</StudioBadge>
+                      <Chip key={tag}>{tag}</Chip>
                     ))}
                   </div>
-                  <p className="mt-1 line-clamp-1 text-sm text-slate-500">
-                    {task.description || task.slug}
-                  </p>
-                  {task.tags.length > 3 ? (
-                    <p className="mt-1 text-[10px] text-slate-400">
-                      +{task.tags.length - 3} weitere Tags
-                    </p>
-                  ) : null}
-                </Link>
+                </div>
 
-                <Link
-                  href={`/admin/tasks/${task.id}`}
-                  prefetch
-                  onMouseEnter={() => prefetchTask(task.id)}
-                  onFocus={() => prefetchTask(task.id)}
-                  className="inline-flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700"
-                >
-                  Bearbeiten
-                  <IconArrowRight size={16} />
-                </Link>
-
-                <button
-                  type="button"
-                  aria-label={`${task.title} duplizieren`}
-                  onClick={() => openDuplicateModal([task.id])}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-600"
-                >
-                  <IconCopy size={16} />
-                </button>
-
-                <button
-                  type="button"
-                  aria-label={`${task.title} löschen`}
-                  onClick={() => openDeleteModal([task.id])}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
-                >
-                  <IconTrash size={16} />
-                </button>
-              </div>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={`/admin/tasks/${task.id}`}
+                    prefetch
+                    onMouseEnter={() => prefetchTask(task.id)}
+                    onFocus={() => prefetchTask(task.id)}
+                    className="tap-lift rounded-2xl bg-primary px-3 py-1.5 text-sm font-bold text-primary-foreground"
+                  >
+                    Bearbeiten
+                  </Link>
+                  <StudioButton
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    icon={<IconCopy size={16} />}
+                    onClick={() => openDuplicateModal([task.id])}
+                  >
+                    Duplizieren
+                  </StudioButton>
+                  <StudioButton
+                    type="button"
+                    size="sm"
+                    variant={task.gameLinkCount > 0 ? "outline" : "danger"}
+                    icon={<IconTrash size={16} />}
+                    onClick={() => openDeleteModal([task.id])}
+                  >
+                    {task.gameLinkCount > 0 ? "Verknüpft" : "Löschen"}
+                  </StudioButton>
+                </div>
+              </article>
             ))}
           </div>
         </>

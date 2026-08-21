@@ -2,13 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { BetaNotesPanel } from "@/components/game/beta-notes-panel";
+import { LevelHero } from "@/components/game/city/level-screen-blocks";
 import {
   buildGpsWaypoints,
   computeTargetDistance,
   GpsMissionMap,
 } from "@/components/game/gps-mission-map";
 import { LevelSolvePanel } from "@/components/game/level-solve-panel";
+import { LevelScoringBar } from "@/components/game/level-scoring-bar";
 import { MediaModal } from "@/components/game/media-modal";
+import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 import type { PurchasedTileHint } from "@/lib/grid/game-state";
 import type { GameLevelStatus } from "@/lib/grid/game-state";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
@@ -30,6 +33,7 @@ type ExitmaniaLevelViewProps = {
   teamStartedAt?: string | null;
   onSubmit: (payload: SolveLevelPayload) => void;
   onPurchaseHint: (tileId: string) => void;
+  feedback?: SolveFeedbackState | null;
 };
 
 export function ExitmaniaLevelView({
@@ -48,6 +52,7 @@ export function ExitmaniaLevelView({
   teamStartedAt,
   onSubmit,
   onPurchaseHint,
+  feedback = null,
 }: ExitmaniaLevelViewProps) {
   const [activeTile, setActiveTile] = useState<LevelContentTile | null>(null);
   const tiles = level.tiles ?? [];
@@ -78,7 +83,7 @@ export function ExitmaniaLevelView({
   };
 
   return (
-    <>
+    <div className="city-game min-w-0">
       {isGpsLevel && waypoints.length > 0 ? (
         <GpsMissionMap
           waypoints={waypoints}
@@ -91,74 +96,69 @@ export function ExitmaniaLevelView({
         />
       ) : null}
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-8">
-        <section className="flex min-w-0 flex-col gap-5">
-          {!isGpsLevel && level.hero_image_url ? (
-            <div className="mx-auto aspect-square w-full max-w-[280px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 sm:max-w-xs">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={level.hero_image_url}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            </div>
-          ) : !isGpsLevel ? (
-            <div className="mx-auto flex aspect-square w-full max-w-[280px] items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-teal-50 to-slate-100 sm:max-w-xs">
-              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                Aufgabe {level.level}
-              </span>
-            </div>
-          ) : null}
-
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-teal-600">
-              Aufgabe {level.level}
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-900 sm:text-3xl">{level.title}</h2>
-            <p className="mt-3 text-sm leading-7 text-slate-600 whitespace-pre-line">
+      {!isGpsLevel ? (
+        <LevelHero
+          title={level.title}
+          description={level.description}
+          imageUrl={level.hero_image_url}
+        />
+      ) : (
+        <div className="min-w-0 space-y-1.5 px-4 pt-4">
+          <h1 className="break-words text-2xl font-bold text-[var(--cg-fg)] [overflow-wrap:anywhere] sm:text-3xl">
+            {level.title}
+          </h1>
+          {level.description?.trim() ? (
+            <p className="break-words text-sm leading-relaxed text-[var(--cg-muted)] [overflow-wrap:anywhere] whitespace-pre-wrap">
               {level.description}
             </p>
-          </div>
+          ) : null}
+        </div>
+      )}
 
-          {effectiveBeta ? (
-            <div className="min-w-0 w-full lg:hidden">
-              <BetaNotesPanel {...betaPanelProps} layout="inline" />
-            </div>
-          ) : (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600 lg:hidden">
-              Hinweise und Dokumente sieht nur die Hinweis-Rolle. Der Team-Leiter schaltet
-              Wegpunkte frei.
-            </div>
-          )}
-
-          <LevelSolvePanel
-            level={level}
-            disabled={disabled}
-            isPending={isPending}
-            isNavigator={canUnlockGps}
-            levelStartedAt={levelStartedAt}
+      <div className="space-y-5 px-4 pb-6 pt-4 sm:px-5">
+        {level.scoring ? (
+          <LevelScoringBar
+            scoring={level.scoring}
+            startedAt={levelStartedAt}
             fallbackStartedAt={teamStartedAt}
-            onSubmit={onSubmit}
-            hideGpsStatus={isGpsLevel && waypoints.length > 0}
+            compact
           />
-        </section>
+        ) : null}
 
-        <aside className="hidden lg:sticky lg:top-4 lg:block lg:self-start">
-          {effectiveBeta ? (
-            <BetaNotesPanel {...betaPanelProps} layout="sidebar" />
-          ) : (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Mitspieler</p>
-              <p className="mt-2">
-                Du löst Aufgaben mit dem Team. Hinweise und Medien liegen bei der Hinweis-Rolle —
-                sprecht euch ab.
-              </p>
-            </div>
-          )}
-        </aside>
+        {effectiveBeta ? (
+          <BetaNotesPanel {...betaPanelProps} layout="inline" cityStyle />
+        ) : (
+          <div className="rounded-3xl bg-[var(--cg-card)] px-4 py-4 text-sm text-[var(--cg-muted)] shadow-[var(--cg-shadow-soft)]">
+            Hinweise und Dokumente sieht nur die Hinweis-Rolle. Der Team-Leiter schaltet
+            Wegpunkte frei.
+          </div>
+        )}
+
+        <LevelSolvePanel
+          level={level}
+          disabled={disabled}
+          isPending={isPending}
+          isNavigator={canUnlockGps}
+          levelStartedAt={levelStartedAt}
+          fallbackStartedAt={teamStartedAt}
+          onSubmit={onSubmit}
+          hideGpsStatus={isGpsLevel && waypoints.length > 0}
+          cityStyle
+          hideScoring
+          feedback={feedback}
+        />
       </div>
 
-      {effectiveBeta ? <MediaModal tile={activeTile} onClose={() => setActiveTile(null)} /> : null}
-    </>
+      {effectiveBeta ? (
+        <MediaModal
+          tile={activeTile}
+          onClose={() => setActiveTile(null)}
+          purchasedHints={purchasedHints}
+          score={score}
+          isPending={isPending}
+          onPurchaseHint={onPurchaseHint}
+        />
+      ) : null}
+    </div>
   );
 }

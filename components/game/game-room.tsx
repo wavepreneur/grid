@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   advanceFromHub,
   dismissSyncModal,
@@ -19,6 +19,7 @@ import { GameHud } from "@/components/game/game-hud";
 import { LevelPanel } from "@/components/game/level-panel";
 import { PlayPhaseFlow } from "@/components/game/play-phase-flow";
 import { SyncModal } from "@/components/game/sync-modal";
+import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 import { IdentityBar } from "@/components/player/identity-bar";
 import { SessionHandoffScreen } from "@/components/player/session-handoff-screen";
 import { GridError } from "@/components/grid/grid-shell";
@@ -61,6 +62,7 @@ export function GameRoom({
 }: GameRoomProps) {
   const [teamState, setTeamState] = useState(initialState);
   const [error, setError] = useState<string | null>(null);
+  const [solveFeedback, setSolveFeedback] = useState<SolveFeedbackState | null>(null);
   const [sessionSuperseded, setSessionSuperseded] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isHintPending, startHintTransition] = useTransition();
@@ -91,7 +93,7 @@ export function GameRoom({
     onSessionSuperseded: () => setSessionSuperseded(true),
   });
 
-  const activeLevel = teamState.currentLevel;
+  const activeLevel = Number(teamState.currentLevel) || 1;
   const levelState = teamState.gameState.levels[String(activeLevel)];
   const levelStartedAt = levelState?.started_at ?? null;
   const isFinished = teamState.status === "finished";
@@ -101,7 +103,13 @@ export function GameRoom({
     [teamState.gameState],
   );
 
-  const currentLevelDefinition = eventContent.levels.find((level) => level.level === activeLevel);
+  useEffect(() => {
+    setSolveFeedback(null);
+  }, [activeLevel]);
+
+  const currentLevelDefinition =
+    eventContent.levels.find((level) => Number(level.level) === activeLevel) ??
+    (eventContent.levels.length === 1 ? eventContent.levels[0] : null);
   const isNavigator = playerSession.canUnlockGps || Boolean(teamState.isNavigator);
   const soloAlpha = playerSession.isAlpha && playerSession.effectiveBeta;
   const purchasedTileHints = teamState.gameState.purchased_tile_hints[String(activeLevel)] ?? {};
@@ -142,6 +150,13 @@ export function GameRoom({
 
   function handleSolveLevel(payload: SolveLevelPayload) {
     setError(null);
+    setSolveFeedback(null);
+    const attemptedAnswer =
+      payload.answer?.trim() ||
+      (payload.selectedOptionIds?.length
+        ? payload.selectedOptionIds.join(", ")
+        : payload.selectedOptionId) ||
+      null;
     startTransition(async () => {
       const result = await solveCurrentLevel({
         inviteCode,
@@ -150,11 +165,25 @@ export function GameRoom({
         payload,
       });
       if (!result.success) {
-        setError(result.error);
+        setSolveFeedback({
+          id: Date.now(),
+          kind: "wrong",
+          message: result.error,
+          attemptedAnswer,
+        });
         return;
       }
-      setTeamState(result.data);
-      cacheTeamState(result.data);
+      const hasSuccessNote = Boolean(result.data?.gameState.modal?.body?.trim());
+      if (!hasSuccessNote) {
+        setSolveFeedback({
+          id: Date.now(),
+          kind: "correct",
+        });
+      } else {
+        setSolveFeedback(null);
+      }
+      setTeamState(result.data!);
+      cacheTeamState(result.data!);
     });
   }
 
@@ -167,7 +196,7 @@ export function GameRoom({
     cacheTeamState(result.data);
   }
 
-  function handleArriveOutdoor(geolocation: GeolocationSample) {
+  function handleArriveOutdoor(geolocation: GeolocationSample, targetLevel?: number) {
     setError(null);
     startTransition(async () => {
       applyTeamResult(
@@ -176,6 +205,7 @@ export function GameRoom({
           joinCode,
           sessionId: playerSession.sessionId,
           geolocation,
+          targetLevel,
         }),
       );
     });
@@ -338,6 +368,7 @@ export function GameRoom({
         soloAlpha={soloAlpha}
         levelStartedAt={levelStartedAt}
         teamStartedAt={teamState.startedAt}
+        solveFeedback={solveFeedback}
         onArriveOutdoor={handleArriveOutdoor}
         onSolveGpsCheckpoint={handleSolveGpsCheckpoint}
         onOpenStation={handleOpenStation}
@@ -366,6 +397,7 @@ export function GameRoom({
         teamStartedAt={teamState.startedAt}
         onSubmit={handleSolveLevel}
         onPurchaseHint={handlePurchaseHint}
+        feedback={solveFeedback}
       />
     ) : (
       <LevelPanel
@@ -377,7 +409,15 @@ export function GameRoom({
       />
     )
   ) : (
-    <GridError message="Level-Inhalt konnte nicht geladen werden." />
+    <GridError
+      message={
+        eventContent.levels.length === 0
+          ? "Level-Inhalt konnte nicht geladen werden — das Spiel hat keine veröffentlichten Aufgaben."
+          : `Level ${activeLevel} fehlt im Content (verfügbar: ${eventContent.levels
+              .map((l) => l.level)
+              .join(", ")}). Bitte Spiel neu veröffentlichen und neues Live-Event starten.`
+      }
+    />
   );
 
   if (phased && usesMissionShell(eventContent)) {

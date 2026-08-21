@@ -10,7 +10,11 @@ export type GameModalState = {
   id: string;
   type: "puzzle_solved";
   level: number;
+  /** Headline on the success card (e.g. „Notiert euch das“). */
   message: string;
+  /** Body copy the team should note — required for the modal to appear. */
+  body?: string;
+  points_earned?: number;
   solved_by: string[];
   created_at: string;
 };
@@ -156,17 +160,21 @@ export function buildLevelCompletedModal(input: {
   level: number;
   solvedBy: string[];
   pointsEarned?: number;
-}): GameModalState {
-  const pointsSuffix =
-    input.pointsEarned !== undefined && input.pointsEarned !== 0
-      ? ` · ${input.pointsEarned >= 0 ? "+" : ""}${input.pointsEarned} Punkte`
-      : "";
+  successTitle?: string | null;
+  successInfo?: string | null;
+}): GameModalState | null {
+  const body = input.successInfo?.trim();
+  if (!body) return null;
+
+  const title = input.successTitle?.trim() || "Notiert euch das";
 
   return {
     id: crypto.randomUUID(),
     type: "puzzle_solved",
     level: input.level,
-    message: `Rätsel gelöst!${pointsSuffix}`,
+    message: title,
+    body,
+    points_earned: input.pointsEarned,
     solved_by: input.solvedBy,
     created_at: new Date().toISOString(),
   };

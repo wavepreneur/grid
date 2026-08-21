@@ -3,6 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTasksGameUsage } from "@/app/actions/cms/delete";
 import { listTasks } from "@/app/actions/cms/tasks";
+import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { queryKeys } from "@/lib/platform/query-keys";
 import type { StudioTask } from "@/lib/cms/types";
 
@@ -11,15 +12,21 @@ export type TaskWithUsage = StudioTask & {
   gameLinkCount: number;
 };
 
-export function useStudioTasksList(initialTasks: StudioTask[]) {
+export function useStudioTasksList(initialTasks: StudioTask[] = []) {
+  const { orgSlug } = useStudioShell();
+  const hasSeed = initialTasks.length > 0;
+
   return useQuery({
-    queryKey: queryKeys.tasks.list(),
+    queryKey: queryKeys.tasks.list(orgSlug),
     queryFn: async () => {
       const result = await listTasks();
       if (!result.success) throw new Error(result.error);
       return result.data!;
     },
-    initialData: initialTasks,
+    // Never seed an empty array — that marks the query "fresh" and skips the fetch.
+    ...(hasSeed
+      ? { initialData: initialTasks, initialDataUpdatedAt: Date.now() }
+      : {}),
   });
 }
 
@@ -46,10 +53,11 @@ export function useInvalidateStudioTasks() {
 
 export function useRefreshStudioTasksList() {
   const queryClient = useQueryClient();
+  const { orgSlug } = useStudioShell();
   return async () => {
     const result = await listTasks();
     if (result.success && result.data) {
-      queryClient.setQueryData(queryKeys.tasks.list(), result.data);
+      queryClient.setQueryData(queryKeys.tasks.list(orgSlug), result.data);
     }
     void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
   };

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
+import { isStudioTestBookingReference } from "@/lib/cms/studio-test-session";
 import {
   buildGameDeleteStatus,
   buildTaskDeleteStatus,
@@ -67,7 +68,7 @@ async function fetchTasksGameLinks(taskIds: string[]): Promise<{
 
   const { data: liveRows, error: liveError } = await supabase
     .from("events")
-    .select("id, title, invite_code, status, studio_game_version_id")
+    .select("id, title, invite_code, status, studio_game_version_id, booking_reference")
     .in(
       "studio_game_version_id",
       allVersionIds.length ? allVersionIds : ["00000000-0000-0000-0000-000000000000"],
@@ -78,6 +79,7 @@ async function fetchTasksGameLinks(taskIds: string[]): Promise<{
 
   const liveEventsByGame = new Map<string, Array<{ id: string; title: string; invite_code: string; status: string }>>();
   for (const row of liveRows ?? []) {
+    if (isStudioTestBookingReference(row.booking_reference as string | null)) continue;
     const gameId = versionToGame.get(row.studio_game_version_id as string);
     if (!gameId) continue;
     const list = liveEventsByGame.get(gameId) ?? [];
@@ -172,7 +174,7 @@ export async function getGamesDeleteStatus(
 
     const { data: liveRows, error: liveError } = await supabase
       .from("events")
-      .select("id, title, invite_code, status, studio_game_version_id")
+      .select("id, title, invite_code, status, studio_game_version_id, booking_reference")
       .in(
         "studio_game_version_id",
         allVersionIds.length ? allVersionIds : ["00000000-0000-0000-0000-000000000000"],
@@ -183,6 +185,7 @@ export async function getGamesDeleteStatus(
 
     const liveEventsByGame = new Map<string, Array<{ id: string; title: string; invite_code: string; status: string }>>();
     for (const row of liveRows ?? []) {
+      if (isStudioTestBookingReference(row.booking_reference as string | null)) continue;
       const gameId = versionToGame.get(row.studio_game_version_id as string);
       if (!gameId) continue;
       const list = liveEventsByGame.get(gameId) ?? [];

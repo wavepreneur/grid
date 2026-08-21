@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { GridButton } from "@/components/grid/grid-shell";
-import { IconCheck } from "@/components/cms/studio-icons";
+import { Check, Lightbulb } from "lucide-react";
+import { BigButton } from "@/components/game/city/ui";
 
 type TileHintModalProps = {
   open: boolean;
@@ -31,16 +31,14 @@ export function TileHintModal({
 }: TileHintModalProps) {
   useEffect(() => {
     if (!open) return;
-
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
     }
-
+    const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKeyDown);
-
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = prev;
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [open, onClose]);
@@ -49,59 +47,66 @@ export function TileHintModal({
 
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-end justify-center bg-slate-900/40 p-4 backdrop-blur-sm sm:items-center"
+      className="city-game fixed inset-0 z-[130] flex items-end justify-center bg-[var(--cg-ink)]/70 p-4 backdrop-blur-sm sm:items-center"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6"
+        className="cg-animate-rise-in w-full max-w-md space-y-4 rounded-[1.5rem] bg-[var(--cg-card)] p-5 shadow-[var(--cg-shadow-lift)]"
         onClick={(event) => event.stopPropagation()}
       >
         {mode === "confirm" ? (
           <>
-            <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">
-              Tipp freischalten
-            </p>
-            <h3 className="mt-2 text-lg font-semibold text-slate-900">Tipp für „{label}"</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-600">
-              Es werden{" "}
-              <span className="font-semibold text-slate-900">{hintCost} Punkte</span> von eurem
-              Score abgezogen.
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--cg-accent)] text-[var(--cg-accent-fg)]">
+                <Lightbulb className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--cg-muted)]">
+                  Tipp freischalten
+                </p>
+                <p className="font-bold text-[var(--cg-fg)]">{label}</p>
+              </div>
+            </div>
+            <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
+              Kostet{" "}
+              <span className="font-bold text-[var(--cg-fg)]">{hintCost} Punkte</span> vom
+              Team-Score. Pro Kachel gibt es einen Tipp.
             </p>
             {!canAfford ? (
-              <p className="mt-3 text-sm text-red-600">
-                Nicht genug Punkte (habt {score}, benötigt {hintCost}).
+              <p className="text-sm font-semibold text-[var(--cg-destructive)]">
+                Nicht genug Punkte (habt {score}, braucht {hintCost}).
               </p>
             ) : null}
-            <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-              <GridButton
-                type="button"
-                disabled={isPending || !canAfford}
-                onClick={onConfirm}
-              >
-                {isPending ? "Wird geladen…" : `${hintCost}P abziehen & anzeigen`}
-              </GridButton>
-              <GridButton type="button" variant="secondary" disabled={isPending} onClick={onClose}>
-                Abbrechen
-              </GridButton>
-            </div>
+            <BigButton
+              variant="accent"
+              disabled={isPending || !canAfford}
+              onClick={onConfirm}
+            >
+              {isPending ? "Wird geladen…" : "Freischalten & anzeigen"}
+            </BigButton>
+            <BigButton variant="ghost" disabled={isPending} onClick={onClose}>
+              Abbrechen
+            </BigButton>
           </>
         ) : (
           <>
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--cg-success)] text-white">
+                <Check className="h-5 w-5" strokeWidth={2.5} />
+              </span>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--cg-success)]">
                   Tipp freigeschaltet
                 </p>
-                <h3 className="mt-2 text-lg font-semibold text-slate-900">{label}</h3>
+                <p className="font-bold text-[var(--cg-fg)]">{label}</p>
               </div>
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-                <IconCheck size={16} />
-              </span>
             </div>
-            <p className="mt-4 text-sm leading-7 text-slate-700 whitespace-pre-line">{hintText}</p>
-            <GridButton type="button" className="mt-5 w-full sm:w-auto" onClick={onClose}>
-              Schließen
-            </GridButton>
+            <p className="text-base font-semibold leading-relaxed text-[var(--cg-fg)] whitespace-pre-line">
+              {hintText}
+            </p>
+            <BigButton variant="ghost" onClick={onClose}>
+              Verstanden
+            </BigButton>
           </>
         )}
       </div>

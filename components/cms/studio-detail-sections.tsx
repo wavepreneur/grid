@@ -49,7 +49,7 @@ export function StudioGameDetailSection({ gameId }: { gameId: string }) {
       <GameEditorPanel
         game={game}
         taskLinks={linksQuery.data ?? []}
-        liveEventCount={liveMetaQuery.data?.liveEvents.length ?? 0}
+        liveEventCount={liveMetaQuery.data?.liveEvents?.length ?? 0}
       />
     </StudioPage>
   );

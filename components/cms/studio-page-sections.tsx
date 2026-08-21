@@ -9,6 +9,7 @@ import { TicketPoolsPanel } from "@/components/cms/tickets/ticket-pools-panel";
 import { StudioListSkeleton } from "@/components/cms/studio-list-skeletons";
 import { useStudioGamesList, useStudioTemplates } from "@/lib/hooks/use-studio-games";
 import { useStudioTasksList } from "@/lib/hooks/use-studio-tasks";
+import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { queryKeys } from "@/lib/platform/query-keys";
 
 export function StudioGamesListSection() {
@@ -39,8 +40,9 @@ export function StudioTasksListSection() {
 }
 
 export function StudioTicketsSection() {
+  const { orgSlug } = useStudioShell();
   const poolsQuery = useQuery({
-    queryKey: queryKeys.tickets.list(),
+    queryKey: queryKeys.tickets.list(orgSlug),
     queryFn: async () => {
       const result = await listTicketPools();
       if (!result.success) throw new Error(result.error);

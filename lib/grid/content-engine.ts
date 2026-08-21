@@ -117,6 +117,7 @@ export function resolveEventContent(input: {
     missionDurationMinutes: contentConfig.mission_duration_minutes ?? 90,
     contentMode,
     allowedFallbacks,
+    routeOrder: profiles.route_order,
   };
 }
 

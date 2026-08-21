@@ -1,19 +1,21 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { queryKeys } from "@/lib/platform/query-keys";
 import type { StudioGame, StudioGameTaskLink, StudioTask, StudioTicketPool } from "@/lib/cms/types";
 
 export function useStudioCache() {
   const queryClient = useQueryClient();
+  const { orgSlug } = useStudioShell();
 
   return {
     setGame(game: StudioGame) {
       queryClient.setQueryData(queryKeys.games.detail(game.id), game);
-      queryClient.setQueryData<StudioGame[]>(queryKeys.games.list(), (old) =>
+      queryClient.setQueryData<StudioGame[]>(queryKeys.games.list(orgSlug), (old) =>
         old?.map((entry) => (entry.id === game.id ? game : entry)),
       );
-      queryClient.setQueryData<StudioGame[]>(queryKeys.games.templates(), (old) =>
+      queryClient.setQueryData<StudioGame[]>(queryKeys.games.templates(orgSlug), (old) =>
         old?.map((entry) => (entry.id === game.id ? game : entry)),
       );
     },
@@ -21,6 +23,12 @@ export function useStudioCache() {
     patchGame(gameId: string, patch: Partial<StudioGame>) {
       queryClient.setQueryData<StudioGame>(queryKeys.games.detail(gameId), (old) =>
         old ? { ...old, ...patch } : old,
+      );
+      queryClient.setQueryData<StudioGame[]>(queryKeys.games.list(orgSlug), (old) =>
+        old?.map((entry) => (entry.id === gameId ? { ...entry, ...patch } : entry)),
+      );
+      queryClient.setQueryData<StudioGame[]>(queryKeys.games.templates(orgSlug), (old) =>
+        old?.map((entry) => (entry.id === gameId ? { ...entry, ...patch } : entry)),
       );
     },
 
@@ -43,7 +51,7 @@ export function useStudioCache() {
 
     setTask(task: StudioTask) {
       queryClient.setQueryData(queryKeys.tasks.detail(task.id), task);
-      queryClient.setQueryData<StudioTask[]>(queryKeys.tasks.list(), (old) => {
+      queryClient.setQueryData<StudioTask[]>(queryKeys.tasks.list(orgSlug), (old) => {
         if (!old) return old;
         const index = old.findIndex((entry) => entry.id === task.id);
         if (index === -1) return [task, ...old];
@@ -58,22 +66,22 @@ export function useStudioCache() {
     },
 
     prependTicketPool(pool: StudioTicketPool) {
-      queryClient.setQueryData<StudioTicketPool[]>(queryKeys.tickets.list(), (old) =>
+      queryClient.setQueryData<StudioTicketPool[]>(queryKeys.tickets.list(orgSlug), (old) =>
         old ? [pool, ...old] : [pool],
       );
-      void queryClient.invalidateQueries({ queryKey: queryKeys.studio.dashboard() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.studio.dashboard(orgSlug) });
     },
 
     patchTicketPool(poolId: string, patch: Partial<StudioTicketPool>) {
-      queryClient.setQueryData<StudioTicketPool[]>(queryKeys.tickets.list(), (old) =>
+      queryClient.setQueryData<StudioTicketPool[]>(queryKeys.tickets.list(orgSlug), (old) =>
         old?.map((pool) => (pool.id === poolId ? { ...pool, ...patch } : pool)),
       );
-      void queryClient.invalidateQueries({ queryKey: queryKeys.studio.dashboard() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.studio.dashboard(orgSlug) });
     },
 
     invalidateTickets() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.tickets.all });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.studio.dashboard() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.studio.dashboard(orgSlug) });
     },
   };
 }

@@ -163,6 +163,11 @@ export type RuntimeProfiles = {
    * @deprecated Use allowed_fallbacks.includes("indoor"). Kept for older JSON.
    */
   indoor_one_click: boolean;
+  /**
+   * linear = nacheinander (Karte zeigt alle, aktives Ziel hervorgehoben).
+   * free = alle Aufgaben ab Start anlaufbar / lösbar.
+   */
+  route_order: "linear" | "free";
   profiles: Record<ContentMode, RuntimeModeProfile>;
 };
 
@@ -170,6 +175,7 @@ export const DEFAULT_RUNTIME_PROFILES: RuntimeProfiles = {
   default_mode: "outdoor",
   allowed_fallbacks: ["indoor", "online"],
   indoor_one_click: true,
+  route_order: "linear",
   profiles: {
     outdoor: {
       active_layers: [1, 2, 3],
@@ -308,6 +314,7 @@ export function parseRuntimeProfiles(raw: unknown): RuntimeProfiles {
     default_mode: defaultMode,
     allowed_fallbacks: parseAllowedFallbacks(obj.allowed_fallbacks, defaultMode, indoorOneClick),
     indoor_one_click: indoorOneClick,
+    route_order: obj.route_order === "free" ? "free" : "linear",
     profiles: { outdoor, indoor, online },
   };
 }
@@ -368,11 +375,11 @@ export function contentContextLabel(ctx: ContentContext): string {
 export function contentModeLabel(mode: ContentMode): string {
   switch (mode) {
     case "outdoor":
-      return "Outdoor (GPS)";
+      return "Outdoor";
     case "indoor":
-      return "Indoor (Stationen)";
+      return "Indoor";
     case "online":
-      return "Online (Tabbrain)";
+      return "Online";
   }
 }
 

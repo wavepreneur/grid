@@ -6,8 +6,9 @@ import { IconPlus } from "@/components/cms/studio-icons";
 export default function AdminTasksPage() {
   return (
     <StudioPage
+      eyebrow="GRID Studio · Schritt 1"
       title="Aufgaben"
-      description="Deine Rätsel-Bibliothek — unabhängig von Spielen. Suche, Tags und Live-Status."
+      description="Hier entsteht der Vorrat. Jede Aufgabe existiert genau einmal und ist neutral — ob sie später Umgebung, Level oder Bonus wird, entscheidest du erst im Spiel."
       actions={
         <StudioLinkButton href="/admin/tasks/new" icon={<IconPlus size={16} />}>
           Neue Aufgabe

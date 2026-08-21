@@ -5,11 +5,19 @@ import { useEffect, useState } from "react";
 import { searchTaskLibrary } from "@/app/actions/cms/tasks";
 import { queryKeys } from "@/lib/platform/query-keys";
 
-export function useTaskLibrarySearch(debouncedQuery: string) {
+export function useTaskLibrarySearch(
+  debouncedQuery: string,
+  options?: { quizOnly?: boolean },
+) {
+  const quizOnly = Boolean(options?.quizOnly);
   return useQuery({
-    queryKey: queryKeys.tasks.librarySearch(debouncedQuery),
+    queryKey: queryKeys.tasks.librarySearch(debouncedQuery, quizOnly),
     queryFn: async () => {
-      const result = await searchTaskLibrary({ query: debouncedQuery, limit: 40 });
+      const result = await searchTaskLibrary({
+        query: debouncedQuery,
+        limit: 40,
+        quizOnly,
+      });
       if (!result.success) throw new Error(result.error);
       return result.data!;
     },

@@ -1,7 +1,7 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
-import { IconClose } from "@/components/cms/studio-icons";
 
 type StudioModalProps = {
   open: boolean;
@@ -14,7 +14,7 @@ type StudioModalProps = {
   size?: "md" | "lg" | "xl";
 };
 
-const widths = { md: "max-w-md", lg: "max-w-lg", xl: "max-w-2xl" };
+const widths = { md: "sm:max-w-md", lg: "sm:max-w-xl", xl: "sm:max-w-3xl" };
 
 export function StudioModal({
   open,
@@ -43,33 +43,33 @@ export function StudioModal({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-end justify-center bg-slate-900/40 p-4 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[200] flex items-end justify-center bg-ink/60 p-0 backdrop-blur-sm sm:items-center sm:p-6"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
-        className={`flex max-h-[min(92vh,900px)] w-full ${widths[size]} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl`}
+        className={`animate-rise-in flex max-h-[92vh] w-full ${widths[size]} flex-col overflow-hidden rounded-t-3xl bg-card shadow-lift sm:rounded-3xl`}
         onClick={(e) => e.stopPropagation()}
       >
         {hero}
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 px-5 pt-5">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-            {subtitle ? <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p> : null}
+            <h2 className="truncate text-xl font-bold text-foreground">{title}</h2>
+            {subtitle ? <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p> : null}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+            className="tap-lift flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary text-foreground"
             aria-label="Schließen"
           >
-            <IconClose size={18} />
+            <X className="h-5 w-5" strokeWidth={2} />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
         {footer ? (
-          <div className="border-t border-slate-100 bg-slate-50/80 px-5 py-4 sm:px-6">{footer}</div>
+          <div className="border-t border-border bg-secondary/50 px-5 py-4">{footer}</div>
         ) : null}
       </div>
     </div>
@@ -84,9 +84,9 @@ export function StudioDetailRow({
   value: string;
 }) {
   return (
-    <div className="border-b border-slate-100 py-3 last:border-0">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-sm leading-6 text-slate-800">{value}</p>
+    <div className="border-b border-border py-3 last:border-0">
+      <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm leading-6 text-foreground">{value}</p>
     </div>
   );
 }

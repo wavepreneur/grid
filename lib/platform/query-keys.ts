@@ -5,30 +5,34 @@ export const queryKeys = {
   },
   studio: {
     all: ["grid", "studio"] as const,
-    dashboard: () => [...queryKeys.studio.all, "dashboard"] as const,
+    dashboard: (orgSlug?: string) =>
+      [...queryKeys.studio.all, "dashboard", orgSlug ?? ""] as const,
   },
   games: {
     all: ["grid", "studio", "games"] as const,
-    list: () => [...queryKeys.games.all, "list"] as const,
-    templates: () => [...queryKeys.games.all, "templates"] as const,
+    list: (orgSlug?: string) => [...queryKeys.games.all, "list", orgSlug ?? ""] as const,
+    templates: (orgSlug?: string) =>
+      [...queryKeys.games.all, "templates", orgSlug ?? ""] as const,
     liveMeta: (gameIds: string[]) =>
-      [...queryKeys.games.all, "live-meta", [...gameIds].sort().join(",")] as const,
+      [...queryKeys.games.all, "live-meta", "list", [...gameIds].sort().join(",")] as const,
     detail: (gameId: string) => [...queryKeys.games.all, "detail", gameId] as const,
     taskLinks: (gameId: string) => [...queryKeys.games.all, "task-links", gameId] as const,
-    liveMetaSingle: (gameId: string) => [...queryKeys.games.all, "live-meta", gameId] as const,
+    liveMetaSingle: (gameId: string) =>
+      [...queryKeys.games.all, "live-meta", "single", gameId] as const,
   },
   tasks: {
     all: ["grid", "studio", "tasks"] as const,
-    list: (filters?: Record<string, string | undefined>) =>
-      [...queryKeys.tasks.all, "list", filters ?? {}] as const,
+    list: (orgSlug?: string, filters?: Record<string, string | undefined>) =>
+      [...queryKeys.tasks.all, "list", orgSlug ?? "", filters ?? {}] as const,
     detail: (taskId: string) => [...queryKeys.tasks.all, "detail", taskId] as const,
     usageMeta: (taskIds: string[]) =>
       [...queryKeys.tasks.all, "usage-meta", [...taskIds].sort().join(",")] as const,
-    librarySearch: (query: string) => [...queryKeys.tasks.all, "library", query] as const,
+    librarySearch: (query: string, quizOnly = false) =>
+      [...queryKeys.tasks.all, "library", query, quizOnly] as const,
   },
   tickets: {
     all: ["grid", "studio", "tickets"] as const,
-    list: () => [...queryKeys.tickets.all, "list"] as const,
+    list: (orgSlug?: string) => [...queryKeys.tickets.all, "list", orgSlug ?? ""] as const,
   },
   cockpit: {
     all: ["grid", "cockpit"] as const,

@@ -53,6 +53,13 @@ export function validateLevelSolution(
     }
   }
 
+  if (payload.revealSolution) {
+    if (!level.scoring?.allow_reveal_solution) {
+      return { ok: false, error: "Lösung anzeigen ist für diese Aufgabe nicht erlaubt." };
+    }
+    return { ok: true };
+  }
+
   if (level.type === "gps") {
     if (context?.gpsEnabled === false) {
       return { ok: false, error: "GPS ist für dieses Event deaktiviert." };
@@ -80,13 +87,23 @@ export function validateLevelSolution(
   }
 
   if (level.type === "digital" || (level.type === "station" && level.answer)) {
+    if (level.input_mode === "confirm") {
+      return { ok: true };
+    }
     if (!payload.answer?.trim()) {
       return { ok: false, error: "Bitte eine Antwort eingeben." };
     }
     if (!level.answer) {
       return { ok: false, error: "Level ohne Lösung konfiguriert." };
     }
-    if (normalizeAnswer(payload.answer) !== normalizeAnswer(level.answer)) {
+    const isBoxes = level.input_mode === "boxes" || level.input_mode === "number";
+    const expected = isBoxes
+      ? level.answer.trim().toLowerCase().replace(/[^a-z0-9]/g, "")
+      : normalizeAnswer(level.answer);
+    const given = isBoxes
+      ? payload.answer.trim().toLowerCase().replace(/[^a-z0-9]/g, "")
+      : normalizeAnswer(payload.answer);
+    if (given !== expected) {
       return { ok: false, error: "Falsche Antwort. Versucht es erneut." };
     }
     return { ok: true };

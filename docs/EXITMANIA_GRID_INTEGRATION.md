@@ -50,6 +50,7 @@ Exitmania games.* (Katalog)                ← Marketing, PDF-URLs, grid_pack_sl
 | `loquiz://` QR | `/e/{invite}/team/{join}` |
 | Webhook `/api/webhooks/loquiz` | `GET /api/v1/events/{inviteCode}/status` + später Outbound-Webhook |
 | Loquiz Results API | `teams.game_state`, Cockpit-API |
+| Scope / Bulk-Tickets / Expiry | siehe **[`ACCESS_SCOPE_AND_PARTNER_API.md`](./ACCESS_SCOPE_AND_PARTNER_API.md)** (Design) |
 
 ## API-Vertrag (Phase 0 — live in GRID)
 

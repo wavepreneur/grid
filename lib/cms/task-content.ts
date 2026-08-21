@@ -3,6 +3,7 @@ import {
   type StudioTaskContent,
   type TaskAnswerType,
   type TaskContentTile,
+  type TaskNumberFieldCount,
   type TaskScoring,
   type TaskTileMediaType,
 } from "@/lib/cms/types";
@@ -30,6 +31,7 @@ export function defaultTaskScoring(): TaskScoring {
     countdown_seconds: null,
     decay_enabled: false,
     decay_floor: 0,
+    allow_reveal_solution: false,
   };
 }
 
@@ -150,9 +152,82 @@ function attachLegacyHintsToTiles(
 }
 
 function migrateAnswerType(raw: unknown): TaskAnswerType {
-  if (raw === "choice" || raw === "multi_choice" || raw === "text") return raw;
+  // Legacy "number" → freitext + code_boxes (handled in normalize).
   if (raw === "number") return "text";
+  if (raw === "choice" || raw === "multi_choice" || raw === "text" || raw === "confirm") {
+    return raw;
+  }
   return "text";
+}
+
+function migrateNumberFields(raw: unknown): TaskNumberFieldCount | undefined {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (n === 1 || n === 2 || n === 3 || n === 4) return n;
+  return undefined;
+}
+
+/** Alphanumeric chars for code boxes (max 4). */
+export function codeBoxChars(answer: string | undefined): string {
+  return (answer ?? "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 4);
+}
+
+/**
+ * From typed code (e.g. "A3b4" / "0364") → stored answer + field count.
+ * Empty → 1 empty box in the player UI.
+ */
+export function charsToCodeBoxAnswer(raw: string): {
+  answer: string;
+  number_fields: TaskNumberFieldCount;
+} {
+  const chars = codeBoxChars(raw);
+  const number_fields = (chars.length === 0
+    ? 1
+    : Math.min(4, chars.length)) as TaskNumberFieldCount;
+  return {
+    answer: chars,
+    number_fields,
+  };
+}
+
+/** @deprecated Use codeBoxChars / charsToCodeBoxAnswer */
+export function numberAnswerToDigits(answer: string | undefined): string {
+  return codeBoxChars(answer).replace(/[^0-9]/g, "");
+}
+
+/** @deprecated Use charsToCodeBoxAnswer */
+export function digitsToNumberAnswer(raw: string): {
+  answer: string;
+  number_fields: TaskNumberFieldCount;
+} {
+  return charsToCodeBoxAnswer(raw.replace(/[^0-9]/g, ""));
+}
+
+export function joinNumberAnswerParts(parts: string[]): string {
+  return parts.map((p) => p.trim()).join("");
+}
+
+export function splitNumberAnswerParts(
+  answer: string | undefined,
+  fieldCount: number,
+): string[] {
+  const count = Math.min(4, Math.max(1, fieldCount));
+  const chars = codeBoxChars(answer);
+  if (chars.length > 0) {
+    return Array.from({ length: count }, (_, i) => chars[i] ?? "");
+  }
+  const parts = (answer ?? "").trim() === "" ? [] : (answer ?? "").trim().split(/\s+/);
+  return Array.from({ length: count }, (_, i) => parts[i] ?? "");
+}
+
+function deriveCodeBoxFields(
+  answer: string | undefined,
+  fallback: unknown,
+): TaskNumberFieldCount {
+  const chars = codeBoxChars(answer);
+  if (chars.length >= 1 && chars.length <= 4) {
+    return chars.length as TaskNumberFieldCount;
+  }
+  return migrateNumberFields(fallback) ?? 1;
 }
 
 /** Normalize persisted JSON + migrate legacy tile/open_media shape. */
@@ -185,6 +260,7 @@ export function normalizeTaskContent(raw: unknown): StudioTaskContent {
       typeof scoringRaw?.decay_floor === "number"
         ? Math.max(0, scoringRaw.decay_floor)
         : defaultTaskScoring().decay_floor,
+    allow_reveal_solution: Boolean(scoringRaw?.allow_reveal_solution),
   };
 
   const options = Array.isArray(source.options)
@@ -205,17 +281,37 @@ export function normalizeTaskContent(raw: unknown): StudioTaskContent {
   const legacyHints = parseLegacyTaskHints(source);
   const tiles = attachLegacyHintsToTiles(migrateLegacyTiles(source), legacyHints);
 
+  const answer_type = migrateAnswerType(source.answer_type);
+  const legacyNumberType = source.answer_type === "number";
+  const code_boxes = Boolean(source.code_boxes) || legacyNumberType;
+  const rawAnswer = typeof source.answer === "string" ? source.answer : undefined;
+  const boxed = code_boxes && answer_type === "text" ? charsToCodeBoxAnswer(rawAnswer ?? "") : null;
+
   return {
     hero_image_url:
       (typeof source.hero_image_url === "string" ? source.hero_image_url.trim() : "") ||
       heroFromLegacy ||
       undefined,
     question: typeof source.question === "string" ? source.question : undefined,
-    answer: typeof source.answer === "string" ? source.answer : undefined,
-    answer_type: migrateAnswerType(source.answer_type),
+    answer: boxed ? boxed.answer || undefined : rawAnswer,
+    answer_type,
+    code_boxes: answer_type === "text" ? code_boxes : undefined,
+    number_fields: boxed
+      ? boxed.number_fields
+      : code_boxes
+        ? deriveCodeBoxFields(rawAnswer, source.number_fields)
+        : undefined,
     options,
     tiles,
     scoring,
+    success_title:
+      typeof source.success_title === "string" && source.success_title.trim()
+        ? source.success_title.trim()
+        : undefined,
+    success_info:
+      typeof source.success_info === "string" && source.success_info.trim()
+        ? source.success_info.trim()
+        : undefined,
   };
 }
 
