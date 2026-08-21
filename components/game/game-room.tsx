@@ -210,8 +210,12 @@ export function GameRoom({
   }
 
   function applyTeamResult(result: { success: boolean; data?: TeamRealtimeState; error?: string }) {
-    if (!result.success || !result.data) {
+    if (!result.success) {
       setError(result.error ?? "Aktion fehlgeschlagen.");
+      return;
+    }
+    if (!result.data) {
+      setError("Aktion fehlgeschlagen.");
       return;
     }
     setTeamState(result.data);
@@ -228,8 +232,12 @@ export function GameRoom({
         geolocation,
         targetLevel,
       });
-      if (!result.success || !result.data) {
+      if (!result.success) {
         setError(result.error ?? "Aktion fehlgeschlagen.");
+        return;
+      }
+      if (!result.data) {
+        setError("Aktion fehlgeschlagen.");
         return;
       }
       const levelKey = targetLevel ?? activeLevel;
