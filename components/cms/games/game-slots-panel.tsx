@@ -10,6 +10,7 @@ import {
 } from "@/app/actions/cms/games";
 import { StudioPanel } from "@/components/cms/admin-shell";
 import { StudioModal } from "@/components/cms/shared/studio-modal";
+import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
 import {
   IconArrowRight,
   IconPlus,
@@ -121,6 +122,7 @@ export function GameSlotsPanel({
   initialLinks,
 }: Props) {
   const cache = useStudioCache();
+  const { confirm } = useStudioConfirm();
   const [links, setLinks] = useState(() => initialLinks);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -405,15 +407,24 @@ export function GameSlotsPanel({
   }
 
   function handleRemoveStop(slot: GameSlot) {
-    if (!confirm(`Stop „${slot.levelLink.task.title}“ entfernen?`)) return;
-    startTransition(async () => {
-      const result = await removeTaskFromGame(slot.levelLink.id, gameId);
-      if (!result.success) {
-        setError(result.error);
-        return;
-      }
-      commit(links.filter((l) => l.id !== slot.levelLink.id));
-    });
+    void (async () => {
+      const ok = await confirm({
+        title: "Stop entfernen?",
+        description: `„${slot.levelLink.task.title}“ wird aus diesem Spiel entfernt.`,
+        confirmLabel: "Entfernen",
+        cancelLabel: "Abbrechen",
+        tone: "danger",
+      });
+      if (!ok) return;
+      startTransition(async () => {
+        const result = await removeTaskFromGame(slot.levelLink.id, gameId);
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
+        commit(links.filter((l) => l.id !== slot.levelLink.id));
+      });
+    })();
   }
 
   function moveStop(slot: GameSlot, dir: -1 | 1) {

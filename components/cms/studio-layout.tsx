@@ -1,7 +1,7 @@
 "use client";
 
 import Link, { useLinkStatus } from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ComponentType, type MouseEvent, type ReactNode } from "react";
 import type { LucideProps } from "lucide-react";
@@ -17,6 +17,7 @@ import {
   Ticket,
 } from "lucide-react";
 import { OrgSwitcher } from "@/components/cms/org-switcher";
+import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { listGames, listTemplates } from "@/app/actions/cms/games";
 import { listTasks } from "@/app/actions/cms/tasks";
@@ -164,18 +165,25 @@ function StudioNavLink({
   pathname: string;
 }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const { confirm } = useStudioConfirm();
   const Icon = item.icon;
 
   const leavingEditor =
     (item.href === "/admin/tasks" && pathname.startsWith("/admin/tasks/")) ||
     (item.href === "/admin/games" && pathname.startsWith("/admin/games/"));
 
-  function guardLeave(event: MouseEvent<HTMLAnchorElement>) {
+  async function guardLeave(event: MouseEvent<HTMLAnchorElement>) {
     if (!leavingEditor) return;
-    const ok = window.confirm(
-      "Editor verlassen und zur Liste? Ungespeicherte Änderungen gehen verloren.",
-    );
-    if (!ok) event.preventDefault();
+    event.preventDefault();
+    const ok = await confirm({
+      title: "Editor verlassen?",
+      description: "Ungespeicherte Änderungen gehen verloren.",
+      confirmLabel: "Zur Liste",
+      cancelLabel: "Weiter bearbeiten",
+      tone: "danger",
+    });
+    if (ok) router.push(item.href);
   }
 
   if (compact) {
@@ -183,7 +191,7 @@ function StudioNavLink({
       <Link
         href={item.href}
         prefetch
-        onClick={guardLeave}
+        onClick={(event) => void guardLeave(event)}
         onMouseEnter={() => prefetchForHref(queryClient, item.href, orgSlug)}
         onFocus={() => prefetchForHref(queryClient, item.href, orgSlug)}
         className={`tap-lift shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold ${
@@ -203,7 +211,7 @@ function StudioNavLink({
         href={item.href}
         prefetch
         title={`${item.label} — ${item.note}`}
-        onClick={guardLeave}
+        onClick={(event) => void guardLeave(event)}
         onMouseEnter={() => prefetchForHref(queryClient, item.href, orgSlug)}
         onFocus={() => prefetchForHref(queryClient, item.href, orgSlug)}
         className={`tap-lift flex h-11 w-11 items-center justify-center rounded-2xl ${
@@ -222,7 +230,7 @@ function StudioNavLink({
     <Link
       href={item.href}
       prefetch
-      onClick={guardLeave}
+      onClick={(event) => void guardLeave(event)}
       onMouseEnter={() => prefetchForHref(queryClient, item.href, orgSlug)}
       onFocus={() => prefetchForHref(queryClient, item.href, orgSlug)}
       className={`tap-lift flex items-center gap-3 rounded-2xl px-3 py-3 ${

@@ -18,6 +18,7 @@ import { GameDeleteButton } from "@/components/cms/games/game-delete-button";
 import { GameDuplicateButton } from "@/components/cms/games/game-duplicate-button";
 import { GameStatusSwitch } from "@/components/cms/games/game-status-switch";
 import { ImageUploadField } from "@/components/cms/shared/image-upload-field";
+import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
 import { useStudioCache } from "@/lib/platform/studio-cache";
 import {
   IconDevices,
@@ -81,6 +82,7 @@ export function GameEditorPanel({
 }: Props) {
   const router = useRouter();
   const cache = useStudioCache();
+  const { confirm } = useStudioConfirm();
   const [game, setGame] = useState<GameEditorState>(() => toEditorState(initialGame));
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -193,18 +195,27 @@ export function GameEditorPanel({
   }
 
   function handleStartLiveEvent() {
-    if (!window.confirm("Live-Event aus der veröffentlichten Version erstellen?")) return;
-    setError(null);
-    setLiveLink(null);
-    startTransition(async () => {
-      const result = await createLiveEventFromGame(game.id);
-      if (!result.success) {
-        setError(result.error);
-        return;
-      }
-      setLiveLink(result.data!.joinPath);
-      setMessage(`Live-Event erstellt — Code ${result.data!.inviteCode}.`);
-    });
+    void (async () => {
+      const ok = await confirm({
+        title: "Live-Event starten?",
+        description:
+          "Es wird ein Event aus der veröffentlichten Version erstellt. Teams können danach beitreten.",
+        confirmLabel: "Event erstellen",
+        cancelLabel: "Abbrechen",
+      });
+      if (!ok) return;
+      setError(null);
+      setLiveLink(null);
+      startTransition(async () => {
+        const result = await createLiveEventFromGame(game.id);
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
+        setLiveLink(result.data!.joinPath);
+        setMessage(`Live-Event erstellt — Code ${result.data!.inviteCode}.`);
+      });
+    })();
   }
 
   return (

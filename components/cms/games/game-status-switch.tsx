@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { publishGame, revertGameToDraft } from "@/app/actions/cms/games";
+import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
 import { IconInfo } from "@/components/cms/studio-icons";
 import { useStudioCache } from "@/lib/platform/studio-cache";
 import type { StudioGameStatus } from "@/lib/cms/types";
@@ -27,6 +28,7 @@ export function GameStatusSwitch({
   onStatusChange,
 }: Props) {
   const cache = useStudioCache();
+  const { alert } = useStudioConfirm();
   const [pending, startTransition] = useTransition();
 
   const isPublished = status === "published";
@@ -49,7 +51,7 @@ export function GameStatusSwitch({
     startTransition(async () => {
       const result = await revertGameToDraft(gameId);
       if (!result.success) {
-        window.alert(result.error);
+        await alert({ title: "Status konnte nicht geändert werden", description: result.error });
         return;
       }
       onStatusChange?.("draft");
@@ -62,7 +64,7 @@ export function GameStatusSwitch({
     startTransition(async () => {
       const result = await publishGame(gameId);
       if (!result.success) {
-        window.alert(result.error);
+        await alert({ title: "Veröffentlichen fehlgeschlagen", description: result.error });
         return;
       }
       onStatusChange?.("published", {

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
+import { StudioConfirmProvider } from "@/components/cms/shared/studio-confirm";
 import type { StudioOrganization } from "@/lib/cms/types";
 
 type StudioShellContextValue = {
@@ -17,7 +18,7 @@ export function StudioShellProvider({
 }: StudioShellContextValue & { children: ReactNode }) {
   return (
     <StudioShellContext.Provider value={{ organizations, orgSlug }}>
-      {children}
+      <StudioConfirmProvider>{children}</StudioConfirmProvider>
     </StudioShellContext.Provider>
   );
 }

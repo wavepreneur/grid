@@ -15,6 +15,7 @@ import { ROLE_ASSIGNMENTS, roleAssignmentLabel, type RoleAssignment } from "@/li
 import type { GpsPin } from "@/lib/cms/gps-defaults";
 import { GpsWaypointPicker } from "@/components/cms/gps/gps-waypoint-picker";
 import { StudioModal } from "@/components/cms/shared/studio-modal";
+import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
 import { TaskTilePreview } from "@/components/cms/tasks/task-tile-preview";
 import { IconEdit, IconMapPin, IconSave, IconTrash } from "@/components/cms/studio-icons";
 import {
@@ -65,6 +66,7 @@ export function TaskLinkModal({
   onRemove,
 }: Props) {
   const cache = useStudioCache();
+  const { confirm } = useStudioConfirm();
   const [gpsDraft, setGpsDraft] = useState<GpsPin | null>(null);
   const [role, setRole] = useState<RoleAssignment>("team");
   const [triggerType, setTriggerType] = useState<BonusTriggerType>("game_start");
@@ -179,7 +181,16 @@ export function TaskLinkModal({
             disabled={pending || saving}
             icon={<IconTrash size={14} />}
             onClick={() => {
-              if (window.confirm("Aufgabe aus dem Spiel entfernen?")) onRemove();
+              void (async () => {
+                const ok = await confirm({
+                  title: "Aufgabe entfernen?",
+                  description: "Die Aufgabe wird aus diesem Spiel entfernt.",
+                  confirmLabel: "Entfernen",
+                  cancelLabel: "Abbrechen",
+                  tone: "danger",
+                });
+                if (ok) onRemove();
+              })();
             }}
           >
             Entfernen

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Building2 } from "lucide-react";
 import { setStudioOrganization } from "@/app/actions/cms/organizations";
+import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
 import { inputCls } from "@/components/cms/ui";
 import { queryKeys } from "@/lib/platform/query-keys";
 import type { StudioOrganization } from "@/lib/cms/types";
@@ -25,7 +26,25 @@ export function OrgSwitcher({ organizations, currentSlug }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
+  const { confirm } = useStudioConfirm();
   const [pending, startTransition] = useTransition();
+
+  function switchTo(slug: string, listPath: string | null) {
+    startTransition(async () => {
+      const result = await setStudioOrganization(slug);
+      if (!result.success) {
+        console.error(result.error);
+        return;
+      }
+      await queryClient.cancelQueries({ queryKey: queryKeys.studio.all });
+      queryClient.removeQueries({ queryKey: queryKeys.studio.all });
+
+      if (listPath) {
+        router.replace(listPath);
+      }
+      router.refresh();
+    });
+  }
 
   return (
     <label className="block">
@@ -46,30 +65,25 @@ export function OrgSwitcher({ organizations, currentSlug }: Props) {
           if (slug === currentSlug) return;
 
           const listPath = listPathAfterOrgSwitch(pathname);
-          if (listPath) {
-            const ok = window.confirm(
-              "Projekt wechseln und Editor verlassen? Ungespeicherte Änderungen gehen verloren.",
-            );
-            if (!ok) {
-              event.target.value = currentSlug;
-              return;
-            }
+          if (!listPath) {
+            switchTo(slug, null);
+            return;
           }
 
-          startTransition(async () => {
-            const result = await setStudioOrganization(slug);
-            if (!result.success) {
-              console.error(result.error);
-              return;
-            }
-            await queryClient.cancelQueries({ queryKey: queryKeys.studio.all });
-            queryClient.removeQueries({ queryKey: queryKeys.studio.all });
-
-            if (listPath) {
-              router.replace(listPath);
-            }
-            router.refresh();
-          });
+          // Reset select immediately; navigate only after Studio confirm.
+          event.target.value = currentSlug;
+          void (async () => {
+            const ok = await confirm({
+              title: "Projekt wechseln?",
+              description:
+                "Du verlässt den Editor. Ungespeicherte Änderungen gehen verloren.",
+              confirmLabel: "Projekt wechseln",
+              cancelLabel: "Abbrechen",
+              tone: "danger",
+            });
+            if (!ok) return;
+            switchTo(slug, listPath);
+          })();
         }}
       >
         {organizations.map((org) => (

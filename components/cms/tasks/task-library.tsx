@@ -36,6 +36,7 @@ import {
   type TaskWithUsage,
 } from "@/lib/hooks/use-studio-tasks";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
+import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
 import { queryKeys } from "@/lib/platform/query-keys";
 import { prefetchStudioTask } from "@/lib/hooks/use-studio-task-detail";
 import type { StudioTask } from "@/lib/cms/types";
@@ -85,6 +86,7 @@ export function TaskLibrary({ initialTasks }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { orgSlug } = useStudioShell();
+  const { alert } = useStudioConfirm();
   const refreshTasks = useRefreshStudioTasksList();
   const { data: rawTasks = initialTasks } = useStudioTasksList(initialTasks);
   const taskIds = useMemo(() => rawTasks.map((t) => t.id), [rawTasks]);
@@ -179,7 +181,10 @@ export function TaskLibrary({ initialTasks }: Props) {
       const result = await getTasksDeleteStatus(ids);
       if (!result.success) {
         setError(result.error);
-        window.alert(result.error || "Löschstatus konnte nicht geladen werden.");
+        await alert({
+          title: "Löschen nicht möglich",
+          description: result.error || "Löschstatus konnte nicht geladen werden.",
+        });
         return;
       }
       setDeleteStatuses(result.data!);
@@ -187,7 +192,7 @@ export function TaskLibrary({ initialTasks }: Props) {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Löschstatus konnte nicht geladen werden.";
       setError(message);
-      window.alert(message);
+      await alert({ title: "Löschen nicht möglich", description: message });
     }
   }
 
