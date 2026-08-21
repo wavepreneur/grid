@@ -334,19 +334,33 @@ export function GameRoom({
       displayName={playerSession.displayName}
     />
   ) : isFinished ? (
-    <div className="space-y-4 px-5 py-8">
-      <p className="text-2xl font-bold text-[var(--cg-fg)]">Mission abgeschlossen!</p>
-      <p className="text-base text-[var(--cg-muted)]">
-        {teamName} · {eventContent.levels.length} Aufgaben ·{" "}
-        <span className="font-semibold text-[var(--cg-fg)]">
-          {teamState.gameState.score ?? 0} Punkte
-        </span>
-      </p>
+    <div className="space-y-6 px-5 py-10">
+      <div className="space-y-2 text-center">
+        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--cg-muted)]">
+          Game Over
+        </p>
+        <p className="text-3xl font-bold text-[var(--cg-fg)]">Mission abgeschlossen!</p>
+        <p className="text-base text-[var(--cg-muted)]">
+          {teamName} · {eventContent.levels.length} Aufgaben
+        </p>
+      </div>
+      <div className="rounded-3xl border-2 border-[var(--cg-border)] bg-[var(--cg-card)] px-5 py-6 text-center shadow-[var(--cg-shadow-lift)]">
+        <p className="text-sm font-semibold uppercase tracking-wide text-[var(--cg-muted)]">
+          Eure Punkte
+        </p>
+        <p className="mt-2 text-5xl font-extrabold tabular-nums text-[var(--cg-fg)]">
+          {teamState.gameState.score ?? 0}
+        </p>
+      </div>
       {eventContent.showLiveScore ? (
-        <Link href={cockpitShowPath(inviteCode)}>
-          <BigButton variant="accent">Live-Ranking ansehen</BigButton>
+        <Link href={cockpitShowPath(inviteCode)} className="block">
+          <BigButton variant="accent">Ranking ansehen</BigButton>
         </Link>
-      ) : null}
+      ) : (
+        <p className="text-center text-sm text-[var(--cg-muted)]">
+          Live-Ranking ist für dieses Event ausgeschaltet.
+        </p>
+      )}
     </div>
   ) : currentLevelDefinition ? (
     phased && usesMissionShell(eventContent) ? (

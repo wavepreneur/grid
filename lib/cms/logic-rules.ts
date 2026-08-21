@@ -654,22 +654,36 @@ export function compileGameLogic(input: {
   const rules = mergedRules.filter((r) => r.enabled);
   const levels = compileStudioGameToLevels({ ...input, links: orderedLinks, rules });
 
+  const slots = buildGameSlots(input.links);
   const task_id_by_level: Record<number, string> = {};
   const level_by_task_id: Record<string, number> = {};
-  orderedLinks.forEach((link, index) => {
-    const levelNumber = index + 1;
-    task_id_by_level[levelNumber] = link.task_id;
-    level_by_task_id[link.task_id] = levelNumber;
-  });
+  if (slots.length > 0) {
+    for (const slot of slots) {
+      task_id_by_level[slot.index] = slot.levelLink.task_id;
+      level_by_task_id[slot.levelLink.task_id] = slot.index;
+    }
+  } else {
+    orderedLinks.forEach((link, index) => {
+      const levelNumber = index + 1;
+      task_id_by_level[levelNumber] = link.task_id;
+      level_by_task_id[link.task_id] = levelNumber;
+    });
+  }
+
+  const endFromRules = rules
+    .filter((r) => r.then.type === "end_game" && r.when.source_task_id)
+    .map((r) => r.when.source_task_id!);
+  const endFromLinks = (slots.length > 0 ? slots.map((s) => s.levelLink) : orderedLinks)
+    .filter((link) => Boolean(parseLinkOverrides(link.overrides).ends_game))
+    .map((link) => link.task_id);
+  const end_game_on_task_ids = Array.from(new Set([...endFromRules, ...endFromLinks]));
 
   return {
     rules,
     levels,
     task_id_by_level,
     level_by_task_id,
-    end_game_on_task_ids: rules
-      .filter((r) => r.then.type === "end_game" && r.when.source_task_id)
-      .map((r) => r.when.source_task_id!),
+    end_game_on_task_ids,
     hide_on_any_solve_task_ids: rules
       .filter(
         (r) =>

@@ -134,6 +134,7 @@ export function GameSlotsPanel({
   const [bonusTaskId, setBonusTaskId] = useState("");
   const [bonusRole, setBonusRole] = useState<RoleAssignment>("gamma");
   const [visibleTo, setVisibleTo] = useState<RoleAssignment>("team");
+  const [endsGame, setEndsGame] = useState(false);
   const [outdoorActivation, setOutdoorActivation] = useState<OutdoorActivation>("gps");
   const [gpsDraft, setGpsDraft] = useState<GpsPin>({
     lat: 52.52,
@@ -231,6 +232,7 @@ export function GameSlotsPanel({
         ? overrides.visible_to
         : "team",
     );
+    setEndsGame(Boolean(overrides.ends_game));
     const existingGps = parseGpsOverride(overrides.location ?? overrides.gps);
     if (unlock.type === "after_task_delay" && unlock.meters && unlock.meters > 0) {
       setOutdoorActivation("after_meters");
@@ -351,6 +353,7 @@ export function GameSlotsPanel({
         bonus_task_id: bonusTaskId || null,
         unlock,
         visible_to: visibleTo,
+        ends_game: endsGame,
         ...(surface === "outdoor" ? { location } : {}),
       });
       if (!result.success) {
@@ -358,7 +361,15 @@ export function GameSlotsPanel({
         return;
       }
 
-      let nextLinks = links.map((l) => (l.id === result.data!.id ? result.data! : l));
+      let nextLinks = links.map((l) => {
+        if (l.id === result.data!.id) return result.data!;
+        if (!endsGame) return l;
+        const o = parseLinkOverrides(l.overrides);
+        if (!o.ends_game) return l;
+        const { ends_game: _removed, ...rest } = o;
+        void _removed;
+        return { ...l, overrides: rest };
+      });
 
       if (bonusTaskId) {
         let bonusLink = nextLinks.find(
@@ -496,6 +507,7 @@ export function GameSlotsPanel({
                       {routeOrder === "free" ? "Frei" : "Linear"}
                       {" · "}
                       {visible === "team" ? "Alle" : roleLabelShort(visible)}
+                      {overrides.ends_game ? " · Abschluss" : ""}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -931,6 +943,25 @@ export function GameSlotsPanel({
                 ))}
               </StudioSelect>
             </div>
+
+            <section className="space-y-2 rounded-3xl bg-secondary/60 p-4">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 rounded border-border"
+                  checked={endsGame}
+                  onChange={(e) => setEndsGame(e.target.checked)}
+                />
+                <span>
+                  <span className="block text-base font-bold">Abschlussaufgabe</span>
+                  <span className="mt-0.5 block text-sm text-muted-foreground">
+                    Nach dem Lösen endet das Spiel — Punkte, Ranking und Game Over. Weitere Stops
+                    danach werden übersprungen. Ideal für die Verabschiedung; Outdoor am besten mit
+                    „Sofort nach vorheriger Aufgabe“.
+                  </span>
+                </span>
+              </label>
+            </section>
 
             <div className="space-y-3">
               <div>

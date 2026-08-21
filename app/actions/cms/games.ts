@@ -481,6 +481,7 @@ export async function updateGameTaskLinkConfig(
     unlock?: GameLinkOverrides["unlock"] | null;
     visible_to?: GameLinkOverrides["visible_to"] | null;
     station?: GameLinkOverrides["station"] | null;
+    ends_game?: boolean | null;
   },
 ): Promise<ActionResult<StudioGameTaskLink>> {
   try {
@@ -615,6 +616,10 @@ export async function updateGameTaskLinkConfig(
       if (patch.station) overrides.station = patch.station;
       else delete overrides.station;
     }
+    if (patch.ends_game !== undefined) {
+      if (patch.ends_game) overrides.ends_game = true;
+      else delete overrides.ends_game;
+    }
 
     const { error: updateError } = await supabase
       .from("studio_game_tasks")
@@ -623,6 +628,33 @@ export async function updateGameTaskLinkConfig(
       .eq("game_id", gameId);
 
     if (updateError) throw new Error(updateError.message);
+
+    // Only one farewell stop per game — clear the flag on sibling mission links.
+    if (patch.ends_game) {
+      const { data: siblings, error: siblingsError } = await supabase
+        .from("studio_game_tasks")
+        .select("id, overrides")
+        .eq("game_id", gameId)
+        .neq("id", linkId);
+
+      if (siblingsError) throw new Error(siblingsError.message);
+
+      await Promise.all(
+        (siblings ?? []).map(async (row) => {
+          const siblingOverrides = {
+            ...(((row as { overrides: GameLinkOverrides }).overrides ??
+              {}) as GameLinkOverrides),
+          };
+          if (!siblingOverrides.ends_game) return;
+          delete siblingOverrides.ends_game;
+          await supabase
+            .from("studio_game_tasks")
+            .update({ overrides: siblingOverrides })
+            .eq("id", row.id)
+            .eq("game_id", gameId);
+        }),
+      );
+    }
 
     const tasksResult = await listGameTasks(gameId);
     if (!tasksResult.success) {

@@ -69,6 +69,11 @@ export type GameLinkOverrides = {
   geo_task_id?: string;
   /** Optional Layer-3 bonus task for this mission slot. */
   bonus_task_id?: string;
+  /**
+   * When true, solving this mission ends the game (farewell / Game Over → ranking).
+   * Only one mission per game should set this; later stops are skipped.
+   */
+  ends_game?: boolean;
   /** Indoor station fields when authored on the mission/geo link. */
   station?: {
     name?: string;
