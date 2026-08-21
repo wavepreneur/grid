@@ -106,14 +106,27 @@ export function TaskEditor({ task, returnTo }: Props) {
         return;
       }
       cache.setTask(result.data!);
-      router.push(returnTo ?? `/admin/tasks/${result.data!.id}`);
+      // Stay on the editor after save — remounting the same route wipes local form feel.
+      // Only navigate when creating a brand-new task (no id yet).
+      if (!task?.id) {
+        router.push(returnTo ?? `/admin/tasks/${result.data!.id}`);
+      }
     });
   }
 
   const scoring = content.scoring ?? defaultTaskScoring();
 
   return (
-    <form onSubmit={handleSubmit} className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
+    <form
+      onSubmit={handleSubmit}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter") return;
+        const target = event.target as HTMLElement;
+        if (target.tagName === "TEXTAREA") return;
+        if (target.tagName === "INPUT") event.preventDefault();
+      }}
+      className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,320px)]"
+    >
       <div className="min-w-0 space-y-6">
         {error ? <StudioError message={error} /> : null}
 

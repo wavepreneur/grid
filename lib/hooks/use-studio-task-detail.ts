@@ -14,6 +14,7 @@ export function useStudioTask(taskId: string) {
       return result.data;
     },
     enabled: Boolean(taskId),
+    placeholderData: (previous) => previous,
   });
 }
 

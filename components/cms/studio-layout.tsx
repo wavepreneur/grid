@@ -3,7 +3,7 @@
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useState, type ComponentType, type MouseEvent, type ReactNode } from "react";
 import type { LucideProps } from "lucide-react";
 import {
   Activity,
@@ -154,21 +154,36 @@ function StudioNavLink({
   compact,
   collapsed,
   orgSlug,
+  pathname,
 }: {
   item: NavItem;
   active: boolean;
   compact?: boolean;
   collapsed?: boolean;
   orgSlug: string;
+  pathname: string;
 }) {
   const queryClient = useQueryClient();
   const Icon = item.icon;
+
+  const leavingEditor =
+    (item.href === "/admin/tasks" && pathname.startsWith("/admin/tasks/")) ||
+    (item.href === "/admin/games" && pathname.startsWith("/admin/games/"));
+
+  function guardLeave(event: MouseEvent<HTMLAnchorElement>) {
+    if (!leavingEditor) return;
+    const ok = window.confirm(
+      "Editor verlassen und zur Liste? Ungespeicherte Änderungen gehen verloren.",
+    );
+    if (!ok) event.preventDefault();
+  }
 
   if (compact) {
     return (
       <Link
         href={item.href}
         prefetch
+        onClick={guardLeave}
         onMouseEnter={() => prefetchForHref(queryClient, item.href, orgSlug)}
         onFocus={() => prefetchForHref(queryClient, item.href, orgSlug)}
         className={`tap-lift shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold ${
@@ -188,6 +203,7 @@ function StudioNavLink({
         href={item.href}
         prefetch
         title={`${item.label} — ${item.note}`}
+        onClick={guardLeave}
         onMouseEnter={() => prefetchForHref(queryClient, item.href, orgSlug)}
         onFocus={() => prefetchForHref(queryClient, item.href, orgSlug)}
         className={`tap-lift flex h-11 w-11 items-center justify-center rounded-2xl ${
@@ -206,6 +222,7 @@ function StudioNavLink({
     <Link
       href={item.href}
       prefetch
+      onClick={guardLeave}
       onMouseEnter={() => prefetchForHref(queryClient, item.href, orgSlug)}
       onFocus={() => prefetchForHref(queryClient, item.href, orgSlug)}
       className={`tap-lift flex items-center gap-3 rounded-2xl px-3 py-3 ${
@@ -282,6 +299,7 @@ export function StudioLayout({ children }: { children: ReactNode }) {
               active={item.match(pathname)}
               compact
               orgSlug={orgSlug}
+              pathname={pathname}
             />
           ))}
         </div>
@@ -354,6 +372,7 @@ export function StudioLayout({ children }: { children: ReactNode }) {
                     active={item.match(pathname)}
                     collapsed={hydrated && collapsed}
                     orgSlug={orgSlug}
+                    pathname={pathname}
                   />
                 </div>
               ))}

@@ -12,6 +12,9 @@ type StudioModalProps = {
   children: ReactNode;
   footer?: ReactNode;
   size?: "md" | "lg" | "xl";
+  /** Default false — accidental outside clicks must not discard editor dialogs. */
+  closeOnBackdrop?: boolean;
+  closeOnEscape?: boolean;
 };
 
 const widths = { md: "sm:max-w-md", lg: "sm:max-w-xl", xl: "sm:max-w-3xl" };
@@ -25,11 +28,13 @@ export function StudioModal({
   children,
   footer,
   size = "lg",
+  closeOnBackdrop = false,
+  closeOnEscape = true,
 }: StudioModalProps) {
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (closeOnEscape && e.key === "Escape") onClose();
     }
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
@@ -37,14 +42,14 @@ export function StudioModal({
       document.body.style.overflow = "";
       window.removeEventListener("keydown", onKey);
     };
-  }, [open, onClose]);
+  }, [open, onClose, closeOnEscape]);
 
   if (!open) return null;
 
   return (
     <div
       className="fixed inset-0 z-[200] flex items-end justify-center bg-ink/60 p-0 backdrop-blur-sm sm:items-center sm:p-6"
-      onClick={onClose}
+      onClick={closeOnBackdrop ? onClose : undefined}
     >
       <div
         role="dialog"

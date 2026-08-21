@@ -104,7 +104,7 @@ const BONUS_ROLE_OPTIONS: Array<{ value: RoleAssignment; label: string; hint: st
   { value: "team", label: "Ganzes Team", hint: "Alle Spieler sehen dieselbe Bonusaufgabe." },
 ];
 
-type OutdoorActivation = "gps" | "after_meters" | "after_minutes";
+type OutdoorActivation = "immediate" | "gps" | "after_meters" | "after_minutes";
 
 type Props = {
   gameId: string;
@@ -157,7 +157,9 @@ export function GameSlotsPanel({
 
   useEffect(() => {
     setLinks(initialLinks);
-  }, [initialLinks]);
+    // Sync when the set of link ids changes (add/remove/reorder from server), not on every new array ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional identity via ids
+  }, [gameId, initialLinks.map((link) => `${link.id}:${link.sort_order}`).join("|")]);
 
   const slots = useMemo(() => buildGameSlots(links), [links]);
   const grouped = useMemo(() => groupLinksByLayerOnLink(links), [links]);
@@ -165,7 +167,7 @@ export function GameSlotsPanel({
 
   const activationHint =
     surface === "outdoor"
-      ? "Outdoor: Einstiegsfrage startet am Wegpunkt, nach gelaufenen Metern oder nach Wartezeit — ideal für Stadttour-Infos."
+      ? "Outdoor: Sofort ab Start (z. B. Briefing), am GPS-Punkt, nach Metern oder nach Wartezeit."
       : surface === "indoor"
         ? "Indoor: Einstiegsfrage erscheint, sobald die Station angetippt wird."
         : "Online: Einstiegsfrage erscheint, wenn die nächste Mission an der Reihe ist.";
@@ -181,10 +183,17 @@ export function GameSlotsPanel({
     if (unlock.type === "after_task_delay" && unlock.meters && unlock.meters > 0) {
       return `nach ${unlock.meters} m`;
     }
-    if (unlock.type === "after_task_delay" && unlock.minutes && unlock.minutes > 0) {
+    if (
+      (unlock.type === "after_task_delay" || unlock.type === "elapsed_minutes") &&
+      unlock.minutes &&
+      unlock.minutes > 0
+    ) {
       return `nach ${unlock.minutes} Min`;
     }
     if (gps) return `GPS ${gps.radius_meters} m`;
+    if (unlock.type === "game_start" || unlock.type === "previous") {
+      return "sofort";
+    }
     return "Aktivierung fehlt";
   }
 
@@ -237,7 +246,7 @@ export function GameSlotsPanel({
       setOutdoorActivation("gps");
       setGpsDraft(existingGps);
     } else {
-      setOutdoorActivation("gps");
+      setOutdoorActivation("immediate");
       setGpsDraft({
         lat: 52.52,
         lng: 13.405,
@@ -290,7 +299,10 @@ export function GameSlotsPanel({
     let location: GpsPin | null = null;
 
     if (surface === "outdoor") {
-      if (outdoorActivation === "gps") {
+      if (outdoorActivation === "immediate") {
+        // Kein GPS, keine Zeit/Meter — Freischaltung bleibt game_start / previous.
+        location = null;
+      } else if (outdoorActivation === "gps") {
         if (!Number.isFinite(gpsDraft.lat) || !Number.isFinite(gpsDraft.lng)) {
           setError("Bitte gültige Latitude und Longitude eintragen.");
           return;
@@ -443,6 +455,9 @@ export function GameSlotsPanel({
         ) : (
           slots.map((slot) => {
             const overrides = parseLinkOverrides(slot.levelLink.overrides);
+            const bonusOverrides = slot.bonusLink
+              ? parseLinkOverrides(slot.bonusLink.overrides)
+              : null;
             const visible =
               overrides.visible_to === "alpha" ||
               overrides.visible_to === "beta" ||
@@ -466,6 +481,14 @@ export function GameSlotsPanel({
                       {slot.quiz
                         ? `Schlüssel: ${slot.quiz.title ?? "Einstiegsfrage"}${slot.quiz.points ? ` · ${slot.quiz.points} P` : ""}`
                         : "Ohne Einstiegsfrage"}
+                      {" · "}
+                      {slot.bonusLink
+                        ? `Bonus: ${slot.bonusLink.task.title}${
+                            bonusOverrides?.role
+                              ? ` (${roleLabelShort(bonusOverrides.role)})`
+                              : ""
+                          }`
+                        : "Ohne Bonus"}
                       {surface === "outdoor"
                         ? ` · ${outdoorActivationLabel(overrides)}`
                         : ""}
@@ -732,14 +755,25 @@ export function GameSlotsPanel({
                 <div>
                   <p className="text-base font-bold">Wann startet die Aufgabe?</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Fester Wegpunkt, gelaufene Meter nach der vorherigen Aufgabe, oder Wartezeit
-                    danach. Die Spiel-Reihenfolge (linear/frei) stellst du unter Spieldaten ein.
+                    Sofort (z. B. Briefing), fester Wegpunkt, Meter oder Wartezeit. Die
+                    Spiel-Reihenfolge (linear/frei) stellst du unter Spieldaten ein.
                   </p>
                 </div>
 
                 <div className="grid gap-2">
                   {(
                     [
+                      {
+                        value: "immediate" as const,
+                        label:
+                          editSlot.index === 1
+                            ? "Sofort ab Spielstart"
+                            : "Sofort nach vorheriger Aufgabe",
+                        hint:
+                          editSlot.index === 1
+                            ? "Ohne GPS, Meter oder Wartezeit — ideal für Briefing vor der Karte"
+                            : "Direkt nach der vorherigen Lösung, ohne zusätzliche Wartezeit",
+                      },
                       {
                         value: "gps" as const,
                         label: "Fester GPS-Punkt",

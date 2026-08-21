@@ -37,20 +37,34 @@ export function OrgSwitcher({ organizations, currentSlug }: Props) {
         value={currentSlug}
         disabled={pending || organizations.length === 0}
         className={`${inputCls} mt-0 py-2 text-sm disabled:opacity-50`}
+        onWheel={(event) => {
+          // Native selects change value on scroll while focused — leave editor by accident.
+          (event.currentTarget as HTMLSelectElement).blur();
+        }}
         onChange={(event) => {
           const slug = event.target.value;
           if (slug === currentSlug) return;
+
+          const listPath = listPathAfterOrgSwitch(pathname);
+          if (listPath) {
+            const ok = window.confirm(
+              "Projekt wechseln und Editor verlassen? Ungespeicherte Änderungen gehen verloren.",
+            );
+            if (!ok) {
+              event.target.value = currentSlug;
+              return;
+            }
+          }
+
           startTransition(async () => {
             const result = await setStudioOrganization(slug);
             if (!result.success) {
               console.error(result.error);
               return;
             }
-            // Drop cached Studio lists — keys were org-agnostic and showed the old project.
             await queryClient.cancelQueries({ queryKey: queryKeys.studio.all });
             queryClient.removeQueries({ queryKey: queryKeys.studio.all });
 
-            const listPath = listPathAfterOrgSwitch(pathname);
             if (listPath) {
               router.replace(listPath);
             }

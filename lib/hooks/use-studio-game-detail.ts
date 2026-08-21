@@ -15,6 +15,7 @@ export function useStudioGame(gameId: string) {
       return result.data;
     },
     enabled: Boolean(gameId),
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -27,6 +28,7 @@ export function useStudioGameTaskLinks(gameId: string) {
       return result.data!;
     },
     enabled: Boolean(gameId),
+    placeholderData: (previous) => previous,
   });
 }
 
