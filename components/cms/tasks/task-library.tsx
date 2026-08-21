@@ -170,14 +170,22 @@ export function TaskLibrary({ initialTasks }: Props) {
 
   async function openDeleteModal(ids: string[]) {
     setDeleteError(null);
+    setError(null);
     setDeleteIds(ids);
-    const result = await getTasksDeleteStatus(ids);
-    if (!result.success) {
-      setError(result.error);
-      return;
+    try {
+      const result = await getTasksDeleteStatus(ids);
+      if (!result.success) {
+        setError(result.error);
+        window.alert(result.error || "Löschstatus konnte nicht geladen werden.");
+        return;
+      }
+      setDeleteStatuses(result.data!);
+      setDeleteOpen(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Löschstatus konnte nicht geladen werden.";
+      setError(message);
+      window.alert(message);
     }
-    setDeleteStatuses(result.data!);
-    setDeleteOpen(true);
   }
 
   function openDuplicateModal(ids: string[]) {

@@ -59,22 +59,47 @@ async function fetchTasksGameLinks(taskIds: string[]): Promise<{
 
   if (linksError) throw new Error(linksError.message);
 
-  // Einstiegsfragen: opener_task_id in config JSON (nicht als task_id der Zeile)
-  const openerOr =
-    taskIds.length === 0
-      ? ""
-      : taskIds.map((id) => `config->>opener_task_id.eq.${id}`).join(",");
+  // Einstiegsfragen: config.opener_task_id — org-scoped scan (JSONB filter is fragile in PostgREST)
+  const openerRows: Array<{
+    id: string;
+    game_id: string;
+    studio_games: unknown;
+    openerTaskId: string;
+  }> = [];
 
-  const { data: openerLinks, error: openerError } = openerOr
-    ? await supabase
+  if (taskIds.length > 0) {
+    const orgId = await getStudioOrganizationId();
+    const { data: orgGames, error: orgGamesError } = await supabase
+      .from("studio_games")
+      .select("id")
+      .eq("organization_id", orgId);
+    if (orgGamesError) throw new Error(orgGamesError.message);
+
+    const orgGameIds = (orgGames ?? []).map((g) => g.id as string);
+    if (orgGameIds.length > 0) {
+      const { data: configLinks, error: configError } = await supabase
         .from("studio_game_tasks")
         .select(
-          "id, game_id, task_id, config, studio_games(id, name, status, published_version_number, organization_id)",
+          "id, game_id, config, studio_games(id, name, status, published_version_number, organization_id)",
         )
-        .or(openerOr)
-    : { data: [], error: null };
+        .in("game_id", orgGameIds);
+      if (configError) throw new Error(configError.message);
 
-  if (openerError) throw new Error(openerError.message);
+      const wanted = new Set(taskIds);
+      for (const row of configLinks ?? []) {
+        const config = row.config as { opener_task_id?: unknown } | null;
+        const openerId =
+          typeof config?.opener_task_id === "string" ? config.opener_task_id : null;
+        if (!openerId || !wanted.has(openerId)) continue;
+        openerRows.push({
+          id: row.id as string,
+          game_id: row.game_id as string,
+          studio_games: row.studio_games,
+          openerTaskId: openerId,
+        });
+      }
+    }
+  }
 
   type LinkRow = {
     id: string;
@@ -82,7 +107,6 @@ async function fetchTasksGameLinks(taskIds: string[]): Promise<{
     task_id: string;
     studio_games: unknown;
     usageKind: "slot" | "opener";
-    openerTaskId?: string;
   };
 
   const normalized: LinkRow[] = [
@@ -93,22 +117,13 @@ async function fetchTasksGameLinks(taskIds: string[]): Promise<{
       studio_games: row.studio_games,
       usageKind: "slot" as const,
     })),
-    ...(openerLinks ?? []).flatMap((row) => {
-      const config = row.config as { opener_task_id?: unknown } | null;
-      const openerId =
-        typeof config?.opener_task_id === "string" ? config.opener_task_id : null;
-      if (!openerId || !taskIds.includes(openerId)) return [];
-      return [
-        {
-          id: row.id as string,
-          game_id: row.game_id as string,
-          task_id: openerId,
-          studio_games: row.studio_games,
-          usageKind: "opener" as const,
-          openerTaskId: openerId,
-        },
-      ];
-    }),
+    ...openerRows.map((row) => ({
+      id: row.id,
+      game_id: row.game_id,
+      task_id: row.openerTaskId,
+      studio_games: row.studio_games,
+      usageKind: "opener" as const,
+    })),
   ];
 
   const gameIds = [
@@ -158,10 +173,9 @@ async function fetchTasksGameLinks(taskIds: string[]): Promise<{
 
   const linksByTask = new Map<string, LinkRow[]>();
   for (const row of normalized) {
-    const taskId = row.task_id;
-    const list = linksByTask.get(taskId) ?? [];
+    const list = linksByTask.get(row.task_id) ?? [];
     list.push(row);
-    linksByTask.set(taskId, list);
+    linksByTask.set(row.task_id, list);
   }
 
   return { linksByTask, liveEventsByGame };
@@ -449,12 +463,15 @@ export async function getTasksGameUsage(taskIds: string[]): Promise<ActionResult
     const result = taskIds.map((taskId) => {
       const taskLinks = linksByTask.get(taskId) ?? [];
       const games = buildTaskGamesFromLinks(taskLinks, liveEventsByGame);
-      const liveGameCount = games.filter((g) => g.liveEvents.length > 0).length;
+      const uniqueGameIds = new Set(games.map((g) => g.gameId));
+      const liveGameCount = [...uniqueGameIds].filter((gameId) =>
+        games.some((g) => g.gameId === gameId && g.liveEvents.length > 0),
+      ).length;
       return {
         taskId,
         games,
         liveGameCount,
-        totalGameCount: games.length,
+        totalGameCount: uniqueGameIds.size,
       };
     });
 
