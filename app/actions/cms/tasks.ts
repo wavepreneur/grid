@@ -72,9 +72,44 @@ export type TaskLibraryItem = {
   answer_type?: string;
 };
 
+/** Distinct tags from the active task pool (for Studio pickers). */
+export async function listTaskLibraryTags(): Promise<ActionResult<string[]>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from("studio_tasks")
+      .select("tags")
+      .eq("is_active", true)
+      .or(`organization_id.eq.${orgId},organization_id.is.null`)
+      .limit(2000);
+
+    if (error) throw new Error(error.message);
+
+    const tags = new Set<string>();
+    for (const row of data ?? []) {
+      for (const tag of (row.tags as string[] | null) ?? []) {
+        const trimmed = tag.trim();
+        if (trimmed) tags.add(trimmed);
+      }
+    }
+
+    return {
+      success: true,
+      data: [...tags].sort((a, b) => a.localeCompare(b, "de", { sensitivity: "base" })),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Schlagworte konnten nicht geladen werden.",
+    };
+  }
+}
+
 /** Lightweight task search for the game logic sidebar — no full content payload. */
 export async function searchTaskLibrary(input: {
   query?: string;
+  tag?: string | null;
   limit?: number;
   /** Only choice / multi_choice tasks (Einstiegsfrage). */
   quizOnly?: boolean;
@@ -84,7 +119,8 @@ export async function searchTaskLibrary(input: {
     const supabase = createAdminClient();
     const limit = Math.min(50, Math.max(1, input.limit ?? 30));
     // Over-fetch when filtering to quiz types client-side.
-    const fetchLimit = input.quizOnly ? Math.min(80, limit * 3) : limit;
+    const fetchLimit = input.quizOnly ? Math.min(100, limit * 4) : limit;
+    const tag = input.tag?.trim() || null;
 
     let query = supabase
       .from("studio_tasks")
@@ -93,6 +129,10 @@ export async function searchTaskLibrary(input: {
       .or(`organization_id.eq.${orgId},organization_id.is.null`)
       .order("updated_at", { ascending: false })
       .limit(fetchLimit);
+
+    if (tag) {
+      query = query.contains("tags", [tag]);
+    }
 
     const q = input.query?.trim();
     if (q) {

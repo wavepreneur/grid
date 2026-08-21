@@ -35,7 +35,7 @@ import {
   roleLabelShort,
   type MissionUnlock,
 } from "@/lib/cms/game-link-config";
-import { useDebouncedValue, useTaskLibrarySearch } from "@/lib/hooks/use-task-library-search";
+import { useDebouncedValue, useTaskLibrarySearch, useTaskLibraryTags } from "@/lib/hooks/use-task-library-search";
 import { useStudioCache } from "@/lib/platform/studio-cache";
 import type { ContentMode, RoleAssignment } from "@/lib/cms/layer-model";
 import { contentModeLabel } from "@/lib/cms/layer-model";
@@ -45,6 +45,50 @@ import {
   type GpsPin,
 } from "@/lib/cms/gps-defaults";
 import type { StudioGameTaskLink } from "@/lib/cms/types";
+
+function PoolTagFilters({
+  tags,
+  selected,
+  onSelect,
+}: {
+  tags: string[];
+  selected: string;
+  onSelect: (tag: string) => void;
+}) {
+  if (tags.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <button
+        type="button"
+        onClick={() => onSelect("")}
+        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+          !selected
+            ? "bg-primary text-primary-foreground"
+            : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+        }`}
+      >
+        Alle
+      </button>
+      {tags.map((tag) => {
+        const active = selected === tag;
+        return (
+          <button
+            key={tag}
+            type="button"
+            onClick={() => onSelect(active ? "" : tag)}
+            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+              active
+                ? "bg-foreground text-background"
+                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            }`}
+          >
+            {tag}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 const VISIBLE_ROLE_OPTIONS: Array<{ value: RoleAssignment; label: string }> = [
   { value: "team", label: "Ganzes Team" },
@@ -99,11 +143,17 @@ export function GameSlotsPanel({
   const [delayMeters, setDelayMeters] = useState(100);
   const [delayMinutes, setDelayMinutes] = useState(5);
   const [search, setSearch] = useState("");
+  const [poolTag, setPoolTag] = useState("");
+  const [openerTag, setOpenerTag] = useState("");
   const [pickedTaskId, setPickedTaskId] = useState("");
   const debounced = useDebouncedValue(search, 200);
   const debouncedOpener = useDebouncedValue(openerSearch, 200);
-  const { data: library = [] } = useTaskLibrarySearch(debounced);
-  const { data: quizLibrary = [] } = useTaskLibrarySearch(debouncedOpener, { quizOnly: true });
+  const { data: libraryTags = [] } = useTaskLibraryTags();
+  const { data: library = [] } = useTaskLibrarySearch(debounced, { tag: poolTag });
+  const { data: quizLibrary = [] } = useTaskLibrarySearch(debouncedOpener, {
+    quizOnly: true,
+    tag: openerTag,
+  });
 
   useEffect(() => {
     setLinks(initialLinks);
@@ -496,30 +546,56 @@ export function GameSlotsPanel({
             </StudioButton>
           </div>
         </div>
+
+        <PoolTagFilters
+          tags={libraryTags}
+          selected={poolTag}
+          onSelect={(tag) => {
+            setPoolTag(tag);
+            setPickedTaskId("");
+          }}
+        />
+
         {library.length > 0 ? (
-          <div className="max-h-48 space-y-1 overflow-y-auto rounded-2xl border border-border p-2">
-            {library.slice(0, 12).map((task) => {
+          <div className="max-h-56 space-y-1 overflow-y-auto rounded-2xl border border-border p-2">
+            {library.slice(0, 24).map((task) => {
               const selected = pickedTaskId === task.id;
               return (
                 <button
                   key={task.id}
                   type="button"
                   onClick={() => setPickedTaskId(task.id)}
-                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm ${
+                  className={`flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-sm ${
                     selected
                       ? "bg-primary/15 font-semibold text-foreground"
                       : "hover:bg-secondary"
                   }`}
                 >
-                  <span className="truncate">{task.title}</span>
-                  {selected ? <span className="text-xs text-primary">gewählt</span> : null}
+                  <span className="min-w-0 flex-1 truncate">{task.title}</span>
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    {task.tags.slice(0, 2).map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    {selected ? <span className="text-xs text-primary">gewählt</span> : null}
+                  </span>
                 </button>
               );
             })}
           </div>
-        ) : search.trim() ? (
-          <p className="text-xs text-muted-foreground">Keine Treffer — Aufgabe zuerst im Pool anlegen.</p>
-        ) : null}
+        ) : search.trim() || poolTag ? (
+          <p className="text-xs text-muted-foreground">
+            Keine Treffer — anderes Schlagwort wählen oder Aufgabe zuerst im Pool anlegen.
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Schlagwort tippen oder suchen, um aus dem Pool zu wählen.
+          </p>
+        )}
       </div>
 
 
@@ -591,6 +667,11 @@ export function GameSlotsPanel({
                         onChange={(e) => setOpenerSearch(e.target.value)}
                         placeholder="Suchen (nur Multiple Choice)…"
                       />
+                      <PoolTagFilters
+                        tags={libraryTags}
+                        selected={openerTag}
+                        onSelect={setOpenerTag}
+                      />
                       <div className="max-h-44 space-y-1 overflow-y-auto rounded-2xl border border-border bg-card p-2">
                         {quizLibrary.length === 0 ? (
                           <p className="px-2 py-3 text-xs text-muted-foreground">
@@ -606,11 +687,23 @@ export function GameSlotsPanel({
                                 setOpenerTaskId(task.id);
                                 setOpenerTitle(task.title);
                               }}
-                              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-secondary"
+                              className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-secondary"
                             >
-                              <span className="truncate font-medium">{task.title}</span>
-                              <span className="shrink-0 text-xs text-muted-foreground">
-                                {task.answer_type === "multi_choice" ? "Mehrfach" : "MC"}
+                              <span className="min-w-0 flex-1 truncate font-medium">
+                                {task.title}
+                              </span>
+                              <span className="flex shrink-0 items-center gap-1.5">
+                                {task.tags.slice(0, 1).map((tag) => (
+                                  <span
+                                    key={tag}
+                                    className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                                <span className="text-xs text-muted-foreground">
+                                  {task.answer_type === "multi_choice" ? "Mehrfach" : "MC"}
+                                </span>
                               </span>
                             </button>
                           ))
