@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { ExitmaniaLevelView } from "@/components/game/exitmania-level-view";
 import { CityStatusHud } from "@/components/game/city/status-hud";
 import { CityTeamBar } from "@/components/game/city/team-bar";
@@ -31,6 +32,7 @@ type Props = {
   activeLevel: number;
   teamName: string;
   myName: string;
+  myPlayerId?: string | null;
   myRole: string;
   myRoleLabel: string;
   timeLabel: string;
@@ -63,11 +65,23 @@ type Props = {
     selectedOptionId?: string;
     selectedOptionIds?: string[];
   }) => void;
+  onAdvanceQuizToLevel: () => void;
   onSolveLevel: (payload: SolveLevelPayload) => void;
   onPurchaseHint: (tileId: string) => void;
   onSubmitBonus: (selectedOptionId: string) => void;
   onSkipBonus: () => void;
 };
+
+function scrollPlayToTop() {
+  if (typeof window === "undefined") return;
+  const active = document.activeElement;
+  if (active instanceof HTMLElement) active.blur();
+  const shell = document.querySelector(".cg-screen-shell");
+  if (shell instanceof HTMLElement) shell.scrollTop = 0;
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+}
 
 export function PlayPhaseFlow({
   eventContent,
@@ -75,6 +89,7 @@ export function PlayPhaseFlow({
   activeLevel,
   teamName,
   myName,
+  myPlayerId = null,
   myRole,
   myRoleLabel,
   timeLabel,
@@ -104,6 +119,7 @@ export function PlayPhaseFlow({
   onSubmitStationCode,
   onStartMission,
   onSubmitQuiz,
+  onAdvanceQuizToLevel,
   onSolveLevel,
   onPurchaseHint,
   onSubmitBonus,
@@ -116,8 +132,17 @@ export function PlayPhaseFlow({
   const completed = Object.values(gameState.levels).filter((e) => e.status === "completed").length;
   const total = eventContent.levels.length;
 
-  const chrome = (
-    <div className="space-y-3 px-4 pb-3 pt-[max(1.25rem,env(safe-area-inset-top))]">
+  // Hub only: map / walk ring / mission picker. Inside a task the chrome is a distraction.
+  const showChrome = phase === "hub" || !level || !slot;
+
+  useEffect(() => {
+    scrollPlayToTop();
+    const t = window.setTimeout(scrollPlayToTop, 50);
+    return () => window.clearTimeout(t);
+  }, [phase, activeLevel]);
+
+  const chrome = showChrome ? (
+    <div className="space-y-2.5 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] sm:space-y-3 sm:pb-3 sm:pt-[max(1.25rem,env(safe-area-inset-top))]">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <CityTeamBar teamName={teamName} meName={myName} meRoleLabel={myRoleLabel} compact />
@@ -131,6 +156,11 @@ export function PlayPhaseFlow({
         timeLabel={paused ? "Pause" : timeLabel}
         score={score}
       />
+    </div>
+  ) : (
+    // Minimal escape hatch while solving — no stats, no team chrome.
+    <div className="flex justify-end px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1">
+      <PlayMoreTrigger onClick={() => onMorePanel("menu")} />
     </div>
   );
 
@@ -222,7 +252,9 @@ export function PlayPhaseFlow({
           quiz={slot.quiz}
           disabled={disabled || paused}
           isPending={isPending}
+          teamReveal={gameState.quiz_reveal}
           onSubmit={onSubmitQuiz}
+          onAdvanceToLevel={onAdvanceQuizToLevel}
         />
       </>
     );
@@ -234,7 +266,7 @@ export function PlayPhaseFlow({
     <>
       {chrome}
       {sheets}
-      <div className="px-4 pb-6">
+      <div className="px-4 pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom)))]">
         <ExitmaniaLevelView
           level={mission}
           allLevels={eventContent.levels}
@@ -249,6 +281,7 @@ export function PlayPhaseFlow({
           gpsCapability={mode === "outdoor" && mission.type === "gps"}
           levelStartedAt={levelStartedAt}
           teamStartedAt={teamStartedAt}
+          myPlayerId={myPlayerId}
           onSubmit={onSolveLevel}
           onPurchaseHint={onPurchaseHint}
           feedback={solveFeedback}

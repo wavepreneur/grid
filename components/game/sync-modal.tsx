@@ -83,7 +83,7 @@ export function SyncModal({ modal, onDismiss, isPending }: SyncModalProps) {
 
         <div className="relative mt-8">
           <BigButton variant="accent" disabled={isPending} onClick={onDismiss}>
-            {isPending ? "Synchronisiere…" : "Weiter"}
+            Weiter
           </BigButton>
         </div>
       </div>

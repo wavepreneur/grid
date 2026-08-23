@@ -306,32 +306,22 @@ export async function solveCurrentLevel(input: {
     const bonus = resolveBonusTask(levelDefinition);
     const enterBonus = Boolean(usesPhasedPlay(content) && bonus);
 
-    const nextSlot = getLevelDefinition(content, isFinished ? currentLevel : nextLevel);
-    const hubPhase: PlayPhase | undefined =
-      !isFinished && nextSlot && usesPhasedPlay(content)
-        ? initialPhaseForSurface(
-            content.contentMode,
-            buildPlaySlot(nextSlot, content.contentMode),
-          )
-        : undefined;
-
     const nextGameState: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
       total_levels: content.levels.length,
       score: gameState.score + pointsEarned,
-      current_phase: enterBonus ? "bonus" : hubPhase ?? gameState.current_phase,
+      // Keep phase on the solved slot under the modal; hub opens on Weiter.
+      current_phase: enterBonus ? "bonus" : isFinished ? gameState.current_phase : "level",
       pending_next_level: enterBonus ? (isFinished ? null : nextLevel) : null,
+      quiz_reveal: null,
       modal: buildLevelCompletedModal({
-            level: currentLevel,
-            solvedBy,
-            pointsEarned,
-            successTitle: levelDefinition.success_title,
-            // Skip / countdown expiry: no post-solve note
-            successInfo: input.payload?.revealSolution
-              ? null
-              : levelDefinition.success_info,
-          }),
+        level: currentLevel,
+        solvedBy,
+        pointsEarned,
+        successTitle: levelDefinition.success_title,
+        successInfo: input.payload?.revealSolution ? null : levelDefinition.success_info,
+      }),
       levels: progressionLevels,
     };
 
@@ -403,7 +393,16 @@ export async function purchaseHint(input: {
   joinCode: string;
   sessionId: string;
   tileId: string;
-}): Promise<ActionResult<{ hintText: string; score: number; cost: number }>> {
+}): Promise<
+  ActionResult<{
+    hintText: string;
+    score: number;
+    cost: number;
+    unlockedBy: string;
+    unlockedByPlayerId: string;
+    unlockedAt: string;
+  }>
+> {
   try {
     const { event, team, player } = await assertPlayerSession(input);
 
@@ -443,6 +442,7 @@ export async function purchaseHint(input: {
       };
     }
 
+    const unlockedAt = new Date().toISOString();
     const nextGameState: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
@@ -451,7 +451,13 @@ export async function purchaseHint(input: {
         ...gameState.purchased_tile_hints,
         [levelKey]: {
           ...levelHints,
-          [input.tileId]: { text: tile.hint.text, cost: pointCost },
+          [input.tileId]: {
+            text: tile.hint.text,
+            cost: pointCost,
+            unlocked_by: player.display_name,
+            unlocked_by_player_id: player.id,
+            unlocked_at: unlockedAt,
+          },
         },
       },
     };
@@ -475,6 +481,7 @@ export async function purchaseHint(input: {
         tile_id: tile.id,
         point_cost: pointCost,
         score: nextGameState.score,
+        unlocked_by: player.display_name,
       },
     });
 
@@ -489,12 +496,20 @@ export async function purchaseHint(input: {
         tile_id: tile.id,
         point_cost: pointCost,
         score: nextGameState.score,
+        unlocked_by: player.display_name,
       },
     });
 
     return {
       success: true,
-      data: { hintText: tile.hint.text, score: nextGameState.score, cost: pointCost },
+      data: {
+        hintText: tile.hint.text,
+        score: nextGameState.score,
+        cost: pointCost,
+        unlockedBy: player.display_name,
+        unlockedByPlayerId: player.id,
+        unlockedAt,
+      },
     };
   } catch (error) {
     return {
@@ -511,7 +526,7 @@ export async function dismissSyncModal(input: {
   modalId: string;
 }): Promise<ActionResult<TeamRealtimeState>> {
   try {
-    const { team, player } = await assertPlayerSession(input);
+    const { event, team, player } = await assertPlayerSession(input);
     const gameState = parseTeamGameState(team.game_state);
 
     if (!gameState.modal || gameState.modal.id !== input.modalId) {
@@ -522,10 +537,35 @@ export async function dismissSyncModal(input: {
       return current;
     }
 
+    const content = await loadResolvedEventContent({
+      eventId: event.id,
+      organizationId: event.organization_id,
+      cityId: event.city_id,
+      contentConfig: event.content_config,
+      routeOverride: event.route_override,
+      studioGameVersionId: event.studio_game_version_id,
+    });
+
+    // After a normal solve, open hub for the next slot. Bonus stays on bonus after dismiss.
+    let nextPhase = gameState.current_phase;
+    if (gameState.current_phase === "level" && usesPhasedPlay(content)) {
+      const nextDef = getLevelDefinition(content, team.current_level || 1);
+      if (nextDef) {
+        nextPhase = initialPhaseForSurface(
+          content.contentMode,
+          buildPlaySlot(nextDef, content.contentMode),
+        );
+      } else {
+        nextPhase = "hub";
+      }
+    }
+
     const nextGameState: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
       modal: null,
+      quiz_reveal: null,
+      current_phase: nextPhase,
     };
 
     const supabase = createAdminClient();
@@ -781,7 +821,7 @@ export async function advanceFromHub(input: {
   }
 }
 
-/** Submit arrival/station/online unlock quiz → advance to level phase. */
+/** Submit arrival/station/online unlock quiz → shared reveal, then advance to level. */
 export async function submitArrivalQuiz(input: {
   inviteCode: string;
   joinCode: string;
@@ -798,6 +838,15 @@ export async function submitArrivalQuiz(input: {
     const gameState = parseTeamGameState(team.game_state);
     if (gameState.current_phase && gameState.current_phase !== "quiz") {
       return { success: false, error: "Gerade ist kein Quiz aktiv." };
+    }
+
+    // Someone already answered — advance the whole team to the puzzle.
+    if (gameState.quiz_reveal) {
+      return advanceQuizToLevel({
+        inviteCode: input.inviteCode,
+        joinCode: input.joinCode,
+        sessionId: input.sessionId,
+      });
     }
 
     const content = await loadResolvedEventContent({
@@ -830,6 +879,12 @@ export async function submitArrivalQuiz(input: {
       levelStartedAt: levelState?.started_at,
       teamStartedAt: team.started_at,
     });
+    const selectedIds =
+      input.selectedOptionIds?.length
+        ? input.selectedOptionIds
+        : input.selectedOptionId
+          ? [input.selectedOptionId]
+          : [];
     const attemptBase = {
       organizationId: event.organization_id,
       eventId: event.id,
@@ -861,7 +916,15 @@ export async function submitArrivalQuiz(input: {
       ...gameState,
       version: gameState.version + 1,
       score: gameState.score + quizPoints,
-      current_phase: "level",
+      current_phase: "quiz",
+      quiz_reveal: {
+        answered_by: player.display_name,
+        answered_by_player_id: player.id,
+        correct,
+        selected_option_ids: selectedIds,
+        points_earned: quizPoints,
+        revealed_at: new Date().toISOString(),
+      },
     };
 
     return persistPhaseState({
@@ -874,6 +937,48 @@ export async function submitArrivalQuiz(input: {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Quiz fehlgeschlagen.",
+    };
+  }
+}
+
+/** After shared quiz reveal — open the real task for the whole team. */
+export async function advanceQuizToLevel(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    const { team, player } = await assertPlayerSession(input);
+    if (team.status !== "playing") {
+      return { success: false, error: "Das Spiel läuft noch nicht." };
+    }
+
+    const gameState = parseTeamGameState(team.game_state);
+    if (gameState.current_phase !== "quiz") {
+      const current = await getGameState(input);
+      return current.success ? current : { success: false, error: "Kein Quiz aktiv." };
+    }
+    if (!gameState.quiz_reveal) {
+      return { success: false, error: "Quiz noch nicht beantwortet." };
+    }
+
+    const nextGameState: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      current_phase: "level",
+      quiz_reveal: null,
+    };
+
+    return persistPhaseState({
+      teamId: team.id,
+      gameState: nextGameState,
+      currentLevel: team.current_level || 1,
+      player,
+    });
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Weiter zur Aufgabe fehlgeschlagen.",
     };
   }
 }

@@ -65,7 +65,7 @@ export function LevelSolvePanel({
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
   const [autoTriggered, setAutoTriggered] = useState(false);
   const [solutionRevealed, setSolutionRevealed] = useState(false);
-  const [codeFocusToken, setCodeFocusToken] = useState(0);
+  const [codeFocusToken, setCodeFocusToken] = useState<number | null>(null);
   const textInputRef = useRef<HTMLInputElement | null>(null);
   const revealSubmittedRef = useRef(false);
   const onSubmitRef = useRef(onSubmit);
@@ -110,7 +110,7 @@ export function LevelSolvePanel({
     setNumberParts(Array.from({ length: numberFieldCount }, () => ""));
     setSelectedOptionId(null);
     setSelectedOptionIds([]);
-    setCodeFocusToken((token) => token + 1);
+    setCodeFocusToken((token) => (token ?? 0) + 1);
     requestAnimationFrame(() => {
       textInputRef.current?.focus({ preventScroll: true });
       textInputRef.current?.select();

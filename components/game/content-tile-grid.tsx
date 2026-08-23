@@ -19,9 +19,10 @@ type ContentTileGridProps = {
   soloAlpha?: boolean;
 };
 
-/** Kachel-Raster — Tipps liegen im Medien-Sheet, nicht als Badge auf der Kachel. */
+/** Kachel-Raster — freigeschaltete Tipps sind für alle am Badge sichtbar. */
 export function ContentTileGrid({
   tiles,
+  purchasedHints,
   onOpen,
   disabled = false,
   layout = "inline",
@@ -73,6 +74,7 @@ export function ContentTileGrid({
               : "h-36 w-36 snap-center sm:h-40 sm:w-40";
             const cover = tile.cover_image_url?.trim() || "";
             const hasCover = cover.length > 0;
+            const tip = purchasedHints[tile.id];
 
             return (
               <div key={tile.id} className={`relative flex-none ${size}`}>
@@ -101,6 +103,11 @@ export function ContentTileGrid({
                     </span>
                   )}
                 </button>
+                {tip ? (
+                  <span className="pointer-events-none absolute left-2 top-2 z-10 rounded-full bg-[var(--cg-success)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow">
+                    Tipp{tip.unlocked_by ? ` · ${tip.unlocked_by}` : ""}
+                  </span>
+                ) : null}
               </div>
             );
           })
@@ -111,6 +118,7 @@ export function ContentTileGrid({
           >
             {tiles.map((tile) => {
               const label = tile.label ?? tileTypeLabel(tile.type);
+              const tip = purchasedHints[tile.id];
               return (
                 <li
                   key={tile.id}
@@ -134,6 +142,11 @@ export function ContentTileGrid({
                         {label}
                       </span>
                     )}
+                    {tip ? (
+                      <span className="absolute left-2 top-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                        Tipp
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               );

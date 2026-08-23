@@ -57,6 +57,11 @@ export function MediaModal({
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--cg-success)]">
             Tipp freigeschaltet
           </p>
+          {purchased?.unlocked_by ? (
+            <p className="text-sm font-semibold text-[var(--cg-muted)]">
+              Von <span className="text-[var(--cg-fg)]">{purchased.unlocked_by}</span> fürs Team
+            </p>
+          ) : null}
           <p className="text-sm leading-relaxed whitespace-pre-wrap text-[var(--cg-fg)]">
             {purchased?.text ?? tile.hint?.text}
           </p>

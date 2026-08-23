@@ -62,7 +62,7 @@ export function CaptainSetupForm({
       }
 
       savePlayerSession(result.data);
-      router.push(eventLobbyPath(inviteCode, result.data.joinCode));
+      router.replace(eventLobbyPath(inviteCode, result.data.joinCode));
     });
   }
 

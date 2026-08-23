@@ -15,8 +15,8 @@ export function GridShell({
   children,
 }: GridShellProps) {
   return (
-    <div className="grid-bg flex min-h-screen flex-col items-center justify-center px-4 py-10">
-      <main className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm sm:p-10">
+    <div className="grid-bg flex min-h-[100dvh] flex-col items-center justify-center px-4 py-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <main className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-10">
         <div className="mb-8 flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-600 text-sm font-bold text-white">
@@ -76,7 +76,7 @@ export function GridInput({
 }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`grid-input w-full rounded-xl px-4 py-3 text-sm outline-none placeholder:text-slate-400 ${className}`}
+      className={`grid-input w-full rounded-xl px-4 py-3.5 text-base outline-none placeholder:text-slate-400 ${className}`}
       {...props}
     />
   );
@@ -89,7 +89,7 @@ export function GridSelect({
 }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`grid-input w-full rounded-xl px-4 py-3 text-sm outline-none ${className}`}
+      className={`grid-input w-full rounded-xl px-4 py-3.5 text-base outline-none ${className}`}
       {...props}
     >
       {children}

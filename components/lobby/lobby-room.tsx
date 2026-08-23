@@ -120,7 +120,7 @@ export function LobbyRoom({
   const handleTeamStatusChange = useCallback(
     (status: string) => {
       if (status === "playing" && !manageMode) {
-        router.push(eventPlayPath(inviteCode, joinCode));
+        router.replace(eventPlayPath(inviteCode, joinCode));
         return;
       }
 
@@ -179,7 +179,7 @@ export function LobbyRoom({
         return;
       }
 
-      router.push(eventPlayPath(inviteCode, joinCode));
+      router.replace(eventPlayPath(inviteCode, joinCode));
     });
   }
 

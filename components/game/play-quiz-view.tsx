@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
 import { IconCheck, IconKey, IconX } from "@/components/game/city/icons";
 import type { ArrivalQuiz } from "@/lib/grid/level-types";
+import type { QuizRevealState } from "@/lib/grid/game-state";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+
+const AUTO_ADVANCE_MS = 2800;
 
 type Props = {
   title: string;
@@ -13,7 +16,11 @@ type Props = {
   quiz: ArrivalQuiz;
   disabled: boolean;
   isPending: boolean;
+  /** Shared team reveal from game_state — drives every device. */
+  teamReveal?: QuizRevealState | null;
   onSubmit: (payload: { selectedOptionId?: string; selectedOptionIds?: string[] }) => void;
+  /** After shared reveal, open the real task for everyone. */
+  onAdvanceToLevel: () => void;
 };
 
 export function PlayQuizView({
@@ -23,34 +30,31 @@ export function PlayQuizView({
   quiz,
   disabled,
   isPending,
+  teamReveal = null,
   onSubmit,
+  onAdvanceToLevel,
 }: Props) {
   const multi = Boolean(quiz.correct_option_ids?.length);
   const [picked, setPicked] = useState<string | null>(null);
   const [pickedMulti, setPickedMulti] = useState<string[]>([]);
-  const [revealed, setRevealed] = useState(false);
-  const [opening, setOpening] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const advancedRef = useRef(false);
+  const sfxPlayedRef = useRef<string | null>(null);
+  const onAdvanceRef = useRef(onAdvanceToLevel);
+  onAdvanceRef.current = onAdvanceToLevel;
 
-  const show = revealed;
-  const correct = multi
-    ? quiz.correct_option_ids!.length === pickedMulti.length &&
-      quiz.correct_option_ids!.every((id) => pickedMulti.includes(id))
-    : picked === quiz.correct_option_id;
-  const points = Math.max(0, Math.round(quiz.points ?? 0));
+  const show = Boolean(teamReveal);
+  const correct = teamReveal?.correct ?? false;
+  const selectedIds = teamReveal?.selected_option_ids ?? [];
+  const points = teamReveal?.points_earned ?? Math.max(0, Math.round(quiz.points ?? 0));
   const displayTitle = quiz.title?.trim() || title;
 
   const heading =
     mode === "online" ? "Einstiegsfrage" : mode === "indoor" ? "Frage vor Ort" : "Umgebungsquiz";
   const intro =
     mode === "online"
-      ? "Alle sehen dieselbe Frage auf ihrem eigenen Bildschirm. Eine Antwort genügt — sie ist der Schlüssel zum Rätsel."
-      : "Diese Frage ist euer Schlüssel. Beantwortet sie und das Rätsel öffnet sich.";
-  const openLabel =
-    mode === "online"
-      ? "Rätsel für alle öffnen"
-      : mode === "indoor"
-        ? "Rätsel aufschließen"
-        : "Level aufschließen";
+      ? "Alle sehen dieselbe Frage. Eine Antwort genügt — sie ist der Schlüssel zum Rätsel."
+      : "Diese Frage ist euer Schlüssel. Eine Antwort vom Team öffnet das Rätsel für alle.";
 
   function isRightOption(id: string) {
     return multi
@@ -58,39 +62,50 @@ export function PlayQuizView({
       : id === quiz.correct_option_id;
   }
 
+  function isSelectedOption(id: string) {
+    if (show) return selectedIds.includes(id);
+    return multi ? pickedMulti.includes(id) : picked === id;
+  }
+
   function toggleMulti(id: string) {
-    if (revealed) return;
+    if (show || disabled || isPending || submitting) return;
     setPickedMulti((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   }
 
-  function pickSingle(id: string) {
-    if (revealed || disabled || isPending) return;
+  function submitSingle(id: string) {
+    if (show || disabled || isPending || submitting) return;
     setPicked(id);
-    setRevealed(true);
+    setSubmitting(true);
+    onSubmit({ selectedOptionId: id });
   }
 
-  function revealMulti() {
-    if (revealed || pickedMulti.length === 0) return;
-    setRevealed(true);
+  function submitMulti() {
+    if (show || pickedMulti.length === 0 || disabled || isPending || submitting) return;
+    setSubmitting(true);
+    onSubmit({ selectedOptionIds: pickedMulti, selectedOptionId: pickedMulti[0] });
   }
 
   useEffect(() => {
-    if (!revealed) return;
-    playPlaySfx(correct ? "correct" : "wrong");
-  }, [revealed, correct]);
-
-  function openPuzzle() {
-    if (opening || disabled || isPending) return;
-    setOpening(true);
-    playPlaySfx("unlock");
-    if (multi) {
-      onSubmit({ selectedOptionIds: pickedMulti, selectedOptionId: pickedMulti[0] });
-    } else if (picked) {
-      onSubmit({ selectedOptionId: picked });
+    if (!teamReveal) {
+      setSubmitting(false);
+      advancedRef.current = false;
+      return;
     }
-  }
+    if (sfxPlayedRef.current !== teamReveal.revealed_at) {
+      sfxPlayedRef.current = teamReveal.revealed_at;
+      playPlaySfx(teamReveal.correct ? "correct" : "wrong");
+    }
+    if (advancedRef.current) return;
+    const timer = window.setTimeout(() => {
+      if (advancedRef.current) return;
+      advancedRef.current = true;
+      playPlaySfx("unlock");
+      onAdvanceRef.current();
+    }, AUTO_ADVANCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [teamReveal]);
 
   return (
     <section className="flex flex-col px-5 pb-8 pt-6">
@@ -127,16 +142,16 @@ export function PlayQuizView({
 
       <div className={`mt-4 grid gap-3 ${mode === "online" ? "sm:grid-cols-2" : ""}`}>
         {quiz.options.map((opt, i) => {
-          const isPicked = multi ? pickedMulti.includes(opt.id) : picked === opt.id;
+          const isPicked = isSelectedOption(opt.id);
           const isRight = isRightOption(opt.id);
           return (
             <button
               key={opt.id}
               type="button"
-              disabled={show || disabled || isPending}
+              disabled={show || disabled || isPending || submitting}
               onClick={() => {
                 if (multi) toggleMulti(opt.id);
-                else pickSingle(opt.id);
+                else submitSingle(opt.id);
               }}
               className={`cg-tap-lift grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border-2 px-4 py-5 text-left text-base font-semibold ${
                 show && isRight
@@ -165,18 +180,21 @@ export function PlayQuizView({
         <div className="mt-6">
           <BigButton
             variant="accent"
-            disabled={disabled || isPending || pickedMulti.length === 0}
-            onClick={revealMulti}
+            disabled={disabled || isPending || submitting || pickedMulti.length === 0}
+            onClick={submitMulti}
           >
-            Antworten prüfen
+            {submitting || isPending ? "Wird geprüft…" : "Antwort fürs Team senden"}
           </BigButton>
         </div>
       ) : null}
 
-      {show ? (
+      {show && teamReveal ? (
         <div
           className={`mt-6 space-y-4 ${correct ? "cg-animate-rise-in" : "cg-animate-shake"}`}
         >
+          <p className="text-center text-sm font-semibold text-[var(--cg-muted)]">
+            Antwort von <span className="text-[var(--cg-fg)]">{teamReveal.answered_by}</span>
+          </p>
           <p
             className={`text-center text-base font-semibold ${
               correct ? "text-[var(--cg-success)]" : "text-[var(--cg-destructive)]"
@@ -210,9 +228,9 @@ export function PlayQuizView({
             </div>
           ) : null}
 
-          <BigButton variant="accent" disabled={disabled || isPending || opening} onClick={openPuzzle}>
-            {opening || isPending ? "Rätsel wird geöffnet…" : openLabel}
-          </BigButton>
+          <p className="text-center text-sm font-medium text-[var(--cg-muted)]">
+            Rätsel öffnet sich für alle…
+          </p>
         </div>
       ) : null}
     </section>

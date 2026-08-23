@@ -356,11 +356,28 @@ select.grid-input option {
   color: var(--cg-fg);
   font-family: var(--font-cg-sans);
   -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
+.grid-play-shell {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+  overscroll-behavior-y: contain;
+}
+
+.grid-bg {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
 }
 
 .cg-screen-shell {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+  max-width: 100%;
 }
 
 .city-game h1,

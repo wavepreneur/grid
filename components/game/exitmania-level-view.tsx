@@ -11,6 +11,7 @@ import {
 import { LevelSolvePanel } from "@/components/game/level-solve-panel";
 import { LevelScoringBar } from "@/components/game/level-scoring-bar";
 import { MediaModal } from "@/components/game/media-modal";
+import { HintUnlockToast } from "@/components/game/hint-unlock-toast";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 import type { PurchasedTileHint } from "@/lib/grid/game-state";
 import type { GameLevelStatus } from "@/lib/grid/game-state";
@@ -31,6 +32,7 @@ type ExitmaniaLevelViewProps = {
   gpsCapability?: boolean;
   levelStartedAt?: string | null;
   teamStartedAt?: string | null;
+  myPlayerId?: string | null;
   onSubmit: (payload: SolveLevelPayload) => void;
   onPurchaseHint: (tileId: string) => void;
   feedback?: SolveFeedbackState | null;
@@ -50,6 +52,7 @@ export function ExitmaniaLevelView({
   gpsCapability = true,
   levelStartedAt,
   teamStartedAt,
+  myPlayerId = null,
   onSubmit,
   onPurchaseHint,
   feedback = null,
@@ -159,6 +162,7 @@ export function ExitmaniaLevelView({
           onPurchaseHint={onPurchaseHint}
         />
       ) : null}
+      <HintUnlockToast purchasedHints={purchasedHints} myPlayerId={myPlayerId} />
     </div>
   );
 }

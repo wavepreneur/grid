@@ -84,7 +84,7 @@ export function TeamEntryGate({
         joinCode,
         result.data.teamStatus ?? teamStatus,
       );
-      router.push(path);
+      router.replace(path);
     });
   }
 

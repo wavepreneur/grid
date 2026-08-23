@@ -9,6 +9,7 @@ import {
   skipBonusPhase,
   solveCurrentLevel,
   submitArrivalQuiz,
+  advanceQuizToLevel,
   submitBonusAnswer,
 } from "@/app/actions/game";
 import { usesMissionShell } from "@/lib/grid/blueprints";
@@ -154,12 +155,18 @@ export function GameRoom({
         const levelKey = String(current.currentLevel);
         const nextGameState = {
           ...current.gameState,
-          score: result.data.score,
+          score: result.data!.score,
           purchased_tile_hints: {
             ...current.gameState.purchased_tile_hints,
             [levelKey]: {
               ...(current.gameState.purchased_tile_hints[levelKey] ?? {}),
-              [tileId]: { text: result.data.hintText, cost: result.data.cost },
+              [tileId]: {
+                text: result.data!.hintText,
+                cost: result.data!.cost,
+                unlocked_by: result.data!.unlockedBy,
+                unlocked_by_player_id: result.data!.unlockedByPlayerId,
+                unlocked_at: result.data!.unlockedAt,
+              },
             },
           },
         };
@@ -311,6 +318,19 @@ export function GameRoom({
     });
   }
 
+  function handleAdvanceQuizToLevel() {
+    setError(null);
+    startTransition(async () => {
+      applyTeamResult(
+        await advanceQuizToLevel({
+          inviteCode,
+          joinCode,
+          sessionId: playerSession.sessionId,
+        }),
+      );
+    });
+  }
+
   function handleSubmitBonus(selectedOptionId: string) {
     setError(null);
     startTransition(async () => {
@@ -381,6 +401,12 @@ export function GameRoom({
       }
       setTeamState(result.data);
       cacheTeamState(result.data);
+      // Land on hub/next view at the top — not mid-form from prior focus.
+      requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        const shell = document.querySelector(".cg-screen-shell");
+        if (shell instanceof HTMLElement) shell.scrollTop = 0;
+      });
     });
   }
 
@@ -436,6 +462,7 @@ export function GameRoom({
         activeLevel={activeLevel}
         teamName={teamName}
         myName={playerSession.displayName}
+        myPlayerId={playerSession.playerId}
         myRole={playerSession.archetypeRole}
         myRoleLabel={archetypeRoleLabel(playerSession.archetypeRole)}
         timeLabel={remainingLabel}
@@ -465,6 +492,7 @@ export function GameRoom({
         onSubmitStationCode={handleSubmitStationCode}
         onStartMission={handleStartMission}
         onSubmitQuiz={handleSubmitQuiz}
+        onAdvanceQuizToLevel={handleAdvanceQuizToLevel}
         onSolveLevel={handleSolveLevel}
         onPurchaseHint={handlePurchaseHint}
         onSubmitBonus={handleSubmitBonus}
@@ -485,6 +513,7 @@ export function GameRoom({
         gpsCapability={eventContent.capabilities.gps}
         levelStartedAt={levelStartedAt}
         teamStartedAt={teamState.startedAt}
+        myPlayerId={playerSession.playerId}
         onSubmit={handleSolveLevel}
         onPurchaseHint={handlePurchaseHint}
         feedback={solveFeedback}

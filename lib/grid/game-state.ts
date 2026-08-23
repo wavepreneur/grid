@@ -12,16 +12,30 @@ export type GameModalState = {
   level: number;
   /** Headline on the success card (e.g. „Notiert euch das“). */
   message: string;
-  /** Body copy the team should note — required for the modal to appear. */
+  /** Body copy the team should note — optional. */
   body?: string;
   points_earned?: number;
   solved_by: string[];
   created_at: string;
 };
 
+/** Shared Schlüssel-Quiz reveal — every device shows the same answerer + result. */
+export type QuizRevealState = {
+  answered_by: string;
+  answered_by_player_id: string;
+  correct: boolean;
+  selected_option_ids: string[];
+  points_earned: number;
+  revealed_at: string;
+};
+
 export type PurchasedTileHint = {
   text: string;
   cost: number;
+  /** Display name of the teammate who unlocked this tip. */
+  unlocked_by?: string;
+  unlocked_by_player_id?: string;
+  unlocked_at?: string;
 };
 
 export type TeamGameState = {
@@ -35,6 +49,8 @@ export type TeamGameState = {
   current_phase?: PlayPhase;
   /** After bonus: level index to open next (set when entering bonus phase). */
   pending_next_level?: number | null;
+  /** Team-wide entry-quiz reveal while still in phase "quiz". */
+  quiz_reveal?: QuizRevealState | null;
   /** @deprecated Use purchased_tile_hints — kept for older saves. */
   hints_used: Record<string, number>;
   /** levelKey -> tileId -> revealed hint */
@@ -100,6 +116,7 @@ export function createInitialGameState(
     total_levels: totalLevels,
     score: DEFAULT_STARTING_SCORE,
     current_phase: "hub",
+    quiz_reveal: null,
     hints_used: {},
     purchased_tile_hints: {},
     purchased_level_hints: {},
@@ -131,11 +148,29 @@ export function parseTeamGameState(value: unknown): TeamGameState {
       typeof candidate.pending_next_level === "number" || candidate.pending_next_level === null
         ? candidate.pending_next_level
         : undefined,
+    quiz_reveal: parseQuizReveal(candidate.quiz_reveal),
     hints_used: candidate.hints_used ?? {},
     purchased_tile_hints: candidate.purchased_tile_hints ?? {},
     purchased_level_hints: candidate.purchased_level_hints ?? {},
     modal: candidate.modal ?? null,
     levels: candidate.levels ?? createInitialGameState().levels,
+  };
+}
+
+function parseQuizReveal(value: unknown): QuizRevealState | null | undefined {
+  if (value === null) return null;
+  if (!value || typeof value !== "object") return undefined;
+  const c = value as Partial<QuizRevealState>;
+  if (!c.answered_by || !c.answered_by_player_id || !c.revealed_at) return null;
+  return {
+    answered_by: String(c.answered_by),
+    answered_by_player_id: String(c.answered_by_player_id),
+    correct: Boolean(c.correct),
+    selected_option_ids: Array.isArray(c.selected_option_ids)
+      ? c.selected_option_ids.map(String)
+      : [],
+    points_earned: Math.max(0, Math.round(Number(c.points_earned) || 0)),
+    revealed_at: String(c.revealed_at),
   };
 }
 
@@ -162,11 +197,11 @@ export function buildLevelCompletedModal(input: {
   pointsEarned?: number;
   successTitle?: string | null;
   successInfo?: string | null;
-}): GameModalState | null {
-  const body = input.successInfo?.trim();
-  if (!body) return null;
-
-  const title = input.successTitle?.trim() || "Notiert euch das";
+}): GameModalState {
+  const body = input.successInfo?.trim() || undefined;
+  const title = body
+    ? input.successTitle?.trim() || "Notiert euch das"
+    : "Aufgabe geschafft";
 
   return {
     id: crypto.randomUUID(),

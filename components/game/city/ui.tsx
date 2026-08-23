@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 
 export function PhoneShell({ children }: { children: ReactNode }) {
   return (
-    <div className="city-game min-h-[100dvh] bg-[var(--cg-ink)]/95 py-0 sm:py-8">
-      <div className="cg-screen-shell relative mx-auto flex min-h-[100dvh] w-full max-w-[30rem] flex-col overflow-x-clip overflow-y-auto bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] sm:min-h-[calc(100dvh-4rem)] sm:rounded-[2.5rem]">
+    <div className="city-game min-h-[var(--vv-height,100dvh)] bg-[var(--cg-ink)]/95 py-0 sm:py-8">
+      <div className="cg-screen-shell relative mx-auto flex min-h-[var(--vv-height,100dvh)] w-full max-w-[30rem] flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] sm:min-h-[calc(100dvh-4rem)] sm:rounded-[2.5rem]">
         {children}
       </div>
     </div>
@@ -49,7 +49,7 @@ export function BigButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`cg-tap-lift flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-5 text-lg font-semibold disabled:opacity-40 ${styles[variant]}`}
+      className={`cg-tap-lift flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-4 text-base font-semibold disabled:opacity-40 sm:py-5 sm:text-lg ${styles[variant]}`}
     >
       {icon}
       {children}
@@ -59,7 +59,7 @@ export function BigButton({
 
 export function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="ps-[0.14em] pe-[0.28em] text-xs font-bold uppercase tracking-[0.12em] text-[var(--cg-muted)]">
+    <p className="overflow-visible ps-[0.2em] pe-[0.35em] text-[0.7rem] font-bold uppercase tracking-[0.1em] text-[var(--cg-muted)]">
       {children}
     </p>
   );
