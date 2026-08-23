@@ -2,6 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import { StudioConfirmProvider } from "@/components/cms/shared/studio-confirm";
+import { StudioUnsavedProvider } from "@/components/cms/studio-unsaved";
 import type { StudioOrganization } from "@/lib/cms/types";
 
 type StudioShellContextValue = {
@@ -18,7 +19,9 @@ export function StudioShellProvider({
 }: StudioShellContextValue & { children: ReactNode }) {
   return (
     <StudioShellContext.Provider value={{ organizations, orgSlug }}>
-      <StudioConfirmProvider>{children}</StudioConfirmProvider>
+      <StudioUnsavedProvider>
+        <StudioConfirmProvider>{children}</StudioConfirmProvider>
+      </StudioUnsavedProvider>
     </StudioShellContext.Provider>
   );
 }

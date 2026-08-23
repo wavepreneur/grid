@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   removeGameTemplate,
@@ -16,6 +16,7 @@ import { GameDeleteButton } from "@/components/cms/games/game-delete-button";
 import { GameDuplicateButton } from "@/components/cms/games/game-duplicate-button";
 import { ImageUploadField } from "@/components/cms/shared/image-upload-field";
 import { useStudioCache } from "@/lib/platform/studio-cache";
+import { useStudioDirtySnapshot } from "@/components/cms/studio-unsaved";
 import {
   IconDevices,
   IconGamepad,
@@ -82,6 +83,23 @@ export function GameEditorPanel({
   const routeOrder = parseRuntimeProfiles(game.runtime_profiles).route_order;
   const countdownOn = Boolean(game.duration_minutes && game.duration_minutes > 0);
 
+  const settingsSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        name: game.name,
+        description: game.description,
+        language: game.language,
+        city_slug: game.city_slug,
+        duration_minutes: game.duration_minutes,
+        gps_enabled: game.gps_enabled,
+        farewell_text: game.farewell_text,
+        logo_url: game.logo_url,
+        runtime_profiles: parseRuntimeProfiles(game.runtime_profiles),
+      }),
+    [game],
+  );
+  const { acknowledgeSaved } = useStudioDirtySnapshot(settingsSnapshot);
+
   function handleSaveSettings(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -103,8 +121,22 @@ export function GameEditorPanel({
         setError(result.error);
         return;
       }
-      setGame(toEditorState(result.data!));
+      const next = toEditorState(result.data!);
+      setGame(next);
       cache.setGame(result.data!);
+      acknowledgeSaved(
+        JSON.stringify({
+          name: next.name,
+          description: next.description,
+          language: next.language,
+          city_slug: next.city_slug,
+          duration_minutes: next.duration_minutes,
+          gps_enabled: next.gps_enabled,
+          farewell_text: next.farewell_text,
+          logo_url: next.logo_url,
+          runtime_profiles: parseRuntimeProfiles(next.runtime_profiles),
+        }),
+      );
       setMessage("Spiel gespeichert.");
     });
   }
@@ -130,8 +162,22 @@ export function GameEditorPanel({
         setError(result.error);
         return;
       }
-      setGame(toEditorState(result.data!));
+      const nextGame = toEditorState(result.data!);
+      setGame(nextGame);
       cache.setGame(result.data!);
+      acknowledgeSaved(
+        JSON.stringify({
+          name: nextGame.name,
+          description: nextGame.description,
+          language: nextGame.language,
+          city_slug: nextGame.city_slug,
+          duration_minutes: nextGame.duration_minutes,
+          gps_enabled: nextGame.gps_enabled,
+          farewell_text: nextGame.farewell_text,
+          logo_url: nextGame.logo_url,
+          runtime_profiles: parseRuntimeProfiles(nextGame.runtime_profiles),
+        }),
+      );
       setMessage(`Layout: ${surfaceLabelDe(next)}`);
     });
   }

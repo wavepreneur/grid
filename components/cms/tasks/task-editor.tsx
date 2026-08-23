@@ -11,6 +11,7 @@ import { TaskScoringEditor, TaskTilesEditor } from "@/components/cms/tasks/task-
 import { ImageUploadField } from "@/components/cms/shared/image-upload-field";
 import { StudioPanel } from "@/components/cms/admin-shell";
 import { useStudioCache } from "@/lib/platform/studio-cache";
+import { useStudioDirtySnapshot } from "@/components/cms/studio-unsaved";
 import { IconArrowRight, IconPlus, IconSave, IconTrash } from "@/components/cms/studio-icons";
 import {
   StudioButton,
@@ -52,6 +53,18 @@ export function TaskEditor({ task, returnTo }: Props) {
   const [content, setContent] = useState<StudioTaskContent>(() =>
     normalizeTaskContent(task?.content ?? DEFAULT_TASK_CONTENT),
   );
+
+  const dirtySnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        title,
+        description,
+        tags,
+        content: normalizeTaskContent(content),
+      }),
+    [title, description, tags, content],
+  );
+  const { acknowledgeSaved } = useStudioDirtySnapshot(dirtySnapshot);
 
   const previewContent = useMemo(() => content, [content]);
 
@@ -106,6 +119,14 @@ export function TaskEditor({ task, returnTo }: Props) {
         return;
       }
       cache.setTask(result.data!);
+      acknowledgeSaved(
+        JSON.stringify({
+          title: result.data!.title,
+          description: result.data!.description ?? "",
+          tags: (result.data!.tags ?? []).join(", "),
+          content: normalizeTaskContent(result.data!.content),
+        }),
+      );
       // Stay on the editor after save — remounting the same route wipes local form feel.
       // Only navigate when creating a brand-new task (no id yet).
       if (!task?.id) {

@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Building2 } from "lucide-react";
 import { setStudioOrganization } from "@/app/actions/cms/organizations";
 import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
+import { useStudioUnsaved } from "@/components/cms/studio-unsaved";
 import { inputCls } from "@/components/cms/ui";
 import { queryKeys } from "@/lib/platform/query-keys";
 import type { StudioOrganization } from "@/lib/cms/types";
@@ -27,6 +28,7 @@ export function OrgSwitcher({ organizations, currentSlug }: Props) {
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const { confirm } = useStudioConfirm();
+  const { isDirty } = useStudioUnsaved();
   const [pending, startTransition] = useTransition();
 
   function switchTo(slug: string, listPath: string | null) {
@@ -67,6 +69,11 @@ export function OrgSwitcher({ organizations, currentSlug }: Props) {
           const listPath = listPathAfterOrgSwitch(pathname);
           if (!listPath) {
             switchTo(slug, null);
+            return;
+          }
+
+          if (!isDirty) {
+            switchTo(slug, listPath);
             return;
           }
 

@@ -19,6 +19,7 @@ import {
 import { OrgSwitcher } from "@/components/cms/org-switcher";
 import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
+import { useStudioUnsaved } from "@/components/cms/studio-unsaved";
 import { listGames, listTemplates } from "@/app/actions/cms/games";
 import { listTasks } from "@/app/actions/cms/tasks";
 import { listTicketPools, getStudioDashboardStats } from "@/app/actions/cms/tickets";
@@ -167,6 +168,7 @@ function StudioNavLink({
   const queryClient = useQueryClient();
   const router = useRouter();
   const { confirm } = useStudioConfirm();
+  const { isDirty } = useStudioUnsaved();
   const Icon = item.icon;
 
   const leavingEditor =
@@ -174,7 +176,7 @@ function StudioNavLink({
     (item.href === "/admin/games" && pathname.startsWith("/admin/games/"));
 
   async function guardLeave(event: MouseEvent<HTMLAnchorElement>) {
-    if (!leavingEditor) return;
+    if (!leavingEditor || !isDirty) return;
     event.preventDefault();
     const ok = await confirm({
       title: "Editor verlassen?",
