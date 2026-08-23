@@ -117,7 +117,7 @@ export function PlayPhaseFlow({
   const total = eventContent.levels.length;
 
   const chrome = (
-    <div className="space-y-3 px-4 pb-2 pt-5">
+    <div className="space-y-3 px-4 pb-3 pt-[max(1.25rem,env(safe-area-inset-top))]">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <CityTeamBar teamName={teamName} meName={myName} meRoleLabel={myRoleLabel} compact />

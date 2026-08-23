@@ -9,7 +9,7 @@ import {
   studioTestBookingReference,
 } from "@/lib/cms/studio-test-session";
 import { generateInviteCode, generateJoinCode } from "@/lib/grid/codes";
-import { eventTeamJoinPath, cockpitPath } from "@/lib/grid/event-routes";
+import { eventCaptainPath, eventTeamJoinPath, cockpitPath } from "@/lib/grid/event-routes";
 import { getCityIdBySlug } from "@/lib/grid/organizations";
 import type { ActionResult } from "@/lib/grid/types";
 
@@ -56,7 +56,7 @@ async function loadTestTeam(eventId: string) {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("teams")
-    .select("id, join_code, status")
+    .select("id, join_code, status, name, captain_player_id")
     .eq("event_id", eventId)
     .order("created_at", { ascending: true })
     .limit(1)
@@ -66,17 +66,50 @@ async function loadTestTeam(eventId: string) {
   return data;
 }
 
+async function countTeamPlayers(teamId: string) {
+  const supabase = createAdminClient();
+  const { count, error } = await supabase
+    .from("players")
+    .select("id", { count: "exact", head: true })
+    .eq("team_id", teamId);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+/**
+ * Fresh / unclaimed test teams open Captain setup (team name first).
+ * Already-running tests keep the join link so teammates can re-enter.
+ */
+function playPathForTestTeam(input: {
+  inviteCode: string;
+  joinCode: string;
+  teamStatus: string;
+  playerCount: number;
+}): string {
+  if (input.teamStatus === "setup" || input.playerCount === 0) {
+    return eventCaptainPath(input.inviteCode, input.joinCode);
+  }
+  return eventTeamJoinPath(input.inviteCode, input.joinCode);
+}
+
 function toSessionPayload(input: {
   eventId: string;
   inviteCode: string;
   joinCode: string;
   publishedVersionNumber: number;
+  teamStatus: string;
+  playerCount: number;
 }): StudioTestSession {
   return {
     eventId: input.eventId,
     inviteCode: input.inviteCode,
     joinCode: input.joinCode,
-    playPath: eventTeamJoinPath(input.inviteCode, input.joinCode),
+    playPath: playPathForTestTeam({
+      inviteCode: input.inviteCode,
+      joinCode: input.joinCode,
+      teamStatus: input.teamStatus,
+      playerCount: input.playerCount,
+    }),
     cockpitPath: cockpitPath(input.inviteCode),
     maxPlayers: STUDIO_TEST_MAX_PLAYERS,
     publishedVersionNumber: input.publishedVersionNumber,
@@ -156,14 +189,14 @@ async function createTestEventAndTeam(input: {
       event_id: event.id,
       organization_id: input.orgId,
       join_code: joinCode,
-      name: "Testteam",
+      name: "Neues Team",
       max_size: STUDIO_TEST_MAX_PLAYERS,
-      status: "lobby",
-      department: "Studio",
-      region: "Test",
+      status: "setup",
+      department: "Other",
+      region: "DACH",
       metadata: { is_studio_test: true },
     })
-    .select("id, join_code")
+    .select("id, join_code, status")
     .single();
 
   if (teamError || !team) {
@@ -176,6 +209,8 @@ async function createTestEventAndTeam(input: {
     inviteCode: event.invite_code,
     joinCode: team.join_code,
     publishedVersionNumber: input.publishedVersionNumber,
+    teamStatus: team.status,
+    playerCount: 0,
   });
 }
 
@@ -221,6 +256,25 @@ export async function getOrCreateStudioTestSession(
       const team = await loadTestTeam(existing.id);
       if (team) {
         const supabase = createAdminClient();
+        let teamStatus = team.status;
+        const playerCount = await countTeamPlayers(team.id);
+
+        // Empty leftover "Testteam" lobbies → reopen captain setup (team name first)
+        if (playerCount === 0 && teamStatus !== "setup") {
+          await supabase
+            .from("teams")
+            .update({
+              status: "setup",
+              name: "Neues Team",
+              captain_player_id: null,
+              navigator_player_id: null,
+              lobby_opened_at: null,
+              lobby_auto_start_at: null,
+            })
+            .eq("id", team.id);
+          teamStatus = "setup";
+        }
+
         const { data: fullEvent } = await supabase
           .from("events")
           .select("content_config")
@@ -254,6 +308,8 @@ export async function getOrCreateStudioTestSession(
             inviteCode: existing.invite_code,
             joinCode: team.join_code,
             publishedVersionNumber: game.published_version_number,
+            teamStatus,
+            playerCount,
           }),
         };
       }

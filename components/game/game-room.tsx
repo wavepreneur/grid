@@ -392,7 +392,7 @@ export function GameRoom({
       displayName={playerSession.displayName}
     />
   ) : isFinished ? (
-    <div className="cg-animate-rise-in space-y-6 px-5 py-10">
+    <div className="cg-animate-rise-in space-y-6 px-5 pb-[max(2.5rem,calc(1.25rem+env(safe-area-inset-bottom)))] pt-[max(2.5rem,env(safe-area-inset-top))]">
       <div className="space-y-2 text-center">
         <span
           aria-hidden

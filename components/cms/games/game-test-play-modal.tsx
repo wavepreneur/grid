@@ -136,9 +136,10 @@ export function GameTestPlayModal({
       ) : null}
 
       <p className="text-sm leading-relaxed text-muted-foreground">
-        Testet den aktuellen gespeicherten Editor-Stand (kein separates Veröffentlichen nötig).
-        Link auf jedem Gerät öffnen. Ohne „Neu generieren“ geht der Fortschritt weiter — nach
-        größeren Inhaltsänderungen besser neu generieren.
+        Testet den aktuellen gespeicherten Editor-Stand. Als Team Lead zuerst den{" "}
+        <strong>Teamnamen</strong> (Highscore) festlegen, dann den Spielernamen. Weitere Geräte
+        treten über denselben Link bzw. die Lobby bei. Ohne „Neu generieren“ geht der Fortschritt
+        weiter — nach größeren Inhaltsänderungen besser neu generieren.
       </p>
 
       {playUrl ? (

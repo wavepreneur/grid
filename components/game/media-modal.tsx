@@ -54,30 +54,22 @@ export function MediaModal({
     <div className="space-y-2">
       {purchased || viewHintOpen ? (
         <>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--cg-success)]">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--cg-success)]">
             Tipp freigeschaltet
           </p>
           <p className="text-sm leading-relaxed whitespace-pre-wrap text-[var(--cg-fg)]">
             {purchased?.text ?? tile.hint?.text}
           </p>
-          <BigButton variant="ghost" onClick={onClose}>
-            Schließen
-          </BigButton>
         </>
       ) : (
-        <>
-          <BigButton
-            variant="accent"
-            icon={<Lightbulb className="h-5 w-5" />}
-            disabled={isPending || !onPurchaseHint}
-            onClick={() => setConfirmOpen(true)}
-          >
-            Tipp freischalten (−{hintCost} P)
-          </BigButton>
-          <BigButton variant="ghost" onClick={onClose}>
-            Schließen
-          </BigButton>
-        </>
+        <BigButton
+          variant="accent"
+          icon={<Lightbulb className="h-5 w-5" />}
+          disabled={isPending || !onPurchaseHint}
+          onClick={() => setConfirmOpen(true)}
+        >
+          Tipp freischalten (−{hintCost} P)
+        </BigButton>
       )}
     </div>
   ) : undefined;

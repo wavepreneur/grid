@@ -19,21 +19,35 @@ export default async function EventCaptainPage({ params, searchParams }: EventCa
   const eventResult = await getEventInvite(normalizedInvite);
   if (!eventResult.success) notFound();
 
+  const contentConfig = eventResult.data.content_config as
+    | Record<string, unknown>
+    | null
+    | undefined;
+  const studioTest = Boolean(contentConfig?.is_studio_test);
+
   return (
     <GridShell
-      title="Team erstellen"
+      title={studioTest ? "Testteam starten" : "Team erstellen"}
       description={
-        normalizedJoin
-          ? `Captain für Team ${normalizedJoin} · ${eventResult.data.title}`
-          : `Starte das erste Team für „${eventResult.data.title}".`
+        studioTest
+          ? "Zuerst Teamname (Highscore), dann dein Spielername."
+          : normalizedJoin
+            ? `Captain für Team ${normalizedJoin} · ${eventResult.data.title}`
+            : `Starte das erste Team für „${eventResult.data.title}".`
       }
     >
-      <CaptainSetupForm inviteCode={normalizedInvite} joinCode={normalizedJoin} />
-      <p className="mt-6 text-center text-xs text-slate-500">
-        <Link href={eventPath(normalizedInvite)} className="text-teal-600 hover:underline">
-          ← Zurück zum Event
-        </Link>
-      </p>
+      <CaptainSetupForm
+        inviteCode={normalizedInvite}
+        joinCode={normalizedJoin}
+        studioTest={studioTest}
+      />
+      {!studioTest ? (
+        <p className="mt-6 text-center text-xs text-slate-500">
+          <Link href={eventPath(normalizedInvite)} className="text-teal-600 hover:underline">
+            ← Zurück zum Event
+          </Link>
+        </p>
+      ) : null}
     </GridShell>
   );
 }

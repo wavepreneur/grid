@@ -358,6 +358,11 @@ select.grid-input option {
   -webkit-tap-highlight-color: transparent;
 }
 
+.cg-screen-shell {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
 .city-game h1,
 .city-game h2,
 .city-game h3 {

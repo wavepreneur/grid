@@ -97,7 +97,7 @@ export function PlayHubView({
     const next = levels.find((l) => levelStatuses[String(l.level)]?.status === "active") ?? current;
 
     return (
-      <section className="flex flex-col gap-4 px-4 pb-6 pt-5">
+      <section className="flex flex-col gap-4 px-4 pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom)))] pt-2">
         <header>
           <SectionLabel>{meta.hubLabelDe}</SectionLabel>
           <h1 className="mt-1 text-xl font-bold text-[var(--cg-fg)]">
@@ -227,7 +227,7 @@ export function PlayHubView({
   ).length;
 
   return (
-    <section className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pb-10 pt-5">
+    <section className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pb-[max(2.5rem,calc(1.25rem+env(safe-area-inset-bottom)))] pt-2">
       <header>
         <SectionLabel>{meta.hubLabelDe}</SectionLabel>
         <h1 className="mt-1 text-xl font-bold text-[var(--cg-fg)] sm:text-2xl">
@@ -363,7 +363,7 @@ function OutdoorHub({
   if (isWalkMode) {
     return (
       <section className="flex min-h-[70vh] flex-col">
-        <div className="space-y-1 px-4 pb-2 pt-5">
+        <div className="space-y-1 px-4 pb-2 pt-2">
           <SectionLabel>Stadtjagd · Strecke</SectionLabel>
           <h1 className="text-xl font-bold text-[var(--cg-fg)]">
             Wegpunkt {current.level} von {levels.length}
@@ -406,7 +406,7 @@ function OutdoorHub({
 
   return (
     <section className="flex min-h-[70vh] flex-col">
-      <div className="space-y-3 px-4 pb-3 pt-5">
+      <div className="space-y-3 px-4 pb-3 pt-2">
         <header>
           <SectionLabel>Stadtjagd</SectionLabel>
           <h1 className="text-xl font-bold text-[var(--cg-fg)]">
@@ -436,7 +436,7 @@ function OutdoorHub({
         ) : null}
       </div>
 
-      <div className="z-20 space-y-3 rounded-t-3xl bg-[var(--cg-card)] px-4 pb-6 pt-4 shadow-[var(--cg-shadow-lift)]">
+      <div className="z-20 space-y-3 rounded-t-3xl bg-[var(--cg-card)] px-4 pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom)))] pt-4 shadow-[var(--cg-shadow-lift)]">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <div className="min-w-0">
             <SectionLabel>Euer Ziel</SectionLabel>
@@ -537,7 +537,7 @@ function OutdoorTimeWait({
   }, [ready]);
 
   return (
-    <section className="flex min-h-[70vh] flex-col px-5 pb-8 pt-5">
+    <section className="flex min-h-[70vh] flex-col px-5 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-2">
       <SectionLabel>Stadtjagd · Wartezeit</SectionLabel>
       <h1 className="mt-1 text-xl font-bold text-[var(--cg-fg)]">
         Wegpunkt {levelIndex} von {total}

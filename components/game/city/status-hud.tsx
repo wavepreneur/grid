@@ -17,7 +17,7 @@ export function CityStatusHud({ mode, completed, total, timeLabel, score }: Prop
     mode === "indoor" ? "Stationen" : mode === "online" ? "Missionen" : "Level";
 
   return (
-    <div className="grid grid-cols-3 gap-2 rounded-2xl bg-[var(--cg-card)] p-2 shadow-[var(--cg-shadow-soft)]">
+    <div className="grid grid-cols-3 gap-2 rounded-2xl bg-[var(--cg-card)] p-2.5 shadow-[var(--cg-shadow-soft)]">
       <Stat icon={<IconFlag size={20} />} value={`${completed}/${total}`} label={label} />
       <Stat icon={<IconClock size={20} />} value={timeLabel} label="Zeit" />
       <Stat icon={<IconStar size={20} />} value={`${score}`} label="Punkte" />
@@ -35,9 +35,11 @@ function Stat({
   label: string;
 }) {
   return (
-    <div className="flex min-w-0 flex-col items-center gap-0.5 rounded-xl bg-[var(--cg-secondary)] px-2 py-2.5 sm:flex-row sm:justify-center sm:gap-2">
+    <div className="flex min-w-0 flex-col items-center gap-1 rounded-xl bg-[var(--cg-secondary)] px-2 py-3 sm:flex-row sm:justify-center sm:gap-2">
       <span className="text-[var(--cg-primary)]">{icon}</span>
-      <span className="truncate text-lg font-bold leading-none text-[var(--cg-fg)]">{value}</span>
+      <span className="truncate text-base font-bold leading-none text-[var(--cg-fg)] sm:text-lg">
+        {value}
+      </span>
       <span className="truncate text-[11px] font-medium text-[var(--cg-muted)]">{label}</span>
     </div>
   );

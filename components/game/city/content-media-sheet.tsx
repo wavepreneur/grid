@@ -2,7 +2,6 @@
 
 import { useEffect, type ReactNode } from "react";
 import { X } from "lucide-react";
-import { BigButton, SectionLabel } from "@/components/game/city/ui";
 
 type ContentMediaSheetProps = {
   open: boolean;
@@ -15,7 +14,8 @@ type ContentMediaSheetProps = {
 };
 
 /**
- * Vollflächiges Content-Sheet (~90% Viewport) — iframe/Bild sauber lesbar, X zum Schließen.
+ * Near-fullscreen content sheet — iframe/image take almost the whole display.
+ * Only a floating X closes (Escape / backdrop also work). No title chrome, no footer CTA.
  */
 export function ContentMediaSheet({
   open,
@@ -44,36 +44,34 @@ export function ContentMediaSheet({
   const isImage = mediaType === "image";
 
   return (
-    <div className="city-game fixed inset-0 z-[120] flex items-end justify-center bg-[var(--cg-ink)]/75 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+    <div
+      className="city-game fixed inset-0 z-[120] flex items-stretch justify-center bg-[var(--cg-ink)]/80 sm:items-center sm:p-3"
+      onClick={onClose}
+    >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="cg-animate-rise-in flex h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-[1.75rem] bg-[var(--cg-card)] shadow-[var(--cg-shadow-lift)] sm:rounded-[1.75rem]"
+        className="cg-animate-rise-in relative flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden bg-[var(--cg-card)] shadow-[var(--cg-shadow-lift)] sm:h-[min(96dvh,900px)] sm:rounded-[1.5rem]"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center gap-3 border-b border-[var(--cg-border)] px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <SectionLabel>Inhalt</SectionLabel>
-            <p className="truncate text-base font-bold text-[var(--cg-fg)]">{title}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Schließen"
-            className="cg-tap-lift flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--cg-secondary)] text-[var(--cg-fg)]"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Schließen"
+          className="cg-tap-lift absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-20 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--cg-ink)]/70 text-white shadow-[var(--cg-shadow-lift)] backdrop-blur-sm ring-1 ring-white/25"
+        >
+          <X className="h-5 w-5" strokeWidth={2.5} />
+        </button>
 
-        <div className="relative min-h-0 flex-1 bg-[var(--cg-bg)]">
+        <div className="relative min-h-0 flex-1 bg-black">
           {mediaUrl?.trim() ? (
             isImage ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={mediaUrl}
                 alt={title}
-                className="h-full w-full object-contain p-3"
+                className="h-full w-full object-contain"
               />
             ) : (
               <iframe
@@ -97,14 +95,10 @@ export function ContentMediaSheet({
         </div>
 
         {tipSlot ? (
-          <div className="shrink-0 border-t border-[var(--cg-border)] px-4 py-3">{tipSlot}</div>
-        ) : (
-          <div className="shrink-0 border-t border-[var(--cg-border)] px-4 py-3">
-            <BigButton variant="ghost" onClick={onClose}>
-              Schließen
-            </BigButton>
+          <div className="shrink-0 border-t border-[var(--cg-border)] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {tipSlot}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

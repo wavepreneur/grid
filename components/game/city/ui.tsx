@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 
 export function PhoneShell({ children }: { children: ReactNode }) {
   return (
-    <div className="city-game min-h-screen bg-[var(--cg-ink)]/95 py-0 sm:py-8">
-      <div className="cg-screen-shell relative mx-auto min-h-screen w-full max-w-[30rem] overflow-hidden bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] sm:min-h-[calc(100vh-4rem)] sm:rounded-[2.5rem]">
+    <div className="city-game min-h-[100dvh] bg-[var(--cg-ink)]/95 py-0 sm:py-8">
+      <div className="cg-screen-shell relative mx-auto flex min-h-[100dvh] w-full max-w-[30rem] flex-col overflow-x-clip overflow-y-auto bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] sm:min-h-[calc(100dvh-4rem)] sm:rounded-[2.5rem]">
         {children}
       </div>
     </div>
@@ -14,8 +14,8 @@ export function PhoneShell({ children }: { children: ReactNode }) {
 
 export function StageShell({ children }: { children: ReactNode }) {
   return (
-    <div className="city-game min-h-screen bg-[var(--cg-ink)]/95">
-      <div className="mx-auto min-h-screen w-full max-w-7xl bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] xl:my-6 xl:min-h-[calc(100vh-3rem)] xl:rounded-[2.5rem]">
+    <div className="city-game min-h-[100dvh] bg-[var(--cg-ink)]/95">
+      <div className="mx-auto min-h-[100dvh] w-full max-w-7xl bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] xl:my-6 xl:min-h-[calc(100dvh-3rem)] xl:rounded-[2.5rem]">
         {children}
       </div>
     </div>
@@ -59,7 +59,7 @@ export function BigButton({
 
 export function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--cg-muted)]">
+    <p className="ps-[0.14em] pe-[0.28em] text-xs font-bold uppercase tracking-[0.12em] text-[var(--cg-muted)]">
       {children}
     </p>
   );
