@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ExitmaniaLevelView } from "@/components/game/exitmania-level-view";
+import { BonusCompleteToast } from "@/components/game/bonus-complete-toast";
 import { CityStatusHud } from "@/components/game/city/status-hud";
 import { CityTeamBar } from "@/components/game/city/team-bar";
 import { PlayBonusView } from "@/components/game/play-bonus-view";
@@ -13,7 +14,8 @@ import {
   type PlayMorePanel,
 } from "@/components/game/play-more-sheet";
 import { PlayQuizView } from "@/components/game/play-quiz-view";
-import { isBonusForRole, resolveBonusTask, roleLabelDe } from "@/lib/grid/bonus";
+import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
+import { isBonusForRole, resolveBonusTask } from "@/lib/grid/bonus";
 import type { PurchasedTileHint, TeamGameState } from "@/lib/grid/game-state";
 import type {
   GeolocationSample,
@@ -22,6 +24,11 @@ import type {
   SolveLevelPayload,
 } from "@/lib/grid/level-types";
 import { buildPlaySlot, missionFromLevel } from "@/lib/grid/play-slots";
+import {
+  bonusAudienceHeadline,
+  DEFAULT_ROLE_LABELS,
+  type RoleDisplayLabels,
+} from "@/lib/grid/role-labels";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 
 type Teammate = { id: string; name: string; roleLabel: string };
@@ -131,6 +138,19 @@ export function PlayPhaseFlow({
   const slot = level ? buildPlaySlot(level, mode, phase) : null;
   const completed = Object.values(gameState.levels).filter((e) => e.status === "completed").length;
   const total = eventContent.levels.length;
+  const roleLabels: RoleDisplayLabels = eventContent.roleLabels ?? DEFAULT_ROLE_LABELS;
+
+  const prevPhaseRef = useRef(phase);
+  const [unlockGate, setUnlockGate] = useState(false);
+
+  // After quiz → level: short key-unlock interstitial on every device.
+  useEffect(() => {
+    const prev = prevPhaseRef.current;
+    prevPhaseRef.current = phase;
+    if (prev === "quiz" && phase === "level") {
+      setUnlockGate(true);
+    }
+  }, [phase]);
 
   // Hub only: map / walk ring / mission picker. Inside a task the chrome is a distraction.
   const showChrome = phase === "hub" || !level || !slot;
@@ -139,7 +159,7 @@ export function PlayPhaseFlow({
     scrollPlayToTop();
     const t = window.setTimeout(scrollPlayToTop, 50);
     return () => window.clearTimeout(t);
-  }, [phase, activeLevel]);
+  }, [phase, activeLevel, unlockGate]);
 
   const chrome = showChrome ? (
     <div className="space-y-2.5 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] sm:space-y-3 sm:pb-3 sm:pt-[max(1.25rem,env(safe-area-inset-top))]">
@@ -158,7 +178,6 @@ export function PlayPhaseFlow({
       />
     </div>
   ) : (
-    // Minimal escape hatch while solving — no stats, no team chrome.
     <div className="flex justify-end px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1">
       <PlayMoreTrigger onClick={() => onMorePanel("menu")} />
     </div>
@@ -181,8 +200,37 @@ export function PlayPhaseFlow({
         transferPending={transferPending}
         onReclaimSession={onReclaimSession}
       />
+      <BonusCompleteToast notice={gameState.bonus_notice} />
     </>
   );
+
+  // Asymmetric role bonus: assignee sees overlay; others keep playing the hub.
+  const activeBonus = gameState.active_bonus;
+  if (activeBonus && !activeBonus.for_team) {
+    const bonusLevel = eventContent.levels.find((l) => l.level === activeBonus.from_level);
+    const bonus = bonusLevel ? resolveBonusTask(bonusLevel) : null;
+    if (bonus && isBonusForRole(bonus, myRole)) {
+      return (
+        <>
+          {sheets}
+          <PlayBonusView
+            bonus={bonus}
+            mode={mode}
+            isMine
+            myName={myName}
+            myRoleLabel={myRoleLabel}
+            teamName={teamName}
+            roleLabels={roleLabels}
+            asymmetricOverlay
+            disabled={disabled}
+            isPending={isPending}
+            onSubmit={onSubmitBonus}
+            onSkipWaiting={onSkipBonus}
+          />
+        </>
+      );
+    }
+  }
 
   if (phase === "bonus" && level) {
     const bonus = resolveBonusTask(level);
@@ -198,7 +246,7 @@ export function PlayPhaseFlow({
             myName={myName}
             myRoleLabel={myRoleLabel}
             teamName={teamName}
-            waitingRoleLabel={roleLabelDe(bonus.for_role)}
+            roleLabels={roleLabels}
             disabled={disabled}
             isPending={isPending}
             onSubmit={onSubmitBonus}
@@ -209,11 +257,40 @@ export function PlayPhaseFlow({
     }
   }
 
+  if (unlockGate && phase === "level") {
+    return (
+      <>
+        {sheets}
+        <PlayTransitionScreen
+          kind="unlock"
+          title="Der Schlüssel öffnet das Level"
+          subtitle="Ihr seid zurück im Spiel — jetzt kommt die eigentliche Aufgabe."
+          audienceIcons={3}
+          autoMs={2200}
+          onDone={() => setUnlockGate(false)}
+        />
+      </>
+    );
+  }
+
   if (phase === "hub" || !level || !slot) {
+    const pendingRoleHint =
+      activeBonus && !activeBonus.for_team
+        ? bonusAudienceHeadline(
+            { for_role: activeBonus.for_role, for_team: false },
+            roleLabels,
+          )
+        : null;
+
     return (
       <>
         {chrome}
         {sheets}
+        {pendingRoleHint ? (
+          <p className="px-4 pb-2 text-center text-xs font-semibold text-[var(--cg-muted)]">
+            Bonus läuft bei {pendingRoleHint} — ihr könnt weiter.
+          </p>
+        ) : null}
         <PlayHubView
           mode={mode}
           levels={eventContent.levels}

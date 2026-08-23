@@ -341,16 +341,18 @@ function resolveModeAndFallbacks(contentConfig: ReturnType<typeof parseContentCo
 }
 
 function withSurfaceFields(
-  base: Omit<ResolvedEventContent, "contentMode" | "allowedFallbacks" | "routeOrder">,
+  base: Omit<ResolvedEventContent, "contentMode" | "allowedFallbacks" | "routeOrder" | "roleLabels">,
   contentConfig: ReturnType<typeof parseContentConfig>,
   levels: LevelDefinition[],
 ): ResolvedEventContent {
   const { contentMode, allowedFallbacks, routeOrder } = resolveModeAndFallbacks(contentConfig);
+  const profiles = parseRuntimeProfiles(contentConfig.runtime_profiles);
   return {
     ...base,
     contentMode,
     allowedFallbacks,
     routeOrder,
+    roleLabels: profiles.role_labels,
     levels: applyContentModeToLevels(levels, contentMode),
   };
 }

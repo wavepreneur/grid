@@ -30,7 +30,7 @@ import { transferCaptain } from "@/app/actions/lobby";
 import { useTeamSync } from "@/lib/hooks/use-team-sync";
 import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
 import { cacheTeamState } from "@/lib/grid/offline-state";
-import { archetypeRoleLabel } from "@/lib/grid/archetype-roles";
+import { displayRoleLabel, DEFAULT_ROLE_LABELS } from "@/lib/grid/role-labels";
 import { clearWalkedDistanceStorage } from "@/lib/hooks/use-walked-distance";
 import type { TeamGameState, TeamRealtimeState } from "@/lib/grid/game-state";
 import type {
@@ -464,7 +464,10 @@ export function GameRoom({
         myName={playerSession.displayName}
         myPlayerId={playerSession.playerId}
         myRole={playerSession.archetypeRole}
-        myRoleLabel={archetypeRoleLabel(playerSession.archetypeRole)}
+        myRoleLabel={displayRoleLabel(
+          playerSession.archetypeRole,
+          eventContent.roleLabels ?? DEFAULT_ROLE_LABELS,
+        )}
         timeLabel={remainingLabel}
         purchasedHints={purchasedTileHints}
         score={teamState.gameState.score ?? 0}

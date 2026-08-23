@@ -7,8 +7,6 @@ import type { ArrivalQuiz } from "@/lib/grid/level-types";
 import type { QuizRevealState } from "@/lib/grid/game-state";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 
-const AUTO_ADVANCE_MS = 2800;
-
 type Props = {
   title: string;
   spotLabel: string;
@@ -19,7 +17,7 @@ type Props = {
   /** Shared team reveal from game_state — drives every device. */
   teamReveal?: QuizRevealState | null;
   onSubmit: (payload: { selectedOptionId?: string; selectedOptionIds?: string[] }) => void;
-  /** After shared reveal, open the real task for everyone. */
+  /** After shared reveal, open the unlock transition for everyone. */
   onAdvanceToLevel: () => void;
 };
 
@@ -38,10 +36,8 @@ export function PlayQuizView({
   const [picked, setPicked] = useState<string | null>(null);
   const [pickedMulti, setPickedMulti] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const advancedRef = useRef(false);
+  const [advancing, setAdvancing] = useState(false);
   const sfxPlayedRef = useRef<string | null>(null);
-  const onAdvanceRef = useRef(onAdvanceToLevel);
-  onAdvanceRef.current = onAdvanceToLevel;
 
   const show = Boolean(teamReveal);
   const correct = teamReveal?.correct ?? false;
@@ -90,22 +86,27 @@ export function PlayQuizView({
   useEffect(() => {
     if (!teamReveal) {
       setSubmitting(false);
-      advancedRef.current = false;
+      setAdvancing(false);
       return;
     }
     if (sfxPlayedRef.current !== teamReveal.revealed_at) {
       sfxPlayedRef.current = teamReveal.revealed_at;
       playPlaySfx(teamReveal.correct ? "correct" : "wrong");
     }
-    if (advancedRef.current) return;
-    const timer = window.setTimeout(() => {
-      if (advancedRef.current) return;
-      advancedRef.current = true;
-      playPlaySfx("unlock");
-      onAdvanceRef.current();
-    }, AUTO_ADVANCE_MS);
-    return () => window.clearTimeout(timer);
   }, [teamReveal]);
+
+  function handleAdvance() {
+    if (advancing || disabled || isPending) return;
+    setAdvancing(true);
+    onAdvanceToLevel();
+  }
+
+  const openLabel =
+    mode === "online"
+      ? "Rätsel für alle öffnen"
+      : mode === "indoor"
+        ? "Rätsel aufschließen"
+        : "Zurück zum Spiel — Rätsel öffnen";
 
   return (
     <section className="flex flex-col px-5 pb-8 pt-6">
@@ -228,9 +229,13 @@ export function PlayQuizView({
             </div>
           ) : null}
 
-          <p className="text-center text-sm font-medium text-[var(--cg-muted)]">
-            Rätsel öffnet sich für alle…
-          </p>
+          <BigButton
+            variant="accent"
+            disabled={disabled || isPending || advancing}
+            onClick={handleAdvance}
+          >
+            {advancing || isPending ? "Öffnet…" : openLabel}
+          </BigButton>
         </div>
       ) : null}
     </section>

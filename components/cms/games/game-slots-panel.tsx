@@ -99,10 +99,26 @@ const VISIBLE_ROLE_OPTIONS: Array<{ value: RoleAssignment; label: string }> = [
 ];
 
 const BONUS_ROLE_OPTIONS: Array<{ value: RoleAssignment; label: string; hint: string }> = [
-  { value: "gamma", label: "Nur Gamma", hint: "Nur Gamma sieht und beantwortet den Bonus." },
-  { value: "alpha", label: "Nur Alpha", hint: "Nur Alpha (Team-Lead) sieht den Bonus." },
-  { value: "beta", label: "Nur Beta", hint: "Nur Beta sieht den Bonus." },
-  { value: "team", label: "Ganzes Team", hint: "Alle Spieler sehen dieselbe Bonusaufgabe." },
+  {
+    value: "gamma",
+    label: "Nur Gamma",
+    hint: "Technisch Gamma — im Spiel erscheint der Anzeigename (z. B. Organizer).",
+  },
+  {
+    value: "alpha",
+    label: "Nur Alpha",
+    hint: "Technisch Alpha — im Spiel erscheint der Anzeigename (z. B. Team Lead).",
+  },
+  {
+    value: "beta",
+    label: "Nur Beta",
+    hint: "Technisch Beta — im Spiel erscheint der Anzeigename (z. B. Profiler).",
+  },
+  {
+    value: "team",
+    label: "Ganzes Team",
+    hint: "Alle Spieler sehen dieselbe Bonusaufgabe mit Team-Intro.",
+  },
 ];
 
 type OutdoorActivation = "immediate" | "gps" | "after_meters" | "after_minutes";

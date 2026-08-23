@@ -304,17 +304,55 @@ export async function solveCurrentLevel(input: {
       : computeLevelReward(levelDefinition.scoring, levelState.started_at);
 
     const bonus = resolveBonusTask(levelDefinition);
-    const enterBonus = Boolean(usesPhasedPlay(content) && bonus);
+    // Bonus only after a real solve — reveal-solution completes without bonus.
+    const wantBonus =
+      Boolean(usesPhasedPlay(content) && bonus) && !input.payload?.revealSolution;
+    const teamBonus = Boolean(wantBonus && bonus?.for_team);
+    const soloBonus = Boolean(wantBonus && bonus && !bonus.for_team);
+
+    let nextPhase: PlayPhase | undefined;
+    let pendingNext: number | null = null;
+    let activeBonus: TeamGameState["active_bonus"] = null;
+    let teamCurrentLevel = isFinished ? currentLevel : nextLevel;
+
+    if (teamBonus) {
+      // Whole team stays on this slot in bonus phase after the Gelöst-modal.
+      nextPhase = "bonus";
+      pendingNext = isFinished ? null : nextLevel;
+      teamCurrentLevel = currentLevel;
+    } else if (soloBonus && bonus) {
+      // Team advances; assigned role gets an overlay via active_bonus.
+      const nextSlot = getLevelDefinition(content, isFinished ? currentLevel : nextLevel);
+      nextPhase = isFinished
+        ? gameState.current_phase
+        : nextSlot && usesPhasedPlay(content)
+          ? initialPhaseForSurface(
+              content.contentMode,
+              buildPlaySlot(nextSlot, content.contentMode),
+            )
+          : "hub";
+      activeBonus = {
+        from_level: currentLevel,
+        for_role: bonus.for_role,
+        for_team: false,
+        started_at: new Date().toISOString(),
+      };
+      teamCurrentLevel = isFinished ? currentLevel : nextLevel;
+    } else {
+      // Keep phase on the solved slot under the modal; hub opens on Weiter.
+      nextPhase = isFinished ? gameState.current_phase : "level";
+    }
 
     const nextGameState: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
       total_levels: content.levels.length,
       score: gameState.score + pointsEarned,
-      // Keep phase on the solved slot under the modal; hub opens on Weiter.
-      current_phase: enterBonus ? "bonus" : isFinished ? gameState.current_phase : "level",
-      pending_next_level: enterBonus ? (isFinished ? null : nextLevel) : null,
+      current_phase: nextPhase,
+      pending_next_level: pendingNext,
       quiz_reveal: null,
+      active_bonus: activeBonus,
+      bonus_notice: null,
       modal: buildLevelCompletedModal({
         level: currentLevel,
         solvedBy,
@@ -329,10 +367,11 @@ export async function solveCurrentLevel(input: {
     const { data: updatedTeam, error } = await supabase
       .from("teams")
       .update({
-        current_level: enterBonus || isFinished ? currentLevel : nextLevel,
+        current_level: teamCurrentLevel,
         game_state: nextGameState,
-        status: enterBonus ? "playing" : isFinished ? "finished" : "playing",
-        finished_at: enterBonus ? null : isFinished ? new Date().toISOString() : null,
+        status: teamBonus || soloBonus || !isFinished ? "playing" : "finished",
+        finished_at:
+          !teamBonus && !soloBonus && isFinished ? new Date().toISOString() : null,
       })
       .eq("id", team.id)
       .eq("status", "playing")
@@ -547,8 +586,13 @@ export async function dismissSyncModal(input: {
     });
 
     // After a normal solve, open hub for the next slot. Bonus stays on bonus after dismiss.
+    // Solo-role bonus already advanced to hub with active_bonus — leave phase alone.
     let nextPhase = gameState.current_phase;
-    if (gameState.current_phase === "level" && usesPhasedPlay(content)) {
+    if (
+      gameState.current_phase === "level" &&
+      !gameState.active_bonus &&
+      usesPhasedPlay(content)
+    ) {
       const nextDef = getLevelDefinition(content, team.current_level || 1);
       if (nextDef) {
         nextPhase = initialPhaseForSurface(
@@ -983,6 +1027,127 @@ export async function advanceQuizToLevel(input: {
   }
 }
 
+async function completeActiveBonus(input: {
+  event: {
+    id: string;
+    organization_id: string;
+    city_id: string | null;
+    content_config: unknown;
+    route_override: unknown;
+    studio_game_version_id?: string | null;
+  };
+  team: {
+    id: string;
+    status: string;
+    current_level: number | null;
+    game_state: unknown;
+    started_at: string | null;
+  };
+  player: {
+    id: string;
+    display_name: string;
+    role: string | null;
+    is_captain: boolean;
+  };
+  gameState: TeamGameState;
+  selectedOptionId?: string;
+  skip?: boolean;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  const { event, team, player, gameState } = input;
+  const active = gameState.active_bonus;
+  if (!active || active.for_team) {
+    return { success: false, error: "Kein aktiver Rollen-Bonus." };
+  }
+
+  const content = await loadResolvedEventContent({
+    eventId: event.id,
+    organizationId: event.organization_id,
+    cityId: event.city_id,
+    contentConfig: event.content_config,
+    routeOverride: event.route_override,
+    studioGameVersionId: event.studio_game_version_id,
+  });
+
+  const levelDefinition = getLevelDefinition(content, active.from_level);
+  const bonus = resolveBonusTask(levelDefinition);
+  if (!bonus) {
+    const cleared: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      active_bonus: null,
+    };
+    const supabase = createAdminClient();
+    const { data: updatedTeam, error } = await supabase
+      .from("teams")
+      .update({ game_state: cleared })
+      .eq("id", team.id)
+      .select(
+        "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
+      )
+      .single();
+    if (error || !updatedTeam) {
+      return { success: false, error: error?.message ?? "Bonus konnte nicht beendet werden." };
+    }
+    return { success: true, data: buildRealtimeState(updatedTeam, player) };
+  }
+
+  const playerRole = (player.role ?? "gamma") as PlayerRole;
+  if (!isBonusForRole(bonus, playerRole)) {
+    return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
+  }
+
+  let correct = false;
+  let reward = 0;
+  if (!input.skip) {
+    if (!input.selectedOptionId) {
+      return { success: false, error: "Bitte eine Antwort auswählen." };
+    }
+    const correctIds =
+      bonus.correct_option_ids && bonus.correct_option_ids.length > 0
+        ? bonus.correct_option_ids
+        : [bonus.correct_option_id];
+    correct = correctIds.includes(input.selectedOptionId);
+    reward = correct ? bonus.reward : 0;
+  }
+
+  const allDone = Object.values(gameState.levels).every((entry) => entry.status === "completed");
+  const noticeId = `bonus-${Date.now()}-${player.id.slice(0, 8)}`;
+  const nextGameState: TeamGameState = {
+    ...gameState,
+    version: gameState.version + 1,
+    score: gameState.score + reward,
+    active_bonus: null,
+    bonus_notice: {
+      id: noticeId,
+      by: player.display_name,
+      correct,
+      reward,
+      created_at: new Date().toISOString(),
+    },
+  };
+
+  const supabase = createAdminClient();
+  const { data: updatedTeam, error } = await supabase
+    .from("teams")
+    .update({
+      game_state: nextGameState,
+      status: allDone ? "finished" : "playing",
+      finished_at: allDone ? new Date().toISOString() : null,
+    })
+    .eq("id", team.id)
+    .eq("status", "playing")
+    .select(
+      "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
+    )
+    .single();
+
+  if (error || !updatedTeam) {
+    return { success: false, error: error?.message ?? "Bonus-Update fehlgeschlagen." };
+  }
+
+  return { success: true, data: buildRealtimeState(updatedTeam, player) };
+}
+
 async function leaveBonusPhase(input: {
   inviteCode: string;
   joinCode: string;
@@ -1014,6 +1179,7 @@ async function leaveBonusPhase(input: {
   const bonus = resolveBonusTask(levelDefinition);
 
   let reward = 0;
+  let correct = false;
   if (!input.skip && bonus) {
     const playerRole = (player.role ?? "gamma") as PlayerRole;
     if (!isBonusForRole(bonus, playerRole)) {
@@ -1032,6 +1198,7 @@ async function leaveBonusPhase(input: {
     }
     if (input.selectedOptionId === bonus.correct_option_id) {
       reward = bonus.reward;
+      correct = true;
     }
   }
 
@@ -1057,12 +1224,23 @@ async function leaveBonusPhase(input: {
     levels = activateLevelEntry(levels, String(nextLevel));
   }
 
+  const noticeId = `bonus-${Date.now()}-${player.id.slice(0, 8)}`;
   const nextGameState: TeamGameState = {
     ...gameState,
     version: gameState.version + 1,
     score: gameState.score + reward,
     current_phase: isFinished ? gameState.current_phase : hubPhase,
     pending_next_level: null,
+    active_bonus: null,
+    bonus_notice: input.skip
+      ? null
+      : {
+          id: noticeId,
+          by: player.display_name,
+          correct,
+          reward,
+          created_at: new Date().toISOString(),
+        },
     levels,
   };
 
@@ -1104,6 +1282,19 @@ export async function submitBonusAnswer(input: {
     }
 
     const gameState = parseTeamGameState(team.game_state);
+
+    // Role-only overlay while the team is already on the next hub.
+    if (gameState.active_bonus && !gameState.active_bonus.for_team) {
+      return completeActiveBonus({
+        event,
+        team,
+        player,
+        gameState,
+        selectedOptionId: input.selectedOptionId,
+        skip: false,
+      });
+    }
+
     if (gameState.current_phase !== "bonus") {
       return { success: false, error: "Keine Bonusphase aktiv." };
     }
@@ -1180,12 +1371,21 @@ export async function submitBonusAnswer(input: {
       levels = activateLevelEntry(levels, String(nextLevel));
     }
 
+    const noticeId = `bonus-${Date.now()}-${player.id.slice(0, 8)}`;
     const nextGameState: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
       score: gameState.score + reward,
       current_phase: finished ? gameState.current_phase : hubPhase,
       pending_next_level: null,
+      active_bonus: null,
+      bonus_notice: {
+        id: noticeId,
+        by: player.display_name,
+        correct,
+        reward,
+        created_at: new Date().toISOString(),
+      },
       levels,
     };
 
@@ -1225,6 +1425,17 @@ export async function skipBonusPhase(input: {
   sessionId: string;
 }): Promise<ActionResult<TeamRealtimeState>> {
   try {
+    const { event, team, player } = await assertPlayerSession(input);
+    const gameState = parseTeamGameState(team.game_state);
+    if (gameState.active_bonus && !gameState.active_bonus.for_team) {
+      return completeActiveBonus({
+        event,
+        team,
+        player,
+        gameState,
+        skip: true,
+      });
+    }
     return await leaveBonusPhase({ ...input, skip: true });
   } catch (error) {
     return {

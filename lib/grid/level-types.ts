@@ -259,6 +259,8 @@ export type ResolvedEventContent = {
   compiledLogic?: CompiledGameLogic | null;
   /** Optional game-wide briefing shown from the play menu. */
   briefingText?: string | null;
+  /** Player-facing Alpha/Beta/Gamma names for this game. */
+  roleLabels?: import("@/lib/grid/role-labels").RoleDisplayLabels;
 };
 
 export type GeolocationSample = {

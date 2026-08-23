@@ -251,6 +251,43 @@ export function GameLayerProfilePanel({ game }: Props) {
           </StudioHint>
         </div>
 
+        <div>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Rollen-Namen im Spiel
+          </p>
+          <p className="mb-3 text-sm text-slate-500">
+            Alpha / Beta / Gamma bleiben technische Schlüssel. Im Spiel sehen Teams nur diese Namen.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {(
+              [
+                ["alpha", "Alpha"],
+                ["beta", "Beta"],
+                ["gamma", "Gamma"],
+              ] as const
+            ).map(([key, tech]) => (
+              <label key={key} className="block space-y-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {tech}
+                </span>
+                <input
+                  type="text"
+                  value={runtimeProfiles.role_labels[key]}
+                  disabled={pending}
+                  onChange={(e) =>
+                    setRuntimeProfiles((prev) => ({
+                      ...prev,
+                      role_labels: { ...prev.role_labels, [key]: e.target.value },
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
+                  placeholder={tech}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+
         {error ? <StudioError message={error} /> : null}
         {message ? <StudioSuccess message={message} /> : null}
 

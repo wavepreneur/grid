@@ -155,6 +155,18 @@ export type RuntimeModeProfile = {
   layer_3_context?: ContentContext;
 };
 
+export type RoleDisplayLabels = {
+  alpha: string;
+  beta: string;
+  gamma: string;
+};
+
+export const DEFAULT_ROLE_LABELS: RoleDisplayLabels = {
+  alpha: "Team Lead",
+  beta: "Profiler",
+  gamma: "Organizer",
+};
+
 export type RuntimeProfiles = {
   default_mode: ContentMode;
   /** Fallbacks the customer/operator may switch to at event time. */
@@ -168,6 +180,10 @@ export type RuntimeProfiles = {
    * free = alle Aufgaben ab Start anlaufbar / lösbar.
    */
   route_order: "linear" | "free";
+  /**
+   * Player-facing names for Alpha/Beta/Gamma (Studio keeps technical keys).
+   */
+  role_labels: RoleDisplayLabels;
   profiles: Record<ContentMode, RuntimeModeProfile>;
 };
 
@@ -176,6 +192,7 @@ export const DEFAULT_RUNTIME_PROFILES: RuntimeProfiles = {
   allowed_fallbacks: ["indoor", "online"],
   indoor_one_click: true,
   route_order: "linear",
+  role_labels: { ...DEFAULT_ROLE_LABELS },
   profiles: {
     outdoor: {
       active_layers: [1, 2, 3],
@@ -194,6 +211,18 @@ export const DEFAULT_RUNTIME_PROFILES: RuntimeProfiles = {
     },
   },
 };
+
+function parseRoleLabels(raw: unknown): RoleDisplayLabels {
+  if (!raw || typeof raw !== "object") return { ...DEFAULT_ROLE_LABELS };
+  const o = raw as Partial<Record<keyof RoleDisplayLabels, unknown>>;
+  return {
+    alpha:
+      typeof o.alpha === "string" && o.alpha.trim() ? o.alpha.trim() : DEFAULT_ROLE_LABELS.alpha,
+    beta: typeof o.beta === "string" && o.beta.trim() ? o.beta.trim() : DEFAULT_ROLE_LABELS.beta,
+    gamma:
+      typeof o.gamma === "string" && o.gamma.trim() ? o.gamma.trim() : DEFAULT_ROLE_LABELS.gamma,
+  };
+}
 
 export type LayerFeatureCheck = {
   question: string;
@@ -315,6 +344,7 @@ export function parseRuntimeProfiles(raw: unknown): RuntimeProfiles {
     allowed_fallbacks: parseAllowedFallbacks(obj.allowed_fallbacks, defaultMode, indoorOneClick),
     indoor_one_click: indoorOneClick,
     route_order: obj.route_order === "free" ? "free" : "linear",
+    role_labels: parseRoleLabels(obj.role_labels),
     profiles: { outdoor, indoor, online },
   };
 }

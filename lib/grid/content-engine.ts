@@ -118,6 +118,7 @@ export function resolveEventContent(input: {
     contentMode,
     allowedFallbacks,
     routeOrder: profiles.route_order,
+    roleLabels: profiles.role_labels,
   };
 }
 

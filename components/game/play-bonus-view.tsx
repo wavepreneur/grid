@@ -4,8 +4,13 @@ import { useEffect, useState } from "react";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
 import { IconCheck, IconGift, IconUser, IconX } from "@/components/game/city/icons";
 import { CityTeamBar } from "@/components/game/city/team-bar";
+import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
 import type { BonusTask } from "@/lib/grid/level-types";
-import { roleLabelDe } from "@/lib/grid/bonus";
+import {
+  bonusAudienceHeadline,
+  bonusAudienceIconCount,
+  type RoleDisplayLabels,
+} from "@/lib/grid/role-labels";
 import type { ContentMode } from "@/lib/cms/layer-model";
 import { hubMeta } from "@/lib/grid/play-slots";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
@@ -17,7 +22,9 @@ type Props = {
   myName: string;
   myRoleLabel: string;
   teamName: string;
-  waitingRoleLabel: string;
+  roleLabels?: RoleDisplayLabels | null;
+  /** When true, non-assignees already play on the hub — no waiting UI. */
+  asymmetricOverlay?: boolean;
   disabled: boolean;
   isPending: boolean;
   onSubmit: (selectedOptionId: string) => void;
@@ -31,17 +38,21 @@ export function PlayBonusView({
   myName,
   myRoleLabel,
   teamName,
-  waitingRoleLabel,
+  roleLabels = null,
+  asymmetricOverlay = false,
   disabled,
   isPending,
   onSubmit,
   onSkipWaiting,
 }: Props) {
+  const [introDone, setIntroDone] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const correct = picked === bonus.correct_option_id;
   const show = picked !== null;
   const hub = hubMeta(mode);
+  const audience = bonusAudienceIconCount(bonus);
+  const audienceLabel = bonusAudienceHeadline(bonus, roleLabels);
 
   useEffect(() => {
     if (!show) return;
@@ -55,6 +66,10 @@ export function PlayBonusView({
   }
 
   if (!isMine) {
+    // Role-only: others stay on hub (asymmetric). Team bonus: rare wait if somehow not mine.
+    if (asymmetricOverlay || bonus.for_team) {
+      return null;
+    }
     return (
       <section className="flex flex-col gap-5 px-5 pb-8 pt-6">
         <CityTeamBar teamName={teamName} meName={myName} meRoleLabel={myRoleLabel} compact />
@@ -64,10 +79,10 @@ export function PlayBonusView({
           </span>
           <SectionLabel>Bonusaufgabe läuft</SectionLabel>
           <h2 className="mt-2 text-2xl font-bold text-[var(--cg-fg)]">
-            {waitingRoleLabel} ist dran
+            {audienceLabel} ist dran
           </h2>
           <p className="mt-3 max-w-sm text-base text-[var(--cg-muted)]">
-            Nur {waitingRoleLabel} sieht die Aufgabe. Danach geht es für alle weiter zur{" "}
+            Nur {audienceLabel} sieht die Aufgabe. Danach geht es für alle weiter zur{" "}
             {hub.hubLabelDe}.
           </p>
         </div>
@@ -77,6 +92,27 @@ export function PlayBonusView({
           </BigButton>
         </div>
       </section>
+    );
+  }
+
+  if (!introDone) {
+    return (
+      <PlayTransitionScreen
+        kind="bonus"
+        title={
+          bonus.for_team
+            ? "Nächste Aufgabe für alle"
+            : "Folgende Aufgabe ist für dich"
+        }
+        highlight={audienceLabel}
+        subtitle={
+          bonus.for_team
+            ? "Macht euch bereit — die Bonusaufgabe erscheint gleich auf jedem Gerät."
+            : "Nur auf deinem Handy. Danach bist du wieder bei deinem Team."
+        }
+        audienceIcons={audience}
+        onDone={() => setIntroDone(true)}
+      />
     );
   }
 
@@ -92,16 +128,18 @@ export function PlayBonusView({
         <h1 className="mt-1 text-2xl font-bold text-[var(--cg-fg)]">{bonus.title}</h1>
       </div>
 
-      <div className="mt-6 flex justify-center">
+      <div className="mt-6 flex flex-col items-center gap-2">
         <span className="flex items-center gap-1.5 rounded-full bg-[var(--cg-primary)] px-3 py-2 text-sm font-bold text-[var(--cg-primary-fg)]">
-          <IconUser size={16} /> {myName}
-          <span className="opacity-70">{roleLabelDe(bonus.for_role)}</span>
+          <IconUser size={16} /> {bonus.for_team ? "Ganzes Team" : myName}
+          <span className="opacity-70">{audienceLabel}</span>
         </span>
       </div>
 
       <div className="cg-animate-rise-in mt-8 space-y-4">
         <p className="rounded-2xl bg-[var(--cg-accent)]/15 px-4 py-3 text-center text-base font-semibold text-[var(--cg-fg)]">
-          {bonus.intro ?? `Nur du siehst diese Aufgabe, ${myName}.`}
+          {bonus.for_team
+            ? "Diese Bonusaufgabe sehen alle im Team."
+            : `Nur du siehst diese Aufgabe, ${myName}.`}
         </p>
         <p className="rounded-2xl bg-[var(--cg-card)] p-5 text-lg font-semibold shadow-[var(--cg-shadow-soft)] text-[var(--cg-fg)]">
           {bonus.question}
@@ -144,7 +182,7 @@ export function PlayBonusView({
                 : "Diesmal daneben — keine Punkte, es geht direkt weiter."}
             </p>
             <BigButton disabled={isPending || submitted} onClick={finish}>
-              Zurück zur {hub.hubLabelDe}
+              {asymmetricOverlay ? "Zurück zum Team" : `Zurück zur ${hub.hubLabelDe}`}
             </BigButton>
           </div>
         ) : null}

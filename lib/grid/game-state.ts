@@ -29,6 +29,26 @@ export type QuizRevealState = {
   revealed_at: string;
 };
 
+/**
+ * Role-only bonus that runs while the rest of the team continues on the hub.
+ * Team-wide bonuses still use current_phase === "bonus".
+ */
+export type ActiveBonusState = {
+  from_level: number;
+  for_role: "alpha" | "beta" | "gamma";
+  for_team: boolean;
+  started_at: string;
+};
+
+/** Short team broadcast after a bonus is finished. */
+export type BonusNoticeState = {
+  id: string;
+  by: string;
+  correct: boolean;
+  reward: number;
+  created_at: string;
+};
+
 export type PurchasedTileHint = {
   text: string;
   cost: number;
@@ -51,6 +71,10 @@ export type TeamGameState = {
   pending_next_level?: number | null;
   /** Team-wide entry-quiz reveal while still in phase "quiz". */
   quiz_reveal?: QuizRevealState | null;
+  /** Asymmetric bonus overlay while team is already on the next hub. */
+  active_bonus?: ActiveBonusState | null;
+  /** Ephemeral toast payload after bonus completes. */
+  bonus_notice?: BonusNoticeState | null;
   /** @deprecated Use purchased_tile_hints — kept for older saves. */
   hints_used: Record<string, number>;
   /** levelKey -> tileId -> revealed hint */
@@ -117,6 +141,8 @@ export function createInitialGameState(
     score: DEFAULT_STARTING_SCORE,
     current_phase: "hub",
     quiz_reveal: null,
+    active_bonus: null,
+    bonus_notice: null,
     hints_used: {},
     purchased_tile_hints: {},
     purchased_level_hints: {},
@@ -149,6 +175,8 @@ export function parseTeamGameState(value: unknown): TeamGameState {
         ? candidate.pending_next_level
         : undefined,
     quiz_reveal: parseQuizReveal(candidate.quiz_reveal),
+    active_bonus: parseActiveBonus(candidate.active_bonus),
+    bonus_notice: parseBonusNotice(candidate.bonus_notice),
     hints_used: candidate.hints_used ?? {},
     purchased_tile_hints: candidate.purchased_tile_hints ?? {},
     purchased_level_hints: candidate.purchased_level_hints ?? {},
@@ -171,6 +199,39 @@ function parseQuizReveal(value: unknown): QuizRevealState | null | undefined {
       : [],
     points_earned: Math.max(0, Math.round(Number(c.points_earned) || 0)),
     revealed_at: String(c.revealed_at),
+  };
+}
+
+function parseActiveBonus(value: unknown): ActiveBonusState | null | undefined {
+  if (value === null) return null;
+  if (!value || typeof value !== "object") return undefined;
+  const c = value as Partial<ActiveBonusState>;
+  if (
+    typeof c.from_level !== "number" ||
+    (c.for_role !== "alpha" && c.for_role !== "beta" && c.for_role !== "gamma") ||
+    !c.started_at
+  ) {
+    return null;
+  }
+  return {
+    from_level: c.from_level,
+    for_role: c.for_role,
+    for_team: Boolean(c.for_team),
+    started_at: String(c.started_at),
+  };
+}
+
+function parseBonusNotice(value: unknown): BonusNoticeState | null | undefined {
+  if (value === null) return null;
+  if (!value || typeof value !== "object") return undefined;
+  const c = value as Partial<BonusNoticeState>;
+  if (!c.id || !c.by || !c.created_at) return null;
+  return {
+    id: String(c.id),
+    by: String(c.by),
+    correct: Boolean(c.correct),
+    reward: Math.max(0, Math.round(Number(c.reward) || 0)),
+    created_at: String(c.created_at),
   };
 }
 
