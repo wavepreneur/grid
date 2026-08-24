@@ -85,48 +85,54 @@ export function ExitmaniaLevelView({
   };
 
   return (
-    <div className="city-game min-w-0">
-      {isGpsLevel && waypoints.length > 0 ? (
-        <GpsMissionMap
-          waypoints={waypoints}
-          activeLevel={level.level}
-          target={level.location}
-          playerPosition={sample}
-          showPlayer={gpsEnabled}
-          distanceToTarget={distanceToTarget}
-          withinRadius={withinRadius}
-        />
-      ) : null}
-
-      {!isGpsLevel ? (
-        <LevelHero
-          title={level.title}
-          description={level.description}
-          imageUrl={level.hero_image_url}
-        />
-      ) : (
-        <div className="min-w-0 space-y-1 px-4 pt-3 sm:px-5">
-          <h1 className="break-words text-xl font-bold text-[var(--cg-fg)] [overflow-wrap:anywhere] sm:text-2xl">
-            {level.title}
-          </h1>
-          {level.description?.trim() ? (
-            <p className="break-words text-sm leading-snug text-[var(--cg-muted)] [overflow-wrap:anywhere] whitespace-pre-wrap">
-              {level.description}
-            </p>
-          ) : null}
-        </div>
-      )}
-
-      <div className="space-y-4 px-4 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-3 sm:px-5">
-        {level.scoring ? (
-          <LevelScoringBar
-            scoring={level.scoring}
-            startedAt={levelStartedAt}
-            fallbackStartedAt={teamStartedAt}
-            compact
+    <div className="city-game flex min-h-[var(--vv-height,100dvh)] min-w-0 flex-col sm:min-h-[calc(var(--vv-height,100dvh)-3.5rem)]">
+      {/* Top: map / hero / scoring */}
+      <div className="shrink-0 pt-[max(0.25rem,env(safe-area-inset-top))]">
+        {isGpsLevel && waypoints.length > 0 ? (
+          <GpsMissionMap
+            waypoints={waypoints}
+            activeLevel={level.level}
+            target={level.location}
+            playerPosition={sample}
+            showPlayer={gpsEnabled}
+            distanceToTarget={distanceToTarget}
+            withinRadius={withinRadius}
           />
         ) : null}
 
+        {!isGpsLevel ? (
+          <LevelHero
+            title={level.title}
+            description={level.description}
+            imageUrl={level.hero_image_url}
+          />
+        ) : (
+          <div className="min-w-0 space-y-2 px-4 pt-3 sm:px-5">
+            <h1 className="break-words text-xl font-bold text-[var(--cg-fg)] [overflow-wrap:anywhere] sm:text-2xl">
+              {level.title}
+            </h1>
+            {level.description?.trim() ? (
+              <p className="break-words text-sm leading-relaxed text-[var(--cg-muted)] [overflow-wrap:anywhere] whitespace-pre-wrap">
+                {level.description}
+              </p>
+            ) : null}
+          </div>
+        )}
+
+        {level.scoring ? (
+          <div className="px-4 pt-4 sm:px-5">
+            <LevelScoringBar
+              scoring={level.scoring}
+              startedAt={levelStartedAt}
+              fallbackStartedAt={teamStartedAt}
+              compact
+            />
+          </div>
+        ) : null}
+      </div>
+
+      {/* Middle: tiles — centers vertically when content is sparse */}
+      <div className="flex min-h-[10rem] flex-1 flex-col justify-center px-4 py-8 sm:px-5 sm:py-10">
         {effectiveBeta ? (
           <BetaNotesPanel {...betaPanelProps} layout="inline" cityStyle />
         ) : (
@@ -135,7 +141,10 @@ export function ExitmaniaLevelView({
             Wegpunkte frei.
           </div>
         )}
+      </div>
 
+      {/* Bottom: solve / OK — anchored to the bottom of the phone column */}
+      <div className="mt-auto shrink-0 px-4 pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom)))] pt-2 sm:px-5">
         <LevelSolvePanel
           level={level}
           disabled={disabled}

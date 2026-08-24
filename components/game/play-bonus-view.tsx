@@ -174,8 +174,8 @@ export function PlayBonusView({
 
       <div className="mt-6 flex flex-col items-center gap-2">
         <span className="flex items-center gap-1.5 rounded-full bg-[var(--cg-primary)] px-3 py-2 text-sm font-bold text-[var(--cg-primary-fg)]">
-          <IconUser size={16} /> {bonus.for_team ? "Ganzes Team" : myName}
-          <span className="opacity-70">{audienceLabel}</span>
+          <IconUser size={16} />
+          {bonus.for_team ? audienceLabel : `${myName} · ${audienceLabel}`}
         </span>
       </div>
 
@@ -185,6 +185,24 @@ export function PlayBonusView({
             ? "Diese Bonusaufgabe sehen alle im Team."
             : `Nur du siehst diese Aufgabe, ${myName}.`}
         </p>
+
+        {bonus.hero_image_url ? (
+          <div className="overflow-hidden rounded-2xl shadow-[var(--cg-shadow-soft)]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={bonus.hero_image_url}
+              alt=""
+              className="max-h-[min(28vh,14rem)] w-full object-cover object-center"
+            />
+          </div>
+        ) : null}
+
+        {bonus.description?.trim() ? (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--cg-muted)]">
+            {bonus.description.trim()}
+          </p>
+        ) : null}
+
         <p className="rounded-2xl bg-[var(--cg-card)] p-5 text-lg font-semibold shadow-[var(--cg-shadow-soft)] text-[var(--cg-fg)]">
           {bonus.question}
         </p>

@@ -57,6 +57,9 @@ export type BonusTask = {
   for_team?: boolean;
   title: string;
   intro?: string;
+  /** Longer briefing from the Studio task (description / success copy). */
+  description?: string;
+  hero_image_url?: string;
   question: string;
   /** Multiple-choice options (empty when answer_mode is text/boxes/confirm). */
   options: QuizOption[];

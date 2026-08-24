@@ -91,7 +91,27 @@ export function PlayTransitionScreen({
       ) : null}
 
       {autoMs ? (
-        <p className="mt-8 text-sm font-medium text-[var(--cg-muted)]">Gleich geht’s weiter…</p>
+        <div className="mt-10 w-full max-w-sm space-y-3">
+          <p className="text-sm font-medium text-[var(--cg-muted)]">
+            {kind === "unlock"
+              ? "Hauptaufgabe wird geladen…"
+              : "Bonusaufgabe wird geladen…"}
+          </p>
+          <div
+            className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--cg-secondary)]"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={
+              kind === "unlock" ? "Lädt die Hauptaufgabe" : "Lädt die Bonusaufgabe"
+            }
+          >
+            <div
+              className="cg-animate-progress-fill h-full rounded-full bg-[var(--cg-primary)]"
+              style={{ animationDuration: `${autoMs}ms` }}
+            />
+          </div>
+        </div>
       ) : (
         <button
           type="button"

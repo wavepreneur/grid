@@ -32,12 +32,12 @@ export function LevelHero({
         </div>
       ) : null}
       {title?.trim() ? (
-        <div className="min-w-0 space-y-1 px-4 pt-3 sm:px-5">
+        <div className="min-w-0 space-y-2.5 px-4 pt-4 sm:px-5 sm:pt-5">
           <h1 className="break-words text-xl font-bold leading-tight text-[var(--cg-fg)] [overflow-wrap:anywhere] sm:text-2xl">
             {title.trim()}
           </h1>
           {description?.trim() ? (
-            <p className="break-words text-sm leading-snug text-[var(--cg-muted)] [overflow-wrap:anywhere] whitespace-pre-wrap">
+            <p className="break-words text-sm leading-relaxed text-[var(--cg-muted)] [overflow-wrap:anywhere] whitespace-pre-wrap">
               {description.trim()}
             </p>
           ) : null}
@@ -164,7 +164,7 @@ function LevelTileCard({
 }
 
 export function LevelTaskCard({ children }: { children: ReactNode }) {
-  return <div className="space-y-3">{children}</div>;
+  return <div className="space-y-4">{children}</div>;
 }
 
 export function LevelScoreHud({ children }: { children: ReactNode }) {

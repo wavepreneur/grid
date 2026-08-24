@@ -238,7 +238,15 @@ export function taskContentToBonus(
         : "gamma";
   const reward =
     content.scoring?.points && content.scoring.points > 0 ? content.scoring.points : 150;
-  const title = task.title.startsWith("Bonus") ? task.title : `Bonus: ${task.title}`;
+  const title = task.title?.trim() || "Bonusaufgabe";
+  const description = [
+    typeof task.description === "string" ? task.description.trim() : "",
+    typeof content.success_info === "string" ? content.success_info.trim() : "",
+  ]
+    .filter(Boolean)
+    .filter((part, index, all) => all.indexOf(part) === index)
+    .join("\n\n");
+  const hero_image_url = content.hero_image_url?.trim() || undefined;
   const intro =
     forRole === "team"
       ? "Diese Bonusaufgabe sehen alle im Team."
@@ -258,6 +266,8 @@ export function taskContentToBonus(
       for_team,
       title,
       intro,
+      description: description || undefined,
+      hero_image_url,
       question,
       options: content.options.map((o) => ({ id: o.id, label: o.label })),
       correct_option_id: correctId,
@@ -272,6 +282,8 @@ export function taskContentToBonus(
       for_team,
       title,
       intro,
+      description: description || undefined,
+      hero_image_url,
       question,
       options: [{ id: "done", label: "Erledigt" }],
       correct_option_id: "done",
@@ -280,31 +292,16 @@ export function taskContentToBonus(
     };
   }
 
-  // text / number / code boxes — free-text bonus
+  // text / number / code boxes — always show an input (never silent „Weiter“).
   const answer = (content.answer ?? "").trim();
-  if (!answer) {
-    // No keyed answer: treat as acknowledgement so the surprise still appears.
-    return {
-      for_role: role,
-      for_team,
-      title,
-      intro,
-      question,
-      options: [{ id: "done", label: "Weiter" }],
-      correct_option_id: "done",
-      reward,
-      answer_mode: "confirm",
-    };
-  }
-
-  const boxed = Boolean(content.code_boxes);
+  const boxed = Boolean(content.code_boxes) || /code|passwort|\bpin\b/i.test(question);
   const fields =
     content.number_fields === 2 ||
     content.number_fields === 3 ||
     content.number_fields === 4
       ? content.number_fields
       : boxed
-        ? Math.min(4, Math.max(1, answer.length || 4))
+        ? Math.min(4, Math.max(1, answer.length || 4)) as 1 | 2 | 3 | 4
         : undefined;
 
   return {
@@ -312,13 +309,15 @@ export function taskContentToBonus(
     for_team,
     title,
     intro,
+    description: description || undefined,
+    hero_image_url,
     question,
     options: [],
     correct_option_id: "__text__",
     reward,
     answer_mode: boxed ? "boxes" : "text",
     answer,
-    number_fields: fields as 1 | 2 | 3 | 4 | undefined,
+    number_fields: fields,
   };
 }
 

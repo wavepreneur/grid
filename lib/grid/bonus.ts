@@ -36,6 +36,11 @@ export function parseBonusTask(raw: unknown): BonusTask | undefined {
     for_team: Boolean(b.for_team),
     title: b.title,
     intro: typeof b.intro === "string" ? b.intro : undefined,
+    description: typeof b.description === "string" ? b.description : undefined,
+    hero_image_url:
+      typeof b.hero_image_url === "string" && b.hero_image_url.trim()
+        ? b.hero_image_url.trim()
+        : undefined,
     question: b.question,
     options: Array.isArray(b.options) ? (b.options as BonusTask["options"]) : [],
     correct_option_id:
@@ -159,8 +164,11 @@ export function isBonusAnswerCorrect(bonus: BonusTask, submission: string): bool
     bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
   if (mode === "text" || mode === "boxes") {
     const expected = (bonus.answer ?? "").trim();
-    if (!expected) return false;
-    return normalizeAnswer(submission) === normalizeAnswer(expected);
+    const given = submission.trim();
+    if (!given) return false;
+    // No solution configured in Studio: accept any non-empty attempt (still immersive).
+    if (!expected) return true;
+    return normalizeAnswer(given) === normalizeAnswer(expected);
   }
   const correctIds =
     bonus.correct_option_ids && bonus.correct_option_ids.length > 0

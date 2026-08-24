@@ -15,7 +15,7 @@ import {
 } from "@/components/game/play-more-sheet";
 import { PlayQuizView } from "@/components/game/play-quiz-view";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
-import { canPresentBonus, findBonusTaskById, resolveBonusTask } from "@/lib/grid/bonus";
+import { canPresentBonus, findBonusTaskById } from "@/lib/grid/bonus";
 import { findPresentableBonusForRole } from "@/lib/grid/bonus-queue";
 import type { PurchasedTileHint, TeamGameState } from "@/lib/grid/game-state";
 import type {
@@ -194,8 +194,10 @@ export function PlayPhaseFlow({
       />
     </div>
   ) : (
-    <div className="flex justify-end px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1">
-      <PlayMoreTrigger onClick={() => onMorePanel("menu")} />
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-end px-4 pt-[max(0.5rem,env(safe-area-inset-top))]">
+      <span className="pointer-events-auto">
+        <PlayMoreTrigger onClick={() => onMorePanel("menu")} />
+      </span>
     </div>
   );
 
@@ -265,6 +267,7 @@ export function PlayPhaseFlow({
         <>
           {sheets}
           <PlayBonusView
+            key={presentBonusMeta.bonus_id}
             bonus={bonus}
             mode={mode}
             isMine
@@ -287,17 +290,18 @@ export function PlayPhaseFlow({
     const activeItem = gameState.bonus_queue?.find(
       (item) => item.status === "active" && item.from_level === level.level,
     );
+    // Only show when a queue item is actually active — never fall back to
+    // resolveBonusTask(level) or the same bonus reappears after completion.
     const bonus =
-      findBonusTaskById(level, activeItem?.bonus_id) ??
-      activeItem?.task_snapshot ??
-      resolveBonusTask(level);
-    if (bonus) {
+      findBonusTaskById(level, activeItem?.bonus_id) ?? activeItem?.task_snapshot ?? null;
+    if (bonus && activeItem) {
       const mine = canPresentBonus(bonus, myRole, { claimUnassigned });
       return (
         <>
           {chrome}
           {sheets}
           <PlayBonusView
+            key={activeItem.bonus_id}
             bonus={bonus}
             mode={mode}
             isMine={mine}
@@ -322,9 +326,9 @@ export function PlayPhaseFlow({
         <PlayTransitionScreen
           kind="unlock"
           title="Der Schlüssel öffnet das Level"
-          subtitle="Ihr seid zurück im Spiel — jetzt kommt die eigentliche Aufgabe."
+          subtitle="Gleich kommt die eigentliche Aufgabe — kurz warten."
           audienceIcons={3}
-          autoMs={2200}
+          autoMs={5000}
           onDone={() => setUnlockGate(false)}
         />
       </>
@@ -410,27 +414,25 @@ export function PlayPhaseFlow({
     <>
       {chrome}
       {sheets}
-      <div className="px-4 pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom)))]">
-        <ExitmaniaLevelView
-          level={mission}
-          allLevels={eventContent.levels}
-          levelStatuses={gameState.levels}
-          purchasedHints={purchasedHints}
-          score={score}
-          disabled={disabled || paused}
-          isPending={isPending}
-          canUnlockGps={canUnlockGps}
-          effectiveBeta={effectiveBeta}
-          soloAlpha={soloAlpha}
-          gpsCapability={mode === "outdoor" && mission.type === "gps"}
-          levelStartedAt={levelStartedAt}
-          teamStartedAt={teamStartedAt}
-          myPlayerId={myPlayerId}
-          onSubmit={onSolveLevel}
-          onPurchaseHint={onPurchaseHint}
-          feedback={solveFeedback}
-        />
-      </div>
+      <ExitmaniaLevelView
+        level={mission}
+        allLevels={eventContent.levels}
+        levelStatuses={gameState.levels}
+        purchasedHints={purchasedHints}
+        score={score}
+        disabled={disabled || paused}
+        isPending={isPending}
+        canUnlockGps={canUnlockGps}
+        effectiveBeta={effectiveBeta}
+        soloAlpha={soloAlpha}
+        gpsCapability={mode === "outdoor" && mission.type === "gps"}
+        levelStartedAt={levelStartedAt}
+        teamStartedAt={teamStartedAt}
+        myPlayerId={myPlayerId}
+        onSubmit={onSolveLevel}
+        onPurchaseHint={onPurchaseHint}
+        feedback={solveFeedback}
+      />
     </>
   );
 }

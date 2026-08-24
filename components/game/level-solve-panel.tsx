@@ -428,7 +428,7 @@ export function LevelSolvePanel({
             ) : null}
 
             {level.type === "digital" && inputMode === "confirm" ? (
-              <p className="text-center text-sm text-[var(--cg-muted)]">
+              <p className="pt-1 text-center text-sm text-[var(--cg-muted)]">
                 Tippt OK, wenn ihr fertig seid.
               </p>
             ) : null}

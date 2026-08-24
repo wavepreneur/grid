@@ -331,7 +331,14 @@ export async function solveCurrentLevel(input: {
       ? 0
       : computeLevelReward(levelDefinition.scoring, levelState.started_at);
 
-    const bonusDefs = resolveBonusDefinitions(levelDefinition);
+    const bonusDefsRaw = resolveBonusDefinitions(levelDefinition);
+    // Dedupe by id — duplicate Studio bindings must not arm the same surprise twice.
+    const seenBonusIds = new Set<string>();
+    const bonusDefs = bonusDefsRaw.filter((def) => {
+      if (seenBonusIds.has(def.id)) return false;
+      seenBonusIds.add(def.id);
+      return true;
+    });
     // Bonus only after a real solve — reveal-solution completes without bonus.
     const wantBonus =
       Boolean(bonusDefs.length > 0) && !input.payload?.revealSolution;
@@ -408,6 +415,8 @@ export async function solveCurrentLevel(input: {
               for_team: Boolean(def.for_team),
               title: def.title,
               intro: def.intro,
+              description: def.description,
+              hero_image_url: def.hero_image_url,
               question: def.question,
               options: def.options,
               correct_option_id: def.correct_option_id,
@@ -1536,7 +1545,9 @@ async function completeActiveBonus(input: {
     reward = correct ? bonus.reward : 0;
   }
 
-  const allDone = Object.values(gameState.levels).every((entry) => entry.status === "completed");
+  const allDoneLevels = Object.values(gameState.levels).every(
+    (entry) => entry.status === "completed",
+  );
   const noticeId = `bonus-${Date.now()}-${player.id.slice(0, 8)}`;
   const now = new Date();
   const doneId = active.bonus_id ?? `${active.from_level}`;
@@ -1554,10 +1565,46 @@ async function completeActiveBonus(input: {
       }
     : null;
 
+  // Team bonus locks current_phase to "bonus" — must advance after solve,
+  // otherwise PlayPhaseFlow falls back to resolveBonusTask and shows it again.
+  const wasTeamPhase =
+    Boolean(active.for_team) || gameState.current_phase === "bonus";
+  let nextPhase = gameState.current_phase;
+  let pendingNext = gameState.pending_next_level ?? null;
+  let nextLevel = team.current_level || active.from_level;
+  let levels = gameState.levels;
+  let finished = false;
+
+  if (wasTeamPhase && !nextActive) {
+    const pending = gameState.pending_next_level;
+    finished =
+      pending === null ||
+      pending === undefined ||
+      pending > content.levels.length ||
+      allDoneLevels;
+    nextLevel = finished ? active.from_level : (pending ?? active.from_level + 1);
+    const nextSlot = getLevelDefinition(content, nextLevel);
+    nextPhase = finished
+      ? gameState.current_phase
+      : nextSlot && usesPhasedPlay(content)
+        ? initialPhaseForSurface(
+            content.contentMode,
+            buildPlaySlot(nextSlot, content.contentMode),
+            nextSlot,
+          )
+        : "hub";
+    pendingNext = null;
+    if (!finished) {
+      levels = activateLevelEntry(levels, String(nextLevel));
+    }
+  }
+
   const nextGameState: TeamGameState = {
     ...gameState,
     version: gameState.version + 1,
     score: gameState.score + reward,
+    current_phase: nextPhase,
+    pending_next_level: pendingNext,
     active_bonus: nextActive,
     bonus_queue: nextQueue,
     bonus_notice: {
@@ -1567,15 +1614,17 @@ async function completeActiveBonus(input: {
       reward,
       created_at: now.toISOString(),
     },
+    levels,
   };
 
   const supabase = createAdminClient();
   const { data: updatedTeam, error } = await supabase
     .from("teams")
     .update({
+      current_level: wasTeamPhase && !nextActive ? nextLevel : team.current_level,
       game_state: nextGameState,
-      status: allDone ? "finished" : "playing",
-      finished_at: allDone ? new Date().toISOString() : null,
+      status: finished || allDoneLevels ? "finished" : "playing",
+      finished_at: finished || allDoneLevels ? new Date().toISOString() : null,
     })
     .eq("id", team.id)
     .eq("status", "playing")
