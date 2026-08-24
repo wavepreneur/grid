@@ -78,6 +78,8 @@ export function GameRoom({
   const [solveFeedback, setSolveFeedback] = useState<SolveFeedbackState | null>(null);
   const [sessionSuperseded, setSessionSuperseded] = useState(false);
   const [isPending, startTransition] = useTransition();
+  /** Only user solve/submit actions — never Realtime resync (that was flipping OK ↔ Sende…). */
+  const [isSolvePending, startSolveTransition] = useTransition();
   const [isHintPending, startHintTransition] = useTransition();
   const [morePanel, setMorePanel] = useState<PlayMorePanel>(null);
   const [paused, setPaused] = useState(false);
@@ -127,17 +129,17 @@ export function GameRoom({
   }, []);
 
   const handleResynced = useCallback(() => {
-    startTransition(async () => {
-      const result = await getGameState({
-        inviteCode,
-        joinCode,
-        sessionId: playerSession.sessionId,
-      });
+    // Background pull — must not touch solve isPending (desktop reconnect spam).
+    void getGameState({
+      inviteCode,
+      joinCode,
+      sessionId: playerSession.sessionId,
+    }).then((result) => {
       if (!result.success) return;
       setTeamState(result.data);
       cacheTeamState(result.data);
     });
-  }, [inviteCode, joinCode, playerSession.sessionId, startTransition]);
+  }, [inviteCode, joinCode, playerSession.sessionId]);
 
   const { isConnected, statusHint: realtimeHint, error: realtimeError } = useTeamSync({
     sessionId: playerSession.sessionId,
@@ -262,7 +264,7 @@ export function GameRoom({
         ? payload.selectedOptionIds.join(", ")
         : payload.selectedOptionId) ||
       null;
-    startTransition(async () => {
+    startSolveTransition(async () => {
       const result = await solveCurrentLevel({
         inviteCode,
         joinCode,
@@ -307,7 +309,7 @@ export function GameRoom({
 
   function handleArriveOutdoor(input: OutdoorArriveInput) {
     setError(null);
-    startTransition(async () => {
+    startSolveTransition(async () => {
       const result = await advanceFromHub({
         inviteCode,
         joinCode,
@@ -356,7 +358,7 @@ export function GameRoom({
 
   function handleOpenStation(levelNumber: number) {
     setError(null);
-    startTransition(async () => {
+    startSolveTransition(async () => {
       applyTeamResult(
         await advanceFromHub({
           inviteCode,
@@ -370,7 +372,7 @@ export function GameRoom({
 
   function handleSubmitStationCode(code: string) {
     setError(null);
-    startTransition(async () => {
+    startSolveTransition(async () => {
       applyTeamResult(
         await advanceFromHub({
           inviteCode,
@@ -384,7 +386,7 @@ export function GameRoom({
 
   function handleStartMission(levelNumber: number) {
     setError(null);
-    startTransition(async () => {
+    startSolveTransition(async () => {
       applyTeamResult(
         await advanceFromHub({
           inviteCode,
@@ -401,7 +403,7 @@ export function GameRoom({
     selectedOptionIds?: string[];
   }) {
     setError(null);
-    startTransition(async () => {
+    startSolveTransition(async () => {
       applyTeamResult(
         await submitArrivalQuiz({
           inviteCode,
@@ -416,7 +418,7 @@ export function GameRoom({
 
   function handleAdvanceQuizToLevel() {
     setError(null);
-    startTransition(async () => {
+    startSolveTransition(async () => {
       applyTeamResult(
         await advanceQuizToLevel({
           inviteCode,
@@ -429,7 +431,7 @@ export function GameRoom({
 
   function handleSubmitBonus(selectedOptionId: string) {
     setError(null);
-    startTransition(async () => {
+    startSolveTransition(async () => {
       applyTeamResult(
         await submitBonusAnswer({
           inviteCode,
@@ -443,7 +445,7 @@ export function GameRoom({
 
   function handleSkipBonus() {
     setError(null);
-    startTransition(async () => {
+    startSolveTransition(async () => {
       applyTeamResult(
         await skipBonusPhase({
           inviteCode,
@@ -632,7 +634,7 @@ export function GameRoom({
         purchasedHints={purchasedTileHints}
         score={teamState.gameState.score ?? 0}
         disabled={solveDisabled && teamState.gameState.current_phase !== "bonus"}
-        isPending={isPending || isHintPending}
+        isPending={isSolvePending || isHintPending}
         canUnlockGps={isNavigator}
         effectiveBeta={playerSession.effectiveBeta}
         soloAlpha={soloAlpha}
@@ -704,7 +706,7 @@ export function GameRoom({
         purchasedHints={purchasedTileHints}
         score={teamState.gameState.score ?? 0}
         disabled={solveDisabled}
-        isPending={isPending || isHintPending}
+        isPending={isSolvePending || isHintPending}
         canUnlockGps={isNavigator}
         effectiveBeta={playerSession.effectiveBeta}
         soloAlpha={soloAlpha}
@@ -720,7 +722,7 @@ export function GameRoom({
       <LevelPanel
         level={currentLevelDefinition}
         disabled={solveDisabled}
-        isPending={isPending}
+        isPending={isSolvePending}
         isNavigator={isNavigator}
         onSubmit={handleSolveLevel}
       />

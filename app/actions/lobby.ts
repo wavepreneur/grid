@@ -282,16 +282,25 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
         actor_player_id: team.captain_player_id,
         payload: { started_at: startedAt, source: "auto" },
       });
-      await initializeTeamGameState(
-        teamId,
-        team.captain_player_id,
-        event.id,
-        event.organization_id,
-        event.city_id,
-        event.content_config,
-        event.route_override,
-        event.studio_game_version_id,
-      );
+      const actorPlayerId = team.captain_player_id;
+      const eventId = event.id;
+      const organizationId = event.organization_id;
+      const cityId = event.city_id;
+      const contentConfig = event.content_config;
+      const routeOverride = event.route_override;
+      const studioGameVersionId = event.studio_game_version_id;
+      after(() => {
+        void initializeTeamGameState(
+          teamId,
+          actorPlayerId,
+          eventId,
+          organizationId,
+          cityId,
+          contentConfig,
+          routeOverride,
+          studioGameVersionId,
+        );
+      });
     }
   }
 }
@@ -1069,22 +1078,39 @@ export async function startGameManually(input: {
       payload: { started_at: startedAt, source: "manual" },
     });
 
-    await initializeTeamGameState(
-      team.id,
-      player.id,
-      event.id,
-      event.organization_id,
-      event.city_id,
-      event.content_config,
-      event.route_override,
-      event.studio_game_version_id,
-    );
+    // Return right away so lead + waiters leave the lobby; heavy content init follows.
+    const eventId = event.id;
+    const organizationId = event.organization_id;
+    const cityId = event.city_id;
+    const contentConfig = event.content_config;
+    const routeOverride = event.route_override;
+    const studioGameVersionId = event.studio_game_version_id;
+    const actorPlayerId = player.id;
+    const teamId = team.id;
 
-    await supabase
-      .from("events")
-      .update({ status: "active", started_at: startedAt })
-      .eq("id", event.id)
-      .in("status", ["draft", "lobby"]);
+    after(() => {
+      void (async () => {
+        try {
+          await initializeTeamGameState(
+            teamId,
+            actorPlayerId,
+            eventId,
+            organizationId,
+            cityId,
+            contentConfig,
+            routeOverride,
+            studioGameVersionId,
+          );
+          await supabase
+            .from("events")
+            .update({ status: "active", started_at: startedAt })
+            .eq("id", eventId)
+            .in("status", ["draft", "lobby"]);
+        } catch {
+          /* Play gate retries until game_state exists. */
+        }
+      })();
+    });
 
     return { success: true, data: { startedAt } };
   } catch (error) {

@@ -141,12 +141,14 @@ export function useTeamSync({
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let attempt = 0;
     let connecting = false;
+    let subscribed = false;
 
     async function teardown() {
       if (retryTimer) {
         clearTimeout(retryTimer);
         retryTimer = null;
       }
+      subscribed = false;
       const channel = channelRef.current;
       channelRef.current = null;
       if (channel) {
@@ -162,6 +164,7 @@ export function useTeamSync({
     function scheduleRetry() {
       if (cancelled) return;
       attempt += 1;
+      subscribed = false;
       const delayMs = Math.min(1000 * 2 ** Math.min(attempt - 1, 4), 12_000);
       setIsConnected(false);
       setStatusHint(
@@ -304,6 +307,7 @@ export function useTeamSync({
 
           if (status === "SUBSCRIBED") {
             attempt = 0;
+            subscribed = true;
             setIsConnected(true);
             setStatusHint(null);
             setError(null);
@@ -320,6 +324,7 @@ export function useTeamSync({
             status === "TIMED_OUT" ||
             status === "CLOSED"
           ) {
+            subscribed = false;
             connecting = false;
             setIsConnected(false);
             scheduleRetry();
@@ -333,6 +338,11 @@ export function useTeamSync({
     function resumeIfNeeded() {
       if (cancelled) return;
       if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      // Healthy channel: soft pull only — full reconnect was thrashing desktop UI.
+      if (subscribed && channelRef.current) {
+        onResyncedRef.current?.();
         return;
       }
       attempt = 0;

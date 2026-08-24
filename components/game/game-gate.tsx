@@ -68,11 +68,24 @@ export function GameGate({
         return;
       }
 
-      const gameResult = await getGameState({
+      // Manual start returns before game_state is written — retry briefly.
+      let gameResult = await getGameState({
         inviteCode,
         joinCode,
         sessionId: syncedSession.sessionId,
       });
+
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        if (!gameResult.success) break;
+        const levels = gameResult.data.gameState?.levels ?? {};
+        if (Object.keys(levels).length > 0) break;
+        await new Promise((resolve) => window.setTimeout(resolve, 250));
+        gameResult = await getGameState({
+          inviteCode,
+          joinCode,
+          sessionId: syncedSession.sessionId,
+        });
+      }
 
       if (!gameResult.success) {
         abandonTeamSession();
