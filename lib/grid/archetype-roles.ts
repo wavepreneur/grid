@@ -59,8 +59,12 @@ export function resolveArchetypeRoleFlags(input: {
   const isAlpha = archetypeRole === "alpha";
   const isBeta = archetypeRole === "beta";
   const isGamma = archetypeRole === "gamma";
-  const hasDedicatedBeta = Boolean(input.team.betaPlayerId) && input.activePlayerCount >= 2;
-  const effectiveBeta = isBeta || (isAlpha && input.activePlayerCount === 1 && !hasDedicatedBeta);
+  // If nobody else is Beta (missing assignment / solo), Alpha still sees notes & tiles.
+  const hasDedicatedBeta =
+    Boolean(input.team.betaPlayerId) &&
+    input.team.betaPlayerId !== input.playerId &&
+    input.activePlayerCount >= 2;
+  const effectiveBeta = isBeta || (isAlpha && !hasDedicatedBeta);
 
   return {
     archetypeRole,

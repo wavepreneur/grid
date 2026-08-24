@@ -113,11 +113,20 @@ export function LobbyRoom({
       sessionId: session.sessionId,
     });
 
-    if (result.success) {
-      setSnapshot(result.data);
-      setCountdown(formatCountdown(result.data.lobby_auto_start_at));
+    if (!result.success) return;
+
+    // Polling often sees "playing" before/without Realtime — never leave the lobby stuck.
+    if (
+      !manageMode &&
+      (result.data.team_status === "playing" || result.data.team_status === "finished")
+    ) {
+      router.replace(eventPlayPath(inviteCode, joinCode));
+      return;
     }
-  }, [inviteCode, joinCode, session.sessionId]);
+
+    setSnapshot(result.data);
+    setCountdown(formatCountdown(result.data.lobby_auto_start_at));
+  }, [inviteCode, joinCode, manageMode, router, session.sessionId]);
 
   const syncSessionFromServer = useCallback(async () => {
     const verified = await verifyTeamSession({
@@ -215,7 +224,9 @@ export function LobbyRoom({
     sessionId: session.sessionId,
     teamId: session.teamId,
     playerId: session.playerId,
-    enabled: !sessionSuperseded && (snapshot.team_status === "lobby" || manageMode),
+    // Keep sync alive until we leave the lobby route — disabling on status flip
+    // used to drop the "playing" redirect when only the poll noticed the start.
+    enabled: !sessionSuperseded,
     onTeamStatusChange: handleTeamStatusChange,
     onPlayersChange: handlePlayersChange,
     onSessionSuperseded: () => setSessionSuperseded(true),
@@ -224,6 +235,14 @@ export function LobbyRoom({
       void syncSessionFromServer();
     },
   });
+
+  // Belt-and-suspenders: any path that marks the snapshot as playing must leave the lobby.
+  useEffect(() => {
+    if (manageMode) return;
+    if (snapshot.team_status === "playing" || snapshot.team_status === "finished") {
+      router.replace(eventPlayPath(inviteCode, joinCode));
+    }
+  }, [inviteCode, joinCode, manageMode, router, snapshot.team_status]);
 
   const autoStartMsLeft = snapshot.lobby_auto_start_at
     ? new Date(snapshot.lobby_auto_start_at).getTime() - Date.now()

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createClient, type RealtimeChannel, type SupabaseClient } from "@supabase/supabase-js";
+import { type RealtimeChannel, type SupabaseClient } from "@supabase/supabase-js";
 import { getRealtimeAccessToken } from "@/app/actions/realtime";
 import { cacheTeamState, loadCachedTeamState } from "@/lib/grid/offline-state";
 import {
@@ -10,6 +10,7 @@ import {
   type TeamSyncEvent,
 } from "@/lib/grid/game-state";
 import type { LobbyPlayer } from "@/lib/grid/types";
+import { getPlayRealtimeClient } from "@/lib/supabase/realtime-browser";
 
 type UseTeamSyncOptions = {
   sessionId: string;
@@ -205,19 +206,10 @@ export function useTeamSync({
 
       const { accessToken } = tokenResult.data;
 
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-          global: {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          },
-        },
-      );
-
-      await supabase.realtime.setAuth(accessToken);
+      const supabase = getPlayRealtimeClient({
+        sessionId,
+        accessToken,
+      });
       if (cancelled) {
         connecting = false;
         return;

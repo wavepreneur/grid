@@ -66,6 +66,14 @@ export function LobbyGate({
           return;
         }
 
+        if (
+          !manageMode &&
+          (result.data.team_status === "playing" || result.data.team_status === "finished")
+        ) {
+          router.replace(eventPlayPath(inviteCode, joinCode));
+          return;
+        }
+
         setSnapshot(result.data);
       });
     });

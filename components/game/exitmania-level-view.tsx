@@ -137,8 +137,8 @@ export function ExitmaniaLevelView({
           <BetaNotesPanel {...betaPanelProps} layout="inline" cityStyle />
         ) : (
           <div className="rounded-3xl bg-[var(--cg-card)] px-4 py-4 text-sm text-[var(--cg-muted)] shadow-[var(--cg-shadow-soft)]">
-            Hinweise und Dokumente sieht nur die Hinweis-Rolle. Der Team-Leiter schaltet
-            Wegpunkte frei.
+            Hinweise und Dokumente erscheinen auf dem Gerät der Hinweis-Rolle. Du kannst die
+            Aufgabe trotzdem lösen bzw. mit OK bestätigen.
           </div>
         )}
       </div>
