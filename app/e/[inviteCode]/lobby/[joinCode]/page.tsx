@@ -28,6 +28,12 @@ export default async function EventLobbyPage({ params, searchParams }: EventLobb
   const contentResult = await getEventContent(normalizedInvite);
   const content = contentResult.success ? contentResult.data : null;
 
+  const contentConfig = eventResult.data.content_config as
+    | Record<string, unknown>
+    | null
+    | undefined;
+  const studioTest = Boolean(contentConfig?.is_studio_test);
+
   return (
     <GridShell
       variant="welcome"
@@ -47,6 +53,7 @@ export default async function EventLobbyPage({ params, searchParams }: EventLobb
         eventTitle={content?.templateName?.trim() || eventResult.data.title}
         briefingIframeUrl={content?.briefingIframeUrl}
         roleLabels={content?.roleLabels}
+        studioTest={studioTest}
       />
     </GridShell>
   );

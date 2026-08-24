@@ -43,6 +43,8 @@ type LobbyRoomProps = {
   eventTitle?: string;
   briefingIframeUrl?: string | null;
   roleLabels?: RoleDisplayLabels | null;
+  /** Studio test sessions may invite freely; live bookings are capped by paid seats. */
+  studioTest?: boolean;
 };
 
 function formatCountdown(targetIso: string | null): string {
@@ -66,6 +68,7 @@ export function LobbyRoom({
   eventTitle,
   briefingIframeUrl = null,
   roleLabels = null,
+  studioTest = false,
 }: LobbyRoomProps) {
   const router = useRouter();
   const labels = roleLabels ?? DEFAULT_ROLE_LABELS;
@@ -300,6 +303,10 @@ export function LobbyRoom({
     teamAllowsMore &&
     playerCount < snapshot.max_size &&
     (isLobby || (manageMode && isPlaying));
+  // Live: no solo “optional invite” — seats are paid/booked; joining uses the booking flow.
+  // Studio test: keep optional invite so you can pull devices into the lobby.
+  const showSoloInvite = canInviteTeammates && aloneNow && studioTest;
+  const showTeamInvite = canInviteTeammates && !aloneNow;
 
   useEffect(() => {
     if (aloneNow) setManageOpen(false);
@@ -412,36 +419,39 @@ export function LobbyRoom({
             </div>
           ) : null}
 
-          {canInviteTeammates ? (
-            aloneNow ? (
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => setInviteOpen((v) => !v)}
-                  className="w-full text-center text-sm font-medium text-slate-500 underline-offset-2 hover:underline"
-                >
-                  {inviteOpen ? "Einladen ausblenden" : "Optional: Mitspieler einladen"}
-                </button>
-                {inviteOpen && teammateUrl ? (
-                  <div className="space-y-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5">
-                    <QrInviteImage url={teammateUrl} />
-                    <CopyInviteLink url={teammateUrl} label="Einladungslink kopieren" />
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <div className="space-y-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5">
-                <p className="text-center text-sm font-semibold text-slate-800">
-                  Freunde einladen
-                </p>
-                {teammateUrl ? (
-                  <>
-                    <QrInviteImage url={teammateUrl} />
-                    <CopyInviteLink url={teammateUrl} label="Einladungslink kopieren" />
-                  </>
-                ) : null}
-              </div>
-            )
+          {showSoloInvite ? (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setInviteOpen((v) => !v)}
+                className="w-full text-center text-sm font-medium text-slate-500 underline-offset-2 hover:underline"
+              >
+                {inviteOpen ? "Einladen ausblenden" : "Optional: Mitspieler einladen (Test)"}
+              </button>
+              {inviteOpen && teammateUrl ? (
+                <div className="space-y-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5">
+                  <QrInviteImage url={teammateUrl} />
+                  <CopyInviteLink url={teammateUrl} label="Einladungslink kopieren" />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {showTeamInvite ? (
+            <div className="space-y-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5">
+              <p className="text-center text-sm font-semibold text-slate-800">
+                Freunde einladen
+              </p>
+              <p className="text-center text-xs text-slate-500">
+                Noch {snapshot.max_size - playerCount} von {snapshot.max_size} Plätzen frei
+              </p>
+              {teammateUrl ? (
+                <>
+                  <QrInviteImage url={teammateUrl} />
+                  <CopyInviteLink url={teammateUrl} label="Einladungslink kopieren" />
+                </>
+              ) : null}
+            </div>
           ) : null}
 
           {isAlpha && isLobby ? (

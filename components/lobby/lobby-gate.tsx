@@ -20,6 +20,7 @@ type LobbyGateProps = {
   eventTitle?: string;
   briefingIframeUrl?: string | null;
   roleLabels?: RoleDisplayLabels | null;
+  studioTest?: boolean;
 };
 
 export function LobbyGate({
@@ -29,6 +30,7 @@ export function LobbyGate({
   eventTitle,
   briefingIframeUrl = null,
   roleLabels = null,
+  studioTest = false,
 }: LobbyGateProps) {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState<LobbySnapshot | null>(null);
@@ -89,6 +91,7 @@ export function LobbyGate({
       eventTitle={eventTitle}
       briefingIframeUrl={briefingIframeUrl}
       roleLabels={roleLabels}
+      studioTest={studioTest}
     />
   );
 }
