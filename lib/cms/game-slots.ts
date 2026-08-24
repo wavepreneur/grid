@@ -315,7 +315,10 @@ export function buildGameSlots(links: StudioGameTaskLink[]): GameSlot[] {
 
     for (const binding of bindings) {
       const found =
-        bonuses.find((b) => b.task_id === binding.task_id || b.id === binding.task_id) ?? null;
+        bonuses.find((b) => b.task_id === binding.task_id || b.id === binding.task_id) ??
+        // Content may already be linked under another layer — still attach for compile.
+        geos.concat(missions).find((b) => b.task_id === binding.task_id || b.id === binding.task_id) ??
+        null;
       if (found) bonusLinks.push(found);
     }
 

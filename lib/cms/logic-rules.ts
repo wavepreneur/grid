@@ -3,6 +3,7 @@ import type { StudioGame, StudioGameTaskLink, StudioTaskContent } from "@/lib/cm
 import {
   groupLinksByLayerOnLink,
   parseBonusTrigger,
+  parseLinkLayer,
   parseLinkOverrides,
   roleAssignmentToPlayerRole,
 } from "@/lib/cms/game-link-config";
@@ -575,8 +576,6 @@ export function compileStudioGameToLevels(input: {
       }
 
       if (slot.bonusBindings.length > 0 || slot.bonusLinks.length > 0) {
-        const layer3 = input.links.filter((l) => l.layer === 3);
-
         const compiled = [];
         const pairs =
           slot.bonusBindings.length > 0
@@ -586,7 +585,13 @@ export function compileStudioGameToLevels(input: {
                   slot.bonusLinks.find(
                     (l) => l.task_id === binding.task_id || l.id === binding.task_id,
                   ) ??
-                  layer3.find(
+                  input.links.find(
+                    (b) =>
+                      parseLinkLayer(b) === 3 &&
+                      (b.task_id === binding.task_id || b.id === binding.task_id),
+                  ) ??
+                  // Fallback: task linked under wrong layer still has the content.
+                  input.links.find(
                     (b) => b.task_id === binding.task_id || b.id === binding.task_id,
                   ) ??
                   null,

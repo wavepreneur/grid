@@ -4,6 +4,7 @@ import {
   type OutdoorProgressState,
 } from "@/lib/grid/outdoor-unlock";
 import type { PlayPhase } from "@/lib/grid/play-surface";
+import { parseBonusTask } from "@/lib/grid/bonus";
 
 /** @deprecated Use EXITMANIA_TOTAL_LEVELS */
 export const PHASE2_DEMO_LEVELS = EXITMANIA_TOTAL_LEVELS;
@@ -59,6 +60,11 @@ export type BonusQueueItem = {
   /** When set, completing this bonus re-arms another after N minutes. */
   interval_minutes?: number;
   fanfare_shown?: boolean;
+  /**
+   * Content snapshot at arm time — UI must not depend on a fresh client content load
+   * (Studio test edits / unpublished publish snapshots).
+   */
+  task_snapshot?: import("@/lib/grid/level-types").BonusTask;
 };
 
 /** Short team broadcast after a bonus is finished. */
@@ -289,6 +295,7 @@ function parseBonusQueue(value: unknown): BonusQueueItem[] | undefined {
           ? c.interval_minutes
           : undefined,
       fanfare_shown: Boolean(c.fanfare_shown),
+      task_snapshot: parseBonusTask(c.task_snapshot) ?? undefined,
     });
   }
   return items;

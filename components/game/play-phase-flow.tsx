@@ -237,20 +237,24 @@ export function PlayPhaseFlow({
         from_level: queueBonus.from_level,
         bonus_id: queueBonus.bonus_id,
         for_team: queueBonus.for_team,
+        snapshot: queueBonus.task_snapshot ?? null,
       }
     : overlayBonus
       ? {
           from_level: overlayBonus.from_level,
           bonus_id: overlayBonus.bonus_id,
           for_team: overlayBonus.for_team,
+          snapshot:
+            (gameState.bonus_queue ?? []).find((i) => i.bonus_id === overlayBonus.bonus_id)
+              ?.task_snapshot ?? null,
         }
       : null;
 
   if (presentBonusMeta) {
     const bonusLevel = eventContent.levels.find((l) => l.level === presentBonusMeta.from_level);
-    const bonus = bonusLevel
-      ? findBonusTaskById(bonusLevel, presentBonusMeta.bonus_id)
-      : null;
+    const bonus =
+      (bonusLevel ? findBonusTaskById(bonusLevel, presentBonusMeta.bonus_id) : null) ??
+      presentBonusMeta.snapshot;
     if (bonus && isBonusForRole(bonus, myRole)) {
       return (
         <>
@@ -275,10 +279,13 @@ export function PlayPhaseFlow({
   }
 
   if (phase === "bonus" && level) {
-    const activeId = gameState.bonus_queue?.find(
+    const activeItem = gameState.bonus_queue?.find(
       (item) => item.status === "active" && item.from_level === level.level,
-    )?.bonus_id;
-    const bonus = findBonusTaskById(level, activeId) ?? resolveBonusTask(level);
+    );
+    const bonus =
+      findBonusTaskById(level, activeItem?.bonus_id) ??
+      activeItem?.task_snapshot ??
+      resolveBonusTask(level);
     if (bonus) {
       return (
         <>

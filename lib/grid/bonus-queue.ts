@@ -82,6 +82,7 @@ export function markBonusDone(
         armed_at: now.toISOString(),
         ready_at: readyAt,
         fanfare_shown: false,
+        task_snapshot: item.task_snapshot,
       });
     }
   }

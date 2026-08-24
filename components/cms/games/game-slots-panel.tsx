@@ -376,6 +376,10 @@ export function GameSlotsPanel({
 
     setError(null);
     startTransition(async () => {
+      if (bonusBindings.some((b) => !b.task_id.trim())) {
+        setError("Bitte für jeden Bonus eine Aufgabe wählen.");
+        return;
+      }
       const result = await updateGameTaskLinkConfig(gameId, editSlot.levelLink.id, {
         opener_task_id: quizEnabled ? openerTaskId : null,
         opener_points: quizEnabled ? quizPoints : null,
@@ -401,6 +405,7 @@ export function GameSlotsPanel({
       });
 
       for (const binding of bonusBindings) {
+        if (!binding.task_id.trim()) continue;
         let bonusLink = nextLinks.find(
           (l) => l.task_id === binding.task_id && parseLinkLayer(l) === 3,
         );
@@ -409,6 +414,10 @@ export function GameSlotsPanel({
           if (add.success && add.data) {
             bonusLink = add.data;
             nextLinks = [...nextLinks, add.data];
+          } else {
+            // Already linked (any layer) — compile can still resolve content by task_id.
+            bonusLink =
+              nextLinks.find((l) => l.task_id === binding.task_id) ?? undefined;
           }
         }
         if (bonusLink) {

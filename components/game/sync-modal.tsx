@@ -24,7 +24,7 @@ export function SyncModal({ modal, onDismiss, isPending }: SyncModalProps) {
   }, [modal.id, hasNote]);
 
   return (
-    <div className="city-game fixed inset-0 z-[120] flex items-end justify-center bg-[var(--cg-ink)]/75 p-4 backdrop-blur-sm sm:items-center">
+    <div className="city-game fixed inset-0 z-[120] flex items-center justify-center bg-[var(--cg-ink)]/75 p-4 backdrop-blur-sm">
       <div
         role="dialog"
         aria-modal="true"

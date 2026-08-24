@@ -376,6 +376,17 @@ export async function solveCurrentLevel(input: {
               when.type === "interval_minutes" && when.minutes
                 ? when.minutes
                 : undefined,
+            task_snapshot: {
+              for_role: def.for_role,
+              for_team: Boolean(def.for_team),
+              title: def.title,
+              intro: def.intro,
+              question: def.question,
+              options: def.options,
+              correct_option_id: def.correct_option_id,
+              correct_option_ids: def.correct_option_ids,
+              reward: def.reward,
+            },
           };
         })
       : (gameState.bonus_queue ?? []);
@@ -702,8 +713,13 @@ export async function dismissSyncModal(input: {
 
     // After a normal solve, open hub for the next slot. Bonus stays on bonus after dismiss.
     // Solo-role bonus already advanced to hub with active_bonus — leave phase alone.
-    let nextPhase = gameState.current_phase;
+    // Also recover if queue already has an active team bonus but phase drifted.
+    const activeTeamBonus = (gameState.bonus_queue ?? []).some(
+      (item) => item.status === "active" && item.for_team,
+    );
+    let nextPhase = activeTeamBonus ? ("bonus" as const) : gameState.current_phase;
     if (
+      !activeTeamBonus &&
       gameState.current_phase === "level" &&
       !gameState.active_bonus &&
       usesPhasedPlay(content)
@@ -1391,7 +1407,10 @@ async function completeActiveBonus(input: {
   });
 
   const levelDefinition = getLevelDefinition(content, active.from_level);
-  const bonus = findBonusTaskById(levelDefinition, active.bonus_id);
+  const bonus =
+    findBonusTaskById(levelDefinition, active.bonus_id) ??
+    fromQueue?.task_snapshot ??
+    null;
   if (!bonus) {
     const now = new Date();
     const cleared: TeamGameState = {
@@ -1680,7 +1699,13 @@ async function leaveBonusPhase(input: {
 
   const bonusLevel = team.current_level || 1;
   const levelDefinition = getLevelDefinition(content, bonusLevel);
-  const bonus = resolveBonusTask(levelDefinition);
+  const activeQueued = (gameState.bonus_queue ?? []).find(
+    (item) => item.status === "active" && item.from_level === bonusLevel,
+  );
+  const bonus =
+    findBonusTaskById(levelDefinition, activeQueued?.bonus_id) ??
+    activeQueued?.task_snapshot ??
+    resolveBonusTask(levelDefinition);
 
   let reward = 0;
   let correct = false;
@@ -1824,7 +1849,13 @@ export async function submitBonusAnswer(input: {
 
     const bonusLevel = team.current_level || 1;
     const levelDefinition = getLevelDefinition(content, bonusLevel);
-    const bonus = resolveBonusTask(levelDefinition);
+    const activeQueued = (gameState.bonus_queue ?? []).find(
+      (item) => item.status === "active" && item.from_level === bonusLevel,
+    );
+    const bonus =
+      findBonusTaskById(levelDefinition, activeQueued?.bonus_id) ??
+      activeQueued?.task_snapshot ??
+      resolveBonusTask(levelDefinition);
     if (!bonus) {
       return leaveBonusPhase({ ...input, skip: true });
     }
