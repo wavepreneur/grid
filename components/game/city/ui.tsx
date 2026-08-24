@@ -12,9 +12,7 @@ function PlayColumnShell({
 }) {
   return (
     <div className="city-game flex min-h-[var(--vv-height,100dvh)] justify-center bg-[var(--cg-ink)]/95 py-0 sm:py-6 sm:pb-10">
-      <div
-        className={`cg-screen-shell relative w-full max-w-[30rem] bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] ${roundedClass}`}
-      >
+      <div className={`cg-screen-shell relative bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] ${roundedClass}`}>
         {children}
       </div>
     </div>

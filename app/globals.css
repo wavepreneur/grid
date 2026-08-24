@@ -374,9 +374,11 @@ select.grid-input option {
 }
 
 .cg-screen-shell {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 30rem;
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-  max-width: 100%;
 }
 
 .city-game h1,
