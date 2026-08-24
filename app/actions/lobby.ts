@@ -1423,6 +1423,10 @@ export async function transferCaptain(input: {
     }
 
     await setTeamNavigator(team.id, target.id);
+    await supabase
+      .from("teams")
+      .update({ captain_player_id: target.id })
+      .eq("id", team.id);
     await rebalanceArchetypeRoles(team.id);
 
     await writeAuditLog({

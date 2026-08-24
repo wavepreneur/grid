@@ -119,7 +119,7 @@ export function LobbyRoom({
     }
   }, [inviteCode, joinCode, session.sessionId]);
 
-  async function syncSessionFromServer() {
+  const syncSessionFromServer = useCallback(async () => {
     const verified = await verifyTeamSession({
       inviteCode,
       joinCode,
@@ -130,7 +130,7 @@ export function LobbyRoom({
       savePlayerSession(verified.data.session);
       setSession(verified.data.session);
     }
-  }
+  }, [inviteCode, joinCode, session.sessionId]);
 
   const handleTeamStatusChange = useCallback(
     (status: string) => {
@@ -140,17 +140,76 @@ export function LobbyRoom({
       }
 
       void refreshLobby();
+      void syncSessionFromServer();
     },
-    [inviteCode, joinCode, manageMode, refreshLobby, router],
+    [inviteCode, joinCode, manageMode, refreshLobby, router, syncSessionFromServer],
   );
 
-  const handlePlayersChange = useCallback((players: LobbySnapshot["players"]) => {
-    setSnapshot((current) => ({
-      ...current,
-      players,
-      active_player_count: players.length,
-    }));
-  }, []);
+  const handlePlayersChange = useCallback(
+    (players: LobbySnapshot["players"]) => {
+      setSnapshot((current) => ({
+        ...current,
+        players,
+        active_player_count: players.length,
+      }));
+
+      const me = players.find((player) => player.id === session.playerId);
+      if (!me) return;
+
+      const liveCanManage = Boolean(me.is_captain || me.is_alpha);
+      const liveIsAlpha = Boolean(me.is_alpha || me.is_captain);
+      const liveRole =
+        me.archetype_role ??
+        (liveIsAlpha ? "alpha" : me.is_beta ? "beta" : "gamma");
+
+      setSession((current) => {
+        if (
+          current.canManageTeam === liveCanManage &&
+          current.isCaptain === Boolean(me.is_captain) &&
+          current.isAlpha === liveIsAlpha &&
+          current.isNavigator === Boolean(me.is_navigator) &&
+          current.archetypeRole === liveRole
+        ) {
+          return current;
+        }
+
+        const next: PlayerSession = {
+          ...current,
+          isCaptain: Boolean(me.is_captain),
+          isAlpha: liveIsAlpha,
+          isBeta: Boolean(me.is_beta),
+          isGamma: Boolean(me.is_gamma) || liveRole === "gamma",
+          isNavigator: Boolean(me.is_navigator),
+          canManageTeam: liveCanManage,
+          canUnlockGps: Boolean(me.is_navigator),
+          archetypeRole: liveRole as PlayerSession["archetypeRole"],
+          effectiveBeta: Boolean(me.is_beta) || liveCanManage,
+        };
+        savePlayerSession(next);
+        return next;
+      });
+
+      // Always re-verify after roster role flips so Start/GPS rights match the server.
+      if (
+        session.canManageTeam !== liveCanManage ||
+        session.isCaptain !== Boolean(me.is_captain) ||
+        session.isAlpha !== liveIsAlpha ||
+        session.isNavigator !== Boolean(me.is_navigator) ||
+        session.archetypeRole !== liveRole
+      ) {
+        void syncSessionFromServer();
+      }
+    },
+    [
+      session.archetypeRole,
+      session.canManageTeam,
+      session.isAlpha,
+      session.isCaptain,
+      session.isNavigator,
+      session.playerId,
+      syncSessionFromServer,
+    ],
+  );
 
   const { error: realtimeError, statusHint: realtimeHint } = useTeamSync({
     sessionId: session.sessionId,
@@ -160,7 +219,17 @@ export function LobbyRoom({
     onTeamStatusChange: handleTeamStatusChange,
     onPlayersChange: handlePlayersChange,
     onSessionSuperseded: () => setSessionSuperseded(true),
+    onResynced: () => {
+      void refreshLobby();
+      void syncSessionFromServer();
+    },
   });
+
+  const autoStartMsLeft = snapshot.lobby_auto_start_at
+    ? new Date(snapshot.lobby_auto_start_at).getTime() - Date.now()
+    : null;
+  const autoStartSoon =
+    typeof autoStartMsLeft === "number" && autoStartMsLeft > 0 && autoStartMsLeft <= 30_000;
 
   useEffect(() => {
     if (snapshot.team_status !== "lobby") return;
@@ -169,15 +238,22 @@ export function LobbyRoom({
       setCountdown(formatCountdown(snapshot.lobby_auto_start_at));
     }, 1000);
 
+    const pollMs = rosterFull || autoStartSoon ? 1000 : 5000;
     const autoStartCheckId = window.setInterval(() => {
       void refreshLobby();
-    }, rosterFull ? 1000 : 5000);
+    }, pollMs);
 
     return () => {
       window.clearInterval(countdownId);
       window.clearInterval(autoStartCheckId);
     };
-  }, [refreshLobby, rosterFull, snapshot.lobby_auto_start_at, snapshot.team_status]);
+  }, [
+    autoStartSoon,
+    refreshLobby,
+    rosterFull,
+    snapshot.lobby_auto_start_at,
+    snapshot.team_status,
+  ]);
 
   function handleStartGame() {
     setError(null);
@@ -291,7 +367,11 @@ export function LobbyRoom({
     });
   }
 
-  const isAlpha = session.canManageTeam;
+  const meLive = snapshot.players.find((player) => player.id === session.playerId);
+  const isAlpha =
+    session.canManageTeam ||
+    Boolean(meLive?.is_captain) ||
+    Boolean(meLive?.is_alpha);
   const isLobby = snapshot.team_status === "lobby";
   const isPlaying = snapshot.team_status === "playing";
   const playerCount = snapshot.active_player_count;
@@ -308,6 +388,8 @@ export function LobbyRoom({
   // Studio test: keep optional invite so you can pull devices into the lobby.
   const showSoloInvite = canInviteTeammates && aloneNow && studioTest;
   const showTeamInvite = canInviteTeammates && !aloneNow;
+  const showAutoStartCountdown =
+    isLobby && Boolean(snapshot.lobby_auto_start_at) && countdown !== "—";
 
   useEffect(() => {
     if (aloneNow) setManageOpen(false);
@@ -360,9 +442,11 @@ export function LobbyRoom({
                 Kurzinformationen
               </span>
               <span className="mt-0.5 block text-sm text-slate-500">
-                {aloneNow
-                  ? "Spielregeln anschauen — bevor der Countdown startet"
-                  : "Regeln lesen — bevor der Countdown startet"}
+                {showAutoStartCountdown
+                  ? `Regeln lesen — Start in ${countdown}`
+                  : aloneNow
+                    ? "Spielregeln anschauen — bevor es losgeht"
+                    : "Regeln lesen — bevor es losgeht"}
               </span>
             </span>
             <span className="rounded-full bg-teal-600 px-3 py-1 text-xs font-bold text-white">
@@ -382,10 +466,36 @@ export function LobbyRoom({
             </GridHint>
           ) : null}
 
-          {isLobby && rosterFull && !aloneNow ? (
-            <p className="text-center text-sm font-semibold text-teal-800">
-              Team voll — Start in {countdown}
-            </p>
+          {showAutoStartCountdown ? (
+            <div
+              className={`rounded-2xl px-4 py-4 text-center ${
+                rosterFull || autoStartSoon
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "border border-teal-200 bg-teal-50 text-teal-950"
+              }`}
+              role="timer"
+              aria-live="polite"
+            >
+              <p
+                className={`text-xs font-bold uppercase tracking-[0.16em] ${
+                  rosterFull || autoStartSoon ? "text-teal-100" : "text-teal-700"
+                }`}
+              >
+                {rosterFull ? "Team voll — Automatischer Start" : "Automatischer Start"}
+              </p>
+              <p className="mt-1 text-3xl font-extrabold tabular-nums tracking-tight">
+                {countdown}
+              </p>
+              <p
+                className={`mt-1 text-sm ${
+                  rosterFull || autoStartSoon ? "text-teal-50" : "text-teal-800/80"
+                }`}
+              >
+                {isAlpha
+                  ? "Du kannst auch früher starten."
+                  : "Die Team-Leitung kann auch früher starten."}
+              </p>
+            </div>
           ) : null}
 
           {/* Team roster + roles only when more than one player is present */}
