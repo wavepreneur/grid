@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 
 export function PhoneShell({ children }: { children: ReactNode }) {
   return (
-    <div className="city-game min-h-[var(--vv-height,100dvh)] bg-[var(--cg-ink)]/95 py-0 sm:py-8">
-      <div className="cg-screen-shell relative mx-auto flex min-h-[var(--vv-height,100dvh)] w-full max-w-[30rem] flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] sm:min-h-[calc(100dvh-4rem)] sm:rounded-[2.5rem]">
+    <div className="city-game flex h-[var(--vv-height,100dvh)] max-h-[var(--vv-height,100dvh)] justify-center overflow-hidden bg-[var(--cg-ink)]/95 py-0 sm:py-8">
+      <div className="cg-screen-shell relative flex min-h-0 w-full max-w-[30rem] flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] sm:max-w-[30rem] sm:rounded-[2.5rem]">
         {children}
       </div>
     </div>
@@ -14,13 +14,12 @@ export function PhoneShell({ children }: { children: ReactNode }) {
 
 /**
  * Online / desktop-friendly play shell.
- * Same phone-first column as outdoor, slightly wider on large screens —
- * never a full 7xl stage that blows up images and tap targets.
+ * Fixed viewport height + inner overflow-y so long quizzes always scroll.
  */
 export function StageShell({ children }: { children: ReactNode }) {
   return (
-    <div className="city-game min-h-[var(--vv-height,100dvh)] bg-[var(--cg-ink)]/95 py-0 sm:py-6">
-      <div className="cg-screen-shell relative mx-auto flex min-h-[var(--vv-height,100dvh)] w-full max-w-[30rem] flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] sm:min-h-[calc(100dvh-3rem)] sm:max-w-xl sm:rounded-[2rem] md:max-w-2xl lg:max-w-3xl">
+    <div className="city-game flex h-[var(--vv-height,100dvh)] max-h-[var(--vv-height,100dvh)] justify-center overflow-hidden bg-[var(--cg-ink)]/95 py-0 sm:py-6">
+      <div className="cg-screen-shell relative flex min-h-0 w-full max-w-[30rem] flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] sm:max-w-xl sm:rounded-[2rem] md:max-w-2xl lg:max-w-3xl">
         {children}
       </div>
     </div>
