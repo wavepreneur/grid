@@ -1056,7 +1056,14 @@ export async function startGameManually(input: {
 export async function resolveTeamJoinCode(input: {
   inviteCode: string;
   joinCode: string;
-}): Promise<ActionResult<{ joinCode: string; teamName: string; teamStatus: GridTeamStatus }>> {
+}): Promise<
+  ActionResult<{
+    joinCode: string;
+    teamName: string;
+    teamStatus: GridTeamStatus;
+    captainDisplayName: string | null;
+  }>
+> {
   try {
     const event = await getEventByInviteCode(input.inviteCode);
     if (!event) {
@@ -1068,12 +1075,42 @@ export async function resolveTeamJoinCode(input: {
       return { success: false, error: "Team-Code ungültig." };
     }
 
+    let captainDisplayName: string | null = null;
+    const supabase = createAdminClient();
+    if (team.captain_player_id) {
+      const { data: captain } = await supabase
+        .from("players")
+        .select("display_name")
+        .eq("id", team.captain_player_id)
+        .maybeSingle();
+      captainDisplayName =
+        typeof captain?.display_name === "string" && captain.display_name.trim()
+          ? captain.display_name.trim()
+          : null;
+    }
+    if (!captainDisplayName) {
+      const { data: captainRow } = await supabase
+        .from("players")
+        .select("display_name")
+        .eq("team_id", team.id)
+        .eq("is_captain", true)
+        .is("left_at", null)
+        .order("joined_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      captainDisplayName =
+        typeof captainRow?.display_name === "string" && captainRow.display_name.trim()
+          ? captainRow.display_name.trim()
+          : null;
+    }
+
     return {
       success: true,
       data: {
         joinCode: team.join_code,
         teamName: team.name,
         teamStatus: team.status,
+        captainDisplayName,
       },
     };
   } catch (error) {

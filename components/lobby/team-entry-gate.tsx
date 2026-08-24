@@ -26,19 +26,20 @@ type TeamEntryGateProps = {
   joinCode: string;
   teamName: string;
   teamStatus: GridTeamStatus;
+  captainDisplayName?: string | null;
   defaultDisplayName?: string;
 };
 
 /**
- * Two clear paths:
- * - Neu mitspielen → claim a free seat
- * - Gerät wechseln → pick your exact name from the roster (or type it)
+ * Invitee join: name only (team already named by the lead).
+ * Optional device-switch path via roster.
  */
 export function TeamEntryGate({
   inviteCode,
   joinCode,
   teamName,
   teamStatus,
+  captainDisplayName = null,
   defaultDisplayName = "",
 }: TeamEntryGateProps) {
   const router = useRouter();
@@ -52,6 +53,7 @@ export function TeamEntryGate({
   const [isPending, startTransition] = useTransition();
 
   const isMidGame = teamStatus === "playing" || teamStatus === "finished";
+  const isLobby = teamStatus === "lobby" || teamStatus === "setup";
 
   useEffect(() => {
     resolveTeamSession(inviteCode, joinCode).then((resolved) => {
@@ -137,49 +139,56 @@ export function TeamEntryGate({
 
   return (
     <div className="flex flex-col gap-5">
-      <p className="text-center text-sm leading-relaxed text-slate-500">
-        Team <strong className="text-slate-800">{teamName}</strong>
-        {isMidGame ? " — das Spiel läuft bereits." : null}
-      </p>
-
-      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
-        <button
-          type="button"
-          onClick={() => {
-            setMode("new");
-            setPendingTakeover(null);
-            setError(null);
-          }}
-          className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
-            mode === "new"
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-500"
-          }`}
-        >
-          Neu mitspielen
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setMode("switch");
-            setPendingTakeover(null);
-            setError(null);
-          }}
-          className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
-            mode === "switch"
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-500"
-          }`}
-        >
-          Gerät wechseln
-        </button>
+      <div className="rounded-2xl bg-teal-50/80 px-4 py-4 text-center">
+        {captainDisplayName ? (
+          <p className="text-sm font-semibold text-teal-900">
+            {captainDisplayName} lädt dich zum Spiel ein
+          </p>
+        ) : (
+          <p className="text-sm font-semibold text-teal-900">Du wurdest eingeladen</p>
+        )}
+        <p className="mt-1 text-base font-bold text-slate-900">{teamName}</p>
+        <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+          {isMidGame
+            ? "Das Spiel läuft bereits — trag deinen Namen ein, um beizutreten."
+            : "Der Teamname steht schon. Trag nur deinen Namen ein — dann landest du im Wartebereich."}
+        </p>
       </div>
 
-      <p className="text-center text-xs leading-relaxed text-slate-500">
-        {mode === "new"
-          ? "Neuen Platz im Team belegen — nur wenn noch einer frei ist."
-          : "Tippe auf deinen Namen unten — Schreibweise muss nicht erraten werden."}
-      </p>
+      {rosterLoaded && roster.length > 0 ? (
+        <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("new");
+              setPendingTakeover(null);
+              setError(null);
+            }}
+            className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
+              mode === "new"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500"
+            }`}
+          >
+            Neu mitspielen
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("switch");
+              setPendingTakeover(null);
+              setError(null);
+            }}
+            className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
+              mode === "switch"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500"
+            }`}
+          >
+            Gerät wechseln
+          </button>
+        </div>
+      ) : null}
 
       {pendingTakeover ? (
         <GridHint tone="warn">
@@ -213,7 +222,7 @@ export function TeamEntryGate({
                 <p className="text-sm text-slate-500">Namen werden geladen…</p>
               ) : roster.length === 0 ? (
                 <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                  Noch niemand im Team — zuerst „Neu mitspielen“ wählen.
+                  Noch niemand im Team — zuerst deinen Namen eingeben.
                 </p>
               ) : (
                 <ul className="flex flex-col gap-2">
@@ -234,22 +243,19 @@ export function TeamEntryGate({
                   ))}
                 </ul>
               )}
-              <p className="pt-1 text-center text-[11px] leading-relaxed text-slate-400">
-                Tipp: In der Lobby kannst du deinen persönlichen Weiterspiel-Link speichern —
-                dann brauchst du den Namen beim nächsten Mal nicht.
-              </p>
             </div>
           ) : (
             <>
               <div>
-                <GridLabel>Dein Name</GridLabel>
+                <GridLabel hint="So siehst du im Team aus">Dein Name</GridLabel>
                 <GridInput
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
-                  placeholder="z. B. Pixel-Ranger"
+                  placeholder="z. B. Alex"
                   required
                   minLength={2}
                   maxLength={32}
+                  autoComplete="nickname"
                   className="text-base"
                 />
               </div>
@@ -279,7 +285,9 @@ export function TeamEntryGate({
                   ? "Einen Moment…"
                   : isMidGame
                     ? "Team beitreten"
-                    : "Mitspielen"}
+                    : isLobby
+                      ? "Zum Wartebereich"
+                      : "Mitspielen"}
               </GridButton>
             </>
           )}

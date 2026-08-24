@@ -41,13 +41,19 @@ export default async function EventTeamPage({ params, searchParams }: EventTeamP
   }
 
   const midGame = teamResult.data.teamStatus === "playing";
+  const captainName = teamResult.data.captainDisplayName;
+  const shellDescription = midGame
+    ? `Team ${teamResult.data.teamName}`
+    : captainName
+      ? `${captainName} lädt dich zu „${teamResult.data.teamName}“ ein.`
+      : `Tritt Team „${teamResult.data.teamName}“ bei.`;
 
   return (
     <GridShell
       variant="welcome"
-      eyebrow={midGame ? "Weiterspielen" : "Willkommen"}
+      eyebrow={midGame ? "Weiterspielen" : "Einladung"}
       title={gameTitle}
-      description={`Team ${teamResult.data.teamName}`}
+      description={shellDescription}
       logoUrl={content?.logoUrl}
     >
       <TeamEntryGate
@@ -55,6 +61,7 @@ export default async function EventTeamPage({ params, searchParams }: EventTeamP
         joinCode={teamResult.data.joinCode}
         teamName={teamResult.data.teamName}
         teamStatus={teamResult.data.teamStatus}
+        captainDisplayName={captainName}
         defaultDisplayName={name?.trim() ?? ""}
       />
     </GridShell>

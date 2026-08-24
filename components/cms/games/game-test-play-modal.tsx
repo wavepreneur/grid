@@ -136,10 +136,9 @@ export function GameTestPlayModal({
       ) : null}
 
       <p className="text-sm leading-relaxed text-muted-foreground">
-        Testet den aktuellen gespeicherten Editor-Stand. Als Team Lead zuerst den{" "}
-        <strong>Teamnamen</strong> (Highscore) festlegen, dann den Spielernamen. Weitere Geräte
-        treten über denselben Link bzw. die Lobby bei. Ohne „Neu generieren“ geht der Fortschritt
-        weiter — nach größeren Inhaltsänderungen besser neu generieren.
+        Als Team Lead zuerst <strong>Teamnamen</strong> und deinen Namen festlegen. Danach denselben
+        Link an Mitspieler schicken — sie sehen die Einladung, tragen nur ihren Namen ein und landen
+        im Wartebereich. Nach größeren Inhaltsänderungen besser „Neu generieren“.
       </p>
 
       {playUrl ? (
