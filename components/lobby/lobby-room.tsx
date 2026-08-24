@@ -75,6 +75,7 @@ export function LobbyRoom({
   const [error, setError] = useState<string | null>(null);
   const [briefingOpen, setBriefingOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [countdown, setCountdown] = useState(
     formatCountdown(initialSnapshot.lobby_auto_start_at),
   );
@@ -289,12 +290,20 @@ export function LobbyRoom({
   const isAlpha = session.canManageTeam;
   const isLobby = snapshot.team_status === "lobby";
   const isPlaying = snapshot.team_status === "playing";
-  const canManageRoles = isAlpha && (isLobby || manageMode);
-  const canStart = snapshot.active_player_count >= 1;
+  const playerCount = snapshot.active_player_count;
+  const aloneNow = playerCount <= 1;
+  const teamAllowsMore = snapshot.max_size > 1;
+  const canManageRoles = isAlpha && (isLobby || manageMode) && !aloneNow;
+  const canStart = playerCount >= 1;
   const canInviteTeammates =
     isAlpha &&
-    snapshot.active_player_count < snapshot.max_size &&
+    teamAllowsMore &&
+    playerCount < snapshot.max_size &&
     (isLobby || (manageMode && isPlaying));
+
+  useEffect(() => {
+    if (aloneNow) setManageOpen(false);
+  }, [aloneNow]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -317,12 +326,13 @@ export function LobbyRoom({
         <>
           <div className="rounded-2xl bg-teal-50/80 px-4 py-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">
-              {eventTitle ?? "Wartebereich"}
+              {eventTitle ?? (aloneNow ? "Bereit machen" : "Wartebereich")}
             </p>
             <p className="mt-1 text-xl font-bold text-slate-900">{snapshot.team_name}</p>
             <p className="mt-1 text-sm text-slate-600">
-              Hallo {session.displayName} · {snapshot.active_player_count}/
-              {snapshot.max_size} bereit
+              {aloneNow
+                ? `Hallo ${session.displayName} — lies kurz die Infos, dann kannst du starten.`
+                : `Hallo ${session.displayName} · ${playerCount}/${snapshot.max_size} im Team`}
             </p>
           </div>
 
@@ -336,7 +346,9 @@ export function LobbyRoom({
                 Kurzinformationen
               </span>
               <span className="mt-0.5 block text-sm text-slate-500">
-                Regeln lesen — bevor der Countdown startet
+                {aloneNow
+                  ? "Spielregeln anschauen — bevor der Countdown startet"
+                  : "Regeln lesen — bevor der Countdown startet"}
               </span>
             </span>
             <span className="rounded-full bg-teal-600 px-3 py-1 text-xs font-bold text-white">
@@ -356,59 +368,80 @@ export function LobbyRoom({
             </GridHint>
           ) : null}
 
-          {isLobby && rosterFull ? (
+          {isLobby && rosterFull && !aloneNow ? (
             <p className="text-center text-sm font-semibold text-teal-800">
               Team voll — Start in {countdown}
             </p>
           ) : null}
 
-          <div>
-            <p className="mb-2 text-sm font-semibold text-slate-700">Euer Team</p>
-            <ul className="flex flex-col gap-2">
-              {snapshot.players.map((player) => {
-                const role = displayRoleLabel(
-                  player.archetype_role ??
-                    (player.is_alpha || player.is_captain
-                      ? "alpha"
-                      : player.is_beta
-                        ? "beta"
-                        : "gamma"),
-                  labels,
-                );
-                return (
-                  <li
-                    key={player.id}
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-slate-900">
-                        {player.display_name}
-                        {player.id === session.playerId ? (
-                          <span className="ml-1.5 text-xs font-medium text-slate-400">
-                            du
-                          </span>
-                        ) : null}
-                      </p>
-                      <p className="text-xs text-slate-500">{role}</p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+          {/* Team roster + roles only when more than one player is present */}
+          {!aloneNow ? (
+            <div>
+              <p className="mb-2 text-sm font-semibold text-slate-700">Euer Team</p>
+              <ul className="flex flex-col gap-2">
+                {snapshot.players.map((player) => {
+                  const role = displayRoleLabel(
+                    player.archetype_role ??
+                      (player.is_alpha || player.is_captain
+                        ? "alpha"
+                        : player.is_beta
+                          ? "beta"
+                          : "gamma"),
+                    labels,
+                  );
+                  return (
+                    <li
+                      key={player.id}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-slate-900">
+                          {player.display_name}
+                          {player.id === session.playerId ? (
+                            <span className="ml-1.5 text-xs font-medium text-slate-400">
+                              du
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className="text-xs text-slate-500">{role}</p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
 
           {canInviteTeammates ? (
-            <div className="space-y-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5">
-              <p className="text-center text-sm font-semibold text-slate-800">
-                Freunde einladen
-              </p>
-              {teammateUrl ? (
-                <>
-                  <QrInviteImage url={teammateUrl} />
-                  <CopyInviteLink url={teammateUrl} label="Einladungslink kopieren" />
-                </>
-              ) : null}
-            </div>
+            aloneNow ? (
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setInviteOpen((v) => !v)}
+                  className="w-full text-center text-sm font-medium text-slate-500 underline-offset-2 hover:underline"
+                >
+                  {inviteOpen ? "Einladen ausblenden" : "Optional: Mitspieler einladen"}
+                </button>
+                {inviteOpen && teammateUrl ? (
+                  <div className="space-y-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5">
+                    <QrInviteImage url={teammateUrl} />
+                    <CopyInviteLink url={teammateUrl} label="Einladungslink kopieren" />
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="space-y-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5">
+                <p className="text-center text-sm font-semibold text-slate-800">
+                  Freunde einladen
+                </p>
+                {teammateUrl ? (
+                  <>
+                    <QrInviteImage url={teammateUrl} />
+                    <CopyInviteLink url={teammateUrl} label="Einladungslink kopieren" />
+                  </>
+                ) : null}
+              </div>
+            )
           ) : null}
 
           {isAlpha && isLobby ? (
@@ -418,7 +451,7 @@ export function LobbyRoom({
               disabled={isPending || !canStart}
               onClick={handleStartGame}
             >
-              {isPending ? "Startet…" : "Spiel starten"}
+              {isPending ? "Startet…" : aloneNow ? "Spiel starten" : "Spiel starten"}
             </GridButton>
           ) : null}
 
@@ -449,7 +482,7 @@ export function LobbyRoom({
           {realtimeError ? <GridError message={realtimeError} /> : null}
           {error ? <GridError message={error} /> : null}
 
-          {manageOpen ? (
+          {manageOpen && canManageRoles ? (
             <div
               className="fixed inset-0 z-[130] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-6"
               onClick={() => setManageOpen(false)}
@@ -486,10 +519,9 @@ export function LobbyRoom({
 
                   {snapshot.players.filter((p) => p.id !== session.playerId).length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
-                      <p className="font-semibold text-slate-800">Noch allein im Team</p>
+                      <p className="font-semibold text-slate-800">Noch keine Mitspieler</p>
                       <p className="mt-2 text-sm text-slate-500">
-                        Lade Mitspieler per QR oder Link ein. Danach kannst du hier Rollen
-                        zuweisen oder jemanden entfernen.
+                        Sobald jemand beitritt, kannst du hier Rollen zuweisen.
                       </p>
                     </div>
                   ) : (

@@ -31,12 +31,12 @@ export default async function EventLobbyPage({ params, searchParams }: EventLobb
   return (
     <GridShell
       variant="welcome"
-      eyebrow={manageMode ? "Team" : "Wartebereich"}
+      eyebrow={manageMode ? "Team" : "Bereit machen"}
       title={content?.templateName?.trim() || eventResult.data.title}
       description={
         manageMode
           ? `Team ${teamResult.data.teamName}`
-          : "Lest die Kurzinformationen und holt eure Mitspieler dazu."
+          : "Kurzinformationen lesen — dann starten."
       }
       logoUrl={content?.logoUrl}
     >
