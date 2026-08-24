@@ -80,6 +80,20 @@ export function LobbyRoom({
   );
   const [isPending, startTransition] = useTransition();
 
+  useEffect(() => {
+    if (!manageOpen) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setManageOpen(false);
+    }
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [manageOpen]);
+
   const rosterFull = isLobbyRosterFull(snapshot);
 
   const teammateUrl = useMemo(() => {
@@ -377,46 +391,6 @@ export function LobbyRoom({
                       </p>
                       <p className="text-xs text-slate-500">{role}</p>
                     </div>
-                    {canManageRoles && manageOpen && !player.is_captain && player.id !== session.playerId ? (
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <button
-                          type="button"
-                          disabled={isPending}
-                          onClick={() => handleTransferCaptain(player.id)}
-                          className="text-xs font-medium text-teal-700"
-                        >
-                          Leitung
-                        </button>
-                        {!player.is_beta && snapshot.active_player_count >= 2 ? (
-                          <button
-                            type="button"
-                            disabled={isPending}
-                            onClick={() => handleAssignBeta(player.id)}
-                            className="text-xs font-medium text-sky-700"
-                          >
-                            Hinweise
-                          </button>
-                        ) : null}
-                        {player.is_beta && snapshot.active_player_count >= 3 ? (
-                          <button
-                            type="button"
-                            disabled={isPending}
-                            onClick={() => handleAssignGamma(player.id)}
-                            className="text-xs font-medium text-slate-500"
-                          >
-                            Standard
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          disabled={isPending}
-                          onClick={() => handleRemovePlayer(player.id)}
-                          className="text-xs font-medium text-red-600"
-                        >
-                          Entfernen
-                        </button>
-                      </div>
-                    ) : null}
                   </li>
                 );
               })}
@@ -459,10 +433,10 @@ export function LobbyRoom({
             {canManageRoles ? (
               <button
                 type="button"
-                onClick={() => setManageOpen((v) => !v)}
+                onClick={() => setManageOpen(true)}
                 className="text-center text-sm font-medium text-slate-500 underline-offset-2 hover:underline"
               >
-                {manageOpen ? "Rollen-Verwaltung ausblenden" : "Rollen verwalten"}
+                Rollen verwalten
               </button>
             ) : null}
             {isLobby ? (
@@ -474,6 +448,137 @@ export function LobbyRoom({
 
           {realtimeError ? <GridError message={realtimeError} /> : null}
           {error ? <GridError message={error} /> : null}
+
+          {manageOpen ? (
+            <div
+              className="fixed inset-0 z-[130] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-6"
+              onClick={() => setManageOpen(false)}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Rollen verwalten"
+                className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white pb-[env(safe-area-inset-bottom)] shadow-xl sm:rounded-3xl sm:pb-0"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">Rollen verwalten</h2>
+                    <p className="mt-0.5 text-sm text-slate-500">
+                      Wer führt, wer Hinweise sieht, wer Bonus macht
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setManageOpen(false)}
+                    className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700"
+                  >
+                    Schließen
+                  </button>
+                </div>
+
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-5">
+                  <p className="rounded-2xl bg-teal-50 px-4 py-3 text-sm text-teal-900">
+                    <strong>{labels.alpha}</strong> startet &amp; GPS ·{" "}
+                    <strong>{labels.beta}</strong> Hinweise ·{" "}
+                    <strong>{labels.gamma}</strong> Bonusaufgaben
+                  </p>
+
+                  {snapshot.players.filter((p) => p.id !== session.playerId).length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
+                      <p className="font-semibold text-slate-800">Noch allein im Team</p>
+                      <p className="mt-2 text-sm text-slate-500">
+                        Lade Mitspieler per QR oder Link ein. Danach kannst du hier Rollen
+                        zuweisen oder jemanden entfernen.
+                      </p>
+                    </div>
+                  ) : (
+                    <ul className="space-y-3">
+                      {snapshot.players.map((player) => {
+                        const role = displayRoleLabel(
+                          player.archetype_role ??
+                            (player.is_alpha || player.is_captain
+                              ? "alpha"
+                              : player.is_beta
+                                ? "beta"
+                                : "gamma"),
+                          labels,
+                        );
+                        const isMe = player.id === session.playerId;
+                        const canEdit =
+                          canManageRoles && !player.is_captain && !isMe;
+
+                        return (
+                          <li
+                            key={player.id}
+                            className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold text-slate-900">
+                                  {player.display_name}
+                                  {isMe ? (
+                                    <span className="ml-1.5 text-xs font-medium text-slate-400">
+                                      du
+                                    </span>
+                                  ) : null}
+                                </p>
+                                <p className="text-xs text-slate-500">{role}</p>
+                              </div>
+                            </div>
+                            {canEdit ? (
+                              <div className="mt-3 grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  disabled={isPending}
+                                  onClick={() => handleTransferCaptain(player.id)}
+                                  className="rounded-xl bg-teal-600 px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                                >
+                                  Leitung geben
+                                </button>
+                                {!player.is_beta && snapshot.active_player_count >= 2 ? (
+                                  <button
+                                    type="button"
+                                    disabled={isPending}
+                                    onClick={() => handleAssignBeta(player.id)}
+                                    className="rounded-xl bg-sky-600 px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                                  >
+                                    → {labels.beta}
+                                  </button>
+                                ) : null}
+                                {player.is_beta && snapshot.active_player_count >= 3 ? (
+                                  <button
+                                    type="button"
+                                    disabled={isPending}
+                                    onClick={() => handleAssignGamma(player.id)}
+                                    className="rounded-xl bg-slate-600 px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                                  >
+                                    → {labels.gamma}
+                                  </button>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  disabled={isPending}
+                                  onClick={() => handleRemovePlayer(player.id)}
+                                  className="rounded-xl border border-red-200 bg-white px-3 py-2.5 text-xs font-bold text-red-600 disabled:opacity-50"
+                                >
+                                  Entfernen
+                                </button>
+                              </div>
+                            ) : isMe ? (
+                              <p className="mt-2 text-xs text-slate-500">
+                                Du bist die Team-Leitung.
+                              </p>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </>
       )}
     </div>
