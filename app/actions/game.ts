@@ -53,6 +53,7 @@ import {
 import {
   canPresentBonus,
   findBonusTaskById,
+  isBonusAnswerCorrect,
   resolveBonusDefinitions,
   resolveBonusTask,
 } from "@/lib/grid/bonus";
@@ -63,7 +64,6 @@ import {
   pickBonusToActivate,
   promoteArmedBonuses,
 } from "@/lib/grid/bonus-queue";
-import { validateArrivalQuiz as validateBonusQuiz } from "@/lib/grid/level-validation";
 
 function buildRealtimeState(
   team: {
@@ -413,6 +413,9 @@ export async function solveCurrentLevel(input: {
               correct_option_id: def.correct_option_id,
               correct_option_ids: def.correct_option_ids,
               reward: def.reward,
+              answer_mode: def.answer_mode,
+              answer: def.answer,
+              number_fields: def.number_fields,
             },
           };
         })
@@ -498,13 +501,18 @@ export async function solveCurrentLevel(input: {
         updated_at: armedAt.toISOString(),
         bonus_walked_meters: armedMeterBonus ? 0 : gameState.outdoor_progress?.bonus_walked_meters,
       },
-      modal: buildLevelCompletedModal({
-        level: currentLevel,
-        solvedBy,
-        pointsEarned,
-        successTitle: levelDefinition.success_title,
-        successInfo: input.payload?.revealSolution ? null : levelDefinition.success_info,
-      }),
+      modal:
+        // Immediate team bonus owns the next screen — skip the Gelöst-modal so
+        // the surprise is not buried under „Weiter“ → next hub.
+        teamBonus
+          ? null
+          : buildLevelCompletedModal({
+              level: currentLevel,
+              solvedBy,
+              pointsEarned,
+              successTitle: levelDefinition.success_title,
+              successInfo: input.payload?.revealSolution ? null : levelDefinition.success_info,
+            }),
       levels: progressionLevels,
     };
 
@@ -1524,11 +1532,7 @@ async function completeActiveBonus(input: {
     if (!input.selectedOptionId) {
       return { success: false, error: "Bitte eine Antwort auswählen." };
     }
-    const correctIds =
-      bonus.correct_option_ids && bonus.correct_option_ids.length > 0
-        ? bonus.correct_option_ids
-        : [bonus.correct_option_id];
-    correct = correctIds.includes(input.selectedOptionId);
+    correct = isBonusAnswerCorrect(bonus, input.selectedOptionId);
     reward = correct ? bonus.reward : 0;
   }
 
@@ -1790,21 +1794,11 @@ async function leaveBonusPhase(input: {
     if (!canPresentBonus(bonus, playerRole, { claimUnassigned })) {
       return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
     }
-    const validation = validateBonusQuiz(
-      {
-        question: bonus.question,
-        options: bonus.options,
-        correct_option_id: bonus.correct_option_id,
-      },
-      input.selectedOptionId,
-    );
-    if (!validation.ok) {
-      return { success: false, error: validation.error };
+    if (!input.selectedOptionId?.trim()) {
+      return { success: false, error: "Bitte eine Antwort eingeben." };
     }
-    if (input.selectedOptionId === bonus.correct_option_id) {
-      reward = bonus.reward;
-      correct = true;
-    }
+    correct = isBonusAnswerCorrect(bonus, input.selectedOptionId);
+    reward = correct ? bonus.reward : 0;
   }
 
   const pending = gameState.pending_next_level;
@@ -1943,15 +1937,11 @@ export async function submitBonusAnswer(input: {
       return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
     }
 
-    if (!input.selectedOptionId) {
-      return { success: false, error: "Bitte eine Antwort auswählen." };
+    if (!input.selectedOptionId?.trim()) {
+      return { success: false, error: "Bitte eine Antwort eingeben." };
     }
 
-    const correctIds =
-      bonus.correct_option_ids && bonus.correct_option_ids.length > 0
-        ? bonus.correct_option_ids
-        : [bonus.correct_option_id];
-    const correct = correctIds.includes(input.selectedOptionId);
+    const correct = isBonusAnswerCorrect(bonus, input.selectedOptionId);
     const reward = correct ? bonus.reward : 0;
     const levelState = gameState.levels[String(bonusLevel)];
     const durations = computeAttemptDurations({

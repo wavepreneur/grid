@@ -227,17 +227,8 @@ export function taskContentToBonus(
   forRole: "alpha" | "beta" | "gamma" | "team" = "gamma",
 ): BonusTask | null {
   const content = normalizeTaskContent(task.content);
-  if (content.answer_type !== "choice" && content.answer_type !== "multi_choice") return null;
-  if (!content.options?.length) return null;
-  const question = (content.question ?? task.description ?? "").trim();
+  const question = (content.question ?? task.description ?? task.title ?? "").trim();
   if (!question) return null;
-
-  const correctIds = content.options.filter((o) => o.correct).map((o) => o.id);
-  const correctId =
-    correctIds[0] ??
-    content.options.find((o) => o.label === content.answer)?.id ??
-    content.options[0]?.id;
-  if (!correctId) return null;
 
   const role =
     forRole === "team"
@@ -245,21 +236,97 @@ export function taskContentToBonus(
       : forRole === "alpha" || forRole === "beta" || forRole === "gamma"
         ? forRole
         : "gamma";
+  const reward =
+    content.scoring?.points && content.scoring.points > 0 ? content.scoring.points : 150;
+  const title = task.title.startsWith("Bonus") ? task.title : `Bonus: ${task.title}`;
+  const intro =
+    forRole === "team"
+      ? "Diese Bonusaufgabe sehen alle im Team."
+      : `Nur ${role === "alpha" ? "Alpha" : role === "beta" ? "Beta" : "Gamma"} sieht diese Aufgabe.`;
+  const for_team = forRole === "team";
+
+  if (content.answer_type === "choice" || content.answer_type === "multi_choice") {
+    if (!content.options?.length) return null;
+    const correctIds = content.options.filter((o) => o.correct).map((o) => o.id);
+    const correctId =
+      correctIds[0] ??
+      content.options.find((o) => o.label === content.answer)?.id ??
+      content.options[0]?.id;
+    if (!correctId) return null;
+    return {
+      for_role: role,
+      for_team,
+      title,
+      intro,
+      question,
+      options: content.options.map((o) => ({ id: o.id, label: o.label })),
+      correct_option_id: correctId,
+      correct_option_ids: correctIds.length > 1 ? correctIds : undefined,
+      reward,
+    };
+  }
+
+  if (content.answer_type === "confirm") {
+    return {
+      for_role: role,
+      for_team,
+      title,
+      intro,
+      question,
+      options: [{ id: "done", label: "Erledigt" }],
+      correct_option_id: "done",
+      reward,
+      answer_mode: "confirm",
+    };
+  }
+
+  // text / number / code boxes — free-text bonus
+  const answer = (content.answer ?? "").trim();
+  if (!answer) {
+    // No keyed answer: treat as acknowledgement so the surprise still appears.
+    return {
+      for_role: role,
+      for_team,
+      title,
+      intro,
+      question,
+      options: [{ id: "done", label: "Weiter" }],
+      correct_option_id: "done",
+      reward,
+      answer_mode: "confirm",
+    };
+  }
+
+  const boxed = Boolean(content.code_boxes);
+  const fields =
+    content.number_fields === 2 ||
+    content.number_fields === 3 ||
+    content.number_fields === 4
+      ? content.number_fields
+      : boxed
+        ? Math.min(4, Math.max(1, answer.length || 4))
+        : undefined;
 
   return {
     for_role: role,
-    title: task.title.startsWith("Bonus") ? task.title : `Bonus: ${task.title}`,
-    intro:
-      forRole === "team"
-        ? "Diese Bonusaufgabe sehen alle im Team."
-        : `Nur ${role === "alpha" ? "Alpha" : role === "beta" ? "Beta" : "Gamma"} sieht diese Aufgabe.`,
+    for_team,
+    title,
+    intro,
     question,
-    options: content.options.map((o) => ({ id: o.id, label: o.label })),
-    correct_option_id: correctId,
-    correct_option_ids: correctIds.length > 1 ? correctIds : undefined,
-    reward: content.scoring?.points && content.scoring.points > 0 ? content.scoring.points : 150,
-    for_team: forRole === "team",
+    options: [],
+    correct_option_id: "__text__",
+    reward,
+    answer_mode: boxed ? "boxes" : "text",
+    answer,
+    number_fields: fields as 1 | 2 | 3 | 4 | undefined,
   };
+}
+
+/** True when a pool task can become a Layer-3 bonus at compile time. */
+export function isBonusCompilableTask(
+  task: Pick<StudioGameTaskLink["task"], "title" | "description" | "content">,
+): boolean {
+  return taskContentToBonus(task as StudioGameTaskLink["task"], "team") !== null;
 }
 
 /** Build author-facing slots from game task links. */

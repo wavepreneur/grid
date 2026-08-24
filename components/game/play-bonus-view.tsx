@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
 import { IconCheck, IconGift, IconUser, IconX } from "@/components/game/city/icons";
 import { CityTeamBar } from "@/components/game/city/team-bar";
+import { CodeBoxesInput } from "@/components/game/code-boxes-input";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
 import type { BonusTask } from "@/lib/grid/level-types";
 import {
@@ -14,6 +15,7 @@ import {
 import type { ContentMode } from "@/lib/cms/layer-model";
 import { hubMeta } from "@/lib/grid/play-slots";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { normalizeAnswer } from "@/lib/grid/content-engine";
 
 type Props = {
   bonus: BonusTask;
@@ -45,14 +47,41 @@ export function PlayBonusView({
   onSubmit,
   onSkipWaiting,
 }: Props) {
+  const answerMode = bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
+  const boxCount = bonus.number_fields ?? Math.min(4, Math.max(1, (bonus.answer ?? "").length || 4));
+
   const [introDone, setIntroDone] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
+  const [textAnswer, setTextAnswer] = useState("");
+  const [numberParts, setNumberParts] = useState<string[]>(() =>
+    Array.from({ length: boxCount }, () => ""),
+  );
   const [submitted, setSubmitted] = useState(false);
-  const correct = picked === bonus.correct_option_id;
-  const show = picked !== null;
+  const [revealed, setRevealed] = useState(false);
+
+  const expected = (bonus.answer ?? "").trim();
+  const typed =
+    answerMode === "boxes"
+      ? numberParts.map((p) => p.trim()).join("")
+      : textAnswer.trim();
+
+  const correct =
+    answerMode === "choice" || answerMode === "confirm"
+      ? picked === bonus.correct_option_id
+      : Boolean(expected) &&
+        normalizeAnswer(typed) === normalizeAnswer(expected);
+
+  const show = revealed;
   const hub = hubMeta(mode);
   const audience = bonusAudienceIconCount(bonus);
   const audienceLabel = bonusAudienceHeadline(bonus, roleLabels);
+
+  const canCheck =
+    answerMode === "choice" || answerMode === "confirm"
+      ? Boolean(picked)
+      : answerMode === "boxes"
+        ? numberParts.every((p) => p.trim().length > 0)
+        : Boolean(typed);
 
   useEffect(() => {
     if (!isMine) return;
@@ -64,10 +93,20 @@ export function PlayBonusView({
     playPlaySfx(correct ? "correct" : "wrong");
   }, [show, correct]);
 
+  function checkAnswer() {
+    if (!canCheck || revealed || submitted) return;
+    setRevealed(true);
+  }
+
   function finish() {
-    if (!picked || submitted) return;
+    if (submitted) return;
+    const payload =
+      answerMode === "choice" || answerMode === "confirm"
+        ? picked
+        : typed || picked;
+    if (!payload) return;
     setSubmitted(true);
-    onSubmit(picked);
+    onSubmit(payload);
   }
 
   if (!isMine) {
@@ -149,37 +188,66 @@ export function PlayBonusView({
         <p className="rounded-2xl bg-[var(--cg-card)] p-5 text-lg font-semibold shadow-[var(--cg-shadow-soft)] text-[var(--cg-fg)]">
           {bonus.question}
         </p>
-        <div className="grid grid-cols-2 gap-3">
-          {bonus.options.map((opt) => {
-            const isPicked = picked === opt.id;
-            const isRight = opt.id === bonus.correct_option_id;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                disabled={show || disabled || isPending || submitted}
-                onClick={() => setPicked(opt.id)}
-                className={`cg-tap-lift flex items-center justify-center gap-2 rounded-2xl border-2 py-6 text-xl font-bold ${
-                  show && isRight
-                    ? "border-[var(--cg-success)] bg-[var(--cg-success)]/20"
-                    : show && isPicked
-                      ? "border-[var(--cg-destructive)] bg-[var(--cg-destructive)]/10"
-                      : "border-[var(--cg-border)] bg-[var(--cg-card)]"
-                }`}
-              >
-                {opt.label}
-                {show && isRight ? <IconCheck className="text-[var(--cg-success)]" /> : null}
-                {show && isPicked && !isRight ? (
-                  <IconX className="text-[var(--cg-destructive)]" />
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
+
+        {answerMode === "choice" || answerMode === "confirm" ? (
+          <div className={`grid gap-3 ${bonus.options.length > 2 ? "grid-cols-2" : "grid-cols-1"}`}>
+            {bonus.options.map((opt) => {
+              const isPicked = picked === opt.id;
+              const isRight = opt.id === bonus.correct_option_id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  disabled={show || disabled || isPending || submitted}
+                  onClick={() => setPicked(opt.id)}
+                  className={`cg-tap-lift flex items-center justify-center gap-2 rounded-2xl border-2 py-6 text-xl font-bold ${
+                    show && isRight
+                      ? "border-[var(--cg-success)] bg-[var(--cg-success)]/20"
+                      : show && isPicked
+                        ? "border-[var(--cg-destructive)] bg-[var(--cg-destructive)]/10"
+                        : "border-[var(--cg-border)] bg-[var(--cg-card)]"
+                  }`}
+                >
+                  {opt.label}
+                  {show && isRight ? <IconCheck className="text-[var(--cg-success)]" /> : null}
+                  {show && isPicked && !isRight ? (
+                    <IconX className="text-[var(--cg-destructive)]" />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {answerMode === "text" ? (
+          <input
+            value={textAnswer}
+            onChange={(e) => setTextAnswer(e.target.value)}
+            placeholder="Antwort eintragen…"
+            disabled={show || disabled || isPending || submitted}
+            className="w-full rounded-2xl border-2 border-[var(--cg-input)] bg-[var(--cg-bg)] px-4 py-4 text-center text-xl font-bold text-[var(--cg-fg)] outline-none focus:border-[var(--cg-primary)] disabled:opacity-50"
+          />
+        ) : null}
+
+        {answerMode === "boxes" ? (
+          <CodeBoxesInput
+            count={boxCount}
+            values={numberParts}
+            onChange={setNumberParts}
+            disabled={show || disabled || isPending || submitted}
+          />
+        ) : null}
       </div>
 
-      <div className="mt-auto pt-6">
-        {show ? (
+      <div className="mt-auto space-y-3 pt-6">
+        {!show ? (
+          <BigButton
+            disabled={disabled || isPending || !canCheck}
+            onClick={checkAnswer}
+          >
+            Antwort prüfen
+          </BigButton>
+        ) : (
           <div className="cg-animate-rise-in space-y-3">
             <p className="text-center text-base font-semibold text-[var(--cg-fg)]">
               {correct
@@ -190,7 +258,7 @@ export function PlayBonusView({
               {asymmetricOverlay ? "Zurück zum Team" : `Zurück zur ${hub.hubLabelDe}`}
             </BigButton>
           </div>
-        ) : null}
+        )}
       </div>
     </section>
   );

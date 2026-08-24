@@ -20,6 +20,7 @@ import {
 } from "@/lib/cms/layer-model";
 import type { BonusTrigger, GameLinkOverrides } from "@/lib/cms/game-link-config";
 import { parseLinkLayer } from "@/lib/cms/game-link-config";
+import { parseBonusBindings } from "@/lib/cms/bonus-bindings";
 import { surfaceToPreset, taskToOpenerArrivalQuiz } from "@/lib/cms/game-slots";
 import { normalizeTaskContent } from "@/lib/cms/task-content";
 import {
@@ -816,7 +817,50 @@ export async function publishGame(
     }
 
     const rules = parseLogicRules(game.logic_rules);
-    const links = tasksResult.data ?? [];
+    let links = tasksResult.data ?? [];
+
+    // Same as live compile: bindings that only reference pool tasks still need a Layer-3 link.
+    const linkedIds = new Set(links.map((l) => l.task_id));
+    const orphanBonusIds = [
+      ...new Set(
+        links.flatMap((link) => {
+          const bindings = parseBonusBindings(link.overrides as GameLinkOverrides);
+          const legacy =
+            typeof (link.overrides as { bonus_task_id?: unknown })?.bonus_task_id === "string"
+              ? [(link.overrides as { bonus_task_id: string }).bonus_task_id.trim()]
+              : [];
+          return [...bindings.map((b) => b.task_id), ...legacy].filter(
+            (id) => id && !linkedIds.has(id),
+          );
+        }),
+      ),
+    ];
+    if (orphanBonusIds.length > 0) {
+      const { data: orphanRows, error: orphanError } = await supabase
+        .from("studio_tasks")
+        .select("*")
+        .in("id", orphanBonusIds)
+        .eq("is_active", true);
+      if (orphanError) throw new Error(orphanError.message);
+      let sortBase = links.filter((l) => parseLinkLayer(l) === 3).length;
+      for (const row of orphanRows ?? []) {
+        const task = mapTaskRow(row as Record<string, unknown>);
+        links = [
+          ...links,
+          {
+            id: `virtual-bonus-${task.id}`,
+            game_id: gameId,
+            task_id: task.id,
+            layer: 3 as const,
+            sort_order: sortBase++,
+            overrides: {},
+            task,
+          },
+        ];
+        linkedIds.add(task.id);
+      }
+    }
+
     const openerIds = [
       ...new Set(
         links.flatMap((link) => {

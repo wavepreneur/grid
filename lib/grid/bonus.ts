@@ -4,6 +4,7 @@
  */
 
 import type { ArrivalQuiz, BonusTask, LevelDefinition, PlayerRole } from "@/lib/grid/level-types";
+import { normalizeAnswer } from "@/lib/grid/content-engine";
 
 export function parseBonusTask(raw: unknown): BonusTask | undefined {
   if (!raw || typeof raw !== "object") return undefined;
@@ -11,19 +12,51 @@ export function parseBonusTask(raw: unknown): BonusTask | undefined {
   const role = b.for_role;
   if (role !== "alpha" && role !== "beta" && role !== "gamma") return undefined;
   if (typeof b.title !== "string" || typeof b.question !== "string") return undefined;
-  if (!Array.isArray(b.options) || typeof b.correct_option_id !== "string") return undefined;
+
+  const mode =
+    b.answer_mode === "text" ||
+    b.answer_mode === "boxes" ||
+    b.answer_mode === "confirm" ||
+    b.answer_mode === "choice"
+      ? b.answer_mode
+      : Array.isArray(b.options) && b.options.length > 0
+        ? "choice"
+        : typeof b.answer === "string" && b.answer.trim()
+          ? "text"
+          : null;
+  if (!mode) return undefined;
+
+  if (mode === "choice") {
+    if (!Array.isArray(b.options) || typeof b.correct_option_id !== "string") return undefined;
+  }
+  if ((mode === "text" || mode === "boxes") && typeof b.answer !== "string") return undefined;
+
   return {
     for_role: role,
     for_team: Boolean(b.for_team),
     title: b.title,
     intro: typeof b.intro === "string" ? b.intro : undefined,
     question: b.question,
-    options: b.options as BonusTask["options"],
-    correct_option_id: b.correct_option_id,
+    options: Array.isArray(b.options) ? (b.options as BonusTask["options"]) : [],
+    correct_option_id:
+      typeof b.correct_option_id === "string" && b.correct_option_id
+        ? b.correct_option_id
+        : mode === "confirm"
+          ? "done"
+          : "__text__",
     correct_option_ids: Array.isArray(b.correct_option_ids)
       ? (b.correct_option_ids as string[])
       : undefined,
     reward: typeof b.reward === "number" ? b.reward : 150,
+    answer_mode: mode === "choice" ? undefined : mode,
+    answer: typeof b.answer === "string" ? b.answer : undefined,
+    number_fields:
+      b.number_fields === 1 ||
+      b.number_fields === 2 ||
+      b.number_fields === 3 ||
+      b.number_fields === 4
+        ? b.number_fields
+        : undefined,
   };
 }
 
@@ -118,6 +151,22 @@ export function canPresentBonus(
 ): boolean {
   if (isBonusForRole(bonus as BonusTask, role)) return true;
   return Boolean(options?.claimUnassigned);
+}
+
+/** Score a bonus submission (choice id or free-text / code). */
+export function isBonusAnswerCorrect(bonus: BonusTask, submission: string): boolean {
+  const mode =
+    bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
+  if (mode === "text" || mode === "boxes") {
+    const expected = (bonus.answer ?? "").trim();
+    if (!expected) return false;
+    return normalizeAnswer(submission) === normalizeAnswer(expected);
+  }
+  const correctIds =
+    bonus.correct_option_ids && bonus.correct_option_ids.length > 0
+      ? bonus.correct_option_ids
+      : [bonus.correct_option_id];
+  return correctIds.includes(submission);
 }
 
 export function roleLabelDe(role: BonusTask["for_role"]): string {

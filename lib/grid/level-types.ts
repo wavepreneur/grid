@@ -58,10 +58,19 @@ export type BonusTask = {
   title: string;
   intro?: string;
   question: string;
+  /** Multiple-choice options (empty when answer_mode is text/boxes/confirm). */
   options: QuizOption[];
   correct_option_id: string;
   correct_option_ids?: string[];
   reward: number;
+  /**
+   * How the player answers. Default/omitted = choice (options).
+   * text/boxes use `answer`; confirm is a single acknowledgement.
+   */
+  answer_mode?: "choice" | "text" | "boxes" | "confirm";
+  /** Expected free-text / code answer when answer_mode is text or boxes. */
+  answer?: string;
+  number_fields?: 1 | 2 | 3 | 4;
 };
 
 /** When a compiled bonus may fire. @see docs/BONUS_LAYER3_MODEL.md */
