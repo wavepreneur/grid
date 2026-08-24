@@ -24,10 +24,12 @@ export function LevelHero({
   const height = tall ? "h-44 sm:h-52" : "h-40 sm:h-48";
   const hero = imageUrl?.trim() || "";
   return (
-    <div>
+    <div className="min-w-0">
       {hero ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={hero} alt="" className={`w-full object-cover ${height}`} />
+        <div className={`w-full overflow-hidden ${height}`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={hero} alt="" className="h-full w-full object-cover object-center" />
+        </div>
       ) : null}
       {title?.trim() ? (
         <div className="min-w-0 space-y-1.5 px-4 pt-4 sm:px-5">

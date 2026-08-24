@@ -109,35 +109,35 @@ export function PlayQuizView({
         : "Zurück zum Spiel — Rätsel öffnen";
 
   return (
-    <section className="flex flex-col px-5 pb-8 pt-6">
-      <div className="mt-2 flex flex-col items-center text-center">
-        <span className="cg-animate-key-turn flex h-20 w-20 items-center justify-center rounded-3xl bg-[var(--cg-accent)] text-[var(--cg-accent-fg)] shadow-[var(--cg-shadow-lift)]">
-          <IconKey size={40} />
+    <section className="mx-auto flex w-full max-w-2xl flex-col px-4 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-4 sm:px-6 sm:pb-10 sm:pt-6">
+      <div className="mt-1 flex flex-col items-center text-center sm:mt-2">
+        <span className="cg-animate-key-turn flex h-16 w-16 items-center justify-center rounded-3xl bg-[var(--cg-accent)] text-[var(--cg-accent-fg)] shadow-[var(--cg-shadow-lift)] sm:h-20 sm:w-20">
+          <IconKey size={36} />
         </span>
         <SectionLabel>{spotLabel}</SectionLabel>
-        <h1 className="mt-2 text-2xl font-bold text-[var(--cg-fg)]">{heading}</h1>
-        <p className="mt-2 max-w-md text-base text-[var(--cg-muted)]">{intro}</p>
+        <h1 className="mt-2 text-xl font-bold text-[var(--cg-fg)] sm:text-2xl">{heading}</h1>
+        <p className="mt-2 max-w-md text-sm text-[var(--cg-muted)] sm:text-base">{intro}</p>
       </div>
 
       {quiz.image_url ? (
-        <div className="cg-animate-rise-in mt-5 overflow-hidden rounded-3xl shadow-[var(--cg-shadow-soft)]">
+        <div className="cg-animate-rise-in mx-auto mt-4 w-full max-w-md overflow-hidden rounded-2xl shadow-[var(--cg-shadow-soft)] sm:mt-5 sm:rounded-3xl">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={quiz.image_url}
             alt=""
-            className="aspect-[16/10] w-full object-cover"
+            className="aspect-[16/10] max-h-[min(36vh,18rem)] w-full object-cover object-center sm:max-h-[min(40vh,22rem)]"
           />
         </div>
       ) : null}
 
-      <div className="mt-5 text-center">
-        <h2 className="text-xl font-bold text-[var(--cg-fg)]">{displayTitle}</h2>
+      <div className="mt-4 text-center sm:mt-5">
+        <h2 className="text-lg font-bold text-[var(--cg-fg)] sm:text-xl">{displayTitle}</h2>
         {quiz.description?.trim() ? (
-          <p className="mt-2 text-base text-[var(--cg-muted)]">{quiz.description.trim()}</p>
+          <p className="mt-2 text-sm text-[var(--cg-muted)] sm:text-base">{quiz.description.trim()}</p>
         ) : null}
       </div>
 
-      <p className="mt-6 rounded-2xl bg-[var(--cg-card)] p-5 text-lg font-semibold shadow-[var(--cg-shadow-soft)] text-[var(--cg-fg)]">
+      <p className="mt-5 rounded-2xl bg-[var(--cg-card)] p-4 text-base font-semibold shadow-[var(--cg-shadow-soft)] text-[var(--cg-fg)] sm:mt-6 sm:p-5 sm:text-lg">
         {quiz.question}
       </p>
 
@@ -154,7 +154,7 @@ export function PlayQuizView({
                 if (multi) toggleMulti(opt.id);
                 else submitSingle(opt.id);
               }}
-              className={`cg-tap-lift grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border-2 px-4 py-5 text-left text-base font-semibold ${
+              className={`cg-tap-lift grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border-2 px-3 py-4 text-left text-sm font-semibold sm:px-4 sm:py-5 sm:text-base ${
                 show && isRight
                   ? "border-[var(--cg-success)] bg-[var(--cg-success)]/20"
                   : show && isPicked && !isRight
@@ -164,10 +164,10 @@ export function PlayQuizView({
                       : "border-[var(--cg-border)] bg-[var(--cg-card)]"
               }`}
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--cg-secondary)] text-sm font-bold text-[var(--cg-fg)]">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--cg-secondary)] text-sm font-bold text-[var(--cg-fg)] sm:h-9 sm:w-9">
                 {String.fromCharCode(65 + i)}
               </span>
-              <span className="min-w-0">{opt.label}</span>
+              <span className="min-w-0 break-words [overflow-wrap:anywhere]">{opt.label}</span>
               {show && isRight ? <IconCheck className="text-[var(--cg-success)]" /> : null}
               {show && isPicked && !isRight ? (
                 <IconX className="text-[var(--cg-destructive)]" />

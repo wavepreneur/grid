@@ -12,10 +12,15 @@ export function PhoneShell({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Online / desktop-friendly play shell.
+ * Same phone-first column as outdoor, slightly wider on large screens —
+ * never a full 7xl stage that blows up images and tap targets.
+ */
 export function StageShell({ children }: { children: ReactNode }) {
   return (
-    <div className="city-game min-h-[100dvh] bg-[var(--cg-ink)]/95">
-      <div className="mx-auto min-h-[100dvh] w-full max-w-7xl bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] xl:my-6 xl:min-h-[calc(100dvh-3rem)] xl:rounded-[2.5rem]">
+    <div className="city-game min-h-[var(--vv-height,100dvh)] bg-[var(--cg-ink)]/95 py-0 sm:py-6">
+      <div className="cg-screen-shell relative mx-auto flex min-h-[var(--vv-height,100dvh)] w-full max-w-[30rem] flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] sm:min-h-[calc(100dvh-3rem)] sm:max-w-xl sm:rounded-[2rem] md:max-w-2xl lg:max-w-3xl">
         {children}
       </div>
     </div>

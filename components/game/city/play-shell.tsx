@@ -9,7 +9,7 @@ type Props = {
   children: ReactNode;
 };
 
-/** Outer chrome for player routes — Phone for co-located, Stage for online. */
+/** Outer chrome for player routes — constrained column on every surface/device. */
 export function CityPlayShell({ mode = "outdoor", children }: Props) {
   if (mode === "online") {
     return <StageShell>{children}</StageShell>;
