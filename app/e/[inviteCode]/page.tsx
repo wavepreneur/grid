@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getEventContent } from "@/app/actions/content";
 import { getEventInvite } from "@/app/actions/lobby";
 import { EventLanding } from "@/components/event/event-landing";
 import { GridShell } from "@/components/grid/grid-shell";
@@ -19,22 +20,23 @@ export default async function EventPage({ params }: EventPageProps) {
   }
 
   const event = eventResult.data;
+  const contentResult = await getEventContent(normalized);
+  const content = contentResult.success ? contentResult.data : null;
+  const title = content?.templateName?.trim() || event.title;
 
   return (
     <GridShell
+      variant="welcome"
       eyebrow="Willkommen"
-      title={event.title}
-      description={
-        event.organization_name
-          ? `${event.organization_name} · Tippe deinen Namen — kein Passwort nötig.`
-          : "Tippe deinen Namen — kein Passwort nötig."
-      }
+      title={title}
+      description="Kein Login nötig — wählt euer Team und legt los."
+      logoUrl={content?.logoUrl}
     >
       <EventLanding event={event} />
-      <p className="mt-8 text-center text-xs text-slate-500">
+      <p className="mt-6 text-center text-xs text-slate-400">
         Event-Leiter?{" "}
-        <Link href={cockpitPath(normalized)} className="font-medium text-teal-600 hover:underline">
-          Operator-Cockpit öffnen
+        <Link href={cockpitPath(normalized)} className="font-medium text-teal-700 hover:underline">
+          Cockpit
         </Link>
       </p>
     </GridShell>

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getEventContent } from "@/app/actions/content";
 import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GridShell } from "@/components/grid/grid-shell";
 import { LobbyGate } from "@/components/lobby/lobby-gate";
@@ -24,15 +25,28 @@ export default async function EventLobbyPage({ params, searchParams }: EventLobb
   });
   if (!teamResult.success) notFound();
 
+  const contentResult = await getEventContent(normalizedInvite);
+  const content = contentResult.success ? contentResult.data : null;
+
   return (
     <GridShell
-      title={manageMode ? "Team verwalten" : "Team-Lobby"}
-      description={`${eventResult.data.title} · ${teamResult.data.teamName}`}
+      variant="welcome"
+      eyebrow={manageMode ? "Team" : "Wartebereich"}
+      title={content?.templateName?.trim() || eventResult.data.title}
+      description={
+        manageMode
+          ? `Team ${teamResult.data.teamName}`
+          : "Lest die Kurzinformationen und holt eure Mitspieler dazu."
+      }
+      logoUrl={content?.logoUrl}
     >
       <LobbyGate
         inviteCode={normalizedInvite}
         joinCode={normalizedJoin}
         manageMode={manageMode}
+        eventTitle={content?.templateName?.trim() || eventResult.data.title}
+        briefingIframeUrl={content?.briefingIframeUrl}
+        roleLabels={content?.roleLabels}
       />
     </GridShell>
   );

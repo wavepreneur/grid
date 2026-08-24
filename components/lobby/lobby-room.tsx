@@ -15,19 +15,22 @@ import {
   CopyInviteLink,
   QrInviteImage,
 } from "@/components/grid/copy-invite-link";
-import { IdentityBar } from "@/components/player/identity-bar";
+import { PlayDocSheet } from "@/components/game/play-doc-sheet";
 import { SessionHandoffScreen } from "@/components/player/session-handoff-screen";
 import {
   GridButton,
   GridError,
   GridHint,
-  GridStat,
 } from "@/components/grid/grid-shell";
 import { eventPlayPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
 import { useTeamSync } from "@/lib/hooks/use-team-sync";
 import { buildTeamInviteUrl } from "@/lib/grid/codes";
 import { isLobbyRosterFull } from "@/lib/grid/lobby-auto-start";
-import { archetypeRoleLabel } from "@/lib/grid/archetype-roles";
+import {
+  displayRoleLabel,
+  DEFAULT_ROLE_LABELS,
+  type RoleDisplayLabels,
+} from "@/lib/grid/role-labels";
 import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
 
@@ -37,6 +40,9 @@ type LobbyRoomProps = {
   initialSnapshot: LobbySnapshot;
   playerSession: PlayerSession;
   manageMode?: boolean;
+  eventTitle?: string;
+  briefingIframeUrl?: string | null;
+  roleLabels?: RoleDisplayLabels | null;
 };
 
 function formatCountdown(targetIso: string | null): string {
@@ -51,34 +57,24 @@ function formatCountdown(targetIso: string | null): string {
   return `${minutes}:${seconds}`;
 }
 
-function playerRoleBadge(player: LobbySnapshot["players"][number]): string {
-  if (player.archetype_role) {
-    return archetypeRoleLabel(player.archetype_role);
-  }
-  if (player.is_alpha || player.is_captain) return "Alpha";
-  if (player.is_beta) return "Beta";
-  if (player.is_gamma) return "Gamma";
-  return "Gamma";
-}
-
-function playerRoleBadgeClass(role: string): string {
-  if (role === "Alpha") return "text-teal-700 bg-teal-50";
-  if (role === "Beta") return "text-sky-700 bg-sky-50";
-  return "text-slate-600 bg-slate-100";
-}
-
 export function LobbyRoom({
   inviteCode,
   joinCode,
   initialSnapshot,
   playerSession,
   manageMode = false,
+  eventTitle,
+  briefingIframeUrl = null,
+  roleLabels = null,
 }: LobbyRoomProps) {
   const router = useRouter();
+  const labels = roleLabels ?? DEFAULT_ROLE_LABELS;
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [session, setSession] = useState(playerSession);
   const [sessionSuperseded, setSessionSuperseded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [briefingOpen, setBriefingOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   const [countdown, setCountdown] = useState(
     formatCountdown(initialSnapshot.lobby_auto_start_at),
   );
@@ -137,7 +133,7 @@ export function LobbyRoom({
     }));
   }, []);
 
-  const { isConnected, error: realtimeError } = useTeamSync({
+  const { error: realtimeError } = useTeamSync({
     sessionId: session.sessionId,
     teamId: session.teamId,
     playerId: session.playerId,
@@ -205,7 +201,6 @@ export function LobbyRoom({
 
   function handleTransferCaptain(targetPlayerId: string) {
     setError(null);
-
     startTransition(async () => {
       const result = await transferCaptain({
         inviteCode,
@@ -213,12 +208,10 @@ export function LobbyRoom({
         sessionId: session.sessionId,
         targetPlayerId,
       });
-
       if (!result.success) {
         setError(result.error);
         return;
       }
-
       await refreshLobby();
       await syncSessionFromServer();
     });
@@ -226,7 +219,6 @@ export function LobbyRoom({
 
   function handleAssignBeta(targetPlayerId: string) {
     setError(null);
-
     startTransition(async () => {
       const result = await assignPlayerRole({
         inviteCode,
@@ -235,12 +227,10 @@ export function LobbyRoom({
         targetPlayerId,
         role: "beta",
       });
-
       if (!result.success) {
         setError(result.error);
         return;
       }
-
       await refreshLobby();
       await syncSessionFromServer();
     });
@@ -248,7 +238,6 @@ export function LobbyRoom({
 
   function handleAssignGamma(targetPlayerId: string) {
     setError(null);
-
     startTransition(async () => {
       const result = await assignPlayerRole({
         inviteCode,
@@ -257,12 +246,10 @@ export function LobbyRoom({
         targetPlayerId,
         role: "gamma",
       });
-
       if (!result.success) {
         setError(result.error);
         return;
       }
-
       await refreshLobby();
       await syncSessionFromServer();
     });
@@ -270,7 +257,6 @@ export function LobbyRoom({
 
   function handleRemovePlayer(targetPlayerId: string) {
     setError(null);
-
     startTransition(async () => {
       const result = await removePlayerFromLobby({
         inviteCode,
@@ -278,12 +264,10 @@ export function LobbyRoom({
         sessionId: session.sessionId,
         targetPlayerId,
       });
-
       if (!result.success) {
         setError(result.error);
         return;
       }
-
       await refreshLobby();
     });
   }
@@ -292,20 +276,20 @@ export function LobbyRoom({
   const isLobby = snapshot.team_status === "lobby";
   const isPlaying = snapshot.team_status === "playing";
   const canManageRoles = isAlpha && (isLobby || manageMode);
-  const minPlayersToStart = 1;
-  const canStart = snapshot.active_player_count >= minPlayersToStart;
+  const canStart = snapshot.active_player_count >= 1;
   const canInviteTeammates =
     isAlpha &&
     snapshot.active_player_count < snapshot.max_size &&
     (isLobby || (manageMode && isPlaying));
 
   return (
-    <div className="flex flex-col gap-6">
-      <IdentityBar
-        inviteCode={inviteCode}
-        joinCode={joinCode}
-        session={session}
-        showManageTeam={!manageMode}
+    <div className="flex flex-col gap-5">
+      <PlayDocSheet
+        open={briefingOpen}
+        title="Kurzinformationen"
+        url={briefingIframeUrl}
+        emptyHint="Für dieses Spiel ist noch kein Briefing-Link hinterlegt. Du findest die Infos später auch im Spielmenü."
+        onClose={() => setBriefingOpen(false)}
       />
 
       {sessionSuperseded ? (
@@ -317,162 +301,179 @@ export function LobbyRoom({
         />
       ) : (
         <>
-      {manageMode && isPlaying ? (
-        <GridHint tone="success">
-          Spiel läuft — hier kannst du Rollen verwalten.{" "}
-          <a
-            href={eventPlayPath(inviteCode, joinCode)}
-            className="font-medium text-emerald-700 underline underline-offset-2"
-          >
-            Zurück zum Spiel
-          </a>
-        </GridHint>
-      ) : null}
-      <div className="grid grid-cols-2 gap-3">
-        <GridStat label="Team" value={snapshot.team_name} />
-        <GridStat
-          label="Spieler"
-          value={`${snapshot.active_player_count} / ${snapshot.max_size}`}
-        />
-        <GridStat label="Abteilung" value={snapshot.department ?? "—"} />
-        <GridStat
-          label="Realtime"
-          value={isConnected ? "Live verbunden" : "Verbinde…"}
-        />
-      </div>
-
-      {isLobby ? (
-        <GridHint tone="info">
-          {rosterFull ? (
-            <>Team voll — Start in {countdown}…</>
-          ) : (
-            <>Auto-Start in {countdown} — oder der Team-Leiter startet manuell.</>
-          )}
-        </GridHint>
-      ) : null}
-
-      {isAlpha && isLobby && !canStart ? (
-        <GridHint tone="warn">
-          Mindestens ein Spieler muss im Team sein, bevor die Mission startet.
-        </GridHint>
-      ) : null}
-
-      <div>
-        <p className="mb-3 text-sm font-medium text-slate-700">Spieler im Team</p>
-        <ul className="flex flex-col gap-2">
-          {snapshot.players.map((player) => (
-            <li
-              key={player.id}
-              className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div>
-                <span className="font-medium text-slate-900">{player.display_name}</span>
-                {player.id === session.playerId ? (
-                  <span className="ml-2 text-xs text-slate-500">(Du)</span>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {(() => {
-                  const role = playerRoleBadge(player);
-                  return (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${playerRoleBadgeClass(role)}`}
-                    >
-                      {role}
-                    </span>
-                  );
-                })()}
-                {canManageRoles && !player.is_captain && player.id !== session.playerId ? (
-                  <>
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() => handleTransferCaptain(player.id)}
-                      className="text-xs font-medium text-teal-600 underline-offset-2 hover:underline"
-                    >
-                      Leitung übergeben
-                    </button>
-                    {!player.is_beta && snapshot.active_player_count >= 2 ? (
-                      <button
-                        type="button"
-                        disabled={isPending}
-                        onClick={() => handleAssignBeta(player.id)}
-                        className="text-xs font-medium text-sky-600 underline-offset-2 hover:underline"
-                      >
-                        Hinweise zuweisen
-                      </button>
-                    ) : null}
-                    {player.is_beta && snapshot.active_player_count >= 3 ? (
-                      <button
-                        type="button"
-                        disabled={isPending}
-                        onClick={() => handleAssignGamma(player.id)}
-                        className="text-xs font-medium text-slate-500 underline-offset-2 hover:underline"
-                      >
-                        Standard-Rolle
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() => handleRemovePlayer(player.id)}
-                      className="text-xs font-medium text-red-600 underline-offset-2 hover:underline"
-                    >
-                      Entfernen
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {canInviteTeammates ? (
-        <div className="flex flex-col gap-4">
-          <div>
-            <p className="mb-3 text-sm font-medium text-slate-700">Mitspieler einladen</p>
-            {manageMode && isPlaying ? (
-              <p className="mb-3 text-sm text-slate-500">
-                Neuer Spieler kann auch während der laufenden Mission beitreten.
-              </p>
-            ) : null}
-            {teammateUrl ? (
-              <>
-                <CopyInviteLink url={teammateUrl} />
-                <div className="mt-4">
-                  <QrInviteImage url={teammateUrl} />
-                </div>
-              </>
-            ) : null}
+          <div className="rounded-2xl bg-teal-50/80 px-4 py-4 text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">
+              {eventTitle ?? "Wartebereich"}
+            </p>
+            <p className="mt-1 text-xl font-bold text-slate-900">{snapshot.team_name}</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Hallo {session.displayName} · {snapshot.active_player_count}/
+              {snapshot.max_size} bereit
+            </p>
           </div>
 
-          {isLobby ? (
+          <button
+            type="button"
+            onClick={() => setBriefingOpen(true)}
+            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-teal-200 bg-white px-4 py-4 text-left shadow-sm transition hover:border-teal-300"
+          >
+            <span>
+              <span className="block text-base font-bold text-slate-900">
+                Kurzinformationen
+              </span>
+              <span className="mt-0.5 block text-sm text-slate-500">
+                Regeln lesen — bevor der Countdown startet
+              </span>
+            </span>
+            <span className="rounded-full bg-teal-600 px-3 py-1 text-xs font-bold text-white">
+              Lesen
+            </span>
+          </button>
+
+          {manageMode && isPlaying ? (
+            <GridHint tone="success">
+              Spiel läuft.{" "}
+              <a
+                href={eventPlayPath(inviteCode, joinCode)}
+                className="font-medium text-emerald-700 underline underline-offset-2"
+              >
+                Zurück zum Spiel
+              </a>
+            </GridHint>
+          ) : null}
+
+          {isLobby && rosterFull ? (
+            <p className="text-center text-sm font-semibold text-teal-800">
+              Team voll — Start in {countdown}
+            </p>
+          ) : null}
+
+          <div>
+            <p className="mb-2 text-sm font-semibold text-slate-700">Euer Team</p>
+            <ul className="flex flex-col gap-2">
+              {snapshot.players.map((player) => {
+                const role = displayRoleLabel(
+                  player.archetype_role ??
+                    (player.is_alpha || player.is_captain
+                      ? "alpha"
+                      : player.is_beta
+                        ? "beta"
+                        : "gamma"),
+                  labels,
+                );
+                return (
+                  <li
+                    key={player.id}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-900">
+                        {player.display_name}
+                        {player.id === session.playerId ? (
+                          <span className="ml-1.5 text-xs font-medium text-slate-400">
+                            du
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="text-xs text-slate-500">{role}</p>
+                    </div>
+                    {canManageRoles && manageOpen && !player.is_captain && player.id !== session.playerId ? (
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => handleTransferCaptain(player.id)}
+                          className="text-xs font-medium text-teal-700"
+                        >
+                          Leitung
+                        </button>
+                        {!player.is_beta && snapshot.active_player_count >= 2 ? (
+                          <button
+                            type="button"
+                            disabled={isPending}
+                            onClick={() => handleAssignBeta(player.id)}
+                            className="text-xs font-medium text-sky-700"
+                          >
+                            Hinweise
+                          </button>
+                        ) : null}
+                        {player.is_beta && snapshot.active_player_count >= 3 ? (
+                          <button
+                            type="button"
+                            disabled={isPending}
+                            onClick={() => handleAssignGamma(player.id)}
+                            className="text-xs font-medium text-slate-500"
+                          >
+                            Standard
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => handleRemovePlayer(player.id)}
+                          className="text-xs font-medium text-red-600"
+                        >
+                          Entfernen
+                        </button>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          {canInviteTeammates ? (
+            <div className="space-y-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5">
+              <p className="text-center text-sm font-semibold text-slate-800">
+                Freunde einladen
+              </p>
+              {teammateUrl ? (
+                <>
+                  <QrInviteImage url={teammateUrl} />
+                  <CopyInviteLink url={teammateUrl} label="Einladungslink kopieren" />
+                </>
+              ) : null}
+            </div>
+          ) : null}
+
+          {isAlpha && isLobby ? (
             <GridButton
               type="button"
+              className="py-4 text-base"
               disabled={isPending || !canStart}
               onClick={handleStartGame}
             >
-              {isPending ? "Startet…" : "Spiel jetzt starten"}
+              {isPending ? "Startet…" : "Spiel starten"}
             </GridButton>
           ) : null}
-        </div>
-      ) : null}
 
-      {!isAlpha && isLobby ? (
-        <p className="text-center text-sm text-slate-500">
-          Warte auf den Team-Leiter oder den Auto-Start…
-        </p>
-      ) : null}
+          {!isAlpha && isLobby ? (
+            <p className="rounded-2xl bg-slate-50 px-4 py-4 text-center text-sm text-slate-600">
+              Warte auf den Start durch die Team-Leitung — nutze die Zeit für die
+              Kurzinformationen.
+            </p>
+          ) : null}
 
-      {isLobby ? (
-        <GridButton type="button" variant="ghost" disabled={isPending} onClick={handleHandover}>
-          Gerät übergeben
-        </GridButton>
-      ) : null}
+          <div className="flex flex-col gap-2">
+            {canManageRoles ? (
+              <button
+                type="button"
+                onClick={() => setManageOpen((v) => !v)}
+                className="text-center text-sm font-medium text-slate-500 underline-offset-2 hover:underline"
+              >
+                {manageOpen ? "Rollen-Verwaltung ausblenden" : "Rollen verwalten"}
+              </button>
+            ) : null}
+            {isLobby ? (
+              <GridButton type="button" variant="ghost" disabled={isPending} onClick={handleHandover}>
+                Gerät übergeben
+              </GridButton>
+            ) : null}
+          </div>
 
-      {realtimeError ? <GridError message={realtimeError} /> : null}
-      {error ? <GridError message={error} /> : null}
+          {realtimeError ? <GridError message={realtimeError} /> : null}
+          {error ? <GridError message={error} /> : null}
         </>
       )}
     </div>

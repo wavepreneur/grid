@@ -80,26 +80,13 @@ export function GameGate({
         return;
       }
 
-      const freshContent: ResolvedEventContent = {
-        templateSlug: contentResult.data.templateSlug,
-        templateName: contentResult.data.templateName,
-        city: contentResult.data.city,
-        levels: contentResult.data.levels,
-        blueprintSlug: contentResult.data.blueprintSlug,
-        archetype: contentResult.data.archetype,
-        capabilities: contentResult.data.capabilities,
-        uiLayout: contentResult.data.uiLayout,
-        showLiveScore: contentResult.data.showLiveScore,
-        missionDurationMinutes: contentResult.data.missionDurationMinutes,
-        contentMode: contentResult.data.contentMode,
-        allowedFallbacks: contentResult.data.allowedFallbacks,
-        compiledLogic: contentResult.data.compiledLogic,
-      };
+      const { eventId, contentRevision, ...resolvedContent } = contentResult.data;
+      const freshContent: ResolvedEventContent = { ...resolvedContent };
 
-      cacheEventContent(contentResult.data.eventId, freshContent);
+      cacheEventContent(eventId, freshContent);
       setSession(syncedSession);
       setEventContent(freshContent);
-      setContentRevision(contentResult.data.contentRevision);
+      setContentRevision(contentRevision);
       setInitialState(gameResult);
       setReady(true);
     });
@@ -116,25 +103,12 @@ export function GameGate({
       const contentResult = await getEventContent(inviteCode);
       if (!contentResult.success) return;
 
-      const freshContent: ResolvedEventContent = {
-        templateSlug: contentResult.data.templateSlug,
-        templateName: contentResult.data.templateName,
-        city: contentResult.data.city,
-        levels: contentResult.data.levels,
-        blueprintSlug: contentResult.data.blueprintSlug,
-        archetype: contentResult.data.archetype,
-        capabilities: contentResult.data.capabilities,
-        uiLayout: contentResult.data.uiLayout,
-        showLiveScore: contentResult.data.showLiveScore,
-        missionDurationMinutes: contentResult.data.missionDurationMinutes,
-        contentMode: contentResult.data.contentMode,
-        allowedFallbacks: contentResult.data.allowedFallbacks,
-        compiledLogic: contentResult.data.compiledLogic,
-      };
+      const { eventId, contentRevision: nextRevision, ...resolvedContent } = contentResult.data;
+      const freshContent: ResolvedEventContent = { ...resolvedContent };
 
-      cacheEventContent(contentResult.data.eventId, freshContent);
+      cacheEventContent(eventId, freshContent);
       setEventContent(freshContent);
-      setContentRevision(contentResult.data.contentRevision);
+      setContentRevision(nextRevision);
     }, 12_000);
 
     return () => window.clearInterval(interval);

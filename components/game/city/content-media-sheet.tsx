@@ -11,6 +11,8 @@ type ContentMediaSheetProps = {
   onClose: () => void;
   /** Optional tip strip below media. */
   tipSlot?: ReactNode;
+  /** Override empty-state copy when no mediaUrl. */
+  emptyMessage?: string;
 };
 
 /**
@@ -24,6 +26,7 @@ export function ContentMediaSheet({
   mediaUrl,
   onClose,
   tipSlot,
+  emptyMessage,
 }: ContentMediaSheetProps) {
   useEffect(() => {
     if (!open) return;
@@ -83,13 +86,15 @@ export function ContentMediaSheet({
               />
             )
           ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+            <div className="flex h-full flex-col items-center justify-center gap-3 bg-[var(--cg-card)] px-6 text-center">
               <p className="text-sm font-semibold text-[var(--cg-muted)]">
-                Noch keine Medien-URL hinterlegt.
+                {emptyMessage ?? "Noch keine Medien-URL hinterlegt."}
               </p>
-              <p className="text-xs text-[var(--cg-muted)]">
-                Im Editor unter „Medien URL / Link“ die Website oder Datei eintragen.
-              </p>
+              {!emptyMessage ? (
+                <p className="text-xs text-[var(--cg-muted)]">
+                  Im Editor unter „Medien URL / Link“ die Website oder Datei eintragen.
+                </p>
+              ) : null}
             </div>
           )}
         </div>

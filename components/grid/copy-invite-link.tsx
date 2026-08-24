@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GridButton, GridError } from "@/components/grid/grid-shell";
+import { GridButton } from "@/components/grid/grid-shell";
 import { IconCopy } from "@/components/cms/studio-icons";
 
 type CopyInviteLinkProps = {
@@ -11,7 +11,7 @@ type CopyInviteLinkProps = {
 
 export function CopyInviteLink({
   url,
-  label = "Einladungslink kopieren",
+  label = "Link kopieren",
 }: CopyInviteLinkProps) {
   const [copied, setCopied] = useState(false);
 
@@ -22,14 +22,9 @@ export function CopyInviteLink({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs break-all text-slate-600">
-        {url}
-      </div>
-      <GridButton type="button" icon={<IconCopy size={16} />} onClick={handleCopy}>
-        {copied ? "Kopiert!" : label}
-      </GridButton>
-    </div>
+    <GridButton type="button" variant="secondary" icon={<IconCopy size={16} />} onClick={handleCopy}>
+      {copied ? "Kopiert!" : label}
+    </GridButton>
   );
 }
 
@@ -41,19 +36,14 @@ export function QrInviteImage({ url }: { url: string }) {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={qrUrl}
-        alt="QR-Code für Teammate-Link"
-        className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
-        width={220}
-        height={220}
+        alt="QR-Code zum Mitspielen"
+        className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm"
+        width={200}
+        height={200}
       />
-      <p className="text-center text-xs text-slate-500">
-        Mitspieler scannen diesen QR-Code, um der Lobby beizutreten.
+      <p className="max-w-xs text-center text-sm text-slate-500">
+        Freunde scannen den Code — und sind sofort dabei.
       </p>
     </div>
   );
-}
-
-export function FormError({ message }: { message?: string | null }) {
-  if (!message) return null;
-  return <GridError message={message} />;
 }

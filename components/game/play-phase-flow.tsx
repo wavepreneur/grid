@@ -191,6 +191,8 @@ export function PlayPhaseFlow({
         onOpen={onMorePanel}
         onClose={() => onMorePanel(null)}
         briefingText={eventContent.briefingText}
+        briefingIframeUrl={eventContent.briefingIframeUrl}
+        faqIframeUrl={eventContent.faqIframeUrl}
         crispWebsiteId={process.env.NEXT_PUBLIC_CRISP_WEBSITE_ID}
         paused={paused}
         onTogglePause={onTogglePause}

@@ -5,6 +5,10 @@ type GridShellProps = {
   eyebrow?: string;
   title: string;
   description?: string;
+  /** Soft welcome layout for mass-play join / lobby (less “admin”). */
+  variant?: "default" | "welcome";
+  /** Optional game logo shown above the title. */
+  logoUrl?: string | null;
   children: ReactNode;
 };
 
@@ -12,8 +16,53 @@ export function GridShell({
   eyebrow = "GRID",
   title,
   description,
+  variant = "default",
+  logoUrl = null,
   children,
 }: GridShellProps) {
+  if (variant === "welcome") {
+    return (
+      <div className="relative flex min-h-[100dvh] flex-col overflow-x-hidden bg-[linear-gradient(165deg,#0f766e_0%,#134e4a_42%,#f7f6f0_42.1%)]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[42%] opacity-30">
+          <div className="absolute -left-16 top-8 h-40 w-40 rounded-full bg-white/20 blur-2xl" />
+          <div className="absolute right-0 top-20 h-48 w-48 rounded-full bg-teal-300/30 blur-3xl" />
+        </div>
+        <main className="relative z-[1] mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
+          <div className="flex flex-1 flex-col justify-center">
+            <div className="mb-6 text-center text-white">
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoUrl}
+                  alt=""
+                  className="mx-auto mb-4 h-16 w-16 rounded-2xl object-cover shadow-lg ring-2 ring-white/40"
+                />
+              ) : (
+                <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-lg font-bold tracking-wide text-white shadow-lg backdrop-blur">
+                  {title.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/75">
+                {eyebrow}
+              </p>
+              <h1 className="mt-2 text-3xl font-bold tracking-tight drop-shadow-sm sm:text-4xl">
+                {title}
+              </h1>
+              {description ? (
+                <p className="mx-auto mt-3 max-w-sm text-base leading-relaxed text-white/85">
+                  {description}
+                </p>
+              ) : null}
+            </div>
+            <div className="rounded-[1.75rem] bg-white p-5 shadow-[0_20px_50px_-24px_rgba(15,23,42,0.45)] sm:p-7">
+              {children}
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="grid-bg flex min-h-[100dvh] flex-col items-center justify-center px-4 py-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <main className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-10">

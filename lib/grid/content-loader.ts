@@ -35,6 +35,7 @@ import {
 import { resolveContentMode } from "@/lib/grid/play-slots";
 import { buildDefaultStation, normalizeStationCode } from "@/lib/grid/stations";
 import { parseBonusTask } from "@/lib/grid/bonus";
+import { parseGameHelpLinks } from "@/lib/grid/game-help-links";
 
 type GlobalLevelRow = {
   level_number: number;
@@ -399,6 +400,8 @@ export async function loadResolvedEventContent(input: {
           missionDurationMinutes:
             game.duration_minutes ?? contentConfig.mission_duration_minutes ?? 90,
           briefingText: game.description?.trim() || null,
+          ...parseGameHelpLinks(game.feature_flags),
+          logoUrl: typeof game.logo_url === "string" && game.logo_url.trim() ? game.logo_url.trim() : null,
         },
         mergedConfig,
         mergedLevels,
@@ -435,6 +438,8 @@ export async function loadResolvedEventContent(input: {
           missionDurationMinutes:
             game.duration_minutes ?? contentConfig.mission_duration_minutes ?? 90,
           briefingText: game.description?.trim() || null,
+          ...parseGameHelpLinks(game.feature_flags),
+          logoUrl: typeof game.logo_url === "string" && game.logo_url.trim() ? game.logo_url.trim() : null,
         },
         mergedConfig,
         mergedLevels,

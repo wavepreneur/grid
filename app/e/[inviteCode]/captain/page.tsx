@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getEventContent } from "@/app/actions/content";
 import { getEventInvite } from "@/app/actions/lobby";
 import { GridShell } from "@/components/grid/grid-shell";
 import { CaptainSetupForm } from "@/components/lobby/captain-setup-form";
@@ -25,16 +26,17 @@ export default async function EventCaptainPage({ params, searchParams }: EventCa
     | undefined;
   const studioTest = Boolean(contentConfig?.is_studio_test);
 
+  const contentResult = await getEventContent(normalizedInvite);
+  const content = contentResult.success ? contentResult.data : null;
+  const gameTitle = content?.templateName?.trim() || eventResult.data.title;
+
   return (
     <GridShell
-      title={studioTest ? "Testteam starten" : "Team erstellen"}
-      description={
-        studioTest
-          ? "Zuerst Teamname (Highscore), dann dein Spielername."
-          : normalizedJoin
-            ? `Captain für Team ${normalizedJoin} · ${eventResult.data.title}`
-            : `Starte das erste Team für „${eventResult.data.title}".`
-      }
+      variant="welcome"
+      eyebrow={studioTest ? "Testspiel" : "Willkommen"}
+      title={gameTitle}
+      description="Legt euren Teamnamen und deinen Namen fest — dann geht’s in den Wartebereich."
+      logoUrl={content?.logoUrl}
     >
       <CaptainSetupForm
         inviteCode={normalizedInvite}
@@ -42,9 +44,9 @@ export default async function EventCaptainPage({ params, searchParams }: EventCa
         studioTest={studioTest}
       />
       {!studioTest ? (
-        <p className="mt-6 text-center text-xs text-slate-500">
-          <Link href={eventPath(normalizedInvite)} className="text-teal-600 hover:underline">
-            ← Zurück zum Event
+        <p className="mt-5 text-center text-xs text-slate-400">
+          <Link href={eventPath(normalizedInvite)} className="text-teal-700 hover:underline">
+            ← Zurück
           </Link>
         </p>
       ) : null}

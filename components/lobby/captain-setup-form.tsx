@@ -9,15 +9,9 @@ import {
 import {
   GridButton,
   GridError,
-  GridHint,
   GridInput,
   GridLabel,
-  GridSelect,
 } from "@/components/grid/grid-shell";
-import {
-  DEPARTMENT_OPTIONS,
-  REGION_OPTIONS,
-} from "@/lib/grid/constants";
 import { eventLobbyPath } from "@/lib/grid/event-routes";
 import { savePlayerSession } from "@/lib/grid/player-session";
 
@@ -45,9 +39,9 @@ export function CaptainSetupForm({
       const payload = {
         inviteCode,
         teamName: String(formData.get("teamName") ?? ""),
-        maxSize: Number(formData.get("maxSize") ?? (studioTest ? 3 : 4)),
-        department: String(formData.get("department") ?? (studioTest ? "Other" : "")),
-        region: String(formData.get("region") ?? (studioTest ? "DACH" : "")),
+        maxSize: Number(formData.get("maxSize") ?? 4),
+        department: String(formData.get("department") ?? "Other"),
+        region: String(formData.get("region") ?? "DACH"),
         displayName: String(formData.get("displayName") ?? ""),
       };
 
@@ -68,19 +62,12 @@ export function CaptainSetupForm({
 
   return (
     <form action={handleSubmit} className="flex flex-col gap-5">
-      {studioTest ? (
-        <GridHint tone="info">
-          Als Team Lead legst du zuerst den <strong>Teamnamen</strong> fest (Highscore), danach
-          deinen Spielernamen.
-        </GridHint>
-      ) : isPrebooked ? (
-        <GridHint tone="info">
-          Vorgebuchtes Team <strong>{joinCode}</strong> — wähle Teamname und deinen Spielernamen.
-        </GridHint>
-      ) : null}
+      <p className="text-center text-sm leading-relaxed text-slate-500">
+        Zwei kurze Angaben — dann seid ihr im Wartebereich und könnt Mitspieler holen.
+      </p>
 
       <div>
-        <GridLabel hint="Erscheint später in der Highscore / im Ranking">Teamname</GridLabel>
+        <GridLabel hint="So erscheint ihr im Ranking">Teamname</GridLabel>
         <GridInput
           name="teamName"
           placeholder="z. B. Berlin Explorers"
@@ -88,13 +75,12 @@ export function CaptainSetupForm({
           minLength={2}
           maxLength={48}
           autoComplete="organization"
+          className="text-base"
         />
       </div>
 
       <div>
-        <GridLabel hint="Zur eindeutigen Zuordnung im Team während des Spiels">
-          Dein Spielername
-        </GridLabel>
+        <GridLabel hint="Dein Name im Team">Dein Name</GridLabel>
         <GridInput
           name="displayName"
           placeholder="z. B. Dervis"
@@ -102,67 +88,25 @@ export function CaptainSetupForm({
           minLength={2}
           maxLength={32}
           autoComplete="nickname"
+          className="text-base"
         />
       </div>
 
-      {studioTest ? (
-        <>
-          <input type="hidden" name="maxSize" value="3" />
-          <input type="hidden" name="department" value="Other" />
-          <input type="hidden" name="region" value="DACH" />
-        </>
-      ) : (
-        <>
-          <div>
-            <GridLabel>Teamgröße (1–8)</GridLabel>
-            <GridSelect name="maxSize" defaultValue="4">
-              {Array.from({ length: 8 }, (_, index) => index + 1).map((size) => (
-                <option key={size} value={size}>
-                  {size} {size === 1 ? "Spieler" : "Spieler"}
-                </option>
-              ))}
-            </GridSelect>
-          </div>
-
-          <div>
-            <GridLabel>Abteilung</GridLabel>
-            <GridSelect name="department" required defaultValue="">
-              <option value="" disabled>
-                Abteilung wählen
-              </option>
-              {DEPARTMENT_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </GridSelect>
-          </div>
-
-          <div>
-            <GridLabel>Region / Land</GridLabel>
-            <GridSelect name="region" required defaultValue="">
-              <option value="" disabled>
-                Region wählen
-              </option>
-              {REGION_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </GridSelect>
-          </div>
-        </>
-      )}
+      <input type="hidden" name="maxSize" value="4" />
+      <input type="hidden" name="department" value="Other" />
+      <input type="hidden" name="region" value="DACH" />
 
       {error ? <GridError message={error} /> : null}
 
-      <GridButton type="submit" disabled={isPending}>
-        {isPending
-          ? "Lobby wird erstellt…"
-          : isPrebooked
-            ? "Team konfigurieren & Lobby öffnen"
-            : "Team erstellen & Lobby öffnen"}
+      <GridButton type="submit" disabled={isPending} className="mt-1 py-4 text-base">
+        {isPending ? "Gleich geht’s los…" : "Weiter zum Wartebereich"}
       </GridButton>
+
+      {studioTest || isPrebooked ? (
+        <p className="text-center text-xs text-slate-400">
+          {studioTest ? "Studio-Test" : `Team-Code ${joinCode}`}
+        </p>
+      ) : null}
     </form>
   );
 }

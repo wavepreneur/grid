@@ -4,22 +4,32 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getLobbySnapshot } from "@/app/actions/lobby";
 import { LobbyRoom } from "@/components/lobby/lobby-room";
-import { IdentityBar } from "@/components/player/identity-bar";
 import { GridError } from "@/components/grid/grid-shell";
 import { eventPlayPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
 import {
   abandonTeamSession,
   resolveTeamSession,
 } from "@/lib/grid/session-recovery";
+import type { RoleDisplayLabels } from "@/lib/grid/role-labels";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
 
 type LobbyGateProps = {
   inviteCode: string;
   joinCode: string;
   manageMode?: boolean;
+  eventTitle?: string;
+  briefingIframeUrl?: string | null;
+  roleLabels?: RoleDisplayLabels | null;
 };
 
-export function LobbyGate({ inviteCode, joinCode, manageMode = false }: LobbyGateProps) {
+export function LobbyGate({
+  inviteCode,
+  joinCode,
+  manageMode = false,
+  eventTitle,
+  briefingIframeUrl = null,
+  roleLabels = null,
+}: LobbyGateProps) {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState<LobbySnapshot | null>(null);
   const [session, setSession] = useState<PlayerSession | null>(null);
@@ -63,18 +73,9 @@ export function LobbyGate({ inviteCode, joinCode, manageMode = false }: LobbyGat
     return <GridError message={error} />;
   }
 
-  if (!session) {
+  if (!session || !snapshot) {
     return (
-      <p className="text-sm text-[var(--grid-muted)]">Lobby wird geladen…</p>
-    );
-  }
-
-  if (!snapshot) {
-    return (
-      <div className="flex flex-col gap-4">
-        <IdentityBar inviteCode={inviteCode} joinCode={joinCode} session={session} />
-        <p className="text-sm text-[var(--grid-muted)]">Team-Daten werden geladen…</p>
-      </div>
+      <p className="py-8 text-center text-sm text-slate-500">Wartebereich wird geladen…</p>
     );
   }
 
@@ -85,6 +86,9 @@ export function LobbyGate({ inviteCode, joinCode, manageMode = false }: LobbyGat
       initialSnapshot={snapshot}
       playerSession={session}
       manageMode={manageMode}
+      eventTitle={eventTitle}
+      briefingIframeUrl={briefingIframeUrl}
+      roleLabels={roleLabels}
     />
   );
 }

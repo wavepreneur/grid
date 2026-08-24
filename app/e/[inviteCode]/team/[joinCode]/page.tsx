@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getEventContent } from "@/app/actions/content";
 import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GridLink, GridShell } from "@/components/grid/grid-shell";
 import { TeamEntryGate } from "@/components/lobby/team-entry-gate";
@@ -23,18 +24,31 @@ export default async function EventTeamPage({ params, searchParams }: EventTeamP
     joinCode: normalizedJoin,
   });
 
+  const contentResult = await getEventContent(normalizedInvite);
+  const content = contentResult.success ? contentResult.data : null;
+  const gameTitle = content?.templateName?.trim() || eventResult.data.title;
+
   if (!teamResult.success) {
     return (
-      <GridShell title="Team nicht gefunden" description="Der Team-Code passt nicht zu diesem Event.">
+      <GridShell
+        variant="welcome"
+        title="Team nicht gefunden"
+        description="Der Code passt nicht — frag dein Team nach dem richtigen Link."
+      >
         <GridLink href={eventPath(normalizedInvite)}>Zurück zum Event</GridLink>
       </GridShell>
     );
   }
 
+  const midGame = teamResult.data.teamStatus === "playing";
+
   return (
     <GridShell
-      title={teamResult.data.teamStatus === "playing" ? "Weiterspielen" : "Team beitreten"}
-      description={`${eventResult.data.title} · Team ${teamResult.data.teamName}`}
+      variant="welcome"
+      eyebrow={midGame ? "Weiterspielen" : "Willkommen"}
+      title={gameTitle}
+      description={`Team ${teamResult.data.teamName}`}
+      logoUrl={content?.logoUrl}
     >
       <TeamEntryGate
         inviteCode={normalizedInvite}

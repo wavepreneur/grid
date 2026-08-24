@@ -259,6 +259,12 @@ export type ResolvedEventContent = {
   compiledLogic?: CompiledGameLogic | null;
   /** Optional game-wide briefing shown from the play menu. */
   briefingText?: string | null;
+  /** Fullscreen iframe URL for Kurzinformationen / rules (Studio link). */
+  briefingIframeUrl?: string | null;
+  /** Fullscreen iframe URL for FAQ / troubleshooting. */
+  faqIframeUrl?: string | null;
+  /** Optional game logo for lobby / onboarding. */
+  logoUrl?: string | null;
   /** Player-facing Alpha/Beta/Gamma names for this game. */
   roleLabels?: import("@/lib/grid/role-labels").RoleDisplayLabels;
 };

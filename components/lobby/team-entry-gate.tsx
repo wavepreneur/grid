@@ -10,7 +10,6 @@ import {
   GridInput,
   GridLabel,
 } from "@/components/grid/grid-shell";
-import { IconArrowRight } from "@/components/cms/studio-icons";
 import { SESSION_ACTIVE } from "@/lib/grid/session-codes";
 import {
   abandonTeamSession,
@@ -89,36 +88,29 @@ export function TeamEntryGate({
   }
 
   if (checkingSession) {
-    return <p className="text-sm text-slate-500">Sitzung wird wiederhergestellt…</p>;
+    return (
+      <p className="py-6 text-center text-sm text-slate-500">Einen Moment…</p>
+    );
   }
 
   return (
     <div className="flex flex-col gap-5">
-      <GridHint tone="info">
-        <p>
-          Team <strong>{teamName}</strong>
-        </p>
-        <p className="mt-2 text-xs leading-6">
-          Dein Name ist deine Spieler-ID im Team. Nach einem Refresh erkennt GRID dich automatisch
-          wieder.
-        </p>
-        {isMidGame ? (
-          <p className="mt-2 font-medium text-teal-700">
-            Das Spiel läuft — du springst direkt zum aktuellen Stand ein.
-          </p>
-        ) : null}
-      </GridHint>
+      <p className="text-center text-sm leading-relaxed text-slate-500">
+        Du trittst Team <strong className="text-slate-800">{teamName}</strong> bei.
+        {isMidGame
+          ? " Das Spiel läuft schon — danach springst du direkt ein."
+          : " Wähle einen Namen, den die anderen erkennen."}
+      </p>
 
       {pendingTakeover ? (
         <GridHint tone="warn">
-          <p className="font-medium">„{pendingTakeover}" ist bereits aktiv</p>
+          <p className="font-medium">„{pendingTakeover}“ ist schon angemeldet</p>
           <p className="mt-2 leading-6">
-            Dieser Name ist auf einem anderen Gerät eingeloggt. Sitzung übernehmen? Das andere
-            Gerät wird abgemeldet.
+            Möchtest du hier weiterspielen? Das andere Gerät wird abgemeldet.
           </p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <GridButton type="button" disabled={isPending} onClick={() => completeJoin(true)}>
-              {isPending ? "Übernehme…" : "Ja, Sitzung übernehmen"}
+              {isPending ? "Übernehme…" : "Hier weiterspielen"}
             </GridButton>
             <GridButton
               type="button"
@@ -136,9 +128,7 @@ export function TeamEntryGate({
       ) : (
         <>
           <div>
-            <GridLabel hint="Wird im Team angezeigt — eindeutig wählen">
-              Dein Spielername
-            </GridLabel>
+            <GridLabel>Dein Name</GridLabel>
             <GridInput
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
@@ -146,6 +136,7 @@ export function TeamEntryGate({
               required
               minLength={2}
               maxLength={32}
+              className="text-base"
             />
           </div>
 
@@ -153,12 +144,12 @@ export function TeamEntryGate({
 
           <GridButton
             type="button"
+            className="py-4 text-base"
             disabled={isPending || displayName.trim().length < 2}
-            icon={<IconArrowRight size={16} />}
             onClick={() => completeJoin(false)}
           >
             {isPending
-              ? "Beitritt läuft…"
+              ? "Tritt bei…"
               : isMidGame
                 ? "Weiterspielen"
                 : "Team beitreten"}

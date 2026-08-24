@@ -94,6 +94,7 @@ export function GameEditorPanel({
         gps_enabled: game.gps_enabled,
         farewell_text: game.farewell_text,
         logo_url: game.logo_url,
+        feature_flags: game.feature_flags ?? {},
         runtime_profiles: parseRuntimeProfiles(game.runtime_profiles),
       }),
     [game],
@@ -115,6 +116,7 @@ export function GameEditorPanel({
         gps_enabled: game.gps_enabled,
         farewell_text: game.farewell_text,
         logo_url: game.logo_url,
+        feature_flags: game.feature_flags ?? {},
         runtime_profiles: parseRuntimeProfiles(game.runtime_profiles),
       });
       if (!result.success) {
@@ -134,6 +136,7 @@ export function GameEditorPanel({
           gps_enabled: next.gps_enabled,
           farewell_text: next.farewell_text,
           logo_url: next.logo_url,
+          feature_flags: next.feature_flags ?? {},
           runtime_profiles: parseRuntimeProfiles(next.runtime_profiles),
         }),
       );
@@ -257,7 +260,7 @@ export function GameEditorPanel({
         <StudioPanel>
           <StudioSectionTitle
             title="2 · Spieldaten"
-            description="Titel, Bild, optionaler Countdown und Kurztext."
+            description="Titel, Bild, Briefing/FAQ-Links und Kurztext für Spieler."
           />
 
           <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -287,14 +290,59 @@ export function GameEditorPanel({
             <div className="md:col-span-2">
               <ImageUploadField
                 label="Bild"
-                hint="Wird in Lobby und Spielkopf gezeigt"
+                hint="Wird in Lobby und Einstieg gezeigt"
                 value={game.logo_url ?? ""}
                 onChange={(url) => setGame({ ...game, logo_url: url || null })}
                 onClear={() => setGame({ ...game, logo_url: null })}
               />
             </div>
             <div className="md:col-span-2">
-              <StudioLabel>Beschreibung</StudioLabel>
+              <StudioLabel>Kurzinformationen (iframe-Link)</StudioLabel>
+              <StudioInput
+                type="url"
+                placeholder="https://…"
+                value={String(
+                  (game.feature_flags as Record<string, unknown> | null)?.briefing_iframe_url ??
+                    "",
+                )}
+                onChange={(e) =>
+                  setGame({
+                    ...game,
+                    feature_flags: {
+                      ...(game.feature_flags ?? {}),
+                      briefing_iframe_url: e.target.value.trim(),
+                    },
+                  })
+                }
+              />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Spielregeln als Webseite — öffnet sich vollflächig in Lobby und Spielmenü.
+              </p>
+            </div>
+            <div className="md:col-span-2">
+              <StudioLabel>FAQ (iframe-Link)</StudioLabel>
+              <StudioInput
+                type="url"
+                placeholder="https://…"
+                value={String(
+                  (game.feature_flags as Record<string, unknown> | null)?.faq_iframe_url ?? "",
+                )}
+                onChange={(e) =>
+                  setGame({
+                    ...game,
+                    feature_flags: {
+                      ...(game.feature_flags ?? {}),
+                      faq_iframe_url: e.target.value.trim(),
+                    },
+                  })
+                }
+              />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Technik, Störungen, Tipps — im Spielmenü unter FAQ.
+              </p>
+            </div>
+            <div className="md:col-span-2">
+              <StudioLabel>Kurztext (optional, Fallback ohne Link)</StudioLabel>
               <StudioTextarea
                 className="min-h-20"
                 value={game.description}
