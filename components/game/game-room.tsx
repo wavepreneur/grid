@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   advanceFromHub,
+  dismissBonusNotice,
   dismissSyncModal,
   getGameState,
   purchaseHint,
@@ -17,6 +18,7 @@ import {
 import { usesMissionShell } from "@/lib/grid/blueprints";
 import { CityPlayShell } from "@/components/game/city/play-shell";
 import { BigButton } from "@/components/game/city/ui";
+import { BonusCompleteToast } from "@/components/game/bonus-complete-toast";
 import { ExitmaniaLevelView } from "@/components/game/exitmania-level-view";
 import { GameHud } from "@/components/game/game-hud";
 import { LevelPanel } from "@/components/game/level-panel";
@@ -452,6 +454,34 @@ export function GameRoom({
     });
   }
 
+  function handleDismissBonusNotice(noticeId: string) {
+    // Optimistic clear so phase remounts cannot resurrect the toast.
+    setTeamState((current) => {
+      if (current.gameState.bonus_notice?.id !== noticeId) return current;
+      const next: TeamRealtimeState = {
+        ...current,
+        gameState: {
+          ...current.gameState,
+          version: current.gameState.version + 1,
+          bonus_notice: null,
+        },
+      };
+      cacheTeamState(next);
+      return next;
+    });
+    void dismissBonusNotice({
+      inviteCode,
+      joinCode,
+      sessionId: playerSession.sessionId,
+      noticeId,
+    }).then((result) => {
+      if (result.success && result.data) {
+        setTeamState(result.data);
+        cacheTeamState(result.data);
+      }
+    });
+  }
+
   const phased = usesPhasedPlay(eventContent);
   const { remainingLabel } = useMissionCountdown(
     teamState.startedAt,
@@ -728,6 +758,10 @@ export function GameRoom({
             </div>
           ) : null}
         </CityPlayShell>
+        <BonusCompleteToast
+          notice={teamState.gameState.bonus_notice}
+          onDismiss={handleDismissBonusNotice}
+        />
         {modal && !sessionSuperseded ? (
           <SyncModal modal={modal} onDismiss={handleDismissModal} isPending={isPending} />
         ) : null}

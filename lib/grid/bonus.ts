@@ -126,6 +126,18 @@ export function findBonusTaskById(
   return resolveBonusTask(level);
 }
 
+/**
+ * Prefer the queue snapshot (exactly what the player saw) when scoring/presenting.
+ */
+export function resolveBonusForPlay(
+  level: LevelDefinition | null | undefined,
+  bonusId: string | null | undefined,
+  snapshot?: BonusTask | null,
+): BonusTask | null {
+  if (snapshot) return snapshot;
+  return findBonusTaskById(level, bonusId);
+}
+
 export function normalizeBonusRole(
   role: PlayerRole | string | null | undefined,
 ): "alpha" | "beta" | "gamma" | null {
@@ -166,8 +178,8 @@ export function isBonusAnswerCorrect(bonus: BonusTask, submission: string): bool
     const expected = (bonus.answer ?? "").trim();
     const given = submission.trim();
     if (!given) return false;
-    // No solution configured in Studio: accept any non-empty attempt (still immersive).
-    if (!expected) return true;
+    // No Studio solution configured → never award free points.
+    if (!expected) return false;
     return normalizeAnswer(given) === normalizeAnswer(expected);
   }
   const correctIds =
@@ -175,6 +187,26 @@ export function isBonusAnswerCorrect(bonus: BonusTask, submission: string): bool
       ? bonus.correct_option_ids
       : [bonus.correct_option_id];
   return correctIds.includes(submission);
+}
+
+/** Human-readable solution for post-answer reveal on bonus tasks. */
+export function formatBonusSolution(bonus: BonusTask): string | null {
+  const mode =
+    bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
+  if (mode === "confirm") return null;
+  if (mode === "text" || mode === "boxes") {
+    const answer = (bonus.answer ?? "").trim();
+    return answer || null;
+  }
+  const correctIds =
+    bonus.correct_option_ids && bonus.correct_option_ids.length > 0
+      ? bonus.correct_option_ids
+      : [bonus.correct_option_id];
+  const labels = bonus.options
+    .filter((opt) => correctIds.includes(opt.id))
+    .map((opt) => opt.label.trim())
+    .filter(Boolean);
+  return labels.length > 0 ? labels.join(" · ") : null;
 }
 
 export function roleLabelDe(role: BonusTask["for_role"]): string {

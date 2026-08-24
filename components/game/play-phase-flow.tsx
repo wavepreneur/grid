@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ExitmaniaLevelView } from "@/components/game/exitmania-level-view";
-import { BonusCompleteToast } from "@/components/game/bonus-complete-toast";
 import { CityStatusHud } from "@/components/game/city/status-hud";
 import { CityTeamBar } from "@/components/game/city/team-bar";
 import { PlayBonusView } from "@/components/game/play-bonus-view";
@@ -15,7 +14,7 @@ import {
 } from "@/components/game/play-more-sheet";
 import { PlayQuizView } from "@/components/game/play-quiz-view";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
-import { canPresentBonus, findBonusTaskById } from "@/lib/grid/bonus";
+import { canPresentBonus, resolveBonusForPlay } from "@/lib/grid/bonus";
 import { findPresentableBonusForRole } from "@/lib/grid/bonus-queue";
 import type { PurchasedTileHint, TeamGameState } from "@/lib/grid/game-state";
 import type {
@@ -227,7 +226,6 @@ export function PlayPhaseFlow({
         onReleaseMySeat={onReleaseMySeat}
         releasePending={releasePending}
       />
-      <BonusCompleteToast notice={gameState.bonus_notice} />
     </>
   );
 
@@ -256,9 +254,11 @@ export function PlayPhaseFlow({
 
   if (presentBonusMeta) {
     const bonusLevel = eventContent.levels.find((l) => l.level === presentBonusMeta.from_level);
-    const bonus =
-      (bonusLevel ? findBonusTaskById(bonusLevel, presentBonusMeta.bonus_id) : null) ??
-      presentBonusMeta.snapshot;
+    const bonus = resolveBonusForPlay(
+      bonusLevel,
+      presentBonusMeta.bonus_id,
+      presentBonusMeta.snapshot,
+    );
     if (
       bonus &&
       (presentBonusMeta.for_team || canPresentBonus(bonus, myRole, { claimUnassigned }))
@@ -292,8 +292,11 @@ export function PlayPhaseFlow({
     );
     // Only show when a queue item is actually active — never fall back to
     // resolveBonusTask(level) or the same bonus reappears after completion.
-    const bonus =
-      findBonusTaskById(level, activeItem?.bonus_id) ?? activeItem?.task_snapshot ?? null;
+    const bonus = resolveBonusForPlay(
+      level,
+      activeItem?.bonus_id,
+      activeItem?.task_snapshot,
+    );
     if (bonus && activeItem) {
       const mine = canPresentBonus(bonus, myRole, { claimUnassigned });
       return (

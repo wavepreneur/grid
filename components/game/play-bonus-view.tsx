@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Check, X } from "lucide-react";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
 import { IconCheck, IconGift, IconUser, IconX } from "@/components/game/city/icons";
 import { CityTeamBar } from "@/components/game/city/team-bar";
 import { CodeBoxesInput } from "@/components/game/code-boxes-input";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
 import type { BonusTask } from "@/lib/grid/level-types";
+import {
+  formatBonusSolution,
+  isBonusAnswerCorrect,
+} from "@/lib/grid/bonus";
 import {
   bonusAudienceHeadline,
   bonusAudienceIconCount,
@@ -15,7 +20,6 @@ import {
 import type { ContentMode } from "@/lib/cms/layer-model";
 import { hubMeta } from "@/lib/grid/play-slots";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
-import { normalizeAnswer } from "@/lib/grid/content-engine";
 
 type Props = {
   bonus: BonusTask;
@@ -59,17 +63,15 @@ export function PlayBonusView({
   const [submitted, setSubmitted] = useState(false);
   const [revealed, setRevealed] = useState(false);
 
-  const expected = (bonus.answer ?? "").trim();
   const typed =
     answerMode === "boxes"
       ? numberParts.map((p) => p.trim()).join("")
       : textAnswer.trim();
 
-  const correct =
-    answerMode === "choice" || answerMode === "confirm"
-      ? picked === bonus.correct_option_id
-      : Boolean(expected) &&
-        normalizeAnswer(typed) === normalizeAnswer(expected);
+  const submission =
+    answerMode === "choice" || answerMode === "confirm" ? (picked ?? "") : typed;
+  const correct = revealed ? isBonusAnswerCorrect(bonus, submission) : false;
+  const solutionLabel = formatBonusSolution(bonus);
 
   const show = revealed;
   const hub = hubMeta(mode);
@@ -160,6 +162,12 @@ export function PlayBonusView({
     );
   }
 
+  const inputTone = !show
+    ? "border-[var(--cg-input)]"
+    : correct
+      ? "border-[var(--cg-success)]"
+      : "border-[var(--cg-destructive)]";
+
   return (
     <section className="mx-auto flex w-full max-w-md flex-col px-4 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-5 sm:px-5">
       <CityTeamBar teamName={teamName} meName={myName} meRoleLabel={myRoleLabel} compact />
@@ -179,7 +187,11 @@ export function PlayBonusView({
         </span>
       </div>
 
-      <div className="cg-animate-rise-in mt-8 space-y-4">
+      <div
+        className={`mt-8 space-y-4 ${
+          show && !correct ? "cg-animate-shake" : "cg-animate-rise-in"
+        }`}
+      >
         <p className="rounded-2xl bg-[var(--cg-accent)]/15 px-4 py-3 text-center text-base font-semibold text-[var(--cg-fg)]">
           {bonus.for_team
             ? "Diese Bonusaufgabe sehen alle im Team."
@@ -243,17 +255,27 @@ export function PlayBonusView({
             onChange={(e) => setTextAnswer(e.target.value)}
             placeholder="Antwort eintragen…"
             disabled={show || disabled || isPending || submitted}
-            className="w-full rounded-2xl border-2 border-[var(--cg-input)] bg-[var(--cg-bg)] px-4 py-4 text-center text-xl font-bold text-[var(--cg-fg)] outline-none focus:border-[var(--cg-primary)] disabled:opacity-50"
+            className={`w-full rounded-2xl border-2 bg-[var(--cg-bg)] px-4 py-4 text-center text-xl font-bold text-[var(--cg-fg)] outline-none focus:border-[var(--cg-primary)] disabled:opacity-70 ${inputTone}`}
           />
         ) : null}
 
         {answerMode === "boxes" ? (
-          <CodeBoxesInput
-            count={boxCount}
-            values={numberParts}
-            onChange={setNumberParts}
-            disabled={show || disabled || isPending || submitted}
-          />
+          <div
+            className={
+              show
+                ? correct
+                  ? "rounded-2xl ring-2 ring-[var(--cg-success)]/50"
+                  : "rounded-2xl ring-2 ring-[var(--cg-destructive)]/50"
+                : undefined
+            }
+          >
+            <CodeBoxesInput
+              count={boxCount}
+              values={numberParts}
+              onChange={setNumberParts}
+              disabled={show || disabled || isPending || submitted}
+            />
+          </div>
         ) : null}
       </div>
 
@@ -266,12 +288,62 @@ export function PlayBonusView({
             Antwort prüfen
           </BigButton>
         ) : (
-          <div className="cg-animate-rise-in space-y-3">
-            <p className="text-center text-base font-semibold text-[var(--cg-fg)]">
-              {correct
-                ? `Richtig! +${bonus.reward} Punkte für das Team.`
-                : "Diesmal daneben — keine Punkte, es geht direkt weiter."}
-            </p>
+          <div
+            className={`space-y-3 ${correct ? "cg-animate-rise-in" : "cg-animate-pop-in"}`}
+          >
+            {correct ? (
+              <div
+                className="flex items-start gap-3 rounded-2xl bg-[var(--cg-success)]/15 px-4 py-3.5 text-left ring-2 ring-[var(--cg-success)]/40"
+                role="status"
+              >
+                <span className="cg-animate-key-turn flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--cg-success)] text-white">
+                  <Check className="h-4 w-4" strokeWidth={2.5} />
+                </span>
+                <div className="min-w-0 pt-0.5">
+                  <p className="text-sm font-bold text-[var(--cg-fg)]">Richtig — stark!</p>
+                  <p className="mt-0.5 text-sm text-[var(--cg-muted)]">
+                    +{bonus.reward} Punkte für das Team.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div
+                  className="flex items-start gap-3 rounded-2xl bg-[var(--cg-destructive)]/12 px-4 py-3.5 text-left ring-2 ring-[var(--cg-destructive)]/35"
+                  role="alert"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--cg-destructive)] text-white">
+                    <X className="h-4 w-4" strokeWidth={2.5} />
+                  </span>
+                  <div className="min-w-0 pt-0.5">
+                    <p className="text-sm font-bold text-[var(--cg-destructive)]">
+                      Diesmal daneben
+                    </p>
+                    {typed || picked ? (
+                      <p className="mt-1 text-sm leading-snug text-[var(--cg-fg)]">
+                        Eure Eingabe:{" "}
+                        <span className="font-bold tracking-wide">
+                          {answerMode === "choice" || answerMode === "confirm"
+                            ? bonus.options.find((o) => o.id === picked)?.label ?? picked
+                            : typed}
+                        </span>
+                      </p>
+                    ) : null}
+                    <p className="mt-0.5 text-sm leading-snug text-[var(--cg-muted)]">
+                      Keine Punkte — es geht direkt weiter.
+                    </p>
+                  </div>
+                </div>
+
+                {solutionLabel ? (
+                  <div className="rounded-2xl border border-[var(--cg-success)]/40 bg-[var(--cg-success)]/10 px-4 py-3 text-left text-sm text-[var(--cg-fg)]">
+                    <p className="font-semibold text-[var(--cg-success)]">Richtige Antwort</p>
+                    <p className="mt-1 text-base font-bold tracking-wide">{solutionLabel}</p>
+                  </div>
+                ) : null}
+              </>
+            )}
+
             <BigButton disabled={isPending || submitted} onClick={finish}>
               {asymmetricOverlay ? "Zurück zum Team" : `Zurück zur ${hub.hubLabelDe}`}
             </BigButton>

@@ -52,9 +52,9 @@ import {
 } from "@/lib/grid/outdoor-unlock";
 import {
   canPresentBonus,
-  findBonusTaskById,
   isBonusAnswerCorrect,
   resolveBonusDefinitions,
+  resolveBonusForPlay,
   resolveBonusTask,
 } from "@/lib/grid/bonus";
 import {
@@ -1499,10 +1499,11 @@ async function completeActiveBonus(input: {
   });
 
   const levelDefinition = getLevelDefinition(content, active.from_level);
-  const bonus =
-    findBonusTaskById(levelDefinition, active.bonus_id) ??
-    fromQueue?.task_snapshot ??
-    null;
+  const bonus = resolveBonusForPlay(
+    levelDefinition,
+    active.bonus_id,
+    fromQueue?.task_snapshot,
+  );
   if (!bonus) {
     const now = new Date();
     const cleared: TeamGameState = {
@@ -1830,10 +1831,11 @@ async function leaveBonusPhase(input: {
   const activeQueued = (gameState.bonus_queue ?? []).find(
     (item) => item.status === "active" && item.from_level === bonusLevel,
   );
-  const bonus =
-    findBonusTaskById(levelDefinition, activeQueued?.bonus_id) ??
-    activeQueued?.task_snapshot ??
-    resolveBonusTask(levelDefinition);
+  const bonus = resolveBonusForPlay(
+    levelDefinition,
+    activeQueued?.bonus_id,
+    activeQueued?.task_snapshot,
+  ) ?? resolveBonusTask(levelDefinition);
 
   let reward = 0;
   let correct = false;
@@ -1973,9 +1975,11 @@ export async function submitBonusAnswer(input: {
       (item) => item.status === "active" && item.from_level === bonusLevel,
     );
     const bonus =
-      findBonusTaskById(levelDefinition, activeQueued?.bonus_id) ??
-      activeQueued?.task_snapshot ??
-      resolveBonusTask(levelDefinition);
+      resolveBonusForPlay(
+        levelDefinition,
+        activeQueued?.bonus_id,
+        activeQueued?.task_snapshot,
+      ) ?? resolveBonusTask(levelDefinition);
     if (!bonus) {
       return leaveBonusPhase({ ...input, skip: true });
     }
@@ -2114,6 +2118,58 @@ export async function skipBonusPhase(input: {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Bonus überspringen fehlgeschlagen.",
+    };
+  }
+}
+
+/** Clear the ephemeral bonus toast so it does not reappear after phase changes. */
+export async function dismissBonusNotice(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  noticeId?: string;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    const { team, player } = await assertPlayerSession(input);
+    const gameState = parseTeamGameState(team.game_state);
+    if (!gameState.bonus_notice) {
+      return { success: true, data: buildRealtimeState(team, player) };
+    }
+    if (input.noticeId && gameState.bonus_notice.id !== input.noticeId) {
+      return { success: true, data: buildRealtimeState(team, player) };
+    }
+
+    const nextGameState: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      bonus_notice: null,
+    };
+
+    const supabase = createAdminClient();
+    const { data: updatedTeam, error } = await supabase
+      .from("teams")
+      .update({ game_state: nextGameState })
+      .eq("id", team.id)
+      .select(
+        "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
+      )
+      .single();
+
+    if (error || !updatedTeam) {
+      return {
+        success: false,
+        error: error?.message ?? "Hinweis konnte nicht geschlossen werden.",
+      };
+    }
+
+    return { success: true, data: buildRealtimeState(updatedTeam, player) };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Hinweis konnte nicht geschlossen werden.",
     };
   }
 }
