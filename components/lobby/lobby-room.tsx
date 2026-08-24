@@ -482,9 +482,9 @@ export function LobbyRoom({
                 Rollen verwalten
               </button>
             ) : null}
-            {isLobby ? (
+            {(isLobby || manageMode) ? (
               <GridButton type="button" variant="ghost" disabled={isPending} onClick={handleHandover}>
-                Gerät übergeben
+                Platz freigeben
               </GridButton>
             ) : null}
           </div>
@@ -604,7 +604,7 @@ export function LobbyRoom({
                                   onClick={() => handleRemovePlayer(player.id)}
                                   className="rounded-xl border border-red-200 bg-white px-3 py-2.5 text-xs font-bold text-red-600 disabled:opacity-50"
                                 >
-                                  Entfernen
+                                  Platz freigeben
                                 </button>
                               </div>
                             ) : isMe ? (

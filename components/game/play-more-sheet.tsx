@@ -19,8 +19,11 @@ type Props = {
   isAlpha: boolean;
   teammates: Array<{ id: string; name: string; roleLabel: string }>;
   onTransferAlpha?: (playerId: string) => void;
+  onReleasePlayerSeat?: (playerId: string) => void;
   transferPending?: boolean;
   onReclaimSession?: () => void;
+  onReleaseMySeat?: () => void;
+  releasePending?: boolean;
 };
 
 /**
@@ -40,11 +43,15 @@ export function PlayMoreSheet({
   isAlpha,
   teammates,
   onTransferAlpha,
+  onReleasePlayerSeat,
   transferPending,
   onReclaimSession,
+  onReleaseMySeat,
+  releasePending,
 }: Props) {
   const showBriefingDoc = open === "briefing" && Boolean(briefingIframeUrl?.trim());
   const showFaqDoc = open === "faq" && Boolean(faqIframeUrl?.trim());
+  const busy = Boolean(transferPending || releasePending);
 
   if (!open) return null;
 
@@ -120,7 +127,7 @@ export function PlayMoreSheet({
                   />
                   <MenuRow
                     title="Team"
-                    hint="Rolle abgeben oder Sitzung zurückholen"
+                    hint="Leitung, Platz freigeben, Gerät wechseln"
                     onClick={() => onOpen("team")}
                   />
                 </div>
@@ -176,8 +183,8 @@ export function PlayMoreSheet({
                   {isAlpha ? (
                     <>
                       <p className="text-sm text-[var(--cg-muted)]">
-                        Du führst das Team. Aufgaben-Aktivierung und GPS liegen bei dir. Gib die Rolle
-                        ab, wenn jemand anderes übernehmen soll.
+                        Du führst das Team. Gib die Leitung ab oder gib einen Platz frei, damit jemand
+                        anderes (oder du auf einem neuen Gerät) weiterspielen kann.
                       </p>
                       <ul className="space-y-2">
                         {teammates.length === 0 ? (
@@ -188,7 +195,7 @@ export function PlayMoreSheet({
                           teammates.map((m) => (
                             <li
                               key={m.id}
-                              className="flex items-center justify-between gap-3 rounded-2xl bg-[var(--cg-secondary)] px-4 py-3"
+                              className="flex flex-col gap-2 rounded-2xl bg-[var(--cg-secondary)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                             >
                               <span className="min-w-0">
                                 <span className="block truncate font-semibold text-[var(--cg-fg)]">
@@ -196,14 +203,26 @@ export function PlayMoreSheet({
                                 </span>
                                 <span className="text-xs text-[var(--cg-muted)]">{m.roleLabel}</span>
                               </span>
-                              <button
-                                type="button"
-                                disabled={transferPending || !onTransferAlpha}
-                                onClick={() => onTransferAlpha?.(m.id)}
-                                className="tap-lift shrink-0 rounded-full bg-[var(--cg-primary)] px-3 py-1.5 text-xs font-bold text-[var(--cg-primary-fg)] disabled:opacity-40"
-                              >
-                                Leitung geben
-                              </button>
+                              <div className="flex shrink-0 flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  disabled={busy || !onTransferAlpha}
+                                  onClick={() => onTransferAlpha?.(m.id)}
+                                  className="tap-lift rounded-full bg-[var(--cg-primary)] px-3 py-1.5 text-xs font-bold text-[var(--cg-primary-fg)] disabled:opacity-40"
+                                >
+                                  Leitung geben
+                                </button>
+                                {onReleasePlayerSeat ? (
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => onReleasePlayerSeat(m.id)}
+                                    className="tap-lift rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-600 disabled:opacity-40"
+                                  >
+                                    Platz freigeben
+                                  </button>
+                                ) : null}
+                              </div>
                             </li>
                           ))
                         )}
@@ -211,13 +230,22 @@ export function PlayMoreSheet({
                     </>
                   ) : (
                     <p className="text-sm text-[var(--cg-muted)]">
-                      Die Team-Leitung aktiviert die Aufgaben. Wenn sie offline ist, kann die Rolle
-                      übertragen werden — oder du holst deine Sitzung zurück.
+                      Die Team-Leitung aktiviert die Aufgaben. Wenn du das Gerät wechselst oder den
+                      Platz für jemand anderen freigibst, nutze die Aktionen unten.
                     </p>
                   )}
                   {onReclaimSession ? (
                     <BigButton variant="outline" onClick={onReclaimSession}>
                       Meine Sitzung zurückholen
+                    </BigButton>
+                  ) : null}
+                  {onReleaseMySeat ? (
+                    <BigButton
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={onReleaseMySeat}
+                    >
+                      {releasePending ? "Einen Moment…" : "Meinen Platz freigeben"}
                     </BigButton>
                   ) : null}
                   <BigButton variant="ghost" onClick={onClose}>

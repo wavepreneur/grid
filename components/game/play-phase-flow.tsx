@@ -61,8 +61,11 @@ type Props = {
   isAlpha: boolean;
   teammates: Teammate[];
   onTransferAlpha?: (playerId: string) => void;
+  onReleasePlayerSeat?: (playerId: string) => void;
   transferPending?: boolean;
   onReclaimSession?: () => void;
+  onReleaseMySeat?: () => void;
+  releasePending?: boolean;
   onArriveOutdoor: (geolocation: GeolocationSample, targetLevel?: number) => void;
   onSolveGpsCheckpoint: (geolocation: GeolocationSample) => void;
   onOpenStation: (levelNumber: number) => void;
@@ -118,8 +121,11 @@ export function PlayPhaseFlow({
   isAlpha,
   teammates,
   onTransferAlpha,
+  onReleasePlayerSeat,
   transferPending,
   onReclaimSession,
+  onReleaseMySeat,
+  releasePending,
   onArriveOutdoor,
   onSolveGpsCheckpoint,
   onOpenStation,
@@ -199,8 +205,11 @@ export function PlayPhaseFlow({
         isAlpha={isAlpha}
         teammates={teammates}
         onTransferAlpha={onTransferAlpha}
+        onReleasePlayerSeat={onReleasePlayerSeat}
         transferPending={transferPending}
         onReclaimSession={onReclaimSession}
+        onReleaseMySeat={onReleaseMySeat}
+        releasePending={releasePending}
       />
       <BonusCompleteToast notice={gameState.bonus_notice} />
     </>

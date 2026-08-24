@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { initializeTeamGameState } from "@/app/actions/game";
 import {
   DEFAULT_LOBBY_AUTO_START_SECONDS,
+  LOBBY_IDLE_RELEASE_MS,
   NAVIGATOR_OFFLINE_MS,
 } from "@/lib/grid/constants";
 import { computeLobbyAutoStartAt } from "@/lib/grid/lobby-auto-start";
@@ -27,7 +28,11 @@ import {
   signPlayerResumeToken,
   verifyPlayerResumeToken,
 } from "@/lib/grid/resume-token";
-import { SESSION_ACTIVE } from "@/lib/grid/session-codes";
+import {
+  PLAYER_NOT_FOUND,
+  SESSION_ACTIVE,
+  TEAM_FULL,
+} from "@/lib/grid/session-codes";
 import {
   assignArchetypeRoleOnJoin,
   buildPlayerSession,
@@ -74,6 +79,80 @@ type ActivePlayerRow = {
 
 function lobbyTeamStatus(status: GridTeamStatus): GridTeamStatus {
   return status === "setup" ? "lobby" : status;
+}
+
+/**
+ * Free lobby seats that stopped heartbeating (closed tab / dead battery)
+ * so paid capacity stays usable before start.
+ */
+async function releaseIdleLobbySeats(input: {
+  teamId: string;
+  teamStatus: GridTeamStatus;
+  organizationId: string;
+  eventId: string;
+  keepPlayerId?: string | null;
+}): Promise<void> {
+  if (input.teamStatus !== "lobby" && input.teamStatus !== "setup") {
+    return;
+  }
+
+  const cutoff = new Date(Date.now() - LOBBY_IDLE_RELEASE_MS).toISOString();
+  const supabase = createAdminClient();
+  const { data: idlePlayers } = await supabase
+    .from("players")
+    .select("id, display_name, is_captain, last_seen_at")
+    .eq("team_id", input.teamId)
+    .is("left_at", null)
+    .lt("last_seen_at", cutoff);
+
+  if (!idlePlayers?.length) return;
+
+  const leftAt = new Date().toISOString();
+
+  for (const player of idlePlayers) {
+    if (input.keepPlayerId && player.id === input.keepPlayerId) continue;
+
+    const { data: team } = await supabase
+      .from("teams")
+      .select("navigator_player_id")
+      .eq("id", input.teamId)
+      .maybeSingle();
+
+    const wasNavigator = team?.navigator_player_id === player.id;
+
+    const { error } = await supabase
+      .from("players")
+      .update({
+        left_at: leftAt,
+        is_captain: false,
+        role: "solver",
+      })
+      .eq("id", player.id)
+      .is("left_at", null);
+
+    if (error) continue;
+
+    await syncTeamLeadershipAfterPlayerLeaves({
+      teamId: input.teamId,
+      organizationId: input.organizationId,
+      eventId: input.eventId,
+      playerId: player.id,
+      wasCaptain: Boolean(player.is_captain),
+      wasNavigator,
+    });
+
+    await writeAuditLog({
+      organizationId: input.organizationId,
+      eventId: input.eventId,
+      teamId: input.teamId,
+      playerId: player.id,
+      action: "lobby_seat_idle_release",
+      payload: {
+        display_name: player.display_name,
+        last_seen_at: player.last_seen_at,
+      },
+    });
+  }
 }
 
 async function buildSessionForTeam(
@@ -635,12 +714,16 @@ export async function joinTeamAsPlayer(input: {
   inviteCode: string;
   joinCode: string;
   displayName: string;
+  /** Confirm takeover when the same name is already active (Neu mitspielen). */
   takeover?: boolean;
+  /** "new" claims a free seat; "switch" resumes an existing seat only. */
+  mode?: "new" | "switch";
 }): Promise<ActionResult<PlayerSession>> {
   try {
     const inviteCode = normalizeCode(input.inviteCode);
     const joinCode = normalizeCode(input.joinCode);
     const displayName = input.displayName.trim();
+    const mode = input.mode ?? "new";
 
     if (!isValidDisplayName(displayName)) {
       return {
@@ -664,6 +747,37 @@ export async function joinTeamAsPlayer(input: {
 
     const supabase = createAdminClient();
     const existingPlayer = await findActivePlayerByDisplayName(team.id, displayName);
+
+    if (mode === "switch") {
+      if (!existingPlayer) {
+        return {
+          success: false,
+          code: PLAYER_NOT_FOUND,
+          error:
+            "Diesen Namen finden wir nicht im Team. Prüfe die Schreibweise — oder tritt neu bei, wenn noch Platz ist.",
+        };
+      }
+
+      const sessionId = await rotatePlayerSession(existingPlayer.id);
+
+      await writeAuditLog({
+        organizationId: event.organization_id,
+        eventId: event.id,
+        teamId: team.id,
+        playerId: existingPlayer.id,
+        action: "session_device_switch",
+        payload: { display_name: existingPlayer.display_name },
+      });
+
+      return {
+        success: true,
+        data: await buildSessionForTeam(
+          { ...existingPlayer, session_id: sessionId },
+          team,
+          event,
+        ),
+      };
+    }
 
     if (existingPlayer) {
       if (!input.takeover) {
@@ -712,7 +826,12 @@ export async function joinTeamAsPlayer(input: {
 
     if (error || !player) {
       if (error?.message.includes("Team") && error.message.includes("full")) {
-        return { success: false, error: "Das Team ist bereits voll." };
+        return {
+          success: false,
+          code: TEAM_FULL,
+          error:
+            "Das Team ist voll. Bist du schon Mitglied? Tippe auf „Gerät wechseln“ und gib deinen Namen ein.",
+        };
       }
       return { success: false, error: error?.message ?? "Beitritt fehlgeschlagen." };
     }
@@ -810,6 +929,21 @@ export async function getLobbySnapshot(input: {
         .from("players")
         .update({ last_seen_at: new Date().toISOString() })
         .eq("id", player.id);
+
+      await releaseIdleLobbySeats({
+        teamId: team.id,
+        teamStatus: team.status,
+        organizationId: event.organization_id,
+        eventId: event.id,
+        keepPlayerId: player.id,
+      });
+    } else {
+      await releaseIdleLobbySeats({
+        teamId: team.id,
+        teamStatus: team.status,
+        organizationId: event.organization_id,
+        eventId: event.id,
+      });
     }
 
     await maybeAutoStartTeam(team.id);
@@ -1314,17 +1448,27 @@ export async function removePlayerFromLobby(input: {
       return { success: false, error: "Team nicht gefunden." };
     }
 
-    if (team.status !== "lobby" && team.status !== "setup") {
-      return { success: false, error: "Spieler können nur in der Lobby entfernt werden." };
+    if (
+      team.status !== "lobby" &&
+      team.status !== "setup" &&
+      team.status !== "playing"
+    ) {
+      return {
+        success: false,
+        error: "Plätze können nur in Lobby oder laufendem Spiel freigegeben werden.",
+      };
     }
 
     const captain = await getPlayerBySessionId(input.sessionId);
     if (!captain || captain.team_id !== team.id || !captain.is_captain) {
-      return { success: false, error: "Nur der Captain kann Spieler entfernen." };
+      return { success: false, error: "Nur die Team-Leitung kann Plätze freigeben." };
     }
 
     if (input.targetPlayerId === captain.id) {
-      return { success: false, error: "Nutze „Gerät übergeben“, um deinen Platz freizugeben." };
+      return {
+        success: false,
+        error: "Nutze „Platz freigeben“, um deinen eigenen Platz freizugeben.",
+      };
     }
 
     const supabase = createAdminClient();
@@ -1339,7 +1483,7 @@ export async function removePlayerFromLobby(input: {
     }
 
     if (target.is_captain) {
-      return { success: false, error: "Captain kann nicht entfernt werden." };
+      return { success: false, error: "Team-Leitung kann nicht entfernt werden." };
     }
 
     const wasNavigator = team.navigator_player_id === target.id;
@@ -1372,10 +1516,11 @@ export async function removePlayerFromLobby(input: {
       eventId: event.id,
       teamId: team.id,
       playerId: captain.id,
-      action: "player_removed_from_lobby",
+      action: "player_seat_released",
       payload: {
         target_player_id: target.id,
         target_display_name: target.display_name,
+        team_status: team.status,
       },
     });
 
@@ -1387,6 +1532,12 @@ export async function removePlayerFromLobby(input: {
     };
   }
 }
+
+/** Alias: Lead frees a teammate seat (lobby or mid-game). */
+export const releasePlayerSeat = removePlayerFromLobby;
+
+/** Alias: self-release seat for someone else / device handoff. */
+export const releaseMySeat = handoverSession;
 
 export async function transferTeamNavigator(input: {
   inviteCode: string;

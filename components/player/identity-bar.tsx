@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { getPlayerResumeToken } from "@/app/actions/lobby";
+import { getPlayerResumeToken, handoverSession } from "@/app/actions/lobby";
 import { abandonTeamSession } from "@/lib/grid/session-recovery";
 import {
   eventPath,
@@ -10,6 +10,7 @@ import {
 } from "@/lib/grid/event-routes";
 import { buildManageTeamUrl, buildPlayUrlWithResume } from "@/lib/grid/play-url";
 import { archetypeRoleLabel } from "@/lib/grid/archetype-roles";
+import { clearPlayerSession } from "@/lib/grid/player-session";
 import { IconHome, IconUsers } from "@/components/cms/studio-icons";
 import type { PlayerSession } from "@/lib/grid/types";
 
@@ -39,11 +40,19 @@ export function IdentityBar({
 }: IdentityBarProps) {
   const router = useRouter();
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
 
-  function handleSwitchPlayer() {
-    abandonTeamSession();
-    window.location.href = eventTeamJoinPath(inviteCode, joinCode);
+  function handleReleaseSeat() {
+    startTransition(async () => {
+      await handoverSession({
+        inviteCode,
+        joinCode,
+        sessionId: session.sessionId,
+      });
+      clearPlayerSession();
+      abandonTeamSession();
+      window.location.href = eventTeamJoinPath(inviteCode, joinCode);
+    });
   }
 
   function handleManageTeam() {
@@ -126,10 +135,11 @@ export function IdentityBar({
           ) : null}
           <button
             type="button"
-            onClick={handleSwitchPlayer}
-            className="rounded-lg px-2.5 py-1 text-xs font-medium text-teal-600 hover:bg-teal-50"
+            disabled={isPending}
+            onClick={handleReleaseSeat}
+            className="rounded-lg px-2.5 py-1 text-xs font-medium text-teal-600 hover:bg-teal-50 disabled:opacity-50"
           >
-            Anderer Spieler
+            {isPending ? "…" : "Platz freigeben"}
           </button>
           {showEventHome ? (
             <button

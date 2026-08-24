@@ -198,6 +198,25 @@ export function useTeamSync({
         .subscribe((status) => {
           if (status === "SUBSCRIBED") {
             setIsConnected(true);
+            void (async () => {
+              const { data } = await supabase
+                .from("players")
+                .select("id, display_name, is_captain, joined_at, left_at")
+                .eq("team_id", teamId)
+                .is("left_at", null)
+                .order("joined_at", { ascending: true });
+
+              if (data) {
+                onPlayersChangeRef.current?.(
+                  data.map((player: PlayerRow) => ({
+                    id: player.id,
+                    display_name: player.display_name,
+                    is_captain: player.is_captain,
+                    joined_at: player.joined_at,
+                  })),
+                );
+              }
+            })();
           }
           if (status === "CHANNEL_ERROR") {
             setError("Realtime-Verbindung fehlgeschlagen.");

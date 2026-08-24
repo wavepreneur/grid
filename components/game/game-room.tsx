@@ -25,8 +25,8 @@ import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner
 import { IdentityBar } from "@/components/player/identity-bar";
 import { SessionHandoffScreen } from "@/components/player/session-handoff-screen";
 import { GridError } from "@/components/grid/grid-shell";
-import { cockpitShowPath } from "@/lib/grid/event-routes";
-import { transferCaptain } from "@/app/actions/lobby";
+import { cockpitShowPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
+import { transferCaptain, handoverSession, removePlayerFromLobby } from "@/app/actions/lobby";
 import { useTeamSync } from "@/lib/hooks/use-team-sync";
 import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
 import { cacheTeamState } from "@/lib/grid/offline-state";
@@ -38,9 +38,11 @@ import type {
   ResolvedEventContent,
   SolveLevelPayload,
 } from "@/lib/grid/level-types";
-import type { PlayerSession } from "@/lib/grid/types";
+import { clearPlayerSession } from "@/lib/grid/player-session";
+import type { LobbyPlayer, PlayerSession } from "@/lib/grid/types";
 import { usesPhasedPlay } from "@/lib/grid/play-slots";
 import { playPlaySfx, unlockPlayAudio } from "@/lib/grid/play-sfx";
+import { useRouter } from "next/navigation";
 
 type GameRoomProps = {
   inviteCode: string;
@@ -65,6 +67,7 @@ export function GameRoom({
   teamName,
   eventTitle = "Mission",
 }: GameRoomProps) {
+  const router = useRouter();
   const [teamState, setTeamState] = useState(initialState);
   const [error, setError] = useState<string | null>(null);
   const [solveFeedback, setSolveFeedback] = useState<SolveFeedbackState | null>(null);
@@ -74,6 +77,8 @@ export function GameRoom({
   const [morePanel, setMorePanel] = useState<PlayMorePanel>(null);
   const [paused, setPaused] = useState(false);
   const [transferPending, setTransferPending] = useState(false);
+  const [releasePending, setReleasePending] = useState(false);
+  const [lobbyPlayers, setLobbyPlayers] = useState<LobbyPlayer[]>([]);
 
   const handleStateUpdate = useCallback((gameState: TeamGameState, currentLevel: number) => {
     setTeamState((current) => {
@@ -99,6 +104,7 @@ export function GameRoom({
     onGameStateChange: handleStateUpdate,
     onTeamStatusChange: handleTeamStatusChange,
     onSessionSuperseded: () => setSessionSuperseded(true),
+    onPlayersChange: setLobbyPlayers,
   });
 
   const activeLevel = Number(teamState.currentLevel) || 1;
@@ -386,6 +392,43 @@ export function GameRoom({
     });
   }
 
+  function handleReleasePlayerSeat(targetPlayerId: string) {
+    setReleasePending(true);
+    startTransition(async () => {
+      const result = await removePlayerFromLobby({
+        inviteCode,
+        joinCode,
+        sessionId: playerSession.sessionId,
+        targetPlayerId,
+      });
+      setReleasePending(false);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      setError(null);
+    });
+  }
+
+  function handleReleaseMySeat() {
+    setReleasePending(true);
+    startTransition(async () => {
+      const result = await handoverSession({
+        inviteCode,
+        joinCode,
+        sessionId: playerSession.sessionId,
+      });
+      setReleasePending(false);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      clearPlayerSession();
+      clearWalkedDistanceStorage(walkStorageKey);
+      router.replace(eventTeamJoinPath(inviteCode, joinCode));
+    });
+  }
+
   function handleDismissModal() {
     if (!modal) return;
     startTransition(async () => {
@@ -485,10 +528,27 @@ export function GameRoom({
         paused={paused}
         onTogglePause={() => setPaused((p) => !p)}
         isAlpha={isAlpha}
-        teammates={[]}
+        teammates={lobbyPlayers
+          .filter((p) => p.id !== playerSession.playerId)
+          .map((p) => ({
+            id: p.id,
+            name: p.display_name,
+            roleLabel: displayRoleLabel(
+              p.archetype_role ??
+                (p.is_alpha || p.is_captain
+                  ? "alpha"
+                  : p.is_beta
+                    ? "beta"
+                    : "gamma"),
+              eventContent.roleLabels ?? DEFAULT_ROLE_LABELS,
+            ),
+          }))}
         onTransferAlpha={handleTransferAlpha}
+        onReleasePlayerSeat={isAlpha ? handleReleasePlayerSeat : undefined}
         transferPending={transferPending}
         onReclaimSession={() => setSessionSuperseded(true)}
+        onReleaseMySeat={handleReleaseMySeat}
+        releasePending={releasePending}
         onArriveOutdoor={handleArriveOutdoor}
         onSolveGpsCheckpoint={handleSolveGpsCheckpoint}
         onOpenStation={handleOpenStation}
