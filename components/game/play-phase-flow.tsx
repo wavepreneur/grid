@@ -15,7 +15,7 @@ import {
 } from "@/components/game/play-more-sheet";
 import { PlayQuizView } from "@/components/game/play-quiz-view";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
-import { isBonusForRole, findBonusTaskById, resolveBonusTask } from "@/lib/grid/bonus";
+import { canPresentBonus, findBonusTaskById, resolveBonusTask } from "@/lib/grid/bonus";
 import { findPresentableBonusForRole } from "@/lib/grid/bonus-queue";
 import type { PurchasedTileHint, TeamGameState } from "@/lib/grid/game-state";
 import type {
@@ -230,7 +230,9 @@ export function PlayPhaseFlow({
   );
 
   // Active / ready bonus from queue (supports parallel role packs).
-  const queueBonus = findPresentableBonusForRole(gameState, myRole);
+  // Solo Alpha claims role-only bonuses so 1-device tests still see Layer 3.
+  const claimUnassigned = Boolean(soloAlpha) || (isAlpha && teammates.length === 0);
+  const queueBonus = findPresentableBonusForRole(gameState, myRole, { claimUnassigned });
   const overlayBonus = gameState.active_bonus;
   const presentBonusMeta = queueBonus
     ? {
@@ -255,7 +257,10 @@ export function PlayPhaseFlow({
     const bonus =
       (bonusLevel ? findBonusTaskById(bonusLevel, presentBonusMeta.bonus_id) : null) ??
       presentBonusMeta.snapshot;
-    if (bonus && isBonusForRole(bonus, myRole)) {
+    if (
+      bonus &&
+      (presentBonusMeta.for_team || canPresentBonus(bonus, myRole, { claimUnassigned }))
+    ) {
       return (
         <>
           {sheets}
@@ -287,6 +292,7 @@ export function PlayPhaseFlow({
       activeItem?.task_snapshot ??
       resolveBonusTask(level);
     if (bonus) {
+      const mine = canPresentBonus(bonus, myRole, { claimUnassigned });
       return (
         <>
           {chrome}
@@ -294,7 +300,7 @@ export function PlayPhaseFlow({
           <PlayBonusView
             bonus={bonus}
             mode={mode}
-            isMine={isBonusForRole(bonus, myRole)}
+            isMine={mine}
             myName={myName}
             myRoleLabel={myRoleLabel}
             teamName={teamName}

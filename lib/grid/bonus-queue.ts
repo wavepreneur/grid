@@ -107,6 +107,7 @@ export function mergeBonusQueue(
 export function findPresentableBonusForRole(
   gameState: TeamGameState,
   role: string | null | undefined,
+  options?: { claimUnassigned?: boolean },
 ): BonusQueueItem | null {
   const queue = gameState.bonus_queue ?? [];
   const normalized =
@@ -116,18 +117,19 @@ export function findPresentableBonusForRole(
         ? "gamma"
         : role;
 
+  const matches = (item: BonusQueueItem) =>
+    item.for_team ||
+    item.for_role === normalized ||
+    Boolean(options?.claimUnassigned);
+
   const active = queue.find(
-    (item) =>
-      item.status === "active" &&
-      (item.for_team || item.for_role === normalized),
+    (item) => item.status === "active" && matches(item),
   );
   if (active) return active;
 
   return (
     queue.find(
-      (item) =>
-        item.status === "ready" &&
-        (item.for_team || item.for_role === normalized),
+      (item) => item.status === "ready" && matches(item),
     ) ?? null
   );
 }

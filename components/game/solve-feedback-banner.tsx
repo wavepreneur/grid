@@ -65,7 +65,7 @@ export function SolveFeedbackBanner({ feedback }: Props) {
       <span className="cg-animate-key-turn flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--cg-success)] text-white">
         <Check className="h-4 w-4" strokeWidth={2.5} />
       </span>
-      <p className="text-sm font-bold text-[var(--cg-fg)]">Richtig — stark!</p>
+      <p className="text-sm font-bold text-[var(--cg-fg)]">Antwort erkannt — stark!</p>
     </div>
   );
 }

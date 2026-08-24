@@ -176,9 +176,18 @@ export function GameRoom({
     [teamState.gameState],
   );
 
+  const playPhase = teamState.gameState.current_phase ?? "level";
+
   useEffect(() => {
     setSolveFeedback(null);
-  }, [activeLevel]);
+  }, [activeLevel, playPhase]);
+
+  // Correct burst is momentary — never leave it under an empty form.
+  useEffect(() => {
+    if (solveFeedback?.kind !== "correct") return;
+    const timer = window.setTimeout(() => setSolveFeedback(null), 1600);
+    return () => window.clearTimeout(timer);
+  }, [solveFeedback]);
 
   useEffect(() => {
     const unlock = () => unlockPlayAudio();

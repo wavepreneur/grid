@@ -653,6 +653,45 @@ export async function updateGameTaskLinkConfig(
 
     if (updateError) throw new Error(updateError.message);
 
+    // Bindings alone are not enough — compile only sees tasks linked on the game.
+    // Auto-attach missing bonus pool tasks as Layer 3 so „Ganzes Team“ actually fires.
+    if (patch.bonus_bindings && patch.bonus_bindings.length > 0) {
+      const neededIds = Array.from(
+        new Set(patch.bonus_bindings.map((b) => b.task_id).filter(Boolean)),
+      );
+      if (neededIds.length > 0) {
+        const { data: existingLinks, error: existingError } = await supabase
+          .from("studio_game_tasks")
+          .select("task_id")
+          .eq("game_id", gameId)
+          .in("task_id", neededIds);
+        if (existingError) throw new Error(existingError.message);
+
+        const linked = new Set((existingLinks ?? []).map((row) => row.task_id as string));
+        const missing = neededIds.filter((id) => !linked.has(id));
+
+        if (missing.length > 0) {
+          const { count, error: countError } = await supabase
+            .from("studio_game_tasks")
+            .select("id", { count: "exact", head: true })
+            .eq("game_id", gameId)
+            .eq("layer", 3);
+          if (countError) throw new Error(countError.message);
+
+          const { error: insertError } = await supabase.from("studio_game_tasks").insert(
+            missing.map((taskId, index) => ({
+              game_id: gameId,
+              task_id: taskId,
+              layer: 3,
+              sort_order: (count ?? 0) + index,
+              overrides: {},
+            })),
+          );
+          if (insertError) throw new Error(insertError.message);
+        }
+      }
+    }
+
     // Only one farewell stop per game — clear the flag on sibling mission links.
     if (patch.ends_game) {
       const { data: siblings, error: siblingsError } = await supabase

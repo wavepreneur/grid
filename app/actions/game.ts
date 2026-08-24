@@ -50,7 +50,12 @@ import {
   upsertOutdoorLevelProgress,
   type OutdoorForceUnlock,
 } from "@/lib/grid/outdoor-unlock";
-import { isBonusForRole, findBonusTaskById, resolveBonusDefinitions, resolveBonusTask } from "@/lib/grid/bonus";
+import {
+  canPresentBonus,
+  findBonusTaskById,
+  resolveBonusDefinitions,
+  resolveBonusTask,
+} from "@/lib/grid/bonus";
 import {
   markBonusActive,
   markBonusDone,
@@ -327,7 +332,6 @@ export async function solveCurrentLevel(input: {
       : computeLevelReward(levelDefinition.scoring, levelState.started_at);
 
     const bonusDefs = resolveBonusDefinitions(levelDefinition);
-    const bonus = resolveBonusTask(levelDefinition);
     // Bonus only after a real solve — reveal-solution completes without bonus.
     const wantBonus =
       Boolean(bonusDefs.length > 0) && !input.payload?.revealSolution;
@@ -342,16 +346,28 @@ export async function solveCurrentLevel(input: {
           if (when.type === "immediate") {
             status = "ready";
             readyAt = armedAt.toISOString();
-          } else if (when.type === "delay_minutes" && when.minutes && when.minutes > 0) {
+          } else if (
+            when.type === "delay_minutes" &&
+            typeof when.minutes === "number" &&
+            when.minutes > 0
+          ) {
             readyAt = new Date(
               armedAt.getTime() + when.minutes * 60_000,
             ).toISOString();
-          } else if (when.type === "interval_minutes" && when.minutes && when.minutes > 0) {
+          } else if (
+            when.type === "interval_minutes" &&
+            typeof when.minutes === "number" &&
+            when.minutes > 0
+          ) {
             // First fire after N minutes from solve, then re-arm on complete.
             readyAt = new Date(
               armedAt.getTime() + when.minutes * 60_000,
             ).toISOString();
-          } else if (when.type === "game_minutes" && when.minutes && when.minutes > 0) {
+          } else if (
+            when.type === "game_minutes" &&
+            typeof when.minutes === "number" &&
+            when.minutes > 0
+          ) {
             const startMs = team.started_at
               ? new Date(team.started_at).getTime()
               : armedAt.getTime();
@@ -359,6 +375,18 @@ export async function solveCurrentLevel(input: {
             if (readyAt <= armedAt.toISOString()) {
               status = "ready";
             }
+          } else if (
+            when.type === "delay_meters" &&
+            typeof when.meters === "number" &&
+            when.meters > 0
+          ) {
+            // Stays armed until walk progress promotes it.
+            readyAt = null;
+          } else {
+            // Unknown / empty delay params → treat as immediate so authored
+            // bonuses never silently vanish.
+            status = "ready";
+            readyAt = armedAt.toISOString();
           }
 
           return {
@@ -401,7 +429,8 @@ export async function solveCurrentLevel(input: {
     const immediateTeam = readyNow.find((item) => item.for_team);
     const immediateSolo = readyNow.find((item) => !item.for_team);
     const teamBonus = Boolean(wantBonus && immediateTeam);
-    const soloBonus = Boolean(wantBonus && !immediateTeam && immediateSolo && bonus);
+    // Do not require resolveBonusTask() — definitions + snapshot are enough.
+    const soloBonus = Boolean(wantBonus && !immediateTeam && immediateSolo);
 
     let nextPhase: PlayPhase | undefined;
     let pendingNext: number | null = null;
@@ -414,7 +443,14 @@ export async function solveCurrentLevel(input: {
       pendingNext = isFinished ? null : nextLevel;
       teamCurrentLevel = currentLevel;
       immediateTeam.status = "active";
-    } else if (soloBonus && immediateSolo && bonus) {
+      activeBonus = {
+        from_level: currentLevel,
+        for_role: immediateTeam.for_role,
+        for_team: true,
+        started_at: armedAt.toISOString(),
+        bonus_id: immediateTeam.bonus_id,
+      };
+    } else if (soloBonus && immediateSolo) {
       // Team advances; assigned role gets an overlay via active_bonus.
       const nextSlot = getLevelDefinition(content, isFinished ? currentLevel : nextLevel);
       nextPhase = isFinished
@@ -713,15 +749,43 @@ export async function dismissSyncModal(input: {
 
     // After a normal solve, open hub for the next slot. Bonus stays on bonus after dismiss.
     // Solo-role bonus already advanced to hub with active_bonus — leave phase alone.
-    // Also recover if queue already has an active team bonus but phase drifted.
-    const activeTeamBonus = (gameState.bonus_queue ?? []).some(
+    // Also recover if queue already has an active/ready team bonus but phase drifted.
+    let queue = gameState.bonus_queue ?? [];
+    const activeTeamBonus = queue.some(
       (item) => item.status === "active" && item.for_team,
     );
-    let nextPhase = activeTeamBonus ? ("bonus" as const) : gameState.current_phase;
+    const readyTeamBonus = queue.find(
+      (item) => item.status === "ready" && item.for_team,
+    );
+
+    let nextPhase = activeTeamBonus || readyTeamBonus ? ("bonus" as const) : gameState.current_phase;
+    let activeBonus = gameState.active_bonus ?? null;
+    let pendingNext = gameState.pending_next_level ?? null;
+    let teamCurrentLevel = team.current_level || 1;
+
+    if (readyTeamBonus && !activeTeamBonus) {
+      queue = markBonusActive(queue, readyTeamBonus.bonus_id);
+      activeBonus = {
+        from_level: readyTeamBonus.from_level,
+        for_role: readyTeamBonus.for_role,
+        for_team: true,
+        started_at: new Date().toISOString(),
+        bonus_id: readyTeamBonus.bonus_id,
+      };
+      nextPhase = "bonus";
+      // Stay on the mission that armed this bonus until it is solved.
+      teamCurrentLevel = readyTeamBonus.from_level;
+      if (pendingNext == null) {
+        const after = readyTeamBonus.from_level + 1;
+        pendingNext = after <= content.levels.length ? after : null;
+      }
+    }
+
     if (
       !activeTeamBonus &&
+      !readyTeamBonus &&
       gameState.current_phase === "level" &&
-      !gameState.active_bonus &&
+      !activeBonus &&
       usesPhasedPlay(content)
     ) {
       const nextDef = getLevelDefinition(content, team.current_level || 1);
@@ -742,12 +806,18 @@ export async function dismissSyncModal(input: {
       modal: null,
       quiz_reveal: null,
       current_phase: nextPhase,
+      active_bonus: activeBonus,
+      pending_next_level: pendingNext,
+      bonus_queue: queue,
     };
 
     const supabase = createAdminClient();
     const { data: updatedTeam, error } = await supabase
       .from("teams")
-      .update({ game_state: nextGameState })
+      .update({
+        current_level: teamCurrentLevel,
+        game_state: nextGameState,
+      })
       .eq("id", team.id)
       .select(
         "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
@@ -1379,11 +1449,14 @@ async function completeActiveBonus(input: {
         : playerRole === "alpha" || playerRole === "beta" || playerRole === "gamma"
           ? playerRole
           : "gamma";
+  const claimUnassigned = (await countActivePlayers(team.id)) <= 1;
 
   const fromQueue = (gameState.bonus_queue ?? []).find(
     (item) =>
       item.status === "active" &&
-      (item.for_team || item.for_role === normalizedRole),
+      (item.for_team ||
+        item.for_role === normalizedRole ||
+        claimUnassigned),
   );
   const active = fromQueue
     ? {
@@ -1441,7 +1514,7 @@ async function completeActiveBonus(input: {
   }
 
   const playerRoleCheck = (player.role ?? "gamma") as PlayerRole;
-  if (!isBonusForRole(bonus, playerRoleCheck)) {
+  if (!canPresentBonus(bonus, playerRoleCheck, { claimUnassigned })) {
     return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
   }
 
@@ -1713,7 +1786,8 @@ async function leaveBonusPhase(input: {
   let correct = false;
   if (!input.skip && bonus) {
     const playerRole = (player.role ?? "gamma") as PlayerRole;
-    if (!isBonusForRole(bonus, playerRole)) {
+    const claimUnassigned = (await countActivePlayers(team.id)) <= 1;
+    if (!canPresentBonus(bonus, playerRole, { claimUnassigned })) {
       return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
     }
     const validation = validateBonusQuiz(
@@ -1864,7 +1938,8 @@ export async function submitBonusAnswer(input: {
     }
 
     const playerRole = (player.role ?? "gamma") as PlayerRole;
-    if (!isBonusForRole(bonus, playerRole)) {
+    const claimUnassigned = (await countActivePlayers(team.id)) <= 1;
+    if (!canPresentBonus(bonus, playerRole, { claimUnassigned })) {
       return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
     }
 

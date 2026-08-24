@@ -88,18 +88,36 @@ export function findBonusTaskById(
   return resolveBonusTask(level);
 }
 
+export function normalizeBonusRole(
+  role: PlayerRole | string | null | undefined,
+): "alpha" | "beta" | "gamma" | null {
+  if (role === "captain" || role === "navigator" || role === "alpha") return "alpha";
+  if (role === "beta") return "beta";
+  if (role === "solver" || role === "gamma") return "gamma";
+  return null;
+}
+
 export function isBonusForRole(
   bonus: BonusTask,
   role: PlayerRole | string | null | undefined,
 ): boolean {
   if (bonus.for_team) return true;
-  const normalized =
-    role === "captain" || role === "navigator"
-      ? "alpha"
-      : role === "solver"
-        ? "gamma"
-        : role;
-  return normalized === bonus.for_role;
+  const normalized = normalizeBonusRole(role);
+  return normalized !== null && normalized === bonus.for_role;
+}
+
+/**
+ * Who may see/solve a bonus on this device.
+ * Solo / Alpha claims role bonuses when the target seat is empty — otherwise
+ * a Gamma-only bonus is invisible in 1-person tests and never completes.
+ */
+export function canPresentBonus(
+  bonus: Pick<BonusTask, "for_role" | "for_team">,
+  role: PlayerRole | string | null | undefined,
+  options?: { claimUnassigned?: boolean },
+): boolean {
+  if (isBonusForRole(bonus as BonusTask, role)) return true;
+  return Boolean(options?.claimUnassigned);
 }
 
 export function roleLabelDe(role: BonusTask["for_role"]): string {

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { parseLinkLayer } from "@/lib/cms/game-link-config";
+import { parseBonusBindings } from "@/lib/cms/bonus-bindings";
+import { parseLinkLayer, type GameLinkOverrides } from "@/lib/cms/game-link-config";
 import {
   compileGameLogic,
   parseLogicRules,
@@ -81,6 +82,47 @@ export async function loadLiveStudioGameSnapshot(
     };
     return [{ ...partial, layer: parseLinkLayer(partial) }];
   });
+
+  // Bonus bindings may reference pool tasks that were never linked as Layer 3.
+  // Hydrate them so live „Testen“ / compile still emits for_team bonuses.
+  const linkedTaskIds = new Set(links.map((l) => l.task_id));
+  const orphanBonusIds = [
+    ...new Set(
+      links.flatMap((link) => {
+        const bindings = parseBonusBindings(link.overrides as GameLinkOverrides);
+        const legacy =
+          typeof (link.overrides as { bonus_task_id?: unknown })?.bonus_task_id === "string"
+            ? [(link.overrides as { bonus_task_id: string }).bonus_task_id.trim()]
+            : [];
+        return [...bindings.map((b) => b.task_id), ...legacy].filter(
+          (id) => id && !linkedTaskIds.has(id),
+        );
+      }),
+    ),
+  ];
+  if (orphanBonusIds.length > 0) {
+    const { data: orphanRows, error: orphanError } = await supabase
+      .from("studio_tasks")
+      .select("*")
+      .in("id", orphanBonusIds)
+      .eq("is_active", true);
+    if (orphanError) throw new Error(orphanError.message);
+
+    let sortBase = links.filter((l) => parseLinkLayer(l) === 3).length;
+    for (const row of orphanRows ?? []) {
+      const task = mapTaskRow(row as Record<string, unknown>);
+      links.push({
+        id: `virtual-bonus-${task.id}`,
+        game_id: gameId,
+        task_id: task.id,
+        layer: 3,
+        sort_order: sortBase++,
+        overrides: {},
+        task,
+      });
+      linkedTaskIds.add(task.id);
+    }
+  }
 
   // Reload Einstiegsfragen from live pool tasks so removed hero images etc. apply immediately.
   const openerIds = [

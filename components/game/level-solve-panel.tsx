@@ -277,6 +277,22 @@ export function LevelSolvePanel({
             : Boolean(selectedOptionId)
           : false;
 
+  // Stale "correct" after remount/phase with empty form — hide so it does not look like praise for blank input.
+  const formLooksEmpty =
+    level.type === "digital"
+      ? inputMode === "confirm"
+        ? false
+        : isCodeBoxes
+          ? numberParts.every((p) => !p.trim())
+          : !answer.trim()
+      : level.type === "quiz"
+        ? isMultiQuiz
+          ? selectedOptionIds.length === 0
+          : !selectedOptionId
+        : false;
+  const visibleFeedback =
+    feedback?.kind === "correct" && formLooksEmpty ? null : feedback;
+
   if (level.type === "gps" && !isNavigator) {
     if (cityStyle) {
       return (
@@ -493,7 +509,7 @@ export function LevelSolvePanel({
               </div>
             ) : null}
 
-            <SolveFeedbackBanner feedback={feedback} />
+            <SolveFeedbackBanner feedback={visibleFeedback} />
             {revealButton}
           </div>
         )}
@@ -624,7 +640,7 @@ export function LevelSolvePanel({
 
           {revealButton}
           <div className="mt-3">
-            <SolveFeedbackBanner feedback={feedback} />
+            <SolveFeedbackBanner feedback={visibleFeedback} />
           </div>
         </>
       )}
