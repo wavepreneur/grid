@@ -116,25 +116,39 @@ export function quizOptionsForUi(quiz: ArrivalQuiz): QuizOption[] {
   return quiz.options;
 }
 
-/** Whether phased Hub→Quiz→Level UI should run (vs. legacy single screen). */
+/** Outdoor arrival gate: GPS pin, walk meters, or wait minutes. */
+export function levelNeedsOutdoorArrivalHub(
+  level: Pick<LevelDefinition, "location" | "triggers">,
+): boolean {
+  return Boolean(
+    level.location ||
+      (level.triggers?.type === "distance" &&
+        typeof level.triggers.after_meters === "number" &&
+        level.triggers.after_meters > 0) ||
+      (level.triggers?.type === "time" &&
+        typeof level.triggers.after_minutes === "number" &&
+        level.triggers.after_minutes > 0),
+  );
+}
+
+/**
+ * Whether phased Hub→Quiz→Level→Bonus UI should run (vs. legacy single screen).
+ * Outdoor always uses phased play — including „sofort“ missions without GPS —
+ * so Layer-3 bonuses and arrival quizzes still work.
+ */
 export function usesPhasedPlay(input: {
   contentMode?: ContentMode;
   levels: LevelDefinition[];
 }): boolean {
   if (input.contentMode === "indoor" || input.contentMode === "online") return true;
+  if (input.contentMode === "outdoor") return true;
   if (input.levels.some((l) => l.station || l.arrival_quiz)) return true;
-  // Outdoor: geofence pins OR meter/time unlocks both need the hub first.
   if (
-    input.contentMode === "outdoor" &&
     input.levels.some(
       (l) =>
-        l.location ||
-        (l.triggers?.type === "distance" &&
-          typeof l.triggers.after_meters === "number" &&
-          l.triggers.after_meters > 0) ||
-        (l.triggers?.type === "time" &&
-          typeof l.triggers.after_minutes === "number" &&
-          l.triggers.after_minutes > 0),
+        Boolean(l.bonus) ||
+        (l.bonuses?.length ?? 0) > 0 ||
+        levelNeedsOutdoorArrivalHub(l),
     )
   ) {
     return true;
@@ -142,10 +156,23 @@ export function usesPhasedPlay(input: {
   return false;
 }
 
+/**
+ * First phase after opening a slot.
+ * Outdoor without GPS/meter/time skips the map hub (Sofort-Freischaltung).
+ */
 export function initialPhaseForSurface(
   surface: PlaySurface,
   slot: PlaySlot,
+  level?: Pick<LevelDefinition, "location" | "triggers"> | null,
 ): PlayPhase {
   if (surface === "online" && !slot.quiz) return "level";
+  if (surface === "outdoor") {
+    const needsHub = level
+      ? levelNeedsOutdoorArrivalHub(level)
+      : Boolean(slot.hub.location);
+    if (!needsHub) {
+      return slot.quiz ? "quiz" : "level";
+    }
+  }
   return "hub";
 }

@@ -263,7 +263,20 @@ export function taskContentToBonus(
 }
 
 /** Build author-facing slots from game task links. */
-export function buildGameSlots(links: StudioGameTaskLink[]): GameSlot[] {
+export function buildGameSlots(
+  links: StudioGameTaskLink[],
+  options?: {
+    /**
+     * Live opener pool tasks keyed by task id.
+     * When set, Einstiegsfragen are rebuilt from current content (not a stale
+     * overrides.arrival_quiz snapshot that can still hold a removed hero image).
+     */
+    openerTasksById?: Record<
+      string,
+      Pick<StudioGameTaskLink["task"], "title" | "description" | "content">
+    >;
+  },
+): GameSlot[] {
   const geos: StudioGameTaskLink[] = [];
   const missions: StudioGameTaskLink[] = [];
   const bonuses: StudioGameTaskLink[] = [];
@@ -282,6 +295,8 @@ export function buildGameSlots(links: StudioGameTaskLink[]): GameSlot[] {
   const levelLinks = missions.length > 0 ? missions : geos;
   if (levelLinks.length === 0) return [];
 
+  const openerTasksById = options?.openerTasksById ?? {};
+
   return levelLinks.map((levelLink, index) => {
     const overrides = parseLinkOverrides(levelLink.overrides);
     const fromOverride = parseArrivalQuizOverride(overrides.arrival_quiz);
@@ -298,12 +313,25 @@ export function buildGameSlots(links: StudioGameTaskLink[]): GameSlot[] {
             : null))
         : null;
 
-    let quiz: StudioArrivalQuiz | null = fromOverride;
-    let quizSource: GameSlot["quizSource"] = fromOverride
-      ? openerTaskId
-        ? "opener_task"
-        : "override"
-      : "none";
+    let quiz: StudioArrivalQuiz | null = null;
+    let quizSource: GameSlot["quizSource"] = "none";
+
+    // Prefer live opener pool content over frozen arrival_quiz snapshot.
+    if (openerTaskId && openerTasksById[openerTaskId]) {
+      const live = taskToOpenerArrivalQuiz(
+        openerTasksById[openerTaskId]!,
+        typeof overrides.opener_points === "number" ? overrides.opener_points : null,
+      );
+      if (live) {
+        quiz = live;
+        quizSource = "opener_task";
+      }
+    }
+
+    if (!quiz && fromOverride) {
+      quiz = fromOverride;
+      quizSource = openerTaskId ? "opener_task" : "override";
+    }
 
     if (!quiz && geoLink) {
       quiz = contentToArrivalQuiz(geoLink.task.content);

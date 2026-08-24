@@ -82,8 +82,42 @@ export async function loadLiveStudioGameSnapshot(
     return [{ ...partial, layer: parseLinkLayer(partial) }];
   });
 
+  // Reload Einstiegsfragen from live pool tasks so removed hero images etc. apply immediately.
+  const openerIds = [
+    ...new Set(
+      links.flatMap((link) => {
+        const id = (link.overrides as { opener_task_id?: unknown })?.opener_task_id;
+        return typeof id === "string" && id.trim() ? [id.trim()] : [];
+      }),
+    ),
+  ];
+  const openerTasksById: Record<
+    string,
+    Pick<StudioTask, "title" | "description" | "content">
+  > = {};
+  if (openerIds.length > 0) {
+    const { data: openerRows, error: openerError } = await supabase
+      .from("studio_tasks")
+      .select("id, title, description, content")
+      .in("id", openerIds);
+    if (openerError) throw new Error(openerError.message);
+    for (const row of openerRows ?? []) {
+      const t = row as {
+        id: string;
+        title: string;
+        description: string | null;
+        content: StudioTask["content"];
+      };
+      openerTasksById[t.id] = {
+        title: t.title,
+        description: t.description ?? "",
+        content: { ...DEFAULT_TASK_CONTENT, ...(t.content ?? {}) },
+      };
+    }
+  }
+
   const rules = parseLogicRules(game.logic_rules);
-  const compiled = compileGameLogic({ game, links, rules });
+  const compiled = compileGameLogic({ game, links, rules, openerTasksById });
 
   return {
     game,

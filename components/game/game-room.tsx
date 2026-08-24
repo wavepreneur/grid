@@ -32,7 +32,7 @@ import { cockpitShowPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
 import { transferCaptain, handoverSession, removePlayerFromLobby } from "@/app/actions/lobby";
 import { useTeamSync } from "@/lib/hooks/use-team-sync";
 import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
-import { cacheTeamState } from "@/lib/grid/offline-state";
+import { cacheTeamState, readLocalPaused, writeLocalPaused, pauseStorageKey } from "@/lib/grid/offline-state";
 import { displayRoleLabel, DEFAULT_ROLE_LABELS } from "@/lib/grid/role-labels";
 import { useBonusQueueTick } from "@/lib/hooks/use-bonus-queue-tick";
 import { clearWalkedDistanceStorage } from "@/lib/hooks/use-walked-distance";
@@ -82,6 +82,31 @@ export function GameRoom({
   const [transferPending, setTransferPending] = useState(false);
   const [releasePending, setReleasePending] = useState(false);
   const [lobbyPlayers, setLobbyPlayers] = useState<LobbyPlayer[]>([]);
+
+  const localPauseKey = pauseStorageKey({
+    inviteCode,
+    joinCode,
+    playerId: playerSession.playerId,
+  });
+
+  // Restore device-local pause after app close / URL reopen.
+  useEffect(() => {
+    if (teamState.status === "finished") {
+      writeLocalPaused(localPauseKey, false);
+      return;
+    }
+    if (!readLocalPaused(localPauseKey)) return;
+    setPaused(true);
+    setMorePanel("pause");
+  }, [localPauseKey, teamState.status]);
+
+  function handleTogglePause() {
+    setPaused((prev) => {
+      const next = !prev;
+      writeLocalPaused(localPauseKey, next);
+      return next;
+    });
+  }
 
   const handleStateUpdate = useCallback((gameState: TeamGameState, currentLevel: number) => {
     setTeamState((current) => {
@@ -579,7 +604,7 @@ export function GameRoom({
         morePanel={morePanel}
         onMorePanel={setMorePanel}
         paused={paused}
-        onTogglePause={() => setPaused((p) => !p)}
+        onTogglePause={handleTogglePause}
         isAlpha={isAlpha}
         teammates={lobbyPlayers
           .filter((p) => p.id !== playerSession.playerId)

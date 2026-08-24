@@ -502,8 +502,14 @@ export function compileStudioGameToLevels(input: {
   game: StudioGame;
   links: StudioGameTaskLink[];
   rules: StudioLogicRule[];
+  openerTasksById?: Record<
+    string,
+    Pick<StudioGameTaskLink["task"], "title" | "description" | "content">
+  >;
 }): LevelDefinition[] {
-  const slots = buildGameSlots(input.links);
+  const slots = buildGameSlots(input.links, {
+    openerTasksById: input.openerTasksById,
+  });
 
   // Slot-based compile: one runtime level per Quiz→Level→Bonus stop
   if (slots.length > 0) {
@@ -694,6 +700,10 @@ export function compileGameLogic(input: {
   game: StudioGame;
   links: StudioGameTaskLink[];
   rules: StudioLogicRule[];
+  openerTasksById?: Record<
+    string,
+    Pick<StudioGameTaskLink["task"], "title" | "description" | "content">
+  >;
 }): CompiledGameLogic {
   const orderedLinks = orderLinksForCompile(input.links);
   const routeOrder = parseRuntimeProfiles(input.game.runtime_profiles).route_order;
@@ -706,9 +716,16 @@ export function compileGameLogic(input: {
   });
   const mergedRules = [...flowRules, ...bonusRules, ...authoredExtras];
   const rules = mergedRules.filter((r) => r.enabled);
-  const levels = compileStudioGameToLevels({ ...input, links: orderedLinks, rules });
+  const levels = compileStudioGameToLevels({
+    ...input,
+    links: orderedLinks,
+    rules,
+    openerTasksById: input.openerTasksById,
+  });
 
-  const slots = buildGameSlots(input.links);
+  const slots = buildGameSlots(input.links, {
+    openerTasksById: input.openerTasksById,
+  });
   const task_id_by_level: Record<number, string> = {};
   const level_by_task_id: Record<string, number> = {};
   if (slots.length > 0) {

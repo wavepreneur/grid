@@ -330,8 +330,7 @@ export async function solveCurrentLevel(input: {
     const bonus = resolveBonusTask(levelDefinition);
     // Bonus only after a real solve — reveal-solution completes without bonus.
     const wantBonus =
-      Boolean(usesPhasedPlay(content) && bonusDefs.length > 0) &&
-      !input.payload?.revealSolution;
+      Boolean(bonusDefs.length > 0) && !input.payload?.revealSolution;
 
     const armedAt = new Date();
     const bonusQueue: NonNullable<TeamGameState["bonus_queue"]> = wantBonus
@@ -424,6 +423,7 @@ export async function solveCurrentLevel(input: {
           ? initialPhaseForSurface(
               content.contentMode,
               buildPlaySlot(nextSlot, content.contentMode),
+              nextSlot,
             )
           : "hub";
       activeBonus = {
@@ -729,6 +729,7 @@ export async function dismissSyncModal(input: {
         nextPhase = initialPhaseForSurface(
           content.contentMode,
           buildPlaySlot(nextDef, content.contentMode),
+          nextDef,
         );
       } else {
         nextPhase = "hub";
@@ -804,6 +805,7 @@ export async function initializeTeamGameState(
       ? initialPhaseForSurface(
           content.contentMode,
           buildPlaySlot(startDef, content.contentMode),
+          startDef,
         )
       : undefined;
   const gameStateWithStart = {
@@ -1745,6 +1747,7 @@ async function leaveBonusPhase(input: {
       ? initialPhaseForSurface(
           content.contentMode,
           buildPlaySlot(nextSlot, content.contentMode),
+          nextSlot,
         )
       : "hub";
 
@@ -1908,6 +1911,7 @@ export async function submitBonusAnswer(input: {
         ? initialPhaseForSurface(
             content.contentMode,
             buildPlaySlot(nextSlot, content.contentMode),
+            nextSlot,
           )
         : "hub";
 

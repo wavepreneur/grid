@@ -16,6 +16,8 @@ import {
 } from "@/lib/cms/types";
 import type { ActionResult } from "@/lib/grid/types";
 import { normalizeTaskContent } from "@/lib/cms/task-content";
+import { taskToOpenerArrivalQuiz } from "@/lib/cms/game-slots";
+import { parseLinkOverrides } from "@/lib/cms/game-link-config";
 
 function normalizeTaskRow(row: StudioTask): StudioTask {
   return {
@@ -26,6 +28,69 @@ function normalizeTaskRow(row: StudioTask): StudioTask {
     content_context: parseContentContext((row as StudioTask).content_context),
     role_assignment: parseRoleAssignment((row as StudioTask).role_assignment),
   };
+}
+
+/**
+ * Keep mission-link arrival_quiz snapshots in sync when a pool opener task changes
+ * (e.g. hero image removed in the task editor).
+ */
+async function refreshOpenerQuizSnapshots(
+  supabase: ReturnType<typeof createAdminClient>,
+  opener: Pick<StudioTask, "id" | "title" | "description" | "content">,
+): Promise<void> {
+  const { data: links, error } = await supabase
+    .from("studio_game_tasks")
+    .select("id, game_id, overrides")
+    .contains("overrides", { opener_task_id: opener.id });
+
+  if (error || !links?.length) {
+    // Fallback: JSON contains scan if contains-filter unsupported
+    if (error) {
+      const { data: allLinks } = await supabase
+        .from("studio_game_tasks")
+        .select("id, game_id, overrides");
+      const matched = (allLinks ?? []).filter((row) => {
+        const o = row.overrides as { opener_task_id?: unknown } | null;
+        return o?.opener_task_id === opener.id;
+      });
+      await writeRefreshedOpenerSnapshots(supabase, matched, opener);
+    }
+    return;
+  }
+
+  await writeRefreshedOpenerSnapshots(supabase, links, opener);
+}
+
+async function writeRefreshedOpenerSnapshots(
+  supabase: ReturnType<typeof createAdminClient>,
+  links: Array<{ id: string; game_id: string; overrides: unknown }>,
+  opener: Pick<StudioTask, "id" | "title" | "description" | "content">,
+): Promise<void> {
+  for (const link of links) {
+    const overrides = parseLinkOverrides(link.overrides);
+    if (overrides.opener_task_id !== opener.id) continue;
+    const quiz = taskToOpenerArrivalQuiz(
+      {
+        title: opener.title,
+        description: opener.description ?? "",
+        content: normalizeTaskContent(opener.content),
+      },
+      typeof overrides.opener_points === "number" ? overrides.opener_points : null,
+    );
+    if (!quiz) {
+      // Opener no longer valid MC — clear image by rebuilding without snapshot image only
+      // if quiz fails entirely, leave as-is to avoid breaking play mid-edit.
+      continue;
+    }
+    const nextOverrides = {
+      ...overrides,
+      arrival_quiz: quiz,
+    };
+    await supabase
+      .from("studio_game_tasks")
+      .update({ overrides: nextOverrides })
+      .eq("id", link.id);
+  }
 }
 
 export async function listTasks(filters: TaskFilterInput = {}): Promise<ActionResult<StudioTask[]>> {
@@ -247,7 +312,17 @@ export async function upsertTask(input: TaskUpsertInput): Promise<ActionResult<S
         .single();
 
       if (error) throw new Error(error.message);
+
+      // Refresh frozen arrival_quiz snapshots that use this task as Einstiegsfrage.
+      await refreshOpenerQuizSnapshots(supabase, {
+        id: data.id as string,
+        title: data.title as string,
+        description: (data.description as string) ?? "",
+        content: normalizeTaskContent(data.content),
+      });
+
       revalidatePath("/admin/tasks");
+      revalidatePath("/admin/games");
       return {
         success: true,
         data: normalizeTaskRow(data as StudioTask),
