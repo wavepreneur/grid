@@ -121,39 +121,60 @@ export async function rebalanceArchetypeRoles(teamId: string): Promise<void> {
     return;
   }
 
-  const alpha = players.find((player) => player.is_captain) ?? players[0];
-  let betaId: string | null = null;
+  const alpha = players.find((player) => player.is_captain) ?? players[0]!;
+  const beta = players.find((player) => player.id !== alpha.id) ?? null;
+  const tasks: Array<Promise<unknown>> = [];
 
-  for (let index = 0; index < players.length; index += 1) {
-    const player = players[index];
-    let role: ArchetypeRole;
-
+  for (const player of players) {
     if (player.id === alpha.id) {
-      role = "alpha";
-      if (!player.is_captain) {
-        await supabase.from("players").update({ is_captain: true, role: "alpha" }).eq("id", player.id);
-      } else if (player.role !== "alpha") {
-        await supabase.from("players").update({ role: "alpha" }).eq("id", player.id);
+      if (!player.is_captain || player.role !== "alpha") {
+        tasks.push(
+          Promise.resolve(
+            supabase
+              .from("players")
+              .update({ is_captain: true, role: "alpha" })
+              .eq("id", player.id),
+          ).then(({ error }) => {
+            if (error) throw new Error(error.message);
+          }),
+        );
       }
-      await setTeamNavigator(teamId, player.id);
       continue;
     }
 
-    if (players.length >= 2 && !betaId) {
-      role = "beta";
-      betaId = player.id;
-      await supabase.from("players").update({ role: "beta", is_captain: false }).eq("id", player.id);
+    if (beta && player.id === beta.id) {
+      if (player.role !== "beta" || player.is_captain) {
+        tasks.push(
+          Promise.resolve(
+            supabase
+              .from("players")
+              .update({ role: "beta", is_captain: false })
+              .eq("id", player.id),
+          ).then(({ error }) => {
+            if (error) throw new Error(error.message);
+          }),
+        );
+      }
       continue;
     }
 
-    role = "gamma";
-    await supabase
-      .from("players")
-      .update({ role: "gamma", is_captain: false })
-      .eq("id", player.id);
+    if (player.role !== "gamma" || player.is_captain) {
+      tasks.push(
+        Promise.resolve(
+          supabase
+            .from("players")
+            .update({ role: "gamma", is_captain: false })
+            .eq("id", player.id),
+        ).then(({ error }) => {
+          if (error) throw new Error(error.message);
+        }),
+      );
+    }
   }
 
-  await setTeamBeta(teamId, players.length >= 2 ? betaId : null);
+  tasks.push(setTeamNavigator(teamId, alpha.id));
+  tasks.push(setTeamBeta(teamId, players.length >= 2 ? (beta?.id ?? null) : null));
+  await Promise.all(tasks);
 }
 
 export async function findActivePlayerByDisplayName(

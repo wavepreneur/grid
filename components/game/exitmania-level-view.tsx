@@ -48,7 +48,7 @@ export function ExitmaniaLevelView({
   disabled,
   isPending,
   canUnlockGps,
-  effectiveBeta,
+  effectiveBeta: _effectiveBeta,
   soloAlpha = false,
   gpsCapability = true,
   levelStartedAt,
@@ -58,6 +58,7 @@ export function ExitmaniaLevelView({
   onPurchaseHint,
   feedback = null,
 }: ExitmaniaLevelViewProps) {
+  void _effectiveBeta;
   const [activeTile, setActiveTile] = useState<LevelContentTile | null>(null);
   const tiles = level.tiles ?? [];
   const isGpsLevel = gpsCapability && level.type === "gps" && Boolean(level.location);
@@ -131,16 +132,9 @@ export function ExitmaniaLevelView({
         ) : null}
       </div>
 
-      {/* Middle: tiles — centers vertically when content is sparse */}
+      {/* v1: tiles/media visible to every player — role gating comes later. */}
       <div className="flex min-h-[10rem] flex-1 flex-col justify-center px-4 py-8 sm:px-5 sm:py-10">
-        {effectiveBeta ? (
-          <BetaNotesPanel {...betaPanelProps} layout="inline" cityStyle />
-        ) : (
-          <div className="rounded-3xl bg-[var(--cg-card)] px-4 py-4 text-sm text-[var(--cg-muted)] shadow-[var(--cg-shadow-soft)]">
-            Hinweise und Dokumente erscheinen auf dem Gerät der Hinweis-Rolle. Du kannst die
-            Aufgabe trotzdem lösen bzw. mit OK bestätigen.
-          </div>
-        )}
+        <BetaNotesPanel {...betaPanelProps} layout="inline" cityStyle />
       </div>
 
       {/* Bottom: solve / OK — anchored to the bottom of the phone column */}
@@ -160,16 +154,14 @@ export function ExitmaniaLevelView({
         />
       </div>
 
-      {effectiveBeta ? (
-        <MediaModal
-          tile={activeTile}
-          onClose={() => setActiveTile(null)}
-          purchasedHints={purchasedHints}
-          score={score}
-          isPending={isPending}
-          onPurchaseHint={onPurchaseHint}
-        />
-      ) : null}
+      <MediaModal
+        tile={activeTile}
+        onClose={() => setActiveTile(null)}
+        purchasedHints={purchasedHints}
+        score={score}
+        isPending={isPending}
+        onPurchaseHint={onPurchaseHint}
+      />
       <HintUnlockToast purchasedHints={purchasedHints} myPlayerId={myPlayerId} />
     </div>
   );

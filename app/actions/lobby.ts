@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { initializeTeamGameState } from "@/app/actions/game";
 import {
@@ -34,7 +35,6 @@ import {
   TEAM_FULL,
 } from "@/lib/grid/session-codes";
 import {
-  assignArchetypeRoleOnJoin,
   buildPlayerSession,
   countActivePlayers,
   findActivePlayerByDisplayName,
@@ -276,6 +276,12 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
 
   if (updated) {
     if (event) {
+      await supabase.from("team_sync_events").insert({
+        team_id: teamId,
+        event_type: "game_started",
+        actor_player_id: team.captain_player_id,
+        payload: { started_at: startedAt, source: "auto" },
+      });
       await initializeTeamGameState(
         teamId,
         team.captain_player_id,
@@ -840,61 +846,78 @@ export async function joinTeamAsPlayer(input: {
       return { success: false, error: error?.message ?? "Beitritt fehlgeschlagen." };
     }
 
-    await assignArchetypeRoleOnJoin(team.id, player.id);
-    await rebalanceArchetypeRoles(team.id);
-    const refreshedTeam = await getTeamByJoinCode(joinCode, event.id);
-    if (!refreshedTeam) {
-      return { success: false, error: "Team nach Beitritt nicht gefunden." };
+    // Minimal sync work before responding — lead already saw the insert via Realtime.
+    // Full rebalance + auto-start continue in the background so the joiner is not blocked.
+    const activeCount = activeBeforeJoin + 1;
+    const teamPatch: Record<string, unknown> = {};
+    if (initialRole === "beta") {
+      teamPatch.beta_player_id = player.id;
     }
-
-    const { data: refreshedPlayer } = await supabase
-      .from("players")
-      .select("id, display_name, is_captain, session_id, role")
-      .eq("id", player.id)
-      .single();
-
     if (team.status === "setup") {
-      await supabase.from("teams").update({ status: "lobby" }).eq("id", team.id);
+      teamPatch.status = "lobby";
     }
-
-    const activeCount = await countActivePlayers(refreshedTeam.id);
-    if (activeCount >= refreshedTeam.max_size && refreshedTeam.status === "lobby") {
-      const lobbyAutoStartAt = computeLobbyAutoStartAt({
+    if (
+      activeCount >= team.max_size &&
+      (team.status === "lobby" || team.status === "setup")
+    ) {
+      teamPatch.lobby_auto_start_at = computeLobbyAutoStartAt({
         autoStartSeconds:
           event.lobby_auto_start_seconds || DEFAULT_LOBBY_AUTO_START_SECONDS,
-        maxSize: refreshedTeam.max_size,
+        maxSize: team.max_size,
         activePlayerCount: activeCount,
-      });
-      await supabase
+      }).toISOString();
+    }
+
+    if (Object.keys(teamPatch).length > 0) {
+      const { error: teamPatchError } = await supabase
         .from("teams")
-        .update({ lobby_auto_start_at: lobbyAutoStartAt.toISOString() })
-        .eq("id", refreshedTeam.id)
-        .eq("status", "lobby");
+        .update(teamPatch)
+        .eq("id", team.id);
+      if (teamPatchError) {
+        return { success: false, error: teamPatchError.message };
+      }
     }
 
-    await maybeAutoStartTeam(refreshedTeam.id);
+    const teamForSession = {
+      ...team,
+      status: (teamPatch.status as typeof team.status | undefined) ?? team.status,
+      beta_player_id:
+        typeof teamPatch.beta_player_id === "string"
+          ? teamPatch.beta_player_id
+          : team.beta_player_id,
+      lobby_auto_start_at:
+        typeof teamPatch.lobby_auto_start_at === "string"
+          ? teamPatch.lobby_auto_start_at
+          : team.lobby_auto_start_at,
+    };
 
-    if (team.status === "playing") {
-      await writeAuditLog({
-        organizationId: event.organization_id,
-        eventId: event.id,
-        teamId: team.id,
-        playerId: player.id,
-        action: "player_joined_mid_game",
-        payload: {
-          display_name: displayName,
-          current_level: team.current_level,
-        },
-      });
-    }
+    after(() => {
+      void (async () => {
+        try {
+          await rebalanceArchetypeRoles(team.id);
+          await maybeAutoStartTeam(team.id);
+          if (team.status === "playing") {
+            await writeAuditLog({
+              organizationId: event.organization_id,
+              eventId: event.id,
+              teamId: team.id,
+              playerId: player.id,
+              action: "player_joined_mid_game",
+              payload: {
+                display_name: displayName,
+                current_level: team.current_level,
+              },
+            });
+          }
+        } catch {
+          /* join already succeeded — background repair must not surface to the player */
+        }
+      })();
+    });
 
     return {
       success: true,
-      data: await buildSessionForTeam(
-        refreshedPlayer ?? player,
-        refreshedTeam,
-        event,
-      ),
+      data: await buildSessionForTeam(player, teamForSession, event),
     };
   } catch (error) {
     return {
@@ -998,7 +1021,13 @@ export async function startGameManually(input: {
     }
 
     const player = await getPlayerBySessionId(input.sessionId);
-    if (!player || player.team_id !== team.id || !player.is_captain) {
+    const isLead =
+      Boolean(player) &&
+      player!.team_id === team.id &&
+      (player!.is_captain ||
+        player!.role === "alpha" ||
+        team.captain_player_id === player!.id);
+    if (!player || player.team_id !== team.id || !isLead) {
       return { success: false, error: "Nur Alpha (Team Lead) kann die Mission starten." };
     }
 
@@ -1014,18 +1043,31 @@ export async function startGameManually(input: {
     const startedAt = new Date().toISOString();
     const supabase = createAdminClient();
 
-    const { error } = await supabase
+    const { data: startedTeam, error } = await supabase
       .from("teams")
       .update({
         status: "playing",
         started_at: startedAt,
       })
       .eq("id", team.id)
-      .eq("status", "lobby");
+      .eq("status", "lobby")
+      .select("id")
+      .maybeSingle();
 
     if (error) {
       return { success: false, error: error.message };
     }
+    if (!startedTeam) {
+      return { success: false, error: "Das Team ist nicht mehr in der Lobby." };
+    }
+
+    // Kick every waiting device immediately (Realtime on teams can lag behind).
+    await supabase.from("team_sync_events").insert({
+      team_id: team.id,
+      event_type: "game_started",
+      actor_player_id: player.id,
+      payload: { started_at: startedAt, source: "manual" },
+    });
 
     await initializeTeamGameState(
       team.id,

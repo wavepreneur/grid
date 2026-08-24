@@ -106,6 +106,11 @@ export function LobbyRoom({
     return buildTeamInviteUrl(window.location.origin, inviteCode, joinCode);
   }, [inviteCode, joinCode]);
 
+  const goToPlay = useCallback(() => {
+    if (manageMode) return;
+    router.replace(eventPlayPath(inviteCode, joinCode));
+  }, [inviteCode, joinCode, manageMode, router]);
+
   const refreshLobby = useCallback(async () => {
     const result = await getLobbySnapshot({
       inviteCode,
@@ -120,13 +125,13 @@ export function LobbyRoom({
       !manageMode &&
       (result.data.team_status === "playing" || result.data.team_status === "finished")
     ) {
-      router.replace(eventPlayPath(inviteCode, joinCode));
+      goToPlay();
       return;
     }
 
     setSnapshot(result.data);
     setCountdown(formatCountdown(result.data.lobby_auto_start_at));
-  }, [inviteCode, joinCode, manageMode, router, session.sessionId]);
+  }, [goToPlay, inviteCode, joinCode, manageMode, session.sessionId]);
 
   const syncSessionFromServer = useCallback(async () => {
     const verified = await verifyTeamSession({
@@ -143,15 +148,15 @@ export function LobbyRoom({
 
   const handleTeamStatusChange = useCallback(
     (status: string) => {
-      if (status === "playing" && !manageMode) {
-        router.replace(eventPlayPath(inviteCode, joinCode));
+      if (status === "playing" || status === "finished") {
+        goToPlay();
         return;
       }
 
       void refreshLobby();
       void syncSessionFromServer();
     },
-    [inviteCode, joinCode, manageMode, refreshLobby, router, syncSessionFromServer],
+    [goToPlay, refreshLobby, syncSessionFromServer],
   );
 
   const handlePlayersChange = useCallback(
@@ -229,6 +234,11 @@ export function LobbyRoom({
     enabled: !sessionSuperseded,
     onTeamStatusChange: handleTeamStatusChange,
     onPlayersChange: handlePlayersChange,
+    onSyncEvent: (event) => {
+      if (event.event_type === "game_started" || event.event_type === "game_finished") {
+        goToPlay();
+      }
+    },
     onSessionSuperseded: () => setSessionSuperseded(true),
     onResynced: () => {
       void refreshLobby();
@@ -238,17 +248,10 @@ export function LobbyRoom({
 
   // Belt-and-suspenders: any path that marks the snapshot as playing must leave the lobby.
   useEffect(() => {
-    if (manageMode) return;
     if (snapshot.team_status === "playing" || snapshot.team_status === "finished") {
-      router.replace(eventPlayPath(inviteCode, joinCode));
+      goToPlay();
     }
-  }, [inviteCode, joinCode, manageMode, router, snapshot.team_status]);
-
-  const autoStartMsLeft = snapshot.lobby_auto_start_at
-    ? new Date(snapshot.lobby_auto_start_at).getTime() - Date.now()
-    : null;
-  const autoStartSoon =
-    typeof autoStartMsLeft === "number" && autoStartMsLeft > 0 && autoStartMsLeft <= 30_000;
+  }, [goToPlay, snapshot.team_status]);
 
   useEffect(() => {
     if (snapshot.team_status !== "lobby") return;
@@ -257,22 +260,16 @@ export function LobbyRoom({
       setCountdown(formatCountdown(snapshot.lobby_auto_start_at));
     }, 1000);
 
-    const pollMs = rosterFull || autoStartSoon ? 1000 : 5000;
+    // Always poll quickly in lobby — manual start must reach other phones within ~1s.
     const autoStartCheckId = window.setInterval(() => {
       void refreshLobby();
-    }, pollMs);
+    }, 1000);
 
     return () => {
       window.clearInterval(countdownId);
       window.clearInterval(autoStartCheckId);
     };
-  }, [
-    autoStartSoon,
-    refreshLobby,
-    rosterFull,
-    snapshot.lobby_auto_start_at,
-    snapshot.team_status,
-  ]);
+  }, [refreshLobby, snapshot.lobby_auto_start_at, snapshot.team_status]);
 
   function handleStartGame() {
     setError(null);
@@ -409,6 +406,11 @@ export function LobbyRoom({
   const showTeamInvite = canInviteTeammates && !aloneNow;
   const showAutoStartCountdown =
     isLobby && Boolean(snapshot.lobby_auto_start_at) && countdown !== "—";
+  const autoStartMsLeft = snapshot.lobby_auto_start_at
+    ? new Date(snapshot.lobby_auto_start_at).getTime() - Date.now()
+    : null;
+  const autoStartSoon =
+    typeof autoStartMsLeft === "number" && autoStartMsLeft > 0 && autoStartMsLeft <= 30_000;
 
   useEffect(() => {
     if (aloneNow) setManageOpen(false);
