@@ -20,17 +20,21 @@ type CaptainSetupFormProps = {
   joinCode?: string;
   /** Studio test: only team + player name; department/region filled server-side. */
   studioTest?: boolean;
+  /** Event cap — form no longer asks for size. */
+  maxPlayersPerTeam?: number;
 };
 
 export function CaptainSetupForm({
   inviteCode,
   joinCode,
   studioTest = false,
+  maxPlayersPerTeam = 4,
 }: CaptainSetupFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const isPrebooked = Boolean(joinCode);
+  const teamCap = Math.min(8, Math.max(1, maxPlayersPerTeam));
 
   function handleSubmit(formData: FormData) {
     setError(null);
@@ -39,7 +43,7 @@ export function CaptainSetupForm({
       const payload = {
         inviteCode,
         teamName: String(formData.get("teamName") ?? ""),
-        maxSize: Number(formData.get("maxSize") ?? 4),
+        maxSize: teamCap,
         department: String(formData.get("department") ?? "Other"),
         region: String(formData.get("region") ?? "DACH"),
         displayName: String(formData.get("displayName") ?? ""),
@@ -92,7 +96,6 @@ export function CaptainSetupForm({
         />
       </div>
 
-      <input type="hidden" name="maxSize" value="4" />
       <input type="hidden" name="department" value="Other" />
       <input type="hidden" name="region" value="DACH" />
 

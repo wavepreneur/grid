@@ -42,6 +42,7 @@ export default async function EventCaptainPage({ params, searchParams }: EventCa
         inviteCode={normalizedInvite}
         joinCode={normalizedJoin}
         studioTest={studioTest}
+        maxPlayersPerTeam={eventResult.data.max_players_per_team}
       />
       {!studioTest ? (
         <p className="mt-5 text-center text-xs text-slate-400">

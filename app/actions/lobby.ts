@@ -329,12 +329,12 @@ export async function createTeamAsCaptain(input: {
     if (event.status === "completed" || event.status === "archived") {
       return { success: false, error: "Dieses Event ist nicht mehr aktiv." };
     }
-    if (input.maxSize > event.max_players_per_team) {
-      return {
-        success: false,
-        error: `Maximal ${event.max_players_per_team} Spieler pro Team erlaubt.`,
-      };
-    }
+
+    // Clamp to event limit — onboarding no longer asks for team size.
+    const maxSize = Math.min(
+      Math.max(1, input.maxSize),
+      Math.max(1, event.max_players_per_team),
+    );
 
     const supabase = createAdminClient();
     const joinCode = generateJoinCode();
@@ -344,7 +344,7 @@ export async function createTeamAsCaptain(input: {
     const lobbyOpenedAt = new Date();
     const lobbyAutoStartAt = computeLobbyAutoStartAt({
       autoStartSeconds,
-      maxSize: input.maxSize,
+      maxSize,
       activePlayerCount: 1,
       from: lobbyOpenedAt,
     });
@@ -355,7 +355,7 @@ export async function createTeamAsCaptain(input: {
         event_id: event.id,
         join_code: joinCode,
         name: teamName,
-        max_size: input.maxSize,
+        max_size: maxSize,
         department,
         region,
         status: "lobby",
@@ -994,12 +994,12 @@ export async function setupPrebookedTeamAsCaptain(input: {
     if (team.captain_player_id) {
       return { success: false, error: "Dieses Team hat bereits einen Captain." };
     }
-    if (input.maxSize > event.max_players_per_team) {
-      return {
-        success: false,
-        error: `Maximal ${event.max_players_per_team} Spieler pro Team erlaubt.`,
-      };
-    }
+
+    // Clamp to event limit — onboarding no longer asks for team size.
+    const maxSize = Math.min(
+      Math.max(1, input.maxSize),
+      Math.max(1, event.max_players_per_team),
+    );
 
     const supabase = createAdminClient();
     const sessionId = randomUUID();
@@ -1008,7 +1008,7 @@ export async function setupPrebookedTeamAsCaptain(input: {
     const lobbyOpenedAt = new Date();
     const lobbyAutoStartAt = computeLobbyAutoStartAt({
       autoStartSeconds,
-      maxSize: input.maxSize,
+      maxSize,
       activePlayerCount: 1,
       from: lobbyOpenedAt,
     });
@@ -1036,7 +1036,7 @@ export async function setupPrebookedTeamAsCaptain(input: {
       .from("teams")
       .update({
         name: teamName,
-        max_size: input.maxSize,
+        max_size: maxSize,
         department,
         region,
         status: "lobby",
