@@ -286,7 +286,7 @@ export function LobbyRoom({
     // Instant feedback outdoors — never leave the start button looking dead.
     setBusy({
       title: "Mission startet…",
-      subtitle: "Alle Geräte werden vorbereitet. Das kann ein paar Sekunden dauern.",
+      subtitle: "Alle Geräte springen jetzt in die Mission.",
     });
 
     void startGameManually({
@@ -299,7 +299,6 @@ export function LobbyRoom({
         setError(result.error);
         return;
       }
-      // Keep overlay until the play route mounts.
       router.replace(eventPlayPath(inviteCode, joinCode));
     });
   }
@@ -333,8 +332,8 @@ export function LobbyRoom({
     setBusy({
       title: "Leitung wird übertragen…",
       subtitle: target
-        ? `${target.display_name} übernimmt. Alle Geräte werden aktualisiert.`
-        : "Alle Geräte werden aktualisiert.",
+        ? `${target.display_name} ist jetzt Team-Leitung.`
+        : "Rollen werden aktualisiert.",
     });
     setManageOpen(false);
 
@@ -385,6 +384,8 @@ export function LobbyRoom({
       savePlayerSession(next);
       return next;
     });
+    // Optimistic UI is the feedback — don't hold the overlay for the network round-trip.
+    setBusy(null);
 
     void transferCaptain({
       inviteCode,
@@ -392,7 +393,6 @@ export function LobbyRoom({
       sessionId: session.sessionId,
       targetPlayerId,
     }).then((result) => {
-      setBusy(null);
       if (!result.success) {
         setError(result.error);
       }

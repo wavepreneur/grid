@@ -898,6 +898,7 @@ export async function initializeTeamGameState(
   const gameStateWithStart = {
     ...initialState,
     levels: stampedState,
+    content_ready: true,
     ...(startPhase ? { current_phase: startPhase } : {}),
   };
 
@@ -910,17 +911,47 @@ export async function initializeTeamGameState(
     })
     .eq("id", teamId);
 
-  await insertSyncEvent({
-    teamId,
-    eventType: "game_started",
-    level: startLevel,
-    actorPlayerId,
-    payload: {
-      total_levels: totalLevels,
-      template_slug: content.templateSlug,
-      starting_score: gameStateWithStart.score,
-    },
-  });
+  // Do not emit another game_started — lobby already broadcast that for redirects.
+}
+
+/**
+ * Completes content compile if the team still has a lobby bootstrap stub.
+ * Safe to call from every device; no-ops when already ready.
+ */
+export async function ensureTeamGameReady(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    const { event, team, player } = await assertPlayerSession(input);
+    if (team.status !== "playing" && team.status !== "finished") {
+      return { success: false, error: "Das Spiel läuft noch nicht." };
+    }
+
+    const gameState = parseTeamGameState(team.game_state);
+    if (gameState.content_ready !== false) {
+      return { success: true, data: buildRealtimeState(team, player) };
+    }
+
+    await initializeTeamGameState(
+      team.id,
+      player.id,
+      event.id,
+      event.organization_id,
+      event.city_id,
+      event.content_config,
+      event.route_override,
+      event.studio_game_version_id,
+    );
+
+    return getGameState(input);
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
 }
 
 async function persistPhaseState(input: {

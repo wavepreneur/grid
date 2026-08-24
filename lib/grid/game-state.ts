@@ -105,6 +105,11 @@ export type TeamGameState = {
   /** Ephemeral toast payload after bonus completes. */
   bonus_notice?: BonusNoticeState | null;
   /**
+   * false = lobby wrote a bootstrap stub; full content still compiling.
+   * undefined/true = ready for play (legacy states treated as ready).
+   */
+  content_ready?: boolean;
+  /**
    * Server-held outdoor walk progress (mission meters + bonus meters).
    * Alpha device reports; all devices read via realtime.
    */
@@ -178,12 +183,23 @@ export function createInitialGameState(
     active_bonus: null,
     bonus_queue: [],
     bonus_notice: null,
+    content_ready: true,
     outdoor_progress: null,
     hints_used: {},
     purchased_tile_hints: {},
     purchased_level_hints: {},
     modal: null,
     levels,
+  };
+}
+
+/** Fast lobby bootstrap — enough for GameGate to mount while content compiles. */
+export function createBootstrapGameState(
+  totalLevels = EXITMANIA_TOTAL_LEVELS,
+): TeamGameState {
+  return {
+    ...createInitialGameState(totalLevels),
+    content_ready: false,
   };
 }
 
@@ -214,6 +230,7 @@ export function parseTeamGameState(value: unknown): TeamGameState {
     active_bonus: parseActiveBonus(candidate.active_bonus),
     bonus_queue: parseBonusQueue(candidate.bonus_queue),
     bonus_notice: parseBonusNotice(candidate.bonus_notice),
+    content_ready: candidate.content_ready === false ? false : true,
     outdoor_progress:
       candidate.outdoor_progress === null
         ? null

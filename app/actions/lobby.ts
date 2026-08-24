@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { initializeTeamGameState } from "@/app/actions/game";
+import { createBootstrapGameState } from "@/lib/grid/game-state";
 import {
   DEFAULT_LOBBY_AUTO_START_SECONDS,
   LOBBY_IDLE_RELEASE_MS,
@@ -276,31 +276,22 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
 
   if (updated) {
     if (event) {
+      const bootstrap = createBootstrapGameState();
+      await supabase
+        .from("teams")
+        .update({
+          current_level: 1,
+          game_state: bootstrap,
+        })
+        .eq("id", teamId);
+
       await supabase.from("team_sync_events").insert({
         team_id: teamId,
         event_type: "game_started",
         actor_player_id: team.captain_player_id,
         payload: { started_at: startedAt, source: "auto" },
       });
-      const actorPlayerId = team.captain_player_id;
-      const eventId = event.id;
-      const organizationId = event.organization_id;
-      const cityId = event.city_id;
-      const contentConfig = event.content_config;
-      const routeOverride = event.route_override;
-      const studioGameVersionId = event.studio_game_version_id;
-      after(() => {
-        void initializeTeamGameState(
-          teamId,
-          actorPlayerId,
-          eventId,
-          organizationId,
-          cityId,
-          contentConfig,
-          routeOverride,
-          studioGameVersionId,
-        );
-      });
+      // Full content compile runs on first GameGate ensureTeamGameReady — never block here.
     }
   }
 }
@@ -1058,12 +1049,15 @@ export async function startGameManually(input: {
 
     const startedAt = new Date().toISOString();
     const supabase = createAdminClient();
+    const bootstrap = createBootstrapGameState();
 
     const { data: startedTeam, error } = await supabase
       .from("teams")
       .update({
         status: "playing",
         started_at: startedAt,
+        current_level: 1,
+        game_state: bootstrap,
       })
       .eq("id", team.id)
       .eq("status", "lobby")
@@ -1085,40 +1079,15 @@ export async function startGameManually(input: {
       payload: { started_at: startedAt, source: "manual" },
     });
 
-    // Return right away so lead + waiters leave the lobby; heavy content init follows.
-    const eventId = event.id;
-    const organizationId = event.organization_id;
-    const cityId = event.city_id;
-    const contentConfig = event.content_config;
-    const routeOverride = event.route_override;
-    const studioGameVersionId = event.studio_game_version_id;
-    const actorPlayerId = player.id;
-    const teamId = team.id;
+    // Mark event active without waiting for content compile.
+    await supabase
+      .from("events")
+      .update({ status: "active", started_at: startedAt })
+      .eq("id", event.id)
+      .in("status", ["draft", "lobby"]);
 
-    after(() => {
-      void (async () => {
-        try {
-          await initializeTeamGameState(
-            teamId,
-            actorPlayerId,
-            eventId,
-            organizationId,
-            cityId,
-            contentConfig,
-            routeOverride,
-            studioGameVersionId,
-          );
-          await supabase
-            .from("events")
-            .update({ status: "active", started_at: startedAt })
-            .eq("id", eventId)
-            .in("status", ["draft", "lobby"]);
-        } catch {
-          /* Play gate retries until game_state exists. */
-        }
-      })();
-    });
-
+    // Heavy content compile happens in GameGate via ensureTeamGameReady —
+    // never via after() (can block Server Actions on Vercel for 10–20s).
     return { success: true, data: { startedAt } };
   } catch (error) {
     return {
@@ -1491,7 +1460,7 @@ export async function transferCaptain(input: {
     const [demoteResult, promoteResult, teamResult] = await Promise.all([
       supabase
         .from("players")
-        .update({ is_captain: false, role: "gamma" })
+        .update({ is_captain: false, role: "beta" })
         .eq("id", captain.id),
       supabase
         .from("players")
@@ -1502,6 +1471,7 @@ export async function transferCaptain(input: {
         .update({
           captain_player_id: target.id,
           navigator_player_id: target.id,
+          beta_player_id: captain.id,
         })
         .eq("id", team.id),
     ]);
@@ -1520,33 +1490,18 @@ export async function transferCaptain(input: {
       return { success: false, error: teamResult.error.message };
     }
 
-    const organizationId = event.organization_id;
-    const eventId = event.id;
-    const teamId = team.id;
-    const fromPlayerId = captain.id;
-    const toPlayerId = target.id;
-    const toDisplayName = target.display_name;
-
-    after(() => {
-      void (async () => {
-        try {
-          await rebalanceArchetypeRoles(teamId);
-          await writeAuditLog({
-            organizationId,
-            eventId,
-            teamId,
-            playerId: fromPlayerId,
-            action: "captain_transferred",
-            payload: {
-              from_player_id: fromPlayerId,
-              to_player_id: toPlayerId,
-              to_display_name: toDisplayName,
-            },
-          });
-        } catch {
-          /* Realtime roster updates still land from the critical writes above. */
-        }
-      })();
+    // No after()/rebalance here — that blocked Server Actions ~10s on Vercel.
+    void writeAuditLog({
+      organizationId: event.organization_id,
+      eventId: event.id,
+      teamId: team.id,
+      playerId: captain.id,
+      action: "captain_transferred",
+      payload: {
+        from_player_id: captain.id,
+        to_player_id: target.id,
+        to_display_name: target.display_name,
+      },
     });
 
     return { success: true, data: { newCaptainId: target.id } };

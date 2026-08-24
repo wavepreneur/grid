@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getEventContent, getEventContentRevision } from "@/app/actions/content";
-import { getGameState } from "@/app/actions/game";
+import { ensureTeamGameReady, getGameState } from "@/app/actions/game";
 import { GameRoom } from "@/components/game/game-room";
 import { GameGateSkeleton } from "@/components/game/game-gate-skeleton";
 import { GridError } from "@/components/grid/grid-shell";
@@ -46,10 +46,14 @@ export function GameGate({
   }, [contentRevision]);
 
   useEffect(() => {
+    let cancelled = false;
+
     Promise.all([
       resolveTeamSession(inviteCode, joinCode),
       getEventContent(inviteCode),
     ]).then(async ([resolved, contentResult]) => {
+      if (cancelled) return;
+
       if (!resolved) {
         abandonTeamSession();
         router.replace(eventTeamJoinPath(inviteCode, joinCode));
@@ -68,29 +72,25 @@ export function GameGate({
         return;
       }
 
-      // Manual start returns before game_state is written — retry with visible wait.
-      let gameResult = await getGameState({
+      // Bootstrap stub is written on start — mount immediately; compile in background.
+      const gameResult = await getGameState({
         inviteCode,
         joinCode,
         sessionId: syncedSession.sessionId,
       });
 
-      for (let attempt = 0; attempt < 40; attempt += 1) {
-        if (!gameResult.success) break;
-        const levels = gameResult.data.gameState?.levels ?? {};
-        if (Object.keys(levels).length > 0) break;
-        await new Promise((resolve) => window.setTimeout(resolve, 400));
-        gameResult = await getGameState({
-          inviteCode,
-          joinCode,
-          sessionId: syncedSession.sessionId,
-        });
-      }
-
       if (!gameResult.success) {
         abandonTeamSession();
         router.replace(eventTeamJoinPath(inviteCode, joinCode));
         return;
+      }
+
+      if (gameResult.data.gameState.content_ready === false) {
+        void ensureTeamGameReady({
+          inviteCode,
+          joinCode,
+          sessionId: syncedSession.sessionId,
+        });
       }
 
       const { eventId, contentRevision, ...resolvedContent } = contentResult.data;
@@ -103,6 +103,10 @@ export function GameGate({
       setInitialState(gameResult);
       setReady(true);
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [inviteCode, joinCode, router]);
 
   useEffect(() => {
