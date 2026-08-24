@@ -966,14 +966,16 @@ export async function getLobbySnapshot(input: {
         .update({ last_seen_at: new Date().toISOString() })
         .eq("id", player.id);
 
-      await releaseIdleLobbySeats({
-        teamId: team.id,
-        teamStatus: team.status,
-        organizationId: event.organization_id,
-        eventId: event.id,
-        keepPlayerId: player.id,
-      });
-    } else {
+      if (team.status === "lobby") {
+        await releaseIdleLobbySeats({
+          teamId: team.id,
+          teamStatus: team.status,
+          organizationId: event.organization_id,
+          eventId: event.id,
+          keepPlayerId: player.id,
+        });
+      }
+    } else if (team.status === "lobby") {
       await releaseIdleLobbySeats({
         teamId: team.id,
         teamStatus: team.status,
@@ -982,7 +984,10 @@ export async function getLobbySnapshot(input: {
       });
     }
 
-    await maybeAutoStartTeam(team.id);
+    // Auto-start only while still in lobby — avoid extra DB work on every poll after start.
+    if (team.status === "lobby") {
+      await maybeAutoStartTeam(team.id);
+    }
 
     const supabase = createAdminClient();
     const { data, error } = await supabase
@@ -1024,12 +1029,14 @@ export async function startGameManually(input: {
       return { success: false, error: "Event nicht gefunden." };
     }
 
-    const team = await getTeamByJoinCode(joinCode, event.id);
+    const [team, player] = await Promise.all([
+      getTeamByJoinCode(joinCode, event.id),
+      getPlayerBySessionId(input.sessionId),
+    ]);
     if (!team) {
       return { success: false, error: "Team nicht gefunden." };
     }
 
-    const player = await getPlayerBySessionId(input.sessionId);
     const isLead =
       Boolean(player) &&
       player!.team_id === team.id &&
@@ -1451,13 +1458,21 @@ export async function transferCaptain(input: {
       return { success: false, error: "Event nicht gefunden." };
     }
 
-    const team = await getTeamByJoinCode(normalizeCode(input.joinCode), event.id);
+    const [team, captain] = await Promise.all([
+      getTeamByJoinCode(normalizeCode(input.joinCode), event.id),
+      getPlayerBySessionId(input.sessionId),
+    ]);
     if (!team) {
       return { success: false, error: "Team nicht gefunden." };
     }
 
-    const captain = await getPlayerBySessionId(input.sessionId);
-    if (!captain || captain.team_id !== team.id || !captain.is_captain) {
+    const isLead =
+      Boolean(captain) &&
+      captain!.team_id === team.id &&
+      (captain!.is_captain ||
+        captain!.role === "alpha" ||
+        team.captain_player_id === captain!.id);
+    if (!captain || captain.team_id !== team.id || !isLead) {
       return { success: false, error: "Nur Alpha kann die Rolle übertragen." };
     }
 
@@ -1472,42 +1487,66 @@ export async function transferCaptain(input: {
       return { success: false, error: "Zielspieler nicht gefunden oder inaktiv." };
     }
 
-    await supabase
-      .from("players")
-      .update({ is_captain: false, role: "gamma" })
-      .eq("id", captain.id);
+    // Critical path only — demote + promote + team lead in parallel.
+    const [demoteResult, promoteResult, teamResult] = await Promise.all([
+      supabase
+        .from("players")
+        .update({ is_captain: false, role: "gamma" })
+        .eq("id", captain.id),
+      supabase
+        .from("players")
+        .update({ is_captain: true, role: "alpha" })
+        .eq("id", target.id),
+      supabase
+        .from("teams")
+        .update({
+          captain_player_id: target.id,
+          navigator_player_id: target.id,
+        })
+        .eq("id", team.id),
+    ]);
 
-    const { error: promoteError } = await supabase
-      .from("players")
-      .update({ is_captain: true, role: "alpha" })
-      .eq("id", target.id);
-
-    if (promoteError) {
+    if (promoteResult.error) {
       await supabase
         .from("players")
         .update({ is_captain: true, role: "alpha" })
         .eq("id", captain.id);
-      return { success: false, error: promoteError.message };
+      return { success: false, error: promoteResult.error.message };
+    }
+    if (demoteResult.error) {
+      return { success: false, error: demoteResult.error.message };
+    }
+    if (teamResult.error) {
+      return { success: false, error: teamResult.error.message };
     }
 
-    await setTeamNavigator(team.id, target.id);
-    await supabase
-      .from("teams")
-      .update({ captain_player_id: target.id })
-      .eq("id", team.id);
-    await rebalanceArchetypeRoles(team.id);
+    const organizationId = event.organization_id;
+    const eventId = event.id;
+    const teamId = team.id;
+    const fromPlayerId = captain.id;
+    const toPlayerId = target.id;
+    const toDisplayName = target.display_name;
 
-    await writeAuditLog({
-      organizationId: event.organization_id,
-      eventId: event.id,
-      teamId: team.id,
-      playerId: captain.id,
-      action: "captain_transferred",
-      payload: {
-        from_player_id: captain.id,
-        to_player_id: target.id,
-        to_display_name: target.display_name,
-      },
+    after(() => {
+      void (async () => {
+        try {
+          await rebalanceArchetypeRoles(teamId);
+          await writeAuditLog({
+            organizationId,
+            eventId,
+            teamId,
+            playerId: fromPlayerId,
+            action: "captain_transferred",
+            payload: {
+              from_player_id: fromPlayerId,
+              to_player_id: toPlayerId,
+              to_display_name: toDisplayName,
+            },
+          });
+        } catch {
+          /* Realtime roster updates still land from the critical writes above. */
+        }
+      })();
     });
 
     return { success: true, data: { newCaptainId: target.id } };

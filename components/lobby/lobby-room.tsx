@@ -11,6 +11,7 @@ import {
   transferCaptain,
   verifyTeamSession,
 } from "@/app/actions/lobby";
+import { LobbyBusyOverlay } from "@/components/lobby/lobby-busy-overlay";
 import {
   CopyInviteLink,
   QrInviteImage,
@@ -84,6 +85,9 @@ export function LobbyRoom({
     formatCountdown(initialSnapshot.lobby_auto_start_at),
   );
   const [isPending, startTransition] = useTransition();
+  const [busy, setBusy] = useState<{ title: string; subtitle?: string } | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!manageOpen) return;
@@ -108,6 +112,12 @@ export function LobbyRoom({
 
   const goToPlay = useCallback(() => {
     if (manageMode) return;
+    setBusy((current) =>
+      current ?? {
+        title: "Mission startet…",
+        subtitle: "Gleich geht’s weiter — Mission wird geladen.",
+      },
+    );
     router.replace(eventPlayPath(inviteCode, joinCode));
   }, [inviteCode, joinCode, manageMode, router]);
 
@@ -273,34 +283,41 @@ export function LobbyRoom({
 
   function handleStartGame() {
     setError(null);
+    // Instant feedback outdoors — never leave the start button looking dead.
+    setBusy({
+      title: "Mission startet…",
+      subtitle: "Alle Geräte werden vorbereitet. Das kann ein paar Sekunden dauern.",
+    });
 
-    startTransition(async () => {
-      const result = await startGameManually({
-        inviteCode,
-        joinCode,
-        sessionId: session.sessionId,
-      });
-
+    void startGameManually({
+      inviteCode,
+      joinCode,
+      sessionId: session.sessionId,
+    }).then((result) => {
       if (!result.success) {
+        setBusy(null);
         setError(result.error);
         return;
       }
-
+      // Keep overlay until the play route mounts.
       router.replace(eventPlayPath(inviteCode, joinCode));
     });
   }
 
   function handleHandover() {
     setError(null);
+    setBusy({
+      title: "Platz wird freigegeben…",
+      subtitle: "Du kannst dich danach erneut anmelden.",
+    });
 
-    startTransition(async () => {
-      const result = await handoverSession({
-        inviteCode,
-        joinCode,
-        sessionId: session.sessionId,
-      });
-
+    void handoverSession({
+      inviteCode,
+      joinCode,
+      sessionId: session.sessionId,
+    }).then((result) => {
       if (!result.success) {
+        setBusy(null);
         setError(result.error);
         return;
       }
@@ -312,19 +329,75 @@ export function LobbyRoom({
 
   function handleTransferCaptain(targetPlayerId: string) {
     setError(null);
-    startTransition(async () => {
-      const result = await transferCaptain({
-        inviteCode,
-        joinCode,
-        sessionId: session.sessionId,
-        targetPlayerId,
-      });
+    const target = snapshot.players.find((player) => player.id === targetPlayerId);
+    setBusy({
+      title: "Leitung wird übertragen…",
+      subtitle: target
+        ? `${target.display_name} übernimmt. Alle Geräte werden aktualisiert.`
+        : "Alle Geräte werden aktualisiert.",
+    });
+    setManageOpen(false);
+
+    // Optimistic UI — old lead loses Start rights immediately; roster flips now.
+    setSnapshot((current) => ({
+      ...current,
+      players: current.players.map((player) => {
+        if (player.id === targetPlayerId) {
+          return {
+            ...player,
+            is_captain: true,
+            is_alpha: true,
+            is_beta: false,
+            is_gamma: false,
+            is_navigator: true,
+            archetype_role: "alpha" as const,
+            role: "alpha",
+          };
+        }
+        if (player.id === session.playerId || player.is_captain || player.is_alpha) {
+          return {
+            ...player,
+            is_captain: false,
+            is_alpha: false,
+            is_beta: true,
+            is_gamma: false,
+            is_navigator: false,
+            archetype_role: "beta" as const,
+            role: "beta",
+          };
+        }
+        return player;
+      }),
+    }));
+    setSession((current) => {
+      const next: PlayerSession = {
+        ...current,
+        isCaptain: false,
+        isAlpha: false,
+        isBeta: true,
+        isGamma: false,
+        isNavigator: false,
+        canManageTeam: false,
+        canUnlockGps: false,
+        archetypeRole: "beta",
+        effectiveBeta: true,
+      };
+      savePlayerSession(next);
+      return next;
+    });
+
+    void transferCaptain({
+      inviteCode,
+      joinCode,
+      sessionId: session.sessionId,
+      targetPlayerId,
+    }).then((result) => {
+      setBusy(null);
       if (!result.success) {
         setError(result.error);
-        return;
       }
-      await refreshLobby();
-      await syncSessionFromServer();
+      void refreshLobby();
+      void syncSessionFromServer();
     });
   }
 
@@ -418,6 +491,7 @@ export function LobbyRoom({
 
   return (
     <div className="flex flex-col gap-5">
+      {busy ? <LobbyBusyOverlay title={busy.title} subtitle={busy.subtitle} /> : null}
       <PlayDocSheet
         open={briefingOpen}
         title="Kurzinformationen"
@@ -596,10 +670,14 @@ export function LobbyRoom({
             <GridButton
               type="button"
               className="py-4 text-base"
-              disabled={isPending || !canStart}
+              disabled={Boolean(busy) || isPending || !canStart}
               onClick={handleStartGame}
             >
-              {isPending ? "Startet…" : aloneNow ? "Spiel starten" : "Spiel starten"}
+              {busy?.title.startsWith("Mission")
+                ? "Startet…"
+                : aloneNow
+                  ? "Spiel starten"
+                  : "Spiel starten"}
             </GridButton>
           ) : null}
 
@@ -621,7 +699,7 @@ export function LobbyRoom({
               </button>
             ) : null}
             {(isLobby || manageMode) ? (
-              <GridButton type="button" variant="ghost" disabled={isPending} onClick={handleHandover}>
+              <GridButton type="button" variant="ghost" disabled={Boolean(busy) || isPending} onClick={handleHandover}>
                 Platz freigeben
               </GridButton>
             ) : null}
@@ -713,7 +791,7 @@ export function LobbyRoom({
                               <div className="mt-3 grid grid-cols-2 gap-2">
                                 <button
                                   type="button"
-                                  disabled={isPending}
+                                  disabled={Boolean(busy) || isPending}
                                   onClick={() => handleTransferCaptain(player.id)}
                                   className="rounded-xl bg-teal-600 px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50"
                                 >
@@ -722,7 +800,7 @@ export function LobbyRoom({
                                 {!player.is_beta && snapshot.active_player_count >= 2 ? (
                                   <button
                                     type="button"
-                                    disabled={isPending}
+                                    disabled={Boolean(busy) || isPending}
                                     onClick={() => handleAssignBeta(player.id)}
                                     className="rounded-xl bg-sky-600 px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50"
                                   >
@@ -732,7 +810,7 @@ export function LobbyRoom({
                                 {player.is_beta && snapshot.active_player_count >= 3 ? (
                                   <button
                                     type="button"
-                                    disabled={isPending}
+                                    disabled={Boolean(busy) || isPending}
                                     onClick={() => handleAssignGamma(player.id)}
                                     className="rounded-xl bg-slate-600 px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50"
                                   >
@@ -741,7 +819,7 @@ export function LobbyRoom({
                                 ) : null}
                                 <button
                                   type="button"
-                                  disabled={isPending}
+                                  disabled={Boolean(busy) || isPending}
                                   onClick={() => handleRemovePlayer(player.id)}
                                   className="rounded-xl border border-red-200 bg-white px-3 py-2.5 text-xs font-bold text-red-600 disabled:opacity-50"
                                 >

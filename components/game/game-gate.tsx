@@ -68,18 +68,18 @@ export function GameGate({
         return;
       }
 
-      // Manual start returns before game_state is written — retry briefly.
+      // Manual start returns before game_state is written — retry with visible wait.
       let gameResult = await getGameState({
         inviteCode,
         joinCode,
         sessionId: syncedSession.sessionId,
       });
 
-      for (let attempt = 0; attempt < 20; attempt += 1) {
+      for (let attempt = 0; attempt < 40; attempt += 1) {
         if (!gameResult.success) break;
         const levels = gameResult.data.gameState?.levels ?? {};
         if (Object.keys(levels).length > 0) break;
-        await new Promise((resolve) => window.setTimeout(resolve, 250));
+        await new Promise((resolve) => window.setTimeout(resolve, 400));
         gameResult = await getGameState({
           inviteCode,
           joinCode,

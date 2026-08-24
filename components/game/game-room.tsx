@@ -494,19 +494,19 @@ export function GameRoom({
 
   function handleTransferAlpha(targetPlayerId: string) {
     setTransferPending(true);
-    startTransition(async () => {
-      const result = await transferCaptain({
-        inviteCode,
-        joinCode,
-        sessionId: playerSession.sessionId,
-        targetPlayerId,
-      });
+    setError(null);
+    setMorePanel(null);
+    void transferCaptain({
+      inviteCode,
+      joinCode,
+      sessionId: playerSession.sessionId,
+      targetPlayerId,
+    }).then((result) => {
       setTransferPending(false);
       if (!result.success) {
         setError(result.error);
         return;
       }
-      setMorePanel(null);
       setError(null);
     });
   }

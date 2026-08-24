@@ -262,7 +262,7 @@ export function PlayMoreSheet({
                                   onClick={() => onTransferAlpha?.(m.id)}
                                   className="tap-lift rounded-full bg-[var(--cg-primary)] px-3 py-1.5 text-xs font-bold text-[var(--cg-primary-fg)] disabled:opacity-40"
                                 >
-                                  Leitung geben
+                                  {transferPending ? "Übertrage…" : "Leitung geben"}
                                 </button>
                                 {onReleasePlayerSeat ? (
                                   <button
