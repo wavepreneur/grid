@@ -55,6 +55,11 @@ export function PlayBonusView({
   const audienceLabel = bonusAudienceHeadline(bonus, roleLabels);
 
   useEffect(() => {
+    if (!isMine) return;
+    playPlaySfx("unlock");
+  }, [isMine]);
+
+  useEffect(() => {
     if (!show) return;
     playPlaySfx(correct ? "correct" : "wrong");
   }, [show, correct]);

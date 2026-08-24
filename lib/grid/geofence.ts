@@ -2,6 +2,11 @@ import type { GeolocationSample, LevelLocation } from "@/lib/grid/level-types";
 
 const EARTH_RADIUS_METERS = 6_371_000;
 
+/** Floor for player unlock radius outdoors (phone drift). */
+const PLAY_MIN_RADIUS_METERS = 25;
+const PLAY_ACCURACY_PADDING_FACTOR = 0.55;
+const PLAY_ACCURACY_PADDING_CAP_METERS = 45;
+
 export function distanceMeters(
   from: GeolocationSample,
   to: Pick<LevelLocation, "lat" | "lng">,
@@ -19,11 +24,36 @@ export function distanceMeters(
   return EARTH_RADIUS_METERS * c;
 }
 
+/**
+ * Strict authored radius (operator/cockpit tools).
+ * Player unlocks use {@link isWithinGeofenceForPlay}.
+ */
 export function isWithinGeofence(
   sample: GeolocationSample,
   target: LevelLocation,
 ): boolean {
   return distanceMeters(sample, target) <= target.radius_meters;
+}
+
+export function playGeofenceRadiusMeters(
+  target: LevelLocation,
+  sampleAccuracy?: number | null,
+): number {
+  const base = Math.max(target.radius_meters, PLAY_MIN_RADIUS_METERS);
+  const accuracy = typeof sampleAccuracy === "number" && sampleAccuracy > 0 ? sampleAccuracy : 0;
+  const padding = Math.min(
+    accuracy * PLAY_ACCURACY_PADDING_FACTOR,
+    PLAY_ACCURACY_PADDING_CAP_METERS,
+  );
+  return base + padding;
+}
+
+/** Mass-outdoor player unlock — min radius + accuracy padding. */
+export function isWithinGeofenceForPlay(
+  sample: GeolocationSample,
+  target: LevelLocation,
+): boolean {
+  return distanceMeters(sample, target) <= playGeofenceRadiusMeters(target, sample.accuracy);
 }
 
 export function formatDistance(meters: number): string {

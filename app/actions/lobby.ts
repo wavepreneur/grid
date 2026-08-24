@@ -811,6 +811,10 @@ export async function joinTeamAsPlayer(input: {
     }
 
     const sessionId = randomUUID();
+    const activeBeforeJoin = await countActivePlayers(team.id);
+    // 2nd seat = Beta (Profiler); further seats = Gamma (Organizer). Avoids a gamma→beta flash.
+    const initialRole =
+      activeBeforeJoin === 1 ? "beta" : "gamma";
 
     const { data: player, error } = await supabase
       .from("players")
@@ -819,7 +823,7 @@ export async function joinTeamAsPlayer(input: {
         session_id: sessionId,
         display_name: displayName,
         is_captain: false,
-        role: "gamma",
+        role: initialRole,
       })
       .select("id, display_name, is_captain, session_id, role")
       .single();
@@ -1070,6 +1074,57 @@ export async function resolveTeamJoinCode(input: {
         joinCode: team.join_code,
         teamName: team.name,
         teamStatus: team.status,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
+
+/**
+ * Public roster for the team join link — exact spellings so players can
+ * pick their name when switching devices (no login required).
+ */
+export async function listActiveTeamJoinRoster(input: {
+  inviteCode: string;
+  joinCode: string;
+}): Promise<ActionResult<{ members: Array<{ displayName: string }> }>> {
+  try {
+    const event = await getEventByInviteCode(normalizeCode(input.inviteCode));
+    if (!event) {
+      return { success: false, error: "Event nicht gefunden." };
+    }
+
+    const team = await getTeamByJoinCode(normalizeCode(input.joinCode), event.id);
+    if (!team) {
+      return { success: false, error: "Team nicht gefunden." };
+    }
+
+    if (team.status === "finished" || team.status === "disbanded") {
+      return { success: true, data: { members: [] } };
+    }
+
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from("players")
+      .select("display_name")
+      .eq("team_id", team.id)
+      .is("left_at", null)
+      .order("joined_at", { ascending: true });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      data: {
+        members: (data ?? []).map((row) => ({
+          displayName: row.display_name as string,
+        })),
       },
     };
   } catch (error) {

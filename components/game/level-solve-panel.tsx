@@ -16,7 +16,7 @@ import {
   type SolveFeedbackState,
 } from "@/components/game/solve-feedback-banner";
 import { IconCheck, IconMapPin } from "@/components/cms/studio-icons";
-import { distanceMeters, formatDistance } from "@/lib/grid/geofence";
+import { distanceMeters, formatDistance, isWithinGeofenceForPlay } from "@/lib/grid/geofence";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
 import { useLevelScoringTimer } from "@/lib/hooks/use-level-scoring-timer";
 import { LevelScoringBar } from "@/components/game/level-scoring-bar";
@@ -85,9 +85,7 @@ export function LevelSolvePanel({
     sample && level.location ? distanceMeters(sample, level.location) : null;
 
   const withinRadius =
-    sample && level.location && distance !== null
-      ? distance <= level.location.radius_meters
-      : false;
+    sample && level.location ? isWithinGeofenceForPlay(sample, level.location) : false;
 
   const inputMode = level.input_mode ?? "text";
   const isCodeBoxes = inputMode === "boxes" || inputMode === "number";
@@ -475,6 +473,26 @@ export function LevelSolvePanel({
               </BigButton>
             )}
 
+            {level.type === "gps" && isNavigator ? (
+              <div className="space-y-2">
+                <BigButton
+                  variant="outline"
+                  disabled={disabled || isPending}
+                  onClick={() =>
+                    onSubmit({
+                      geolocation: sample ?? undefined,
+                      forceUnlock: "geofence",
+                    })
+                  }
+                >
+                  Wir sind am Punkt
+                </BigButton>
+                <p className="text-center text-xs text-[var(--cg-muted)]">
+                  Wenn GPS hängt — Alpha öffnet fürs Team.
+                </p>
+              </div>
+            ) : null}
+
             <SolveFeedbackBanner feedback={feedback} />
             {revealButton}
           </div>
@@ -586,6 +604,23 @@ export function LevelSolvePanel({
                     : "Antwort senden"}
             </GridButton>
           )}
+
+          {level.type === "gps" && isNavigator ? (
+            <GridButton
+              type="button"
+              variant="secondary"
+              className="mt-2"
+              disabled={disabled || isPending}
+              onClick={() =>
+                onSubmit({
+                  geolocation: sample ?? undefined,
+                  forceUnlock: "geofence",
+                })
+              }
+            >
+              Wir sind am Punkt
+            </GridButton>
+          ) : null}
 
           {revealButton}
           <div className="mt-3">

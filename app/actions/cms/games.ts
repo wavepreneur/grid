@@ -477,6 +477,20 @@ export async function updateGameTaskLinkConfig(
     opener_task_id?: string | null;
     opener_points?: number | null;
     bonus_task_id?: string | null;
+    bonus_bindings?: Array<{
+      task_id: string;
+      role: "alpha" | "beta" | "gamma" | "team";
+      when: {
+        type:
+          | "immediate"
+          | "delay_minutes"
+          | "delay_meters"
+          | "game_minutes"
+          | "interval_minutes";
+        minutes?: number;
+        meters?: number;
+      };
+    }> | null;
     geo_task_id?: string | null;
     unlock?: GameLinkOverrides["unlock"] | null;
     visible_to?: GameLinkOverrides["visible_to"] | null;
@@ -599,6 +613,16 @@ export async function updateGameTaskLinkConfig(
     if (patch.bonus_task_id !== undefined) {
       if (patch.bonus_task_id) overrides.bonus_task_id = patch.bonus_task_id;
       else delete overrides.bonus_task_id;
+    }
+    if (patch.bonus_bindings !== undefined) {
+      if (patch.bonus_bindings && patch.bonus_bindings.length > 0) {
+        overrides.bonus_bindings = patch.bonus_bindings;
+        // Keep legacy pointer on first for older readers
+        overrides.bonus_task_id = patch.bonus_bindings[0]!.task_id;
+      } else {
+        delete overrides.bonus_bindings;
+        delete overrides.bonus_task_id;
+      }
     }
     if (patch.geo_task_id !== undefined) {
       if (patch.geo_task_id) overrides.geo_task_id = patch.geo_task_id;

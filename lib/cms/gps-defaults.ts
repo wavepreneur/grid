@@ -4,7 +4,8 @@ export type GpsPin = {
   radius_meters: number;
 };
 
-export const DEFAULT_GPS_RADIUS_METERS = 15;
+/** Default pin radius for new Studio waypoints — outdoor phones need slack. */
+export const DEFAULT_GPS_RADIUS_METERS = 40;
 
 export const CITY_COORDINATES: Record<string, GpsPin> = {
   berlin: { lat: 52.520008, lng: 13.404954, radius_meters: DEFAULT_GPS_RADIUS_METERS },

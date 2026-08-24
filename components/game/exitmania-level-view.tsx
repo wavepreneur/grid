@@ -16,6 +16,7 @@ import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner
 import type { PurchasedTileHint } from "@/lib/grid/game-state";
 import type { GameLevelStatus } from "@/lib/grid/game-state";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
+import { isWithinGeofenceForPlay } from "@/lib/grid/geofence";
 import type { LevelContentTile, LevelDefinition, SolveLevelPayload } from "@/lib/grid/level-types";
 
 type ExitmaniaLevelViewProps = {
@@ -70,9 +71,7 @@ export function ExitmaniaLevelView({
 
   const distanceToTarget = computeTargetDistance(sample, level.location);
   const withinRadius =
-    sample && level.location && distanceToTarget !== null
-      ? distanceToTarget <= level.location.radius_meters
-      : false;
+    sample && level.location ? isWithinGeofenceForPlay(sample, level.location) : false;
 
   const betaPanelProps = {
     tiles,

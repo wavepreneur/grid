@@ -38,6 +38,11 @@ export function normalizeCode(value: string): string {
   return value.trim().toUpperCase();
 }
 
+/** Match key for display names: trim, collapse spaces, case-insensitive. */
+export function normalizeDisplayNameKey(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 export function isValidDisplayName(value: string): boolean {
   const trimmed = value.trim();
   return trimmed.length >= 2 && trimmed.length <= 32;

@@ -70,6 +70,19 @@ export type GameLinkOverrides = {
   /** Optional Layer-3 bonus task for this mission slot. */
   bonus_task_id?: string;
   /**
+   * Preferred: 0…N Layer-3 bonuses bound to this mission (who + when).
+   * @see docs/BONUS_LAYER3_MODEL.md
+   */
+  bonus_bindings?: Array<{
+    task_id: string;
+    role?: RoleAssignment;
+    when?: {
+      type?: string;
+      minutes?: number;
+      meters?: number;
+    };
+  }>;
+  /**
    * When true, solving this mission ends the game (farewell / Game Over → ranking).
    * Only one mission per game should set this; later stops are skipped.
    */

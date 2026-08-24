@@ -1,4 +1,8 @@
 import { EXITMANIA_TOTAL_LEVELS, DEFAULT_STARTING_SCORE } from "@/lib/grid/level-types";
+import {
+  parseOutdoorProgress,
+  type OutdoorProgressState,
+} from "@/lib/grid/outdoor-unlock";
 import type { PlayPhase } from "@/lib/grid/play-surface";
 
 /** @deprecated Use EXITMANIA_TOTAL_LEVELS */
@@ -38,6 +42,23 @@ export type ActiveBonusState = {
   for_role: "alpha" | "beta" | "gamma";
   for_team: boolean;
   started_at: string;
+  /** Compiled bonus id when from bonuses[]. */
+  bonus_id?: string;
+};
+
+/** Armed / ready Layer-3 surprises. @see docs/BONUS_LAYER3_MODEL.md */
+export type BonusQueueItem = {
+  bonus_id: string;
+  from_level: number;
+  for_role: "alpha" | "beta" | "gamma";
+  for_team: boolean;
+  armed_at: string;
+  ready_at: string | null;
+  status: "armed" | "ready" | "active" | "done" | "skipped";
+  meters_required?: number;
+  /** When set, completing this bonus re-arms another after N minutes. */
+  interval_minutes?: number;
+  fanfare_shown?: boolean;
 };
 
 /** Short team broadcast after a bonus is finished. */
@@ -73,8 +94,15 @@ export type TeamGameState = {
   quiz_reveal?: QuizRevealState | null;
   /** Asymmetric bonus overlay while team is already on the next hub. */
   active_bonus?: ActiveBonusState | null;
+  /** Layer-3 surprise queue (armed / ready / done). */
+  bonus_queue?: BonusQueueItem[];
   /** Ephemeral toast payload after bonus completes. */
   bonus_notice?: BonusNoticeState | null;
+  /**
+   * Server-held outdoor walk progress (mission meters + bonus meters).
+   * Alpha device reports; all devices read via realtime.
+   */
+  outdoor_progress?: OutdoorProgressState | null;
   /** @deprecated Use purchased_tile_hints — kept for older saves. */
   hints_used: Record<string, number>;
   /** levelKey -> tileId -> revealed hint */
@@ -142,7 +170,9 @@ export function createInitialGameState(
     current_phase: "hub",
     quiz_reveal: null,
     active_bonus: null,
+    bonus_queue: [],
     bonus_notice: null,
+    outdoor_progress: null,
     hints_used: {},
     purchased_tile_hints: {},
     purchased_level_hints: {},
@@ -176,7 +206,12 @@ export function parseTeamGameState(value: unknown): TeamGameState {
         : undefined,
     quiz_reveal: parseQuizReveal(candidate.quiz_reveal),
     active_bonus: parseActiveBonus(candidate.active_bonus),
+    bonus_queue: parseBonusQueue(candidate.bonus_queue),
     bonus_notice: parseBonusNotice(candidate.bonus_notice),
+    outdoor_progress:
+      candidate.outdoor_progress === null
+        ? null
+        : parseOutdoorProgress(candidate.outdoor_progress) ?? undefined,
     hints_used: candidate.hints_used ?? {},
     purchased_tile_hints: candidate.purchased_tile_hints ?? {},
     purchased_level_hints: candidate.purchased_level_hints ?? {},
@@ -218,7 +253,45 @@ function parseActiveBonus(value: unknown): ActiveBonusState | null | undefined {
     for_role: c.for_role,
     for_team: Boolean(c.for_team),
     started_at: String(c.started_at),
+    bonus_id: typeof c.bonus_id === "string" ? c.bonus_id : undefined,
   };
+}
+
+function parseBonusQueue(value: unknown): BonusQueueItem[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const items: BonusQueueItem[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const c = raw as Partial<BonusQueueItem>;
+    if (typeof c.bonus_id !== "string" || typeof c.from_level !== "number") continue;
+    if (c.for_role !== "alpha" && c.for_role !== "beta" && c.for_role !== "gamma") continue;
+    if (
+      c.status !== "armed" &&
+      c.status !== "ready" &&
+      c.status !== "active" &&
+      c.status !== "done" &&
+      c.status !== "skipped"
+    ) {
+      continue;
+    }
+    items.push({
+      bonus_id: c.bonus_id,
+      from_level: c.from_level,
+      for_role: c.for_role,
+      for_team: Boolean(c.for_team),
+      armed_at: String(c.armed_at ?? ""),
+      ready_at: c.ready_at == null ? null : String(c.ready_at),
+      status: c.status,
+      meters_required:
+        typeof c.meters_required === "number" ? c.meters_required : undefined,
+      interval_minutes:
+        typeof c.interval_minutes === "number" && c.interval_minutes > 0
+          ? c.interval_minutes
+          : undefined,
+      fanfare_shown: Boolean(c.fanfare_shown),
+    });
+  }
+  return items;
 }
 
 function parseBonusNotice(value: unknown): BonusNoticeState | null | undefined {

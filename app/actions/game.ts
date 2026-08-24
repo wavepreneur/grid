@@ -42,8 +42,22 @@ import {
   usesPhasedPlay,
 } from "@/lib/grid/play-slots";
 import type { PlayPhase } from "@/lib/grid/play-surface";
-import { isWithinGeofence } from "@/lib/grid/geofence";
-import { isBonusForRole, resolveBonusTask } from "@/lib/grid/bonus";
+import { isWithinGeofenceForPlay } from "@/lib/grid/geofence";
+import {
+  hasReachedDistanceMeters,
+  resolveOutdoorUnlockMode,
+  upsertOutdoorBonusMeters,
+  upsertOutdoorLevelProgress,
+  type OutdoorForceUnlock,
+} from "@/lib/grid/outdoor-unlock";
+import { isBonusForRole, findBonusTaskById, resolveBonusDefinitions, resolveBonusTask } from "@/lib/grid/bonus";
+import {
+  markBonusActive,
+  markBonusDone,
+  mergeBonusQueue,
+  pickBonusToActivate,
+  promoteArmedBonuses,
+} from "@/lib/grid/bonus-queue";
 import { validateArrivalQuiz as validateBonusQuiz } from "@/lib/grid/level-validation";
 
 function buildRealtimeState(
@@ -168,6 +182,14 @@ export async function solveCurrentLevel(input: {
       activePlayerCount,
       gpsEnabled: blueprint.capabilities.gps,
     });
+    const forceUnlock = input.payload?.forceUnlock;
+    if (forceUnlock && !archetype.canUnlockGps) {
+      return {
+        success: false,
+        error: "Nur Alpha / GPS-Leiter kann den Standort manuell freigeben.",
+      };
+    }
+
     const validation = validateLevelSolution(levelDefinition, input.payload ?? {}, {
       isCaptain: player.is_captain,
       isNavigator: team.navigator_player_id === player.id,
@@ -176,6 +198,7 @@ export async function solveCurrentLevel(input: {
       archetypeRole: archetype.archetypeRole,
       playerRole,
       gpsEnabled: content.capabilities.gps,
+      forceUnlock,
     });
 
     if (!validation.ok) {
@@ -303,24 +326,85 @@ export async function solveCurrentLevel(input: {
       ? 0
       : computeLevelReward(levelDefinition.scoring, levelState.started_at);
 
+    const bonusDefs = resolveBonusDefinitions(levelDefinition);
     const bonus = resolveBonusTask(levelDefinition);
     // Bonus only after a real solve — reveal-solution completes without bonus.
     const wantBonus =
-      Boolean(usesPhasedPlay(content) && bonus) && !input.payload?.revealSolution;
-    const teamBonus = Boolean(wantBonus && bonus?.for_team);
-    const soloBonus = Boolean(wantBonus && bonus && !bonus.for_team);
+      Boolean(usesPhasedPlay(content) && bonusDefs.length > 0) &&
+      !input.payload?.revealSolution;
+
+    const armedAt = new Date();
+    const bonusQueue: NonNullable<TeamGameState["bonus_queue"]> = wantBonus
+      ? bonusDefs.map((def) => {
+          const when = def.when ?? { type: "immediate" as const };
+          let readyAt: string | null = null;
+          let status: "armed" | "ready" = "armed";
+
+          if (when.type === "immediate") {
+            status = "ready";
+            readyAt = armedAt.toISOString();
+          } else if (when.type === "delay_minutes" && when.minutes && when.minutes > 0) {
+            readyAt = new Date(
+              armedAt.getTime() + when.minutes * 60_000,
+            ).toISOString();
+          } else if (when.type === "interval_minutes" && when.minutes && when.minutes > 0) {
+            // First fire after N minutes from solve, then re-arm on complete.
+            readyAt = new Date(
+              armedAt.getTime() + when.minutes * 60_000,
+            ).toISOString();
+          } else if (when.type === "game_minutes" && when.minutes && when.minutes > 0) {
+            const startMs = team.started_at
+              ? new Date(team.started_at).getTime()
+              : armedAt.getTime();
+            readyAt = new Date(startMs + when.minutes * 60_000).toISOString();
+            if (readyAt <= armedAt.toISOString()) {
+              status = "ready";
+            }
+          }
+
+          return {
+            bonus_id: def.id,
+            from_level: currentLevel,
+            for_role: def.for_role,
+            for_team: Boolean(def.for_team),
+            armed_at: armedAt.toISOString(),
+            ready_at: readyAt,
+            status,
+            meters_required:
+              when.type === "delay_meters" && when.meters ? when.meters : undefined,
+            interval_minutes:
+              when.type === "interval_minutes" && when.minutes
+                ? when.minutes
+                : undefined,
+          };
+        })
+      : (gameState.bonus_queue ?? []);
+
+    const readyNow = bonusQueue.filter((item) => {
+      if (item.status === "ready" || item.status === "active") return true;
+      if (item.status === "armed" && item.ready_at && item.ready_at <= armedAt.toISOString()) {
+        return true;
+      }
+      return false;
+    });
+
+    const immediateTeam = readyNow.find((item) => item.for_team);
+    const immediateSolo = readyNow.find((item) => !item.for_team);
+    const teamBonus = Boolean(wantBonus && immediateTeam);
+    const soloBonus = Boolean(wantBonus && !immediateTeam && immediateSolo && bonus);
 
     let nextPhase: PlayPhase | undefined;
     let pendingNext: number | null = null;
     let activeBonus: TeamGameState["active_bonus"] = null;
     let teamCurrentLevel = isFinished ? currentLevel : nextLevel;
 
-    if (teamBonus) {
+    if (teamBonus && immediateTeam) {
       // Whole team stays on this slot in bonus phase after the Gelöst-modal.
       nextPhase = "bonus";
       pendingNext = isFinished ? null : nextLevel;
       teamCurrentLevel = currentLevel;
-    } else if (soloBonus && bonus) {
+      immediateTeam.status = "active";
+    } else if (soloBonus && immediateSolo && bonus) {
       // Team advances; assigned role gets an overlay via active_bonus.
       const nextSlot = getLevelDefinition(content, isFinished ? currentLevel : nextLevel);
       nextPhase = isFinished
@@ -333,15 +417,22 @@ export async function solveCurrentLevel(input: {
           : "hub";
       activeBonus = {
         from_level: currentLevel,
-        for_role: bonus.for_role,
+        for_role: immediateSolo.for_role,
         for_team: false,
-        started_at: new Date().toISOString(),
+        started_at: armedAt.toISOString(),
+        bonus_id: immediateSolo.bonus_id,
       };
+      immediateSolo.status = "active";
       teamCurrentLevel = isFinished ? currentLevel : nextLevel;
     } else {
       // Keep phase on the solved slot under the modal; hub opens on Weiter.
+      // Delayed bonuses stay in queue until ready_at / meters.
       nextPhase = isFinished ? gameState.current_phase : "level";
     }
+
+    const armedMeterBonus = bonusQueue.some(
+      (item) => typeof item.meters_required === "number" && item.meters_required > 0,
+    );
 
     const nextGameState: TeamGameState = {
       ...gameState,
@@ -352,7 +443,14 @@ export async function solveCurrentLevel(input: {
       pending_next_level: pendingNext,
       quiz_reveal: null,
       active_bonus: activeBonus,
+      bonus_queue: mergeBonusQueue(gameState.bonus_queue, bonusQueue),
       bonus_notice: null,
+      outdoor_progress: {
+        level: isFinished ? currentLevel : nextLevel,
+        walked_meters: 0,
+        updated_at: armedAt.toISOString(),
+        bonus_walked_meters: armedMeterBonus ? 0 : gameState.outdoor_progress?.bonus_walked_meters,
+      },
       modal: buildLevelCompletedModal({
         level: currentLevel,
         solvedBy,
@@ -412,8 +510,25 @@ export async function solveCurrentLevel(input: {
         score: nextGameState.score,
         points_earned: pointsEarned,
         reveal_solution: Boolean(input.payload?.revealSolution),
+        force_unlock: forceUnlock ?? null,
       },
     });
+
+    if (forceUnlock) {
+      await writeAuditLog({
+        organizationId: event.organization_id,
+        eventId: event.id,
+        teamId: team.id,
+        playerId: player.id,
+        action: "outdoor_force_unlock",
+        payload: {
+          level: currentLevel,
+          mode: forceUnlock,
+          path: "solve",
+          geolocation: input.payload?.geolocation ?? null,
+        },
+      });
+    }
 
     return {
       success: true,
@@ -728,7 +843,7 @@ async function persistPhaseState(input: {
 }
 
 /**
- * Advance Hub → Quiz (arrival: GPS near / station code / online start).
+ * Advance Hub → Quiz (arrival: GPS near / station code / online start / walk meters).
  * Does not complete the level.
  */
 export async function advanceFromHub(input: {
@@ -741,6 +856,13 @@ export async function advanceFromHub(input: {
   stationCode?: string;
   /** Jump to a specific level (indoor code match / online mission pick). */
   targetLevel?: number;
+  /** Outdoor distance unlock: meters walked on the tracking device. */
+  walkedMeters?: number;
+  /**
+   * Alpha lead override when GPS/meters fail outdoors.
+   * Audited — prevents support dead-ends without silent cheating.
+   */
+  forceUnlock?: OutdoorForceUnlock;
 }): Promise<ActionResult<TeamRealtimeState>> {
   try {
     const { event, team, player } = await assertPlayerSession(input);
@@ -793,24 +915,75 @@ export async function advanceFromHub(input: {
       return { success: false, error: "Dieses Level ist schon gelöst." };
     }
 
-    if (content.contentMode === "outdoor" && levelDefinition.location) {
-      const distanceUnlock =
-        levelDefinition.triggers?.type === "distance" &&
-        Boolean(levelDefinition.triggers.after_meters && levelDefinition.triggers.after_meters > 0);
-      const timeUnlock =
-        levelDefinition.triggers?.type === "time" &&
-        Boolean(levelDefinition.triggers.after_minutes && levelDefinition.triggers.after_minutes > 0);
-      // Walk/time unlocks are not geofenced — a leftover GPS pin must not block opening.
-      if (!distanceUnlock && !timeUnlock) {
+    const playerRole = (player.role ?? "gamma") as PlayerRole;
+    const activePlayerCount = await countActivePlayers(team.id);
+    const blueprint = resolveBlueprint(parseContentConfig(event.content_config));
+    const archetype = resolveArchetypeRoleFlags({
+      playerId: player.id,
+      playerRole,
+      isCaptain: player.is_captain,
+      team: {
+        captainPlayerId: team.captain_player_id ?? null,
+        navigatorPlayerId: team.navigator_player_id ?? null,
+        betaPlayerId: team.beta_player_id ?? null,
+      },
+      activePlayerCount,
+      gpsEnabled: blueprint.capabilities.gps,
+    });
+
+    const unlockMode = resolveOutdoorUnlockMode(levelDefinition);
+    const nowIso = new Date().toISOString();
+    let outdoorProgress = gameState.outdoor_progress ?? null;
+
+    if (input.forceUnlock) {
+      if (!archetype.canUnlockGps) {
+        return {
+          success: false,
+          error: "Nur Alpha / GPS-Leiter kann den Standort manuell freigeben.",
+        };
+      }
+      if (
+        (input.forceUnlock === "geofence" && unlockMode !== "geofence") ||
+        (input.forceUnlock === "distance" && unlockMode !== "distance")
+      ) {
+        return { success: false, error: "Dieser Override passt nicht zum aktuellen Unlock." };
+      }
+    }
+
+    if (content.contentMode === "outdoor" && unlockMode === "geofence" && levelDefinition.location) {
+      if (!input.forceUnlock) {
         if (!input.geolocation) {
           return { success: false, error: "GPS-Position erforderlich." };
         }
-        if (!isWithinGeofence(input.geolocation, levelDefinition.location)) {
+        if (!isWithinGeofenceForPlay(input.geolocation, levelDefinition.location)) {
           return {
             success: false,
             error: `Noch nicht am Wegpunkt (Radius: ${levelDefinition.location.radius_meters} m).`,
           };
         }
+      }
+    }
+
+    if (content.contentMode === "outdoor" && unlockMode === "distance") {
+      const required = levelDefinition.triggers?.after_meters ?? 0;
+      if (typeof input.walkedMeters === "number" && input.walkedMeters >= 0) {
+        outdoorProgress = upsertOutdoorLevelProgress({
+          existing: outdoorProgress,
+          level: currentLevel,
+          reportedMeters: input.walkedMeters,
+          playerId: player.id,
+          nowIso,
+        });
+      }
+      const walked =
+        outdoorProgress && outdoorProgress.level === currentLevel
+          ? outdoorProgress.walked_meters
+          : 0;
+      if (!input.forceUnlock && !hasReachedDistanceMeters(walked, required)) {
+        return {
+          success: false,
+          error: `Noch nicht genug Meter gelaufen (${Math.round(walked)} / ${required} m).`,
+        };
       }
     }
 
@@ -836,6 +1009,16 @@ export async function advanceFromHub(input: {
       version: gameState.version + 1,
       current_phase: nextPhase,
       levels,
+      // Mission meters reset; bonus meter walk (Layer-3) must survive hub advance.
+      outdoor_progress:
+        unlockMode === "distance" || unlockMode === "geofence"
+          ? {
+              level: currentLevel,
+              walked_meters: 0,
+              updated_at: nowIso,
+              bonus_walked_meters: outdoorProgress?.bonus_walked_meters,
+            }
+          : outdoorProgress,
     };
 
     const supabase = createAdminClient();
@@ -856,11 +1039,126 @@ export async function advanceFromHub(input: {
       return { success: false, error: error?.message ?? "Hub-Update fehlgeschlagen." };
     }
 
+    if (input.forceUnlock) {
+      await writeAuditLog({
+        organizationId: event.organization_id,
+        eventId: event.id,
+        teamId: team.id,
+        playerId: player.id,
+        action: "outdoor_force_unlock",
+        payload: {
+          level: currentLevel,
+          mode: input.forceUnlock,
+          walked_meters: outdoorProgress?.walked_meters ?? null,
+          geolocation: input.geolocation ?? null,
+        },
+      });
+    } else if (content.contentMode === "outdoor" && (unlockMode === "geofence" || unlockMode === "distance")) {
+      await writeAuditLog({
+        organizationId: event.organization_id,
+        eventId: event.id,
+        teamId: team.id,
+        playerId: player.id,
+        action: "outdoor_hub_arrive",
+        payload: {
+          level: currentLevel,
+          mode: unlockMode,
+          walked_meters:
+            unlockMode === "distance" ? outdoorProgress?.walked_meters ?? null : null,
+        },
+      });
+    }
+
     return { success: true, data: buildRealtimeState(updatedTeam, player) };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Hub-Fortschritt fehlgeschlagen.",
+    };
+  }
+}
+
+/**
+ * Alpha device reports walked meters so the team state stays the source of truth.
+ * Non-trackers still see progress via realtime.
+ */
+export async function syncOutdoorWalkProgress(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  level: number;
+  walkedMeters: number;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    const { event, team, player } = await assertPlayerSession(input);
+    if (team.status !== "playing") {
+      return { success: false, error: "Das Spiel läuft noch nicht." };
+    }
+
+    const playerRole = (player.role ?? "gamma") as PlayerRole;
+    const activePlayerCount = await countActivePlayers(team.id);
+    const blueprint = resolveBlueprint(parseContentConfig(event.content_config));
+    const archetype = resolveArchetypeRoleFlags({
+      playerId: player.id,
+      playerRole,
+      isCaptain: player.is_captain,
+      team: {
+        captainPlayerId: team.captain_player_id ?? null,
+        navigatorPlayerId: team.navigator_player_id ?? null,
+        betaPlayerId: team.beta_player_id ?? null,
+      },
+      activePlayerCount,
+      gpsEnabled: blueprint.capabilities.gps,
+    });
+
+    if (!archetype.canUnlockGps) {
+      return { success: false, error: "Nur Alpha / GPS-Leiter trackt die Strecke." };
+    }
+
+    const gameState = parseTeamGameState(team.game_state);
+    const nowIso = new Date().toISOString();
+    const outdoorProgress = upsertOutdoorLevelProgress({
+      existing: gameState.outdoor_progress,
+      level: input.level,
+      reportedMeters: input.walkedMeters,
+      playerId: player.id,
+      nowIso,
+    });
+
+    const unchanged =
+      gameState.outdoor_progress?.level === outdoorProgress.level &&
+      Math.abs((gameState.outdoor_progress?.walked_meters ?? 0) - outdoorProgress.walked_meters) < 0.5;
+
+    if (unchanged) {
+      return { success: true, data: buildRealtimeState(team, player) };
+    }
+
+    const nextGameState: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      outdoor_progress: outdoorProgress,
+    };
+
+    const supabase = createAdminClient();
+    const { data: updatedTeam, error } = await supabase
+      .from("teams")
+      .update({ game_state: nextGameState })
+      .eq("id", team.id)
+      .eq("status", "playing")
+      .select(
+        "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
+      )
+      .single();
+
+    if (error || !updatedTeam) {
+      return { success: false, error: error?.message ?? "Meter-Sync fehlgeschlagen." };
+    }
+
+    return { success: true, data: buildRealtimeState(updatedTeam, player) };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Meter-Sync fehlgeschlagen.",
     };
   }
 }
@@ -1054,9 +1352,33 @@ async function completeActiveBonus(input: {
   skip?: boolean;
 }): Promise<ActionResult<TeamRealtimeState>> {
   const { event, team, player, gameState } = input;
-  const active = gameState.active_bonus;
-  if (!active || active.for_team) {
-    return { success: false, error: "Kein aktiver Rollen-Bonus." };
+  const playerRole = (player.role ?? "gamma") as PlayerRole;
+  const normalizedRole =
+    playerRole === "captain" || playerRole === "navigator"
+      ? "alpha"
+      : playerRole === "solver"
+        ? "gamma"
+        : playerRole === "alpha" || playerRole === "beta" || playerRole === "gamma"
+          ? playerRole
+          : "gamma";
+
+  const fromQueue = (gameState.bonus_queue ?? []).find(
+    (item) =>
+      item.status === "active" &&
+      (item.for_team || item.for_role === normalizedRole),
+  );
+  const active = fromQueue
+    ? {
+        from_level: fromQueue.from_level,
+        for_role: fromQueue.for_role,
+        for_team: fromQueue.for_team,
+        started_at: fromQueue.armed_at,
+        bonus_id: fromQueue.bonus_id,
+      }
+    : gameState.active_bonus;
+
+  if (!active) {
+    return { success: false, error: "Kein aktiver Bonus." };
   }
 
   const content = await loadResolvedEventContent({
@@ -1069,12 +1391,18 @@ async function completeActiveBonus(input: {
   });
 
   const levelDefinition = getLevelDefinition(content, active.from_level);
-  const bonus = resolveBonusTask(levelDefinition);
+  const bonus = findBonusTaskById(levelDefinition, active.bonus_id);
   if (!bonus) {
+    const now = new Date();
     const cleared: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
       active_bonus: null,
+      bonus_queue: markBonusDone(
+        gameState.bonus_queue ?? [],
+        active.bonus_id ?? "",
+        now,
+      ),
     };
     const supabase = createAdminClient();
     const { data: updatedTeam, error } = await supabase
@@ -1091,8 +1419,8 @@ async function completeActiveBonus(input: {
     return { success: true, data: buildRealtimeState(updatedTeam, player) };
   }
 
-  const playerRole = (player.role ?? "gamma") as PlayerRole;
-  if (!isBonusForRole(bonus, playerRole)) {
+  const playerRoleCheck = (player.role ?? "gamma") as PlayerRole;
+  if (!isBonusForRole(bonus, playerRoleCheck)) {
     return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
   }
 
@@ -1112,17 +1440,34 @@ async function completeActiveBonus(input: {
 
   const allDone = Object.values(gameState.levels).every((entry) => entry.status === "completed");
   const noticeId = `bonus-${Date.now()}-${player.id.slice(0, 8)}`;
+  const now = new Date();
+  const doneId = active.bonus_id ?? `${active.from_level}`;
+  let nextQueue = markBonusDone(gameState.bonus_queue ?? [], doneId, now);
+
+  // Keep active_bonus if another role still has an active item.
+  const stillActive = nextQueue.find((item) => item.status === "active");
+  const nextActive = stillActive
+    ? {
+        from_level: stillActive.from_level,
+        for_role: stillActive.for_role,
+        for_team: stillActive.for_team,
+        started_at: stillActive.armed_at,
+        bonus_id: stillActive.bonus_id,
+      }
+    : null;
+
   const nextGameState: TeamGameState = {
     ...gameState,
     version: gameState.version + 1,
     score: gameState.score + reward,
-    active_bonus: null,
+    active_bonus: nextActive,
+    bonus_queue: nextQueue,
     bonus_notice: {
       id: noticeId,
       by: player.display_name,
       correct,
       reward,
-      created_at: new Date().toISOString(),
+      created_at: now.toISOString(),
     },
   };
 
@@ -1146,6 +1491,165 @@ async function completeActiveBonus(input: {
   }
 
   return { success: true, data: buildRealtimeState(updatedTeam, player) };
+}
+
+/**
+ * Promote armed bonuses (time/meters) and activate the next ready surprise.
+ * Called on a client tick after phone wake / walk progress.
+ */
+export async function activateReadyBonuses(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  /** Meters walked since arm, keyed by bonus_id (for delay_meters). */
+  walkedMetersByBonusId?: Record<string, number>;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    const { team, player } = await assertPlayerSession(input);
+    if (team.status !== "playing") {
+      return { success: false, error: "Das Spiel läuft noch nicht." };
+    }
+
+    const gameState = parseTeamGameState(team.game_state);
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    let outdoorProgress = gameState.outdoor_progress ?? null;
+    const clientMeters = input.walkedMetersByBonusId ?? {};
+    const maxClientMeters = Math.max(0, ...Object.values(clientMeters), 0);
+
+    if (maxClientMeters > 0) {
+      outdoorProgress = upsertOutdoorBonusMeters({
+        existing: outdoorProgress,
+        reportedMeters: maxClientMeters,
+        playerId: player.id,
+        nowIso,
+        level: team.current_level ?? outdoorProgress?.level,
+      });
+    }
+
+    const serverBonusMeters = outdoorProgress?.bonus_walked_meters ?? 0;
+    const mergedMetersByBonusId: Record<string, number> = { ...clientMeters };
+    for (const item of gameState.bonus_queue ?? []) {
+      if (item.meters_required && item.meters_required > 0) {
+        const client = clientMeters[item.bonus_id] ?? 0;
+        mergedMetersByBonusId[item.bonus_id] = Math.max(client, serverBonusMeters);
+      }
+    }
+
+    let queue = promoteArmedBonuses(
+      gameState.bonus_queue ?? [],
+      nowIso,
+      mergedMetersByBonusId,
+    );
+
+    // Also promote by ready_at even if status still armed
+    queue = queue.map((item) => {
+      if (
+        item.status === "armed" &&
+        item.ready_at &&
+        item.ready_at <= nowIso &&
+        !item.meters_required
+      ) {
+        return { ...item, status: "ready" as const };
+      }
+      return item;
+    });
+
+    const pick = pickBonusToActivate(queue);
+    let activeBonus = gameState.active_bonus ?? null;
+    let currentPhase = gameState.current_phase;
+    let pendingNext = gameState.pending_next_level;
+    let currentLevel = team.current_level ?? 1;
+
+    if (!activeBonus) {
+      const readySolos = queue.filter((item) => item.status === "ready" && !item.for_team);
+      const readyTeam = queue.find((item) => item.status === "ready" && item.for_team);
+
+      // Parallel role pack: activate every ready solo bonus at once.
+      for (const item of readySolos) {
+        queue = markBonusActive(queue, item.bonus_id);
+      }
+      if (readySolos[0]) {
+        activeBonus = {
+          from_level: readySolos[0].from_level,
+          for_role: readySolos[0].for_role,
+          for_team: false,
+          started_at: nowIso,
+          bonus_id: readySolos[0].bonus_id,
+        };
+      } else if (readyTeam) {
+        queue = markBonusActive(queue, readyTeam.bonus_id);
+        activeBonus = {
+          from_level: readyTeam.from_level,
+          for_role: readyTeam.for_role,
+          for_team: true,
+          started_at: nowIso,
+          bonus_id: readyTeam.bonus_id,
+        };
+      } else if (pick) {
+        queue = markBonusActive(queue, pick.bonus_id);
+        activeBonus = {
+          from_level: pick.from_level,
+          for_role: pick.for_role,
+          for_team: pick.for_team,
+          started_at: nowIso,
+          bonus_id: pick.bonus_id,
+        };
+      }
+
+      void currentPhase;
+      void pendingNext;
+      void currentLevel;
+    }
+
+    const changed =
+      JSON.stringify(queue) !== JSON.stringify(gameState.bonus_queue ?? []) ||
+      JSON.stringify(activeBonus) !== JSON.stringify(gameState.active_bonus ?? null) ||
+      JSON.stringify(outdoorProgress) !== JSON.stringify(gameState.outdoor_progress ?? null);
+
+    if (!changed) {
+      return {
+        success: true,
+        data: buildRealtimeState(team, player),
+      };
+    }
+
+    const nextGameState: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      bonus_queue: queue,
+      active_bonus: activeBonus,
+      outdoor_progress: outdoorProgress,
+    };
+
+    const supabase = createAdminClient();
+    const { data: updatedTeam, error } = await supabase
+      .from("teams")
+      .update({
+        game_state: nextGameState,
+      })
+      .eq("id", team.id)
+      .eq("status", "playing")
+      .select(
+        "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
+      )
+      .single();
+
+    if (error || !updatedTeam) {
+      return {
+        success: false,
+        error: error?.message ?? "Bonus-Queue konnte nicht aktualisiert werden.",
+      };
+    }
+
+    return { success: true, data: buildRealtimeState(updatedTeam, player) };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Bonus-Activate fehlgeschlagen.",
+    };
+  }
 }
 
 async function leaveBonusPhase(input: {
@@ -1225,6 +1729,15 @@ async function leaveBonusPhase(input: {
   }
 
   const noticeId = `bonus-${Date.now()}-${player.id.slice(0, 8)}`;
+  const now = new Date();
+  let queue = gameState.bonus_queue ?? [];
+  const activeItem = queue.find(
+    (item) => item.status === "active" && item.from_level === bonusLevel,
+  );
+  if (activeItem) {
+    queue = markBonusDone(queue, activeItem.bonus_id, now);
+  }
+
   const nextGameState: TeamGameState = {
     ...gameState,
     version: gameState.version + 1,
@@ -1232,6 +1745,7 @@ async function leaveBonusPhase(input: {
     current_phase: isFinished ? gameState.current_phase : hubPhase,
     pending_next_level: null,
     active_bonus: null,
+    bonus_queue: queue,
     bonus_notice: input.skip
       ? null
       : {
@@ -1283,8 +1797,8 @@ export async function submitBonusAnswer(input: {
 
     const gameState = parseTeamGameState(team.game_state);
 
-    // Role-only overlay while the team is already on the next hub.
-    if (gameState.active_bonus && !gameState.active_bonus.for_team) {
+    // Overlay (role or team) while the rest of the team may already be on the hub.
+    if (gameState.active_bonus) {
       return completeActiveBonus({
         event,
         team,
@@ -1372,6 +1886,15 @@ export async function submitBonusAnswer(input: {
     }
 
     const noticeId = `bonus-${Date.now()}-${player.id.slice(0, 8)}`;
+    const now = new Date();
+    let queue = gameState.bonus_queue ?? [];
+    const activeItem = queue.find(
+      (item) => item.status === "active" && item.from_level === bonusLevel,
+    );
+    if (activeItem) {
+      queue = markBonusDone(queue, activeItem.bonus_id, now);
+    }
+
     const nextGameState: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
@@ -1379,12 +1902,13 @@ export async function submitBonusAnswer(input: {
       current_phase: finished ? gameState.current_phase : hubPhase,
       pending_next_level: null,
       active_bonus: null,
+      bonus_queue: queue,
       bonus_notice: {
         id: noticeId,
         by: player.display_name,
         correct,
         reward,
-        created_at: new Date().toISOString(),
+        created_at: now.toISOString(),
       },
       levels,
     };
@@ -1427,7 +1951,7 @@ export async function skipBonusPhase(input: {
   try {
     const { event, team, player } = await assertPlayerSession(input);
     const gameState = parseTeamGameState(team.game_state);
-    if (gameState.active_bonus && !gameState.active_bonus.for_team) {
+    if (gameState.active_bonus) {
       return completeActiveBonus({
         event,
         team,

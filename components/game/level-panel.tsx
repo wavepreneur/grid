@@ -7,7 +7,7 @@ import {
   GridInput,
   GridLabel,
 } from "@/components/grid/grid-shell";
-import { distanceMeters, formatDistance } from "@/lib/grid/geofence";
+import { distanceMeters, formatDistance, isWithinGeofenceForPlay } from "@/lib/grid/geofence";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
 import type { LevelDefinition } from "@/lib/grid/level-types";
 
@@ -20,6 +20,7 @@ type LevelPanelProps = {
     answer?: string;
     selectedOptionId?: string;
     geolocation?: { lat: number; lng: number; accuracy?: number };
+    forceUnlock?: "geofence" | "distance";
   }) => void;
 };
 
@@ -41,9 +42,7 @@ export function LevelPanel({
       : null;
 
   const withinRadius =
-    sample && level.location && distance !== null
-      ? distance <= level.location.radius_meters
-      : false;
+    sample && level.location ? isWithinGeofenceForPlay(sample, level.location) : false;
 
   function handleSubmit() {
     if (level.type === "gps") {
@@ -145,20 +144,36 @@ export function LevelPanel({
       ) : null}
 
       {level.type === "gps" && !isNavigator ? null : (
-        <GridButton
-          type="button"
-          className="mt-6"
-          disabled={
-            disabled ||
-            isPending ||
-            (level.type === "gps" && (!isNavigator || !withinRadius)) ||
-            (level.type === "digital" && !answer.trim()) ||
-            (level.type === "quiz" && !selectedOptionId)
-          }
-          onClick={handleSubmit}
-        >
-          {isPending ? "Sende…" : "Aufgabe abschließen"}
-        </GridButton>
+        <div className="mt-6 flex flex-col gap-2">
+          <GridButton
+            type="button"
+            disabled={
+              disabled ||
+              isPending ||
+              (level.type === "gps" && (!isNavigator || !withinRadius)) ||
+              (level.type === "digital" && !answer.trim()) ||
+              (level.type === "quiz" && !selectedOptionId)
+            }
+            onClick={handleSubmit}
+          >
+            {isPending ? "Sende…" : "Aufgabe abschließen"}
+          </GridButton>
+          {level.type === "gps" && isNavigator ? (
+            <GridButton
+              type="button"
+              variant="secondary"
+              disabled={disabled || isPending}
+              onClick={() =>
+                onSubmit({
+                  geolocation: sample ?? undefined,
+                  forceUnlock: "geofence",
+                })
+              }
+            >
+              Wir sind am Punkt
+            </GridButton>
+          ) : null}
+        </div>
       )}
     </div>
   );

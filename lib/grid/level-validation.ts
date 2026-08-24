@@ -3,7 +3,7 @@ import {
   normalizeAnswer,
   requiresGps,
 } from "@/lib/grid/content-engine";
-import { isWithinGeofence } from "@/lib/grid/geofence";
+import { isWithinGeofenceForPlay } from "@/lib/grid/geofence";
 import type {
   ArrivalQuiz,
   LevelDefinition,
@@ -20,6 +20,8 @@ export type LevelValidationContext = {
   archetypeRole?: "alpha" | "beta" | "gamma";
   playerRole: PlayerRole;
   gpsEnabled?: boolean;
+  /** Alpha lead override when GPS fails — audited by caller. */
+  forceUnlock?: "geofence" | "distance";
 };
 
 function normalizeRequiredRole(role: PlayerRole): "alpha" | "beta" | "gamma" | "captain" | "navigator" | "solver" {
@@ -74,10 +76,13 @@ export function validateLevelSolution(
         error: "GPS-Checkpoints kann nur Alpha am Zielort freischalten.",
       };
     }
+    if (context?.forceUnlock === "geofence") {
+      return { ok: true };
+    }
     if (!payload.geolocation) {
       return { ok: false, error: "GPS-Position erforderlich. Bitte Standort freigeben." };
     }
-    if (!isWithinGeofence(payload.geolocation, level.location)) {
+    if (!isWithinGeofenceForPlay(payload.geolocation, level.location)) {
       return {
         ok: false,
         error: `Ihr seid noch nicht am Checkpoint (Radius: ${level.location.radius_meters} m).`,

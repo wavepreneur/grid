@@ -68,9 +68,8 @@ Layer sind **Bausteine**, kein festes 3-Stufen-Rezept. Spiele kombinieren sie fr
 |-------------|------|
 | Skalierung | Eigene Schicht, verknüpft mit Slot 1/2 |
 | Rollen | Alpha, Beta, Gamma oder ganzes Team |
-| Trigger | Aufgabe gelöst, Punkte, Spielzeit, GPS/Code erreicht |
-| Kontext | `content_context`: outdoor \| indoor \| online \| any |
-| DB (Runtime) | `logic_rules` + Studio-Tasks Layer 3 |
+| Trigger | Aufgabe gelöst (+ optional Minuten/Meter), Spielzeit, Intervalle |
+| Runtime | `level.bonuses[]` + `bonus_queue` — siehe [`BONUS_LAYER3_MODEL.md`](./BONUS_LAYER3_MODEL.md) |
 
 **Typische Spiele:** Nur Layer 3 = **Micro-Pulse** (Slack, ~10 Min, REST).
 

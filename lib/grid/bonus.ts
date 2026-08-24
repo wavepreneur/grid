@@ -30,8 +30,62 @@ export function parseBonusTask(raw: unknown): BonusTask | undefined {
 /** Resolve bonus for a completed mission slot. */
 export function resolveBonusTask(level: LevelDefinition | null | undefined): BonusTask | null {
   if (!level) return null;
+  if (level.bonuses?.length) {
+    const first = level.bonuses[0];
+    if (first) {
+      const { id: _id, when: _when, fanfare: _f, ...task } = first;
+      return task;
+    }
+  }
   if (level.bonus) return level.bonus;
   return null;
+}
+
+/** All bonuses for a mission (compiled list or legacy single). */
+export function resolveBonusDefinitions(
+  level: LevelDefinition | null | undefined,
+): import("@/lib/grid/level-types").BonusDefinition[] {
+  if (!level) return [];
+  if (level.bonuses?.length) return level.bonuses;
+  if (level.bonus) {
+    return [
+      {
+        ...level.bonus,
+        id: `legacy-${level.level}`,
+        when: { type: "immediate" },
+        fanfare: true,
+      },
+    ];
+  }
+  return [];
+}
+
+export function findBonusDefinition(
+  level: LevelDefinition | null | undefined,
+  bonusId: string | null | undefined,
+): import("@/lib/grid/level-types").BonusDefinition | null {
+  if (!level || !bonusId) return null;
+  const defs = resolveBonusDefinitions(level);
+  return defs.find((d) => d.id === bonusId) ?? null;
+}
+
+/** Content-only BonusTask from a definition (or legacy first). */
+export function bonusDefinitionToTask(
+  def: import("@/lib/grid/level-types").BonusDefinition | null | undefined,
+): BonusTask | null {
+  if (!def) return null;
+  const { id: _id, when: _when, fanfare: _f, ...task } = def;
+  return task;
+}
+
+export function findBonusTaskById(
+  level: LevelDefinition | null | undefined,
+  bonusId: string | null | undefined,
+): BonusTask | null {
+  if (bonusId) {
+    return bonusDefinitionToTask(findBonusDefinition(level, bonusId));
+  }
+  return resolveBonusTask(level);
 }
 
 export function isBonusForRole(

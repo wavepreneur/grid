@@ -12,6 +12,12 @@ type Props = {
   disabled: boolean;
   isPending: boolean;
   onOpen: () => void;
+  /**
+   * Alpha lead override when GPS stalls — always available so teams never soft-lock.
+   */
+  onForceOpen?: () => void;
+  showForceOpen?: boolean;
+  gpsError?: string | null;
   /** Dev-only: add meters without walking. */
   onSimulateWalk?: () => void;
 };
@@ -28,6 +34,9 @@ export function OutdoorWalkRing({
   disabled,
   isPending,
   onOpen,
+  onForceOpen,
+  showForceOpen = false,
+  gpsError = null,
   onSimulateWalk,
 }: Props) {
   const progress = Math.min(1, walkedMeters / Math.max(1, targetMeters));
@@ -123,19 +132,35 @@ export function OutdoorWalkRing({
           : "Der Ring füllt sich, während ihr lauft. Am Ziel vibriert das Gerät und es piept."}
       </p>
 
+      {gpsError ? (
+        <p className="mt-3 max-w-sm text-center text-sm text-[var(--cg-destructive)]">{gpsError}</p>
+      ) : null}
+
       {complete ? (
         <div className="cg-animate-pop-in mt-6 w-full max-w-sm">
           <BigButton variant="accent" disabled={disabled || isPending} onClick={onOpen}>
             Aufgabe öffnen
           </BigButton>
         </div>
-      ) : onSimulateWalk && process.env.NODE_ENV === "development" ? (
-        <div className="mt-6 w-full max-w-sm">
-          <BigButton variant="outline" disabled={disabled || isPending} onClick={onSimulateWalk}>
-            +25 m simulieren (Dev)
-          </BigButton>
+      ) : (
+        <div className="mt-6 w-full max-w-sm space-y-3">
+          {onSimulateWalk && process.env.NODE_ENV === "development" ? (
+            <BigButton variant="outline" disabled={disabled || isPending} onClick={onSimulateWalk}>
+              +25 m simulieren (Dev)
+            </BigButton>
+          ) : null}
+          {showForceOpen && onForceOpen ? (
+            <BigButton variant="outline" disabled={disabled || isPending} onClick={onForceOpen}>
+              Aufgabe trotzdem öffnen
+            </BigButton>
+          ) : null}
+          {showForceOpen ? (
+            <p className="text-center text-xs text-[var(--cg-muted)]">
+              Nur wenn GPS hängt oder die Strecke klar gelaufen ist — Alpha entscheidet fürs Team.
+            </p>
+          ) : null}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

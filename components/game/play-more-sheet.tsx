@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { BigButton } from "@/components/game/city/ui";
 import { PlayDocSheet } from "@/components/game/play-doc-sheet";
+import { PersonalResumeLinkCard } from "@/components/player/personal-resume-link-card";
 
 export type PlayMorePanel = "menu" | "briefing" | "faq" | "support" | "pause" | "team" | null;
 
@@ -18,6 +19,11 @@ type Props = {
   onTogglePause: () => void;
   isAlpha: boolean;
   teammates: Array<{ id: string; name: string; roleLabel: string }>;
+  /** Full roster incl. me — exact spellings for device-switch help. */
+  roster?: Array<{ id: string; name: string; roleLabel: string; isMe?: boolean }>;
+  inviteCode?: string;
+  joinCode?: string;
+  sessionId?: string;
   onTransferAlpha?: (playerId: string) => void;
   onReleasePlayerSeat?: (playerId: string) => void;
   transferPending?: boolean;
@@ -42,6 +48,10 @@ export function PlayMoreSheet({
   onTogglePause,
   isAlpha,
   teammates,
+  roster = [],
+  inviteCode,
+  joinCode,
+  sessionId,
   onTransferAlpha,
   onReleasePlayerSeat,
   transferPending,
@@ -52,6 +62,7 @@ export function PlayMoreSheet({
   const showBriefingDoc = open === "briefing" && Boolean(briefingIframeUrl?.trim());
   const showFaqDoc = open === "faq" && Boolean(faqIframeUrl?.trim());
   const busy = Boolean(transferPending || releasePending);
+  const nameRoster = roster.length > 0 ? roster : teammates;
 
   if (!open) return null;
 
@@ -127,7 +138,7 @@ export function PlayMoreSheet({
                   />
                   <MenuRow
                     title="Team"
-                    hint="Leitung, Platz freigeben, Gerät wechseln"
+                    hint="Namen, Weiterspiel-Link, Leitung, Platz freigeben"
                     onClick={() => onOpen("team")}
                   />
                 </div>
@@ -180,11 +191,52 @@ export function PlayMoreSheet({
 
               {open === "team" ? (
                 <div className="space-y-4">
+                  {nameRoster.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-[var(--cg-fg)]">
+                        Namen im Team
+                      </p>
+                      <p className="text-xs text-[var(--cg-muted)]">
+                        Exakte Schreibweise — bei Gerätewechsel tippt die Person ihren Namen
+                        an oder nutzt den persönlichen Link.
+                      </p>
+                      <ul className="space-y-1.5">
+                        {nameRoster.map((m) => (
+                          <li
+                            key={m.id}
+                            className="flex items-center justify-between gap-2 rounded-xl bg-[var(--cg-secondary)] px-3 py-2.5"
+                          >
+                            <span className="min-w-0 truncate font-semibold text-[var(--cg-fg)]">
+                              {m.name}
+                              {"isMe" in m && m.isMe ? (
+                                <span className="ml-1.5 text-xs font-medium text-[var(--cg-muted)]">
+                                  du
+                                </span>
+                              ) : null}
+                            </span>
+                            <span className="shrink-0 text-xs text-[var(--cg-muted)]">
+                              {m.roleLabel}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {inviteCode && joinCode && sessionId ? (
+                    <PersonalResumeLinkCard
+                      inviteCode={inviteCode}
+                      joinCode={joinCode}
+                      sessionId={sessionId}
+                      compact
+                    />
+                  ) : null}
+
                   {isAlpha ? (
                     <>
                       <p className="text-sm text-[var(--cg-muted)]">
-                        Du führst das Team. Gib die Leitung ab oder gib einen Platz frei, damit jemand
-                        anderes (oder du auf einem neuen Gerät) weiterspielen kann.
+                        Du führst das Team. Gib die Leitung ab oder gib einen Platz frei, damit
+                        jemand anderes (oder du auf einem neuen Gerät) weiterspielen kann.
                       </p>
                       <ul className="space-y-2">
                         {teammates.length === 0 ? (
@@ -230,8 +282,8 @@ export function PlayMoreSheet({
                     </>
                   ) : (
                     <p className="text-sm text-[var(--cg-muted)]">
-                      Die Team-Leitung aktiviert die Aufgaben. Wenn du das Gerät wechselst oder den
-                      Platz für jemand anderen freigibst, nutze die Aktionen unten.
+                      Die Team-Leitung aktiviert die Aufgaben. Wenn du das Gerät wechselst oder
+                      den Platz für jemand anderen freigibst, nutze die Aktionen unten.
                     </p>
                   )}
                   {onReclaimSession ? (

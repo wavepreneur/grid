@@ -41,6 +41,12 @@ import { useStudioCache } from "@/lib/platform/studio-cache";
 import type { ContentMode, RoleAssignment } from "@/lib/cms/layer-model";
 import { contentModeLabel } from "@/lib/cms/layer-model";
 import {
+  BONUS_WHEN_OPTIONS,
+  type BonusAudience,
+  type BonusBinding,
+  bonusWhenLabel,
+} from "@/lib/cms/bonus-bindings";
+import {
   DEFAULT_GPS_RADIUS_METERS,
   parseGpsOverride,
   type GpsPin,
@@ -98,7 +104,7 @@ const VISIBLE_ROLE_OPTIONS: Array<{ value: RoleAssignment; label: string }> = [
   { value: "gamma", label: "Nur Gamma" },
 ];
 
-const BONUS_ROLE_OPTIONS: Array<{ value: RoleAssignment; label: string; hint: string }> = [
+const BONUS_ROLE_OPTIONS: Array<{ value: BonusAudience; label: string; hint: string }> = [
   {
     value: "gamma",
     label: "Nur Gamma",
@@ -149,8 +155,7 @@ export function GameSlotsPanel({
   const [openerTitle, setOpenerTitle] = useState("");
   const [quizPoints, setQuizPoints] = useState(0);
   const [openerSearch, setOpenerSearch] = useState("");
-  const [bonusTaskId, setBonusTaskId] = useState("");
-  const [bonusRole, setBonusRole] = useState<RoleAssignment>("gamma");
+  const [bonusBindings, setBonusBindings] = useState<BonusBinding[]>([]);
   const [visibleTo, setVisibleTo] = useState<RoleAssignment>("team");
   const [endsGame, setEndsGame] = useState(false);
   const [outdoorActivation, setOutdoorActivation] = useState<OutdoorActivation>("gps");
@@ -230,17 +235,23 @@ export function GameSlotsPanel({
     setOpenerTitle(slot.quiz?.title ?? "");
     setQuizPoints(slot.quiz?.points ?? overrides.opener_points ?? 0);
     setOpenerSearch("");
-    setBonusTaskId(slot.bonusLink?.task_id ?? "");
-    const existingRole = slot.bonusLink
-      ? parseLinkOverrides(slot.bonusLink.overrides).role
-      : undefined;
-    setBonusRole(
-      existingRole === "alpha" ||
-        existingRole === "beta" ||
-        existingRole === "gamma" ||
-        existingRole === "team"
-        ? existingRole
-        : "gamma",
+    setBonusBindings(
+      slot.bonusBindings.length > 0
+        ? slot.bonusBindings
+        : slot.bonusLink
+          ? [
+              {
+                task_id: slot.bonusLink.task_id,
+                role: (() => {
+                  const r = parseLinkOverrides(slot.bonusLink!.overrides).role;
+                  return r === "alpha" || r === "beta" || r === "gamma" || r === "team"
+                    ? r
+                    : "gamma";
+                })(),
+                when: { type: "immediate" },
+              },
+            ]
+          : [],
     );
     setVisibleTo(
       overrides.visible_to === "alpha" ||
@@ -368,7 +379,7 @@ export function GameSlotsPanel({
       const result = await updateGameTaskLinkConfig(gameId, editSlot.levelLink.id, {
         opener_task_id: quizEnabled ? openerTaskId : null,
         opener_points: quizEnabled ? quizPoints : null,
-        bonus_task_id: bonusTaskId || null,
+        bonus_bindings: bonusBindings.length > 0 ? bonusBindings : null,
         unlock,
         visible_to: visibleTo,
         ends_game: endsGame,
@@ -389,23 +400,28 @@ export function GameSlotsPanel({
         return { ...l, overrides: rest };
       });
 
-      if (bonusTaskId) {
+      for (const binding of bonusBindings) {
         let bonusLink = nextLinks.find(
-          (l) => l.task_id === bonusTaskId && parseLinkLayer(l) === 3,
+          (l) => l.task_id === binding.task_id && parseLinkLayer(l) === 3,
         );
         if (!bonusLink) {
-          const add = await addTaskToGame(gameId, bonusTaskId, 3);
+          const add = await addTaskToGame(gameId, binding.task_id, 3);
           if (add.success && add.data) {
             bonusLink = add.data;
             nextLinks = [...nextLinks, add.data];
           }
         }
         if (bonusLink) {
+          const delaySeconds =
+            binding.when.type === "delay_minutes" && binding.when.minutes
+              ? Math.round(binding.when.minutes * 60)
+              : undefined;
           const bonusUpdate = await updateGameTaskLinkConfig(gameId, bonusLink.id, {
-            role: bonusRole,
+            role: binding.role,
             trigger: {
               type: "after_task_solved",
               source_task_id: editSlot.levelLink.task_id,
+              delay_seconds: delaySeconds,
             },
           });
           if (bonusUpdate.success && bonusUpdate.data) {
@@ -898,6 +914,9 @@ export function GameSlotsPanel({
                           }))
                         }
                       />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Empfohlen ≥ 40 m. Runtime nutzt mindestens 25 m + GPS-Genauigkeit.
+                      </p>
                     </div>
                   </div>
                 ) : null}
@@ -991,50 +1010,214 @@ export function GameSlotsPanel({
             </section>
 
             <div className="space-y-3">
-              <div>
-                <StudioLabel hint="Erscheint nach gelöster Aufgabe">Bonus (optional)</StudioLabel>
-                <StudioSelect
-                  value={bonusTaskId}
-                  onChange={(e) => setBonusTaskId(e.target.value)}
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <StudioLabel hint="Überraschungen — nicht der nächste Missions-Schritt">
+                    Bonusaufgaben (Layer 3)
+                  </StudioLabel>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Mehrere möglich: Sofort, +Minuten, +Meter, parallel je Rolle. Erscheinen mit
+                    Fanfare.
+                  </p>
+                </div>
+                <StudioButton
+                  type="button"
+                  variant="ghost"
+                  onClick={() =>
+                    setBonusBindings((prev) => [
+                      ...prev,
+                      {
+                        task_id: bonusCandidates[0]?.task_id ?? library[0]?.id ?? "",
+                        role: "team",
+                        when: { type: "immediate" },
+                      },
+                    ])
+                  }
                 >
-                  <option value="">Kein Bonus</option>
-                  {bonusCandidates.map((b) => (
-                    <option key={b.task_id} value={b.task_id}>
-                      {b.task.title}
-                    </option>
-                  ))}
-                  {library
-                    .filter((t) => !bonusCandidates.some((b) => b.task_id === t.id))
-                    .map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.title} (Pool)
-                      </option>
-                    ))}
-                </StudioSelect>
+                  + Bonus
+                </StudioButton>
               </div>
 
-              {bonusTaskId ? (
-                <div>
-                  <StudioLabel>Wer erhält den Bonus?</StudioLabel>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                    {BONUS_ROLE_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setBonusRole(opt.value)}
-                        className={`rounded-2xl border px-3 py-2 text-left text-sm ${
-                          bonusRole === opt.value
-                            ? "border-primary bg-primary/10 font-semibold"
-                            : "border-border"
-                        }`}
-                      >
-                        <span className="block font-medium">{opt.label}</span>
-                        <span className="text-xs text-muted-foreground">{opt.hint}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              {bonusBindings.some((b) => b.role !== "team") ? (
+                <StudioHint tone="warn">
+                  Rollen-Bonus (nur Alpha/Beta/Gamma): Bei Solo-Teams oder wenn die Rolle im
+                  Team fehlt, erscheint dieser Bonus für niemanden. Für Tests oft „Ganzes Team“
+                  oder die Rolle wählen, die wirklich mitspielt.
+                </StudioHint>
               ) : null}
+
+              {bonusBindings.length === 0 ? (
+                <p className="rounded-2xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+                  Kein Bonus — Mission endet nach dem Lösen ohne Extra-Punkte-Überraschung.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {bonusBindings.map((binding, index) => (
+                    <li
+                      key={`${binding.task_id}-${index}`}
+                      className="space-y-3 rounded-2xl border border-border bg-muted/30 px-3 py-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Bonus {index + 1}
+                        </span>
+                        <button
+                          type="button"
+                          className="text-xs font-semibold text-red-600"
+                          onClick={() =>
+                            setBonusBindings((prev) => prev.filter((_, i) => i !== index))
+                          }
+                        >
+                          Entfernen
+                        </button>
+                      </div>
+
+                      <div>
+                        <StudioLabel>Inhalt</StudioLabel>
+                        <StudioSelect
+                          value={binding.task_id}
+                          onChange={(e) => {
+                            const task_id = e.target.value;
+                            setBonusBindings((prev) =>
+                              prev.map((b, i) => (i === index ? { ...b, task_id } : b)),
+                            );
+                          }}
+                        >
+                          <option value="">Aufgabe wählen…</option>
+                          {bonusCandidates.map((b) => (
+                            <option key={b.task_id} value={b.task_id}>
+                              {b.task.title}
+                            </option>
+                          ))}
+                          {library
+                            .filter((t) => !bonusCandidates.some((b) => b.task_id === t.id))
+                            .map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.title} (Pool)
+                              </option>
+                            ))}
+                        </StudioSelect>
+                      </div>
+
+                      <div>
+                        <StudioLabel>Wer?</StudioLabel>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {BONUS_ROLE_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() =>
+                                setBonusBindings((prev) =>
+                                  prev.map((b, i) =>
+                                    i === index ? { ...b, role: opt.value } : b,
+                                  ),
+                                )
+                              }
+                              className={`rounded-2xl border px-3 py-2 text-left text-sm ${
+                                binding.role === opt.value
+                                  ? "border-primary bg-primary/10 font-semibold"
+                                  : "border-border"
+                              }`}
+                            >
+                              <span className="block font-medium">{opt.label}</span>
+                              <span className="text-xs text-muted-foreground">{opt.hint}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <StudioLabel>Wann?</StudioLabel>
+                        <div className="mt-2 grid gap-2">
+                          {BONUS_WHEN_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() =>
+                                setBonusBindings((prev) =>
+                                  prev.map((b, i) =>
+                                    i === index
+                                      ? {
+                                          ...b,
+                                          when: {
+                                            type: opt.value,
+                                            minutes:
+                                              opt.value === "delay_minutes" ||
+                                              opt.value === "game_minutes" ||
+                                              opt.value === "interval_minutes"
+                                                ? b.when.minutes ?? 5
+                                                : undefined,
+                                            meters:
+                                              opt.value === "delay_meters"
+                                                ? b.when.meters ?? 20
+                                                : undefined,
+                                          },
+                                        }
+                                      : b,
+                                  ),
+                                )
+                              }
+                              className={`rounded-2xl border px-3 py-2 text-left text-sm ${
+                                binding.when.type === opt.value
+                                  ? "border-primary bg-primary/10 font-semibold"
+                                  : "border-border"
+                              }`}
+                            >
+                              <span className="block font-medium">{opt.label}</span>
+                              <span className="text-xs text-muted-foreground">{opt.hint}</span>
+                            </button>
+                          ))}
+                        </div>
+                        {binding.when.type === "delay_minutes" ||
+                        binding.when.type === "game_minutes" ||
+                        binding.when.type === "interval_minutes" ? (
+                          <div className="mt-2">
+                            <StudioLabel>Minuten</StudioLabel>
+                            <StudioInput
+                              type="number"
+                              min={1}
+                              value={binding.when.minutes ?? 5}
+                              onChange={(e) => {
+                                const minutes = Math.max(1, Number(e.target.value) || 1);
+                                setBonusBindings((prev) =>
+                                  prev.map((b, i) =>
+                                    i === index
+                                      ? { ...b, when: { ...b.when, minutes } }
+                                      : b,
+                                  ),
+                                );
+                              }}
+                            />
+                          </div>
+                        ) : null}
+                        {binding.when.type === "delay_meters" ? (
+                          <div className="mt-2">
+                            <StudioLabel>Meter</StudioLabel>
+                            <StudioInput
+                              type="number"
+                              min={1}
+                              value={binding.when.meters ?? 20}
+                              onChange={(e) => {
+                                const meters = Math.max(1, Number(e.target.value) || 1);
+                                setBonusBindings((prev) =>
+                                  prev.map((b, i) =>
+                                    i === index
+                                      ? { ...b, when: { ...b.when, meters } }
+                                      : b,
+                                  ),
+                                );
+                              }}
+                            />
+                          </div>
+                        ) : null}
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {bonusWhenLabel(binding.when)}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             {error ? <StudioError message={error} /> : null}

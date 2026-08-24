@@ -17,6 +17,7 @@ import {
 } from "@/components/grid/copy-invite-link";
 import { PlayDocSheet } from "@/components/game/play-doc-sheet";
 import { SessionHandoffScreen } from "@/components/player/session-handoff-screen";
+import { PersonalResumeLinkCard } from "@/components/player/personal-resume-link-card";
 import {
   GridButton,
   GridError,
@@ -151,7 +152,7 @@ export function LobbyRoom({
     }));
   }, []);
 
-  const { error: realtimeError } = useTeamSync({
+  const { error: realtimeError, statusHint: realtimeHint } = useTeamSync({
     sessionId: session.sessionId,
     teamId: session.teamId,
     playerId: session.playerId,
@@ -343,6 +344,12 @@ export function LobbyRoom({
             </p>
           </div>
 
+          <PersonalResumeLinkCard
+            inviteCode={inviteCode}
+            joinCode={joinCode}
+            sessionId={session.sessionId}
+          />
+
           <button
             type="button"
             onClick={() => setBriefingOpen(true)}
@@ -489,6 +496,9 @@ export function LobbyRoom({
             ) : null}
           </div>
 
+          {realtimeHint ? (
+            <p className="text-center text-xs text-slate-500">{realtimeHint}</p>
+          ) : null}
           {realtimeError ? <GridError message={realtimeError} /> : null}
           {error ? <GridError message={error} /> : null}
 

@@ -21,6 +21,8 @@ type UseTeamSyncOptions = {
   onSyncEvent?: (event: TeamSyncEvent) => void;
   onPlayersChange?: (players: LobbyPlayer[]) => void;
   onSessionSuperseded?: () => void;
+  /** Fired after Realtime is SUBSCRIBED again (e.g. after phone wake) — pull fresh state. */
+  onResynced?: () => void;
 };
 
 type TeamRow = {
@@ -39,8 +41,64 @@ type PlayerRow = {
   joined_at: string;
   left_at: string | null;
   session_id?: string;
+  role?: string | null;
 };
 
+type TeamRoleRow = {
+  beta_player_id: string | null;
+  navigator_player_id: string | null;
+  captain_player_id: string | null;
+};
+
+function toLobbyPlayers(rows: PlayerRow[], team: TeamRoleRow | null): LobbyPlayer[] {
+  return rows.map((player) => {
+    const role = player.role ?? null;
+    const isAlpha =
+      player.is_captain || role === "alpha" || team?.captain_player_id === player.id;
+    const isBeta = !isAlpha && (role === "beta" || team?.beta_player_id === player.id);
+    const archetype_role = isAlpha ? "alpha" : isBeta ? "beta" : "gamma";
+
+    return {
+      id: player.id,
+      display_name: player.display_name,
+      is_captain: player.is_captain,
+      joined_at: player.joined_at,
+      role: (role as LobbyPlayer["role"]) ?? undefined,
+      is_navigator: team?.navigator_player_id === player.id,
+      is_alpha: isAlpha,
+      is_beta: isBeta,
+      is_gamma: archetype_role === "gamma",
+      archetype_role,
+    };
+  });
+}
+
+async function loadActiveLobbyPlayers(
+  supabase: SupabaseClient,
+  teamId: string,
+): Promise<LobbyPlayer[]> {
+  const [{ data: team }, { data: players }] = await Promise.all([
+    supabase
+      .from("teams")
+      .select("beta_player_id, navigator_player_id, captain_player_id")
+      .eq("id", teamId)
+      .maybeSingle(),
+    supabase
+      .from("players")
+      .select("id, display_name, is_captain, joined_at, left_at, role")
+      .eq("team_id", teamId)
+      .is("left_at", null)
+      .order("joined_at", { ascending: true }),
+  ]);
+
+  if (!players) return [];
+  return toLobbyPlayers(players as PlayerRow[], (team as TeamRoleRow | null) ?? null);
+}
+
+/**
+ * Team Realtime sync with wake/reconnect.
+ * Phone sleep often drops the socket — we reconnect quietly; play actions still work via REST.
+ */
 export function useTeamSync({
   sessionId,
   teamId,
@@ -51,8 +109,12 @@ export function useTeamSync({
   onSyncEvent,
   onPlayersChange,
   onSessionSuperseded,
+  onResynced,
 }: UseTeamSyncOptions) {
   const [isConnected, setIsConnected] = useState(false);
+  /** Soft status for wake/reconnect — not a hard failure. */
+  const [statusHint, setStatusHint] = useState<string | null>(null);
+  /** Hard failures (auth/token) that need attention. */
   const [error, setError] = useState<string | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const clientRef = useRef<SupabaseClient | null>(null);
@@ -62,26 +124,82 @@ export function useTeamSync({
   const onSyncEventRef = useRef(onSyncEvent);
   const onPlayersChangeRef = useRef(onPlayersChange);
   const onSessionSupersededRef = useRef(onSessionSuperseded);
+  const onResyncedRef = useRef(onResynced);
 
   onTeamStatusChangeRef.current = onTeamStatusChange;
   onGameStateChangeRef.current = onGameStateChange;
   onSyncEventRef.current = onSyncEvent;
   onPlayersChangeRef.current = onPlayersChange;
   onSessionSupersededRef.current = onSessionSuperseded;
+  onResyncedRef.current = onResynced;
 
   useEffect(() => {
     if (!enabled) return;
 
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
+    let connecting = false;
+
+    async function teardown() {
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+      const channel = channelRef.current;
+      channelRef.current = null;
+      if (channel) {
+        try {
+          await channel.unsubscribe();
+        } catch {
+          /* ignore */
+        }
+      }
+      clientRef.current = null;
+    }
+
+    function scheduleRetry() {
+      if (cancelled) return;
+      attempt += 1;
+      const delayMs = Math.min(1000 * 2 ** Math.min(attempt - 1, 4), 12_000);
+      setIsConnected(false);
+      setStatusHint(
+        attempt <= 2
+          ? "Verbindung wird wiederhergestellt…"
+          : "Team-Sync kurz unterbrochen — du kannst weiterspielen.",
+      );
+      setError(null);
+      retryTimer = setTimeout(() => {
+        void connect();
+      }, delayMs);
+    }
 
     async function connect() {
+      if (cancelled || connecting) return;
+      connecting = true;
+
+      await teardown();
+      if (cancelled) {
+        connecting = false;
+        return;
+      }
+
       setError(null);
+      if (attempt > 0) {
+        setStatusHint("Verbindung wird wiederhergestellt…");
+      }
 
       const tokenResult = await getRealtimeAccessToken(sessionId);
-      if (cancelled) return;
+      if (cancelled) {
+        connecting = false;
+        return;
+      }
 
       if (!tokenResult.success) {
         setError(tokenResult.error);
+        setIsConnected(false);
+        connecting = false;
+        scheduleRetry();
         return;
       }
 
@@ -100,6 +218,10 @@ export function useTeamSync({
       );
 
       await supabase.realtime.setAuth(accessToken);
+      if (cancelled) {
+        connecting = false;
+        return;
+      }
 
       clientRef.current = supabase;
 
@@ -109,32 +231,36 @@ export function useTeamSync({
         onTeamStatusChangeRef.current?.(cached.status);
       }
 
-      let channelBuilder = supabase.channel(`team-sync:${teamId}`).on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "teams",
-            filter: `id=eq.${teamId}`,
-          },
-          (payload) => {
-            const row = payload.new as TeamRow;
-            const gameState = parseTeamGameState(row.game_state);
-            const nextState = {
-              teamId: row.id,
-              status: row.status,
-              currentLevel: row.current_level,
-              gameState,
-              startedAt: row.started_at,
-              lobbyAutoStartAt: row.lobby_auto_start_at,
-              isCaptain: cached?.isCaptain,
-            };
+      let channelBuilder = supabase.channel(`team-sync:${teamId}:${Date.now()}`).on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "teams",
+          filter: `id=eq.${teamId}`,
+        },
+        (payload) => {
+          const row = payload.new as TeamRow;
+          const gameState = parseTeamGameState(row.game_state);
+          const nextState = {
+            teamId: row.id,
+            status: row.status,
+            currentLevel: row.current_level,
+            gameState,
+            startedAt: row.started_at,
+            lobbyAutoStartAt: row.lobby_auto_start_at,
+            isCaptain: cached?.isCaptain,
+          };
 
-            cacheTeamState(nextState);
-            onTeamStatusChangeRef.current?.(row.status);
-            onGameStateChangeRef.current?.(gameState, row.current_level);
-          },
-        );
+          cacheTeamState(nextState);
+          onTeamStatusChangeRef.current?.(row.status);
+          onGameStateChangeRef.current?.(gameState, row.current_level);
+
+          void loadActiveLobbyPlayers(supabase, teamId).then((players) => {
+            onPlayersChangeRef.current?.(players);
+          });
+        },
+      );
 
       if (playerId) {
         channelBuilder = channelBuilder.on(
@@ -163,24 +289,10 @@ export function useTeamSync({
             table: "players",
             filter: `team_id=eq.${teamId}`,
           },
-          async () => {
-            const { data } = await supabase
-              .from("players")
-              .select("id, display_name, is_captain, joined_at, left_at")
-              .eq("team_id", teamId)
-              .is("left_at", null)
-              .order("joined_at", { ascending: true });
-
-            if (data) {
-              onPlayersChangeRef.current?.(
-                data.map((player: PlayerRow) => ({
-                  id: player.id,
-                  display_name: player.display_name,
-                  is_captain: player.is_captain,
-                  joined_at: player.joined_at,
-                })),
-              );
-            }
+          () => {
+            void loadActiveLobbyPlayers(supabase, teamId).then((players) => {
+              onPlayersChangeRef.current?.(players);
+            });
           },
         )
         .on(
@@ -196,47 +308,60 @@ export function useTeamSync({
           },
         )
         .subscribe((status) => {
-          if (status === "SUBSCRIBED") {
-            setIsConnected(true);
-            void (async () => {
-              const { data } = await supabase
-                .from("players")
-                .select("id, display_name, is_captain, joined_at, left_at")
-                .eq("team_id", teamId)
-                .is("left_at", null)
-                .order("joined_at", { ascending: true });
+          if (cancelled) return;
 
-              if (data) {
-                onPlayersChangeRef.current?.(
-                  data.map((player: PlayerRow) => ({
-                    id: player.id,
-                    display_name: player.display_name,
-                    is_captain: player.is_captain,
-                    joined_at: player.joined_at,
-                  })),
-                );
-              }
-            })();
+          if (status === "SUBSCRIBED") {
+            attempt = 0;
+            setIsConnected(true);
+            setStatusHint(null);
+            setError(null);
+            connecting = false;
+            void loadActiveLobbyPlayers(supabase, teamId).then((players) => {
+              if (!cancelled) onPlayersChangeRef.current?.(players);
+            });
+            onResyncedRef.current?.();
+            return;
           }
-          if (status === "CHANNEL_ERROR") {
-            setError("Realtime-Verbindung fehlgeschlagen.");
+
+          if (
+            status === "CHANNEL_ERROR" ||
+            status === "TIMED_OUT" ||
+            status === "CLOSED"
+          ) {
+            connecting = false;
             setIsConnected(false);
+            scheduleRetry();
           }
         });
 
       channelRef.current = channel;
+      connecting = false;
     }
 
-    connect();
+    function resumeIfNeeded() {
+      if (cancelled) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      attempt = 0;
+      void connect();
+    }
+
+    void connect();
+
+    document.addEventListener("visibilitychange", resumeIfNeeded);
+    window.addEventListener("online", resumeIfNeeded);
+    window.addEventListener("pageshow", resumeIfNeeded);
 
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", resumeIfNeeded);
+      window.removeEventListener("online", resumeIfNeeded);
+      window.removeEventListener("pageshow", resumeIfNeeded);
+      void teardown();
       setIsConnected(false);
-      channelRef.current?.unsubscribe();
-      channelRef.current = null;
-      clientRef.current = null;
     };
   }, [enabled, playerId, sessionId, teamId]);
 
-  return { isConnected, error };
+  return { isConnected, statusHint, error };
 }

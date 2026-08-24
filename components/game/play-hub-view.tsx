@@ -12,11 +12,19 @@ import { IconCheck, IconLock } from "@/components/game/city/icons";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
 import { useWalkedDistance } from "@/lib/hooks/use-walked-distance";
 import type { ContentMode } from "@/lib/cms/layer-model";
-import { isWithinGeofence } from "@/lib/grid/geofence";
+import { isWithinGeofenceForPlay, playGeofenceRadiusMeters } from "@/lib/grid/geofence";
+import type { OutdoorForceUnlock } from "@/lib/grid/outdoor-unlock";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 import type { GameLevelStatus } from "@/lib/grid/game-state";
 import type { LevelDefinition, GeolocationSample } from "@/lib/grid/level-types";
 import { hubMeta } from "@/lib/grid/play-slots";
+
+export type OutdoorArriveInput = {
+  geolocation?: GeolocationSample;
+  targetLevel?: number;
+  walkedMeters?: number;
+  forceUnlock?: OutdoorForceUnlock;
+};
 
 type Props = {
   mode: ContentMode;
@@ -29,11 +37,15 @@ type Props = {
   isPending: boolean;
   /** Persist outdoor walk progress across remounts. */
   walkStorageKey?: string | null;
-  onArriveOutdoor: (geolocation: GeolocationSample, targetLevel?: number) => void;
-  onSolveGpsCheckpoint: (geolocation: GeolocationSample) => void;
+  /** Server-held meters for the active distance unlock (team truth). */
+  serverWalkedMeters?: number;
+  onArriveOutdoor: (input: OutdoorArriveInput) => void;
+  onSolveGpsCheckpoint: (input: OutdoorArriveInput) => void;
   onOpenStation: (levelNumber: number) => void;
   onSubmitStationCode: (code: string) => void;
   onStartMission: (levelNumber: number) => void;
+  /** Alpha reports walk progress to the server. */
+  onReportWalkProgress?: (level: number, walkedMeters: number) => void;
 };
 
 export function PlayHubView({
@@ -46,11 +58,13 @@ export function PlayHubView({
   disabled,
   isPending,
   walkStorageKey = null,
+  serverWalkedMeters = 0,
   onArriveOutdoor,
   onSolveGpsCheckpoint,
   onOpenStation,
   onSubmitStationCode,
   onStartMission,
+  onReportWalkProgress,
 }: Props) {
   const meta = hubMeta(mode);
   const current = levels.find((l) => l.level === activeLevel) ?? levels[0];
@@ -83,10 +97,12 @@ export function PlayHubView({
         disabled={disabled}
         isPending={isPending}
         walkStorageKey={walkStorageKey}
+        serverWalkedMeters={serverWalkedMeters}
+        onReportWalkProgress={onReportWalkProgress}
         onArrive={
           gpsOnly
-            ? (geo) => onSolveGpsCheckpoint(geo)
-            : (geo, level) => onArriveOutdoor(geo, level)
+            ? (input) => onSolveGpsCheckpoint(input)
+            : (input) => onArriveOutdoor(input)
         }
       />
     );
@@ -276,7 +292,9 @@ function OutdoorHub({
   disabled,
   isPending,
   walkStorageKey,
+  serverWalkedMeters = 0,
   onArrive,
+  onReportWalkProgress,
 }: {
   levels: LevelDefinition[];
   levelStatuses: Record<string, { status: GameLevelStatus }>;
@@ -286,7 +304,9 @@ function OutdoorHub({
   disabled: boolean;
   isPending: boolean;
   walkStorageKey?: string | null;
-  onArrive: (geolocation: GeolocationSample, targetLevel?: number) => void;
+  serverWalkedMeters?: number;
+  onArrive: (input: OutdoorArriveInput) => void;
+  onReportWalkProgress?: (level: number, walkedMeters: number) => void;
 }) {
   const isWalkMode =
     current.triggers?.type === "distance" &&
@@ -309,6 +329,7 @@ function OutdoorHub({
   });
   const [simBonus, setSimBonus] = useState(0);
   const arrivedPingRef = useRef(false);
+  const lastReportRef = useRef(0);
 
   const waypoints = useMemo(
     () => buildGpsWaypoints(levels, levelStatuses),
@@ -321,16 +342,19 @@ function OutdoorHub({
       if (!level.location) return false;
       const status = levelStatuses[String(level.level)]?.status ?? "locked";
       if (status === "locked" || status === "completed") return false;
-      return isWithinGeofence(sample, level.location);
+      return isWithinGeofenceForPlay(sample, level.location);
     });
     return hit ?? current;
   }, [isGpsMode, routeOrder, sample, levels, levelStatuses, current]);
 
   const distanceToTarget = computeTargetDistance(sample, targetLevel.location);
   const withinRadius =
-    sample && targetLevel.location && distanceToTarget !== null
-      ? distanceToTarget <= targetLevel.location.radius_meters
+    sample && targetLevel.location
+      ? isWithinGeofenceForPlay(sample, targetLevel.location)
       : false;
+  const playRadius = targetLevel.location
+    ? Math.round(playGeofenceRadiusMeters(targetLevel.location, sample?.accuracy))
+    : 40;
 
   useEffect(() => {
     if (!isGpsMode) return;
@@ -349,15 +373,44 @@ function OutdoorHub({
   ).length;
 
   const targetMeters = current.triggers?.after_meters ?? 100;
-  const walkedMeters = walk.displayMeters + simBonus;
+  const localWalked = walk.displayMeters + simBonus;
+  const walkedMeters = Math.max(localWalked, serverWalkedMeters);
 
-  function openWithSample(geo?: GeolocationSample | null, level?: number) {
+  // Keep server progress warm so reopen / teammate devices share truth.
+  useEffect(() => {
+    if (!isWalkMode || !canUnlockGps || !onReportWalkProgress) return;
+    const meters = Math.max(walk.meters + simBonus, serverWalkedMeters);
+    if (meters < 1) return;
+    const now = Date.now();
+    if (now - lastReportRef.current < 4000) return;
+    lastReportRef.current = now;
+    onReportWalkProgress(current.level, meters);
+  }, [
+    isWalkMode,
+    canUnlockGps,
+    onReportWalkProgress,
+    walk.meters,
+    simBonus,
+    serverWalkedMeters,
+    current.level,
+  ]);
+
+  function openWithSample(
+    geo?: GeolocationSample | null,
+    level?: number,
+    forceUnlock?: OutdoorForceUnlock,
+  ) {
     const position =
       geo ??
       walk.sample ??
       sample ??
       ({ lat: 0, lng: 0, accuracy: 50 } satisfies GeolocationSample);
-    onArrive(position, level);
+    onArrive({
+      geolocation: position,
+      targetLevel: level,
+      walkedMeters: isWalkMode ? Math.max(walk.meters + simBonus, serverWalkedMeters) : undefined,
+      forceUnlock,
+    });
   }
 
   if (isWalkMode) {
@@ -375,15 +428,18 @@ function OutdoorHub({
           walkedMeters={walkedMeters}
           disabled={disabled}
           isPending={isPending}
+          gpsError={walk.error}
+          showForceOpen={canUnlockGps}
           onOpen={() => openWithSample(walk.sample, current.level)}
-          onSimulateWalk={() => setSimBonus((m) => m + 1)}
+          onForceOpen={() => openWithSample(walk.sample, current.level, "distance")}
+          onSimulateWalk={() => setSimBonus((m) => m + 25)}
         />
-        {walk.error ? (
-          <p className="px-5 pb-6 text-center text-sm text-[var(--cg-destructive)]">{walk.error}</p>
-        ) : null}
         {!canUnlockGps ? (
           <p className="px-5 pb-6 text-center text-sm text-[var(--cg-muted)]">
-            Nur Alpha / GPS-Leiter kann die Strecke tracken — bitte Gerät mit Freigabe nutzen.
+            Nur Alpha / GPS-Leiter trackt die Strecke — bitte das Freigabe-Gerät nutzen.
+            {serverWalkedMeters > 0
+              ? ` Team-Stand: ca. ${Math.round(serverWalkedMeters)} m.`
+              : ""}
           </p>
         ) : null}
       </section>
@@ -468,9 +524,32 @@ function OutdoorHub({
         ) : (
           <>
             <p className="text-center text-sm text-[var(--cg-muted)]">
-              Lauft zum Wegpunkt. Bei ca. {targetLevel.location?.radius_meters ?? 10} m piept es und
-              ihr könnt öffnen.
+              Lauft zum Wegpunkt. Bei ca. {playRadius} m piept es und ihr könnt öffnen.
             </p>
+            {canUnlockGps ? (
+              <div className="space-y-2">
+                <BigButton
+                  variant="outline"
+                  disabled={disabled || isPending}
+                  onClick={() =>
+                    openWithSample(
+                      sample,
+                      routeOrder === "free" ? targetLevel.level : undefined,
+                      "geofence",
+                    )
+                  }
+                >
+                  Wir sind am Punkt
+                </BigButton>
+                <p className="text-center text-xs text-[var(--cg-muted)]">
+                  Wenn GPS hängt oder der Radius nicht greift — Alpha öffnet fürs Team.
+                </p>
+              </div>
+            ) : (
+              <p className="text-center text-sm text-[var(--cg-muted)]">
+                Nur Alpha / GPS-Leiter kann den Wegpunkt freischalten.
+              </p>
+            )}
             {process.env.NODE_ENV === "development" && targetLevel.location ? (
               <BigButton
                 variant="outline"

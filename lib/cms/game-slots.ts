@@ -8,6 +8,7 @@ import {
   parseLinkOverrides,
   type GameLinkOverrides,
 } from "@/lib/cms/game-link-config";
+import { parseBonusBindings, type BonusBinding } from "@/lib/cms/bonus-bindings";
 import type { ContentMode } from "@/lib/cms/layer-model";
 import { LAYER_GAME_PRESETS, type LayerGamePreset } from "@/lib/cms/layer-model";
 import type { StudioGameTaskLink, StudioTask, StudioTaskContent } from "@/lib/cms/types";
@@ -40,7 +41,11 @@ export type GameSlot = {
   /** Pool task id when Einstiegsfrage is bound. */
   openerTaskId: string | null;
   geoLink: StudioGameTaskLink | null;
+  /** @deprecated Prefer bonusBindings + bonusLinks */
   bonusLink: StudioGameTaskLink | null;
+  /** All Layer-3 links bound to this mission. */
+  bonusLinks: StudioGameTaskLink[];
+  bonusBindings: BonusBinding[];
 };
 
 export function surfaceToPreset(surface: ContentMode): LayerGamePreset {
@@ -305,27 +310,59 @@ export function buildGameSlots(links: StudioGameTaskLink[]): GameSlot[] {
       if (quiz) quizSource = "geo_task";
     }
 
-    const bonusTaskId = overrides.bonus_task_id;
-    let bonusLink =
-      (bonusTaskId
-        ? bonuses.find((b) => b.task_id === bonusTaskId || b.id === bonusTaskId)
-        : null) ?? null;
+    const bindings = parseBonusBindings(overrides);
+    const bonusLinks: StudioGameTaskLink[] = [];
 
-    if (!bonusLink) {
-      bonusLink =
-        bonuses.find((b) => {
-          const t = parseLinkOverrides(b.overrides).trigger;
-          return t?.type === "after_task_solved" && t.source_task_id === levelLink.task_id;
-        }) ?? null;
+    for (const binding of bindings) {
+      const found =
+        bonuses.find((b) => b.task_id === binding.task_id || b.id === binding.task_id) ?? null;
+      if (found) bonusLinks.push(found);
     }
 
-    if (!bonusLink && bonuses[index] && !bonusTaskId) {
-      const candidate = bonuses[index]!;
-      const t = parseLinkOverrides(candidate.overrides).trigger;
-      if (!t || t.type === "game_start" || t.source_task_id === levelLink.task_id) {
-        bonusLink = candidate;
+    // Legacy fallbacks when no bindings yet
+    if (bonusLinks.length === 0) {
+      const bonusTaskId = overrides.bonus_task_id;
+      let bonusLink =
+        (bonusTaskId
+          ? bonuses.find((b) => b.task_id === bonusTaskId || b.id === bonusTaskId)
+          : null) ?? null;
+
+      if (!bonusLink) {
+        bonusLink =
+          bonuses.find((b) => {
+            const t = parseLinkOverrides(b.overrides).trigger;
+            return t?.type === "after_task_solved" && t.source_task_id === levelLink.task_id;
+          }) ?? null;
+      }
+
+      if (!bonusLink && bonuses[index] && !bonusTaskId) {
+        const candidate = bonuses[index]!;
+        const t = parseLinkOverrides(candidate.overrides).trigger;
+        if (!t || t.type === "game_start" || t.source_task_id === levelLink.task_id) {
+          bonusLink = candidate;
+        }
+      }
+
+      if (bonusLink) {
+        bonusLinks.push(bonusLink);
       }
     }
+
+    const resolvedBindings =
+      bindings.length > 0
+        ? bindings
+        : bonusLinks.map((link) => {
+            const bo = parseLinkOverrides(link.overrides);
+            const role = bo.role ?? "gamma";
+            return {
+              task_id: link.task_id,
+              role:
+                role === "alpha" || role === "beta" || role === "gamma" || role === "team"
+                  ? role
+                  : ("gamma" as const),
+              when: { type: "immediate" as const },
+            };
+          });
 
     return {
       index: index + 1,
@@ -334,16 +371,19 @@ export function buildGameSlots(links: StudioGameTaskLink[]): GameSlot[] {
       quizSource,
       openerTaskId,
       geoLink,
-      bonusLink,
+      bonusLink: bonusLinks[0] ?? null,
+      bonusLinks,
+      bonusBindings: resolvedBindings,
     };
   });
 }
 
 export function slotPhaseSummary(slot: GameSlot): string {
+  const bonusCount = slot.bonusBindings.length || (slot.bonusLink ? 1 : 0);
   const parts = [
     slot.quiz ? "Quiz" : "Quiz fehlt",
     "Level",
-    slot.bonusLink ? "Bonus" : "ohne Bonus",
+    bonusCount > 1 ? `${bonusCount} Boni` : bonusCount === 1 ? "Bonus" : "ohne Bonus",
   ];
   return parts.join(" → ");
 }

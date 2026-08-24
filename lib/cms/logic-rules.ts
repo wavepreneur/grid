@@ -574,16 +574,65 @@ export function compileStudioGameToLevels(input: {
         level.triggers = { ...(level.triggers ?? {}), type: "sequential" };
       }
 
-      if (slot.bonusLink) {
-        const bonusOverrides = parseLinkOverrides(slot.bonusLink.overrides);
-        const role = bonusOverrides.role ?? "gamma";
-        const bonus = taskContentToBonus(
-          slot.bonusLink.task,
-          role === "team" ? "team" : role === "alpha" || role === "beta" || role === "gamma" ? role : "gamma",
-        );
-        if (bonus) {
+      if (slot.bonusBindings.length > 0 || slot.bonusLinks.length > 0) {
+        const layer3 = input.links.filter((l) => l.layer === 3);
+
+        const compiled = [];
+        const pairs =
+          slot.bonusBindings.length > 0
+            ? slot.bonusBindings.map((binding) => ({
+                binding,
+                link:
+                  slot.bonusLinks.find(
+                    (l) => l.task_id === binding.task_id || l.id === binding.task_id,
+                  ) ??
+                  layer3.find(
+                    (b) => b.task_id === binding.task_id || b.id === binding.task_id,
+                  ) ??
+                  null,
+              }))
+            : slot.bonusLinks.map((link) => ({
+                binding: {
+                  task_id: link.task_id,
+                  role: (parseLinkOverrides(link.overrides).role ?? "gamma") as
+                    | "alpha"
+                    | "beta"
+                    | "gamma"
+                    | "team",
+                  when: { type: "immediate" as const },
+                },
+                link,
+              }));
+
+        for (const { binding, link } of pairs) {
+          if (!link) continue;
+          const role = binding.role ?? "gamma";
+          const bonus = taskContentToBonus(
+            link.task,
+            role === "team"
+              ? "team"
+              : role === "alpha" || role === "beta" || role === "gamma"
+                ? role
+                : "gamma",
+          );
+          if (!bonus) continue;
           if (role === "team") bonus.for_team = true;
-          level.bonus = bonus;
+          compiled.push({
+            ...bonus,
+            id: `${slot.index}-${link.task_id}`,
+            when: {
+              type: binding.when.type,
+              minutes:
+                "minutes" in binding.when ? binding.when.minutes : undefined,
+              meters: "meters" in binding.when ? binding.when.meters : undefined,
+            },
+            fanfare: true,
+          });
+        }
+
+        if (compiled.length > 0) {
+          level.bonuses = compiled;
+          level.bonus = compiled[0];
         }
       }
 

@@ -5,12 +5,14 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import {
   advanceFromHub,
   dismissSyncModal,
+  getGameState,
   purchaseHint,
   skipBonusPhase,
   solveCurrentLevel,
   submitArrivalQuiz,
   advanceQuizToLevel,
   submitBonusAnswer,
+  syncOutdoorWalkProgress,
 } from "@/app/actions/game";
 import { usesMissionShell } from "@/lib/grid/blueprints";
 import { CityPlayShell } from "@/components/game/city/play-shell";
@@ -19,6 +21,7 @@ import { ExitmaniaLevelView } from "@/components/game/exitmania-level-view";
 import { GameHud } from "@/components/game/game-hud";
 import { LevelPanel } from "@/components/game/level-panel";
 import { PlayPhaseFlow } from "@/components/game/play-phase-flow";
+import type { OutdoorArriveInput } from "@/components/game/play-hub-view";
 import type { PlayMorePanel } from "@/components/game/play-more-sheet";
 import { SyncModal } from "@/components/game/sync-modal";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
@@ -31,10 +34,10 @@ import { useTeamSync } from "@/lib/hooks/use-team-sync";
 import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
 import { cacheTeamState } from "@/lib/grid/offline-state";
 import { displayRoleLabel, DEFAULT_ROLE_LABELS } from "@/lib/grid/role-labels";
+import { useBonusQueueTick } from "@/lib/hooks/use-bonus-queue-tick";
 import { clearWalkedDistanceStorage } from "@/lib/hooks/use-walked-distance";
 import type { TeamGameState, TeamRealtimeState } from "@/lib/grid/game-state";
 import type {
-  GeolocationSample,
   ResolvedEventContent,
   SolveLevelPayload,
 } from "@/lib/grid/level-types";
@@ -96,7 +99,20 @@ export function GameRoom({
     });
   }, []);
 
-  const { isConnected, error: realtimeError } = useTeamSync({
+  const handleResynced = useCallback(() => {
+    startTransition(async () => {
+      const result = await getGameState({
+        inviteCode,
+        joinCode,
+        sessionId: playerSession.sessionId,
+      });
+      if (!result.success) return;
+      setTeamState(result.data);
+      cacheTeamState(result.data);
+    });
+  }, [inviteCode, joinCode, playerSession.sessionId, startTransition]);
+
+  const { isConnected, statusHint: realtimeHint, error: realtimeError } = useTeamSync({
     sessionId: playerSession.sessionId,
     teamId: playerSession.teamId,
     playerId: playerSession.playerId,
@@ -105,6 +121,7 @@ export function GameRoom({
     onTeamStatusChange: handleTeamStatusChange,
     onSessionSuperseded: () => setSessionSuperseded(true),
     onPlayersChange: setLobbyPlayers,
+    onResynced: handleResynced,
   });
 
   const activeLevel = Number(teamState.currentLevel) || 1;
@@ -112,6 +129,23 @@ export function GameRoom({
   const levelStartedAt = levelState?.started_at ?? null;
   const isFinished = teamState.status === "finished";
   const modal = teamState.gameState.modal;
+  const walkStorageKey = `grid:walk:${inviteCode}:${joinCode}`;
+
+  useBonusQueueTick({
+    inviteCode,
+    joinCode,
+    sessionId: playerSession.sessionId,
+    gameState: teamState.gameState,
+    walkStorageKey,
+    enabled: !sessionSuperseded && !isFinished,
+    // One tracker device (Alpha/GPS lead) — avoids split meter counters across phones.
+    trackMeters: playerSession.canUnlockGps,
+    onState: (state) => {
+      setTeamState(state);
+      cacheTeamState(state);
+    },
+  });
+
   const completedLevels = useMemo(
     () => countCompletedLevels(teamState.gameState),
     [teamState.gameState],
@@ -235,15 +269,17 @@ export function GameRoom({
     cacheTeamState(result.data);
   }
 
-  function handleArriveOutdoor(geolocation: GeolocationSample, targetLevel?: number) {
+  function handleArriveOutdoor(input: OutdoorArriveInput) {
     setError(null);
     startTransition(async () => {
       const result = await advanceFromHub({
         inviteCode,
         joinCode,
         sessionId: playerSession.sessionId,
-        geolocation,
-        targetLevel,
+        geolocation: input.geolocation,
+        targetLevel: input.targetLevel,
+        walkedMeters: input.walkedMeters,
+        forceUnlock: input.forceUnlock,
       });
       if (!result.success) {
         setError(result.error ?? "Aktion fehlgeschlagen.");
@@ -253,15 +289,33 @@ export function GameRoom({
         setError("Aktion fehlgeschlagen.");
         return;
       }
-      const levelKey = targetLevel ?? activeLevel;
+      const levelKey = input.targetLevel ?? activeLevel;
       clearWalkedDistanceStorage(`grid:walk:${inviteCode}:${joinCode}:L${levelKey}`);
       setTeamState(result.data);
       cacheTeamState(result.data);
     });
   }
 
-  function handleSolveGpsCheckpoint(geolocation: GeolocationSample) {
-    handleSolveLevel({ geolocation });
+  function handleSolveGpsCheckpoint(input: OutdoorArriveInput) {
+    handleSolveLevel({
+      geolocation: input.geolocation,
+      forceUnlock: input.forceUnlock,
+    });
+  }
+
+  function handleReportWalkProgress(level: number, walkedMeters: number) {
+    void syncOutdoorWalkProgress({
+      inviteCode,
+      joinCode,
+      sessionId: playerSession.sessionId,
+      level,
+      walkedMeters,
+    }).then((result) => {
+      if (result.success && result.data) {
+        setTeamState(result.data);
+        cacheTeamState(result.data);
+      }
+    });
   }
 
   function handleOpenStation(levelNumber: number) {
@@ -370,7 +424,6 @@ export function GameRoom({
     eventContent.missionDurationMinutes,
     paused,
   );
-  const walkStorageKey = `grid:walk:${inviteCode}:${joinCode}`;
   const isAlpha = Boolean(playerSession.isAlpha || teamState.isCaptain);
 
   function handleTransferAlpha(targetPlayerId: string) {
@@ -543,6 +596,23 @@ export function GameRoom({
               eventContent.roleLabels ?? DEFAULT_ROLE_LABELS,
             ),
           }))}
+        roster={lobbyPlayers.map((p) => ({
+          id: p.id,
+          name: p.display_name,
+          roleLabel: displayRoleLabel(
+            p.archetype_role ??
+              (p.is_alpha || p.is_captain
+                ? "alpha"
+                : p.is_beta
+                  ? "beta"
+                  : "gamma"),
+            eventContent.roleLabels ?? DEFAULT_ROLE_LABELS,
+          ),
+          isMe: p.id === playerSession.playerId,
+        }))}
+        inviteCode={inviteCode}
+        joinCode={joinCode}
+        sessionId={playerSession.sessionId}
         onTransferAlpha={handleTransferAlpha}
         onReleasePlayerSeat={isAlpha ? handleReleasePlayerSeat : undefined}
         transferPending={transferPending}
@@ -551,6 +621,7 @@ export function GameRoom({
         releasePending={releasePending}
         onArriveOutdoor={handleArriveOutdoor}
         onSolveGpsCheckpoint={handleSolveGpsCheckpoint}
+        onReportWalkProgress={handleReportWalkProgress}
         onOpenStation={handleOpenStation}
         onSubmitStationCode={handleSubmitStationCode}
         onStartMission={handleStartMission}
@@ -607,6 +678,11 @@ export function GameRoom({
       <>
         <CityPlayShell mode={eventContent.contentMode}>
           {playBody}
+          {realtimeHint ? (
+            <p className="px-4 pb-2 text-center text-xs text-[var(--cg-muted)]">
+              {realtimeHint}
+            </p>
+          ) : null}
           {realtimeError ? (
             <div className="px-4 pb-4">
               <GridError message={realtimeError} />
@@ -650,6 +726,9 @@ export function GameRoom({
           />
         ) : null}
         {playBody}
+        {realtimeHint ? (
+          <p className="text-center text-xs text-slate-500">{realtimeHint}</p>
+        ) : null}
         {realtimeError ? <GridError message={realtimeError} /> : null}
         {error ? <GridError message={error} /> : null}
       </div>

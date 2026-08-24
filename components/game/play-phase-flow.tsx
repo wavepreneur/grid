@@ -6,7 +6,7 @@ import { BonusCompleteToast } from "@/components/game/bonus-complete-toast";
 import { CityStatusHud } from "@/components/game/city/status-hud";
 import { CityTeamBar } from "@/components/game/city/team-bar";
 import { PlayBonusView } from "@/components/game/play-bonus-view";
-import { PlayHubView } from "@/components/game/play-hub-view";
+import { PlayHubView, type OutdoorArriveInput } from "@/components/game/play-hub-view";
 import {
   PauseBanner,
   PlayMoreSheet,
@@ -15,10 +15,10 @@ import {
 } from "@/components/game/play-more-sheet";
 import { PlayQuizView } from "@/components/game/play-quiz-view";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
-import { isBonusForRole, resolveBonusTask } from "@/lib/grid/bonus";
+import { isBonusForRole, findBonusTaskById, resolveBonusTask } from "@/lib/grid/bonus";
+import { findPresentableBonusForRole } from "@/lib/grid/bonus-queue";
 import type { PurchasedTileHint, TeamGameState } from "@/lib/grid/game-state";
 import type {
-  GeolocationSample,
   LevelDefinition,
   ResolvedEventContent,
   SolveLevelPayload,
@@ -60,14 +60,19 @@ type Props = {
   onTogglePause: () => void;
   isAlpha: boolean;
   teammates: Teammate[];
+  roster?: Array<Teammate & { isMe?: boolean }>;
+  inviteCode?: string;
+  joinCode?: string;
+  sessionId?: string;
   onTransferAlpha?: (playerId: string) => void;
   onReleasePlayerSeat?: (playerId: string) => void;
   transferPending?: boolean;
   onReclaimSession?: () => void;
   onReleaseMySeat?: () => void;
   releasePending?: boolean;
-  onArriveOutdoor: (geolocation: GeolocationSample, targetLevel?: number) => void;
-  onSolveGpsCheckpoint: (geolocation: GeolocationSample) => void;
+  onArriveOutdoor: (input: OutdoorArriveInput) => void;
+  onSolveGpsCheckpoint: (input: OutdoorArriveInput) => void;
+  onReportWalkProgress?: (level: number, walkedMeters: number) => void;
   onOpenStation: (levelNumber: number) => void;
   onSubmitStationCode: (code: string) => void;
   onStartMission: (levelNumber: number) => void;
@@ -120,6 +125,10 @@ export function PlayPhaseFlow({
   onTogglePause,
   isAlpha,
   teammates,
+  roster,
+  inviteCode,
+  joinCode,
+  sessionId,
   onTransferAlpha,
   onReleasePlayerSeat,
   transferPending,
@@ -128,6 +137,7 @@ export function PlayPhaseFlow({
   releasePending,
   onArriveOutdoor,
   onSolveGpsCheckpoint,
+  onReportWalkProgress,
   onOpenStation,
   onSubmitStationCode,
   onStartMission,
@@ -204,6 +214,10 @@ export function PlayPhaseFlow({
         onTogglePause={onTogglePause}
         isAlpha={isAlpha}
         teammates={teammates}
+        roster={roster}
+        inviteCode={inviteCode}
+        joinCode={joinCode}
+        sessionId={sessionId}
         onTransferAlpha={onTransferAlpha}
         onReleasePlayerSeat={onReleasePlayerSeat}
         transferPending={transferPending}
@@ -215,11 +229,28 @@ export function PlayPhaseFlow({
     </>
   );
 
-  // Asymmetric role bonus: assignee sees overlay; others keep playing the hub.
-  const activeBonus = gameState.active_bonus;
-  if (activeBonus && !activeBonus.for_team) {
-    const bonusLevel = eventContent.levels.find((l) => l.level === activeBonus.from_level);
-    const bonus = bonusLevel ? resolveBonusTask(bonusLevel) : null;
+  // Active / ready bonus from queue (supports parallel role packs).
+  const queueBonus = findPresentableBonusForRole(gameState, myRole);
+  const overlayBonus = gameState.active_bonus;
+  const presentBonusMeta = queueBonus
+    ? {
+        from_level: queueBonus.from_level,
+        bonus_id: queueBonus.bonus_id,
+        for_team: queueBonus.for_team,
+      }
+    : overlayBonus
+      ? {
+          from_level: overlayBonus.from_level,
+          bonus_id: overlayBonus.bonus_id,
+          for_team: overlayBonus.for_team,
+        }
+      : null;
+
+  if (presentBonusMeta) {
+    const bonusLevel = eventContent.levels.find((l) => l.level === presentBonusMeta.from_level);
+    const bonus = bonusLevel
+      ? findBonusTaskById(bonusLevel, presentBonusMeta.bonus_id)
+      : null;
     if (bonus && isBonusForRole(bonus, myRole)) {
       return (
         <>
@@ -232,7 +263,7 @@ export function PlayPhaseFlow({
             myRoleLabel={myRoleLabel}
             teamName={teamName}
             roleLabels={roleLabels}
-            asymmetricOverlay
+            asymmetricOverlay={!presentBonusMeta.for_team}
             disabled={disabled}
             isPending={isPending}
             onSubmit={onSubmitBonus}
@@ -244,7 +275,10 @@ export function PlayPhaseFlow({
   }
 
   if (phase === "bonus" && level) {
-    const bonus = resolveBonusTask(level);
+    const activeId = gameState.bonus_queue?.find(
+      (item) => item.status === "active" && item.from_level === level.level,
+    )?.bonus_id;
+    const bonus = findBonusTaskById(level, activeId) ?? resolveBonusTask(level);
     if (bonus) {
       return (
         <>
@@ -285,13 +319,16 @@ export function PlayPhaseFlow({
   }
 
   if (phase === "hub" || !level || !slot) {
-    const pendingRoleHint =
-      activeBonus && !activeBonus.for_team
-        ? bonusAudienceHeadline(
-            { for_role: activeBonus.for_role, for_team: false },
-            roleLabels,
-          )
-        : null;
+    const pendingRoleItem = (gameState.bonus_queue ?? []).find(
+      (item) =>
+        (item.status === "active" || item.status === "ready") && !item.for_team,
+    );
+    const pendingRoleHint = pendingRoleItem
+      ? bonusAudienceHeadline(
+          { for_role: pendingRoleItem.for_role, for_team: false },
+          roleLabels,
+        )
+      : null;
 
     return (
       <>
@@ -312,8 +349,14 @@ export function PlayPhaseFlow({
           disabled={disabled || paused}
           isPending={isPending}
           walkStorageKey={walkStorageKey}
+          serverWalkedMeters={
+            gameState.outdoor_progress?.level === activeLevel
+              ? gameState.outdoor_progress.walked_meters
+              : 0
+          }
           onArriveOutdoor={onArriveOutdoor}
           onSolveGpsCheckpoint={onSolveGpsCheckpoint}
+          onReportWalkProgress={onReportWalkProgress}
           onOpenStation={onOpenStation}
           onSubmitStationCode={onSubmitStationCode}
           onStartMission={onStartMission}

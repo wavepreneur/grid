@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { joinTeamAsPlayer } from "@/app/actions/lobby";
+import { joinTeamAsPlayer, listActiveTeamJoinRoster } from "@/app/actions/lobby";
 import {
   GridButton,
   GridError,
@@ -32,7 +32,7 @@ type TeamEntryGateProps = {
 /**
  * Two clear paths:
  * - Neu mitspielen → claim a free seat
- * - Gerät wechseln → same person, rotate session (no new seat)
+ * - Gerät wechseln → pick your exact name from the roster (or type it)
  */
 export function TeamEntryGate({
   inviteCode,
@@ -44,6 +44,8 @@ export function TeamEntryGate({
   const router = useRouter();
   const [mode, setMode] = useState<JoinMode>("new");
   const [displayName, setDisplayName] = useState(defaultDisplayName);
+  const [roster, setRoster] = useState<string[]>([]);
+  const [rosterLoaded, setRosterLoaded] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [pendingTakeover, setPendingTakeover] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -63,21 +65,44 @@ export function TeamEntryGate({
     });
   }, [inviteCode, joinCode, router]);
 
-  function completeJoin(takeover: boolean) {
+  useEffect(() => {
+    if (checkingSession) return;
+
+    let cancelled = false;
+    listActiveTeamJoinRoster({ inviteCode, joinCode }).then((result) => {
+      if (cancelled) return;
+      if (result.success) {
+        setRoster(result.data.members.map((m) => m.displayName));
+      }
+      setRosterLoaded(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checkingSession, inviteCode, joinCode]);
+
+  function completeJoin(
+    takeover: boolean,
+    nameOverride?: string,
+    modeOverride?: JoinMode,
+  ) {
+    const name = (nameOverride ?? displayName).trim();
+    const effectiveMode = modeOverride ?? mode;
     setError(null);
 
     startTransition(async () => {
       const result = await joinTeamAsPlayer({
         inviteCode,
         joinCode,
-        displayName,
-        mode: takeover ? "new" : mode,
+        displayName: name,
+        mode: takeover ? "new" : effectiveMode,
         takeover,
       });
 
       if (!result.success) {
-        if (result.code === SESSION_ACTIVE && mode === "new") {
-          setPendingTakeover(displayName.trim());
+        if (result.code === SESSION_ACTIVE && effectiveMode === "new") {
+          setPendingTakeover(name);
           setError(null);
           return;
         }
@@ -94,6 +119,14 @@ export function TeamEntryGate({
       );
       router.replace(path);
     });
+  }
+
+  function pickRosterName(name: string) {
+    setDisplayName(name);
+    setMode("switch");
+    setPendingTakeover(null);
+    setError(null);
+    completeJoin(false, name, "switch");
   }
 
   if (checkingSession) {
@@ -145,7 +178,7 @@ export function TeamEntryGate({
       <p className="text-center text-xs leading-relaxed text-slate-500">
         {mode === "new"
           ? "Neuen Platz im Team belegen — nur wenn noch einer frei ist."
-          : "Du warst schon dabei (Akku leer, anderes Handy). Gleicher Name — kein neuer Platz."}
+          : "Tippe auf deinen Namen unten — Schreibweise muss nicht erraten werden."}
       </p>
 
       {pendingTakeover ? (
@@ -173,50 +206,85 @@ export function TeamEntryGate({
         </GridHint>
       ) : (
         <>
-          <div>
-            <GridLabel>
-              {mode === "switch" ? "Dein Name im Team" : "Dein Name"}
-            </GridLabel>
-            <GridInput
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-              placeholder="z. B. Pixel-Ranger"
-              required
-              minLength={2}
-              maxLength={32}
-              className="text-base"
-            />
-          </div>
+          {mode === "switch" ? (
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-slate-700">Wer bist du?</p>
+              {!rosterLoaded ? (
+                <p className="text-sm text-slate-500">Namen werden geladen…</p>
+              ) : roster.length === 0 ? (
+                <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  Noch niemand im Team — zuerst „Neu mitspielen“ wählen.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {roster.map((name) => (
+                    <li key={name}>
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => pickRosterName(name)}
+                        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-left font-semibold text-slate-900 shadow-sm transition hover:border-teal-300 hover:bg-teal-50/50 disabled:opacity-50"
+                      >
+                        <span className="truncate">{name}</span>
+                        <span className="shrink-0 text-xs font-bold text-teal-700">
+                          Das bin ich
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="pt-1 text-center text-[11px] leading-relaxed text-slate-400">
+                Tipp: In der Lobby kannst du deinen persönlichen Weiterspiel-Link speichern —
+                dann brauchst du den Namen beim nächsten Mal nicht.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div>
+                <GridLabel>Dein Name</GridLabel>
+                <GridInput
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  placeholder="z. B. Pixel-Ranger"
+                  required
+                  minLength={2}
+                  maxLength={32}
+                  className="text-base"
+                />
+              </div>
 
-          {error ? <GridError message={error} /> : null}
+              {error ? <GridError message={error} /> : null}
 
-          {error?.includes("voll") && mode === "new" ? (
-            <button
-              type="button"
-              className="text-center text-sm font-semibold text-teal-700 underline-offset-2 hover:underline"
-              onClick={() => {
-                setMode("switch");
-                setError(null);
-              }}
-            >
-              Ich bin schon im Team — Gerät wechseln
-            </button>
-          ) : null}
+              {error?.includes("voll") ? (
+                <button
+                  type="button"
+                  className="text-center text-sm font-semibold text-teal-700 underline-offset-2 hover:underline"
+                  onClick={() => {
+                    setMode("switch");
+                    setError(null);
+                  }}
+                >
+                  Ich bin schon im Team — Gerät wechseln
+                </button>
+              ) : null}
 
-          <GridButton
-            type="button"
-            className="py-4 text-base"
-            disabled={isPending || displayName.trim().length < 2}
-            onClick={() => completeJoin(false)}
-          >
-            {isPending
-              ? "Einen Moment…"
-              : mode === "switch"
-                ? "Auf diesem Gerät weiterspielen"
-                : isMidGame
-                  ? "Team beitreten"
-                  : "Mitspielen"}
-          </GridButton>
+              <GridButton
+                type="button"
+                className="py-4 text-base"
+                disabled={isPending || displayName.trim().length < 2}
+                onClick={() => completeJoin(false)}
+              >
+                {isPending
+                  ? "Einen Moment…"
+                  : isMidGame
+                    ? "Team beitreten"
+                    : "Mitspielen"}
+              </GridButton>
+            </>
+          )}
+
+          {mode === "switch" && error ? <GridError message={error} /> : null}
         </>
       )}
     </div>

@@ -6,6 +6,7 @@ import {
   buildArchetypeSessionFields,
 } from "@/lib/grid/archetype-roles";
 import type { ArchetypeRole } from "@/lib/grid/archetype-roles";
+import { normalizeDisplayNameKey } from "@/lib/grid/codes";
 import type { GridTeamStatus, PlayerSession } from "@/lib/grid/types";
 
 type ActivePlayer = {
@@ -160,7 +161,7 @@ export async function findActivePlayerByDisplayName(
   displayName: string,
 ): Promise<ActivePlayer | null> {
   const supabase = createAdminClient();
-  const normalized = displayName.trim().toLowerCase();
+  const normalized = normalizeDisplayNameKey(displayName);
 
   const { data, error } = await supabase
     .from("players")
@@ -172,7 +173,7 @@ export async function findActivePlayerByDisplayName(
 
   return (
     (data as ActivePlayer[] | null)?.find(
-      (player) => player.display_name.toLowerCase() === normalized,
+      (player) => normalizeDisplayNameKey(player.display_name) === normalized,
     ) ?? null
   );
 }

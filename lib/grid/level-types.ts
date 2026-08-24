@@ -64,6 +64,25 @@ export type BonusTask = {
   reward: number;
 };
 
+/** When a compiled bonus may fire. @see docs/BONUS_LAYER3_MODEL.md */
+export type BonusWhenCompiled = {
+  type:
+    | "immediate"
+    | "delay_minutes"
+    | "delay_meters"
+    | "game_minutes"
+    | "interval_minutes";
+  minutes?: number;
+  meters?: number;
+};
+
+/** Full Layer-3 bonus definition attached to a mission level. */
+export type BonusDefinition = BonusTask & {
+  id: string;
+  when: BonusWhenCompiled;
+  fanfare?: boolean;
+};
+
 export type LevelTileType =
   | "image"
   | "video"
@@ -153,8 +172,10 @@ export type LevelDefinition = {
   teaser?: string;
   /** Online hub: how material is split across roles (display only until extras ship). */
   role_split?: string;
-  /** Layer-3 bonus after this mission is solved. */
+  /** Layer-3 bonus after this mission is solved (legacy: first of `bonuses`). */
   bonus?: BonusTask;
+  /** Full Layer-3 surprise list for this mission. @see docs/BONUS_LAYER3_MODEL.md */
+  bonuses?: BonusDefinition[];
   /** Success overlay headline (with success_info). */
   success_title?: string;
   /** Note shown after solve — omit/empty = no success window. */
@@ -282,6 +303,8 @@ export type SolveLevelPayload = {
   geolocation?: GeolocationSample;
   /** Skip after revealing solution — awards 0 points when scoring allows it. */
   revealSolution?: boolean;
+  /** Alpha lead override when GPS fails — server audits. */
+  forceUnlock?: "geofence" | "distance";
 };
 
 export const EXITMANIA_TOTAL_LEVELS = 10;

@@ -123,8 +123,22 @@ export function usesPhasedPlay(input: {
 }): boolean {
   if (input.contentMode === "indoor" || input.contentMode === "online") return true;
   if (input.levels.some((l) => l.station || l.arrival_quiz)) return true;
-  // Outdoor with GPS waypoints still benefits from map hub first
-  if (input.contentMode === "outdoor" && input.levels.some((l) => l.location)) return true;
+  // Outdoor: geofence pins OR meter/time unlocks both need the hub first.
+  if (
+    input.contentMode === "outdoor" &&
+    input.levels.some(
+      (l) =>
+        l.location ||
+        (l.triggers?.type === "distance" &&
+          typeof l.triggers.after_meters === "number" &&
+          l.triggers.after_meters > 0) ||
+        (l.triggers?.type === "time" &&
+          typeof l.triggers.after_minutes === "number" &&
+          l.triggers.after_minutes > 0),
+    )
+  ) {
+    return true;
+  }
   return false;
 }
 
