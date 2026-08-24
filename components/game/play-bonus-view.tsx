@@ -76,7 +76,7 @@ export function PlayBonusView({
       return null;
     }
     return (
-      <section className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pb-8 pt-6 sm:px-6">
+      <section className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pb-8 pt-5 sm:px-5">
         <CityTeamBar teamName={teamName} meName={myName} meRoleLabel={myRoleLabel} compact />
         <div className="mt-8 flex flex-col items-center text-center">
           <span className="cg-animate-pop-in flex h-20 w-20 items-center justify-center rounded-3xl bg-[var(--cg-accent)] text-[var(--cg-accent-fg)] shadow-[var(--cg-shadow-lift)]">
@@ -122,7 +122,7 @@ export function PlayBonusView({
   }
 
   return (
-    <section className="mx-auto flex min-h-[70vh] w-full max-w-2xl flex-col px-4 pb-8 pt-6 sm:px-6">
+    <section className="mx-auto flex w-full max-w-md flex-col px-4 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-5 sm:px-5">
       <CityTeamBar teamName={teamName} meName={myName} meRoleLabel={myRoleLabel} compact />
 
       <div className="mt-6 flex flex-col items-center text-center">

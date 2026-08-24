@@ -17,7 +17,7 @@ export const viewport: Viewport = {
 
 export default function EventPlayLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="grid-play-shell h-[var(--vv-height,100dvh)] max-h-[var(--vv-height,100dvh)] overflow-hidden">
+    <div className="grid-play-shell min-h-[var(--vv-height,100dvh)]">
       <PlayViewportGuard />
       {children}
     </div>

@@ -21,7 +21,7 @@ export function LevelHero({
   imageUrl?: string | null;
   tall?: boolean;
 }) {
-  const height = tall ? "h-44 sm:h-52" : "h-40 sm:h-48";
+  const height = tall ? "h-40 sm:h-44" : "h-36 sm:h-40";
   const hero = imageUrl?.trim() || "";
   return (
     <div className="min-w-0">
@@ -32,12 +32,12 @@ export function LevelHero({
         </div>
       ) : null}
       {title?.trim() ? (
-        <div className="min-w-0 space-y-1.5 px-4 pt-4 sm:px-5">
-          <h1 className="break-words text-2xl font-bold leading-tight text-[var(--cg-fg)] [overflow-wrap:anywhere] sm:text-[1.65rem]">
+        <div className="min-w-0 space-y-1 px-4 pt-3 sm:px-5">
+          <h1 className="break-words text-xl font-bold leading-tight text-[var(--cg-fg)] [overflow-wrap:anywhere] sm:text-2xl">
             {title.trim()}
           </h1>
           {description?.trim() ? (
-            <p className="break-words text-sm leading-relaxed text-[var(--cg-muted)] [overflow-wrap:anywhere] whitespace-pre-wrap">
+            <p className="break-words text-sm leading-snug text-[var(--cg-muted)] [overflow-wrap:anywhere] whitespace-pre-wrap">
               {description.trim()}
             </p>
           ) : null}
@@ -126,7 +126,7 @@ function LevelTileCard({
   tile: LevelTilePreviewModel;
   single: boolean;
 }) {
-  const size = single ? "h-40 w-40 max-w-full" : "h-36 w-36 snap-center sm:h-40 sm:w-40";
+  const size = single ? "h-32 w-32 max-w-full" : "h-32 w-32 snap-center sm:h-36 sm:w-36";
   const cover = tile.coverImageUrl?.trim() || "";
   const hasCover = cover.length > 0;
   const placeholderIcon =

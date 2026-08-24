@@ -365,7 +365,6 @@ select.grid-input option {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   touch-action: manipulation;
-  overscroll-behavior-y: contain;
 }
 
 .grid-bg {

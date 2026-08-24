@@ -105,19 +105,19 @@ export function ExitmaniaLevelView({
           imageUrl={level.hero_image_url}
         />
       ) : (
-        <div className="min-w-0 space-y-1.5 px-4 pt-4">
-          <h1 className="break-words text-2xl font-bold text-[var(--cg-fg)] [overflow-wrap:anywhere] sm:text-3xl">
+        <div className="min-w-0 space-y-1 px-4 pt-3 sm:px-5">
+          <h1 className="break-words text-xl font-bold text-[var(--cg-fg)] [overflow-wrap:anywhere] sm:text-2xl">
             {level.title}
           </h1>
           {level.description?.trim() ? (
-            <p className="break-words text-sm leading-relaxed text-[var(--cg-muted)] [overflow-wrap:anywhere] whitespace-pre-wrap">
+            <p className="break-words text-sm leading-snug text-[var(--cg-muted)] [overflow-wrap:anywhere] whitespace-pre-wrap">
               {level.description}
             </p>
           ) : null}
         </div>
       )}
 
-      <div className="space-y-5 px-4 pb-6 pt-4 sm:px-5">
+      <div className="space-y-4 px-4 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-3 sm:px-5">
         {level.scoring ? (
           <LevelScoringBar
             scoring={level.scoring}

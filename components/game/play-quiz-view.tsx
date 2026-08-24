@@ -109,7 +109,7 @@ export function PlayQuizView({
         : "Zurück zum Spiel — Rätsel öffnen";
 
   return (
-    <section className="mx-auto flex w-full max-w-2xl flex-col px-4 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-4 sm:px-6 sm:pb-10 sm:pt-6">
+    <section className="mx-auto flex w-full max-w-md flex-col px-4 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-4 sm:px-5">
       <div className="mt-1 flex flex-col items-center text-center sm:mt-2">
         <span className="cg-animate-key-turn flex h-16 w-16 items-center justify-center rounded-3xl bg-[var(--cg-accent)] text-[var(--cg-accent-fg)] shadow-[var(--cg-shadow-lift)] sm:h-20 sm:w-20">
           <IconKey size={36} />
@@ -125,7 +125,7 @@ export function PlayQuizView({
           <img
             src={quiz.image_url}
             alt=""
-            className="aspect-[16/10] max-h-[min(36vh,18rem)] w-full object-cover object-center sm:max-h-[min(40vh,22rem)]"
+            className="aspect-[16/10] max-h-[min(28vh,14rem)] w-full object-cover object-center"
           />
         </div>
       ) : null}
@@ -137,11 +137,11 @@ export function PlayQuizView({
         ) : null}
       </div>
 
-      <p className="mt-5 rounded-2xl bg-[var(--cg-card)] p-4 text-base font-semibold shadow-[var(--cg-shadow-soft)] text-[var(--cg-fg)] sm:mt-6 sm:p-5 sm:text-lg">
+      <p className="mt-4 rounded-2xl bg-[var(--cg-card)] p-4 text-base font-semibold shadow-[var(--cg-shadow-soft)] text-[var(--cg-fg)]">
         {quiz.question}
       </p>
 
-      <div className={`mt-4 grid gap-3 ${mode === "online" ? "sm:grid-cols-2" : ""}`}>
+      <div className="mt-3 grid gap-2.5">
         {quiz.options.map((opt, i) => {
           const isPicked = isSelectedOption(opt.id);
           const isRight = isRightOption(opt.id);

@@ -70,8 +70,8 @@ export function ContentTileGrid({
           tiles.map((tile) => {
             const label = tile.label ?? tileTypeLabel(tile.type);
             const size = single
-              ? "h-40 w-40 max-w-full"
-              : "h-36 w-36 snap-center sm:h-40 sm:w-40";
+              ? "h-32 w-32 max-w-full"
+              : "h-32 w-32 snap-center sm:h-36 sm:w-36";
             const cover = tile.cover_image_url?.trim() || "";
             const hasCover = cover.length > 0;
             const tip = purchasedHints[tile.id];

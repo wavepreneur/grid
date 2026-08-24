@@ -2,27 +2,35 @@
 
 import type { ReactNode } from "react";
 
-export function PhoneShell({ children }: { children: ReactNode }) {
+/** Phone-column play frame — same proportions on phone, tablet, and desktop. */
+function PlayColumnShell({
+  children,
+  roundedClass,
+}: {
+  children: ReactNode;
+  roundedClass: string;
+}) {
   return (
-    <div className="city-game flex h-[var(--vv-height,100dvh)] max-h-[var(--vv-height,100dvh)] justify-center overflow-hidden bg-[var(--cg-ink)]/95 py-0 sm:py-8">
-      <div className="cg-screen-shell relative flex min-h-0 w-full max-w-[30rem] flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] sm:max-w-[30rem] sm:rounded-[2.5rem]">
+    <div className="city-game flex min-h-[var(--vv-height,100dvh)] justify-center bg-[var(--cg-ink)]/95 py-0 sm:py-6 sm:pb-10">
+      <div
+        className={`cg-screen-shell relative w-full max-w-[30rem] bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] ${roundedClass}`}
+      >
         {children}
       </div>
     </div>
   );
 }
 
-/**
- * Online / desktop-friendly play shell.
- * Fixed viewport height + inner overflow-y so long quizzes always scroll.
- */
+export function PhoneShell({ children }: { children: ReactNode }) {
+  return (
+    <PlayColumnShell roundedClass="sm:rounded-[2.5rem]">{children}</PlayColumnShell>
+  );
+}
+
+/** Online uses the same phone column so levels/quizzes never stretch bloated. */
 export function StageShell({ children }: { children: ReactNode }) {
   return (
-    <div className="city-game flex h-[var(--vv-height,100dvh)] max-h-[var(--vv-height,100dvh)] justify-center overflow-hidden bg-[var(--cg-ink)]/95 py-0 sm:py-6">
-      <div className="cg-screen-shell relative flex min-h-0 w-full max-w-[30rem] flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)] sm:max-w-xl sm:rounded-[2rem] md:max-w-2xl lg:max-w-3xl">
-        {children}
-      </div>
-    </div>
+    <PlayColumnShell roundedClass="sm:rounded-[2rem]">{children}</PlayColumnShell>
   );
 }
 
@@ -53,7 +61,7 @@ export function BigButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`cg-tap-lift flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-4 text-base font-semibold disabled:opacity-40 sm:py-5 sm:text-lg ${styles[variant]}`}
+      className={`cg-tap-lift flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-3.5 text-base font-semibold disabled:opacity-40 ${styles[variant]}`}
     >
       {icon}
       {children}
