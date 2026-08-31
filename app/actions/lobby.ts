@@ -1410,107 +1410,217 @@ export async function transferCaptain(input: {
   joinCode: string;
   sessionId: string;
   targetPlayerId: string;
-}): Promise<ActionResult<{ newCaptainId: string }>> {
+  seq?: number;
+}): Promise<ActionResult<{ newCaptainId: string; seq: number; ignored?: boolean }>> {
   try {
     const event = await getEventByInviteCode(normalizeCode(input.inviteCode));
     if (!event) {
       return { success: false, error: "Event nicht gefunden." };
     }
 
-    const [team, captain] = await Promise.all([
+    const [team, actor] = await Promise.all([
       getTeamByJoinCode(normalizeCode(input.joinCode), event.id),
       getPlayerBySessionId(input.sessionId),
     ]);
     if (!team) {
       return { success: false, error: "Team nicht gefunden." };
     }
-
-    const isLead =
-      Boolean(captain) &&
-      captain!.team_id === team.id &&
-      (captain!.is_captain ||
-        captain!.role === "alpha" ||
-        team.captain_player_id === captain!.id);
-    if (!captain || captain.team_id !== team.id || !isLead) {
-      return { success: false, error: "Nur Alpha kann die Rolle übertragen." };
+    if (!actor || actor.team_id !== team.id) {
+      return { success: false, error: "Session ungültig." };
     }
 
+    const seq = Number(input.seq);
+    const leadSeq = Number.isFinite(seq) && seq > 0 ? seq : Date.now();
     const supabase = createAdminClient();
-    const { data: target, error: targetError } = await supabase
-      .from("players")
-      .select("id, display_name, team_id, left_at")
-      .eq("id", input.targetPlayerId)
-      .maybeSingle();
 
-    if (targetError || !target || target.team_id !== team.id || target.left_at) {
-      return { success: false, error: "Zielspieler nicht gefunden oder inaktiv." };
-    }
-
-    // Critical path only — demote + promote + team lead in parallel.
-    const [demoteResult, promoteResult, teamResult] = await Promise.all([
-      supabase
-        .from("players")
-        .update({ is_captain: false, role: "beta" })
-        .eq("id", captain.id),
-      supabase
-        .from("players")
-        .update({ is_captain: true, role: "alpha" })
-        .eq("id", target.id),
-      supabase
-        .from("teams")
-        .update({
-          captain_player_id: target.id,
-          navigator_player_id: target.id,
-          beta_player_id: captain.id,
-        })
-        .eq("id", team.id),
-    ]);
-
-    if (promoteResult.error) {
-      await supabase
-        .from("players")
-        .update({ is_captain: true, role: "alpha" })
-        .eq("id", captain.id);
-      return { success: false, error: promoteResult.error.message };
-    }
-    if (demoteResult.error) {
-      return { success: false, error: demoteResult.error.message };
-    }
-    if (teamResult.error) {
-      return { success: false, error: teamResult.error.message };
-    }
-
-    await supabase.from("team_sync_events").insert({
-      team_id: team.id,
-      event_type: "captain_transferred",
-      actor_player_id: captain.id,
-      payload: {
-        new_captain_id: target.id,
-        previous_captain_id: captain.id,
-      },
+    const { data: rpcData, error: rpcError } = await supabase.rpc("transfer_team_lead", {
+      p_team_id: team.id,
+      p_actor_id: actor.id,
+      p_target_id: input.targetPlayerId,
+      p_seq: leadSeq,
     });
 
-    // No after()/rebalance here — that blocked Server Actions ~10s on Vercel.
-    void writeAuditLog({
-      organizationId: event.organization_id,
-      eventId: event.id,
+    if (!rpcError) {
+      const parsed =
+        typeof rpcData === "string"
+          ? (JSON.parse(rpcData) as Record<string, unknown>)
+          : ((rpcData ?? {}) as Record<string, unknown>);
+      if (parsed.ok === false) {
+        return {
+          success: false,
+          error: String(parsed.error ?? "Leitung konnte nicht übertragen werden."),
+        };
+      }
+
+      const newCaptainId = String(parsed.captain_id ?? input.targetPlayerId);
+      const committedSeq = Number(parsed.seq ?? leadSeq);
+      const ignored = Boolean(parsed.ignored);
+
+      if (!ignored && parsed.noop !== true) {
+        await supabase.from("team_sync_events").insert({
+          team_id: team.id,
+          event_type: "captain_transferred",
+          actor_player_id: actor.id,
+          payload: {
+            new_captain_id: newCaptainId,
+            previous_captain_id: parsed.previous_captain_id ?? actor.id,
+            seq: committedSeq,
+          },
+        });
+      }
+
+      void writeAuditLog({
+        organizationId: event.organization_id,
+        eventId: event.id,
+        teamId: team.id,
+        playerId: actor.id,
+        action: "captain_transferred",
+        payload: {
+          from_player_id: actor.id,
+          to_player_id: newCaptainId,
+          seq: committedSeq,
+          ignored,
+        },
+      });
+
+      return {
+        success: true,
+        data: { newCaptainId, seq: committedSeq, ignored },
+      };
+    }
+
+    return transferCaptainSequential({
+      event,
       teamId: team.id,
-      playerId: captain.id,
-      action: "captain_transferred",
-      payload: {
-        from_player_id: captain.id,
-        to_player_id: target.id,
-        to_display_name: target.display_name,
-      },
+      actor,
+      targetPlayerId: input.targetPlayerId,
+      seq: leadSeq,
+      captainPlayerId: team.captain_player_id ?? null,
     });
-
-    return { success: true, data: { newCaptainId: target.id } };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unbekannter Fehler",
     };
   }
+}
+
+async function transferCaptainSequential(input: {
+  event: GridEvent;
+  teamId: string;
+  actor: { id: string; is_captain?: boolean; role?: string | null };
+  targetPlayerId: string;
+  seq: number;
+  captainPlayerId: string | null;
+}): Promise<ActionResult<{ newCaptainId: string; seq: number; ignored?: boolean }>> {
+  const supabase = createAdminClient();
+  const { data: target, error: targetError } = await supabase
+    .from("players")
+    .select("id, display_name, team_id, left_at")
+    .eq("id", input.targetPlayerId)
+    .maybeSingle();
+
+  if (targetError || !target || target.team_id !== input.teamId || target.left_at) {
+    return { success: false, error: "Zielspieler nicht gefunden oder inaktiv." };
+  }
+
+  const { data: lastEvent } = await supabase
+    .from("team_sync_events")
+    .select("payload, created_at")
+    .eq("team_id", input.teamId)
+    .eq("event_type", "captain_transferred")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const lastPayload = (lastEvent?.payload ?? {}) as Record<string, unknown>;
+  const lastSeq = Number(lastPayload.seq ?? 0);
+  const lastNewId = String(lastPayload.new_captain_id ?? "");
+  const lastIsFresh =
+    Boolean(lastEvent?.created_at) &&
+    Date.now() - new Date(String(lastEvent?.created_at)).getTime() < 20_000;
+
+  if (Number.isFinite(lastSeq) && lastSeq > 0 && input.seq < lastSeq) {
+    return {
+      success: true,
+      data: {
+        newCaptainId: lastNewId || input.captainPlayerId || input.actor.id,
+        seq: lastSeq,
+        ignored: true,
+      },
+    };
+  }
+
+  const isLead =
+    Boolean(input.actor.is_captain) ||
+    input.actor.role === "alpha" ||
+    input.captainPlayerId === input.actor.id;
+  const isPendingLead = lastIsFresh && lastNewId === input.actor.id;
+  if (!isLead && !isPendingLead) {
+    return { success: false, error: "Nur Alpha kann die Rolle übertragen." };
+  }
+
+  await supabase.from("team_sync_events").insert({
+    team_id: input.teamId,
+    event_type: "captain_transferred",
+    actor_player_id: input.actor.id,
+    payload: {
+      new_captain_id: target.id,
+      previous_captain_id: input.actor.id,
+      seq: input.seq,
+    },
+  });
+
+  const { error: demoteError } = await supabase
+    .from("players")
+    .update({ is_captain: false, role: "beta" })
+    .eq("team_id", input.teamId)
+    .eq("is_captain", true)
+    .neq("id", target.id)
+    .is("left_at", null);
+  if (demoteError) {
+    return { success: false, error: demoteError.message };
+  }
+
+  const { error: promoteError } = await supabase
+    .from("players")
+    .update({ is_captain: true, role: "alpha" })
+    .eq("id", target.id);
+  if (promoteError) {
+    await supabase
+      .from("players")
+      .update({ is_captain: true, role: "alpha" })
+      .eq("id", input.actor.id);
+    return { success: false, error: promoteError.message };
+  }
+
+  const { error: teamError } = await supabase
+    .from("teams")
+    .update({
+      captain_player_id: target.id,
+      navigator_player_id: target.id,
+      beta_player_id: input.actor.id,
+    })
+    .eq("id", input.teamId);
+  if (teamError) {
+    return { success: false, error: teamError.message };
+  }
+
+  void writeAuditLog({
+    organizationId: input.event.organization_id,
+    eventId: input.event.id,
+    teamId: input.teamId,
+    playerId: input.actor.id,
+    action: "captain_transferred",
+    payload: {
+      from_player_id: input.actor.id,
+      to_player_id: target.id,
+      to_display_name: target.display_name,
+      seq: input.seq,
+    },
+  });
+
+  return { success: true, data: { newCaptainId: target.id, seq: input.seq } };
 }
 
 export async function assignPlayerRole(input: {

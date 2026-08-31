@@ -36,10 +36,11 @@ import {
 import {
   applyCaptainTransferToPlayers,
   applyRosterToSession,
-  rosterHonorsHeldCaptain,
   rosterNeedsSessionSync,
+  rosterWithHeldCaptain,
   sessionAfterCaptainTransfer,
 } from "@/lib/grid/live-session";
+import { nextLeadSeq, noteLeadSeq, parseLeadSeq } from "@/lib/grid/lead-seq";
 import {
   clearMissionStarting,
   markMissionStarting,
@@ -100,12 +101,29 @@ export function LobbyRoom({
     null,
   );
   const holdCaptainIdRef = useRef<string | null>(null);
-  const holdCaptainUntilRef = useRef(0);
+  const holdSeqRef = useRef(0);
   const startInFlightRef = useRef(false);
 
-  function holdTransferredCaptain(playerId: string) {
+  function applyHeldLead(playerId: string, seq: number): boolean {
+    if (seq < holdSeqRef.current) return false;
+    noteLeadSeq(seq);
+    holdSeqRef.current = seq;
     holdCaptainIdRef.current = playerId;
-    holdCaptainUntilRef.current = Date.now() + 5000;
+    return true;
+  }
+
+  function applyLeadToUi(playerId: string) {
+    setSnapshot((current) => ({
+      ...current,
+      captain_player_id: playerId,
+      navigator_player_id: playerId,
+      players: applyCaptainTransferToPlayers(current.players, playerId),
+    }));
+    setSession((current) => {
+      const next = sessionAfterCaptainTransfer(current, playerId);
+      savePlayerSession(next);
+      return next;
+    });
   }
 
   useEffect(() => {
@@ -164,15 +182,7 @@ export function LobbyRoom({
     }
 
     const heldId = holdCaptainIdRef.current;
-    const players = rosterHonorsHeldCaptain(
-      result.data.players,
-      heldId,
-      holdCaptainUntilRef.current,
-    )
-      ? result.data.players
-      : heldId
-        ? applyCaptainTransferToPlayers(result.data.players, heldId)
-        : result.data.players;
+    const players = rosterWithHeldCaptain(result.data.players, heldId);
 
     setSnapshot({ ...result.data, players });
     setCountdown(formatCountdown(result.data.lobby_auto_start_at));
@@ -187,7 +197,7 @@ export function LobbyRoom({
 
     if (verified.success) {
       const held = holdCaptainIdRef.current;
-      if (held && Date.now() < holdCaptainUntilRef.current) {
+      if (held) {
         const shouldBeLead = verified.data.session.playerId === held;
         const isLead =
           verified.data.session.isCaptain || verified.data.session.isAlpha;
@@ -216,15 +226,7 @@ export function LobbyRoom({
   const handlePlayersChange = useCallback(
     (players: LobbySnapshot["players"]) => {
       const heldId = holdCaptainIdRef.current;
-      const nextPlayers = rosterHonorsHeldCaptain(
-        players,
-        heldId,
-        holdCaptainUntilRef.current,
-      )
-        ? players
-        : heldId
-          ? applyCaptainTransferToPlayers(players, heldId)
-          : players;
+      const nextPlayers = rosterWithHeldCaptain(players, heldId);
 
       setSnapshot((current) => ({
         ...current,
@@ -241,7 +243,7 @@ export function LobbyRoom({
         return next;
       });
 
-      if (rosterNeedsSessionSync(session, me)) {
+      if (rosterNeedsSessionSync(session, me) && !holdCaptainIdRef.current) {
         void syncSessionFromServer();
       }
     },
@@ -265,18 +267,14 @@ export function LobbyRoom({
       if (event.event_type === "captain_transferred") {
         const newCaptainId = String(event.payload.new_captain_id ?? "");
         if (!newCaptainId) return;
-        holdTransferredCaptain(newCaptainId);
-        setSnapshot((current) => ({
-          ...current,
-          captain_player_id: newCaptainId,
-          navigator_player_id: newCaptainId,
-          players: applyCaptainTransferToPlayers(current.players, newCaptainId),
-        }));
-        setSession((current) => {
-          const next = sessionAfterCaptainTransfer(current, newCaptainId);
-          savePlayerSession(next);
-          return next;
-        });
+        const seq = parseLeadSeq(event.payload.seq);
+        if (!seq) {
+          if (holdCaptainIdRef.current) return;
+          if (!applyHeldLead(newCaptainId, nextLeadSeq())) return;
+        } else if (!applyHeldLead(newCaptainId, seq)) {
+          return;
+        }
+        applyLeadToUi(newCaptainId);
       }
     },
     onSessionSuperseded: () => setSessionSuperseded(true),
@@ -376,27 +374,16 @@ export function LobbyRoom({
 
   function handleTransferCaptain(targetPlayerId: string) {
     setError(null);
-    const target = snapshot.players.find((player) => player.id === targetPlayerId);
     setManageOpen(false);
-    holdTransferredCaptain(targetPlayerId);
-
-    setSnapshot((current) => ({
-      ...current,
-      captain_player_id: targetPlayerId,
-      navigator_player_id: targetPlayerId,
-      players: applyCaptainTransferToPlayers(current.players, targetPlayerId),
-    }));
-    setSession((current) => {
-      const next = sessionAfterCaptainTransfer(current, targetPlayerId);
-      savePlayerSession(next);
-      return next;
-    });
-    setBusy(null);
+    const seq = nextLeadSeq();
+    if (!applyHeldLead(targetPlayerId, seq)) return;
+    applyLeadToUi(targetPlayerId);
 
     void broadcast({
       type: "captain_transferred",
       new_captain_id: targetPlayerId,
       previous_captain_id: session.playerId,
+      seq,
     });
 
     void transferCaptain({
@@ -404,9 +391,18 @@ export function LobbyRoom({
       joinCode,
       sessionId: session.sessionId,
       targetPlayerId,
+      seq,
     }).then((result) => {
       if (!result.success) {
         setError(result.error);
+        void refreshLobby();
+        return;
+      }
+      const committedSeq = result.data.seq;
+      const committedId = result.data.newCaptainId;
+      if (!applyHeldLead(committedId, committedSeq)) return;
+      if (committedId !== targetPlayerId) {
+        applyLeadToUi(committedId);
       }
     });
   }

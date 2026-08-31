@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   advanceFromHub,
   dismissBonusNotice,
@@ -43,7 +43,8 @@ import type {
   ResolvedEventContent,
   SolveLevelPayload,
 } from "@/lib/grid/level-types";
-import { applyCaptainTransferToPlayers, applyRosterToSession, sessionAfterCaptainTransfer } from "@/lib/grid/live-session";
+import { applyCaptainTransferToPlayers, applyRosterToSession, rosterWithHeldCaptain, sessionAfterCaptainTransfer } from "@/lib/grid/live-session";
+import { nextLeadSeq, noteLeadSeq, parseLeadSeq } from "@/lib/grid/lead-seq";
 import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
 import type { LobbyPlayer, PlayerSession } from "@/lib/grid/types";
 import { usesPhasedPlay } from "@/lib/grid/play-slots";
@@ -88,6 +89,25 @@ export function GameRoom({
   const [transferPending, setTransferPending] = useState(false);
   const [releasePending, setReleasePending] = useState(false);
   const [lobbyPlayers, setLobbyPlayers] = useState<LobbyPlayer[]>([]);
+  const holdCaptainIdRef = useRef<string | null>(null);
+  const holdSeqRef = useRef(0);
+
+  function applyHeldLead(playerId: string, seq: number): boolean {
+    if (seq < holdSeqRef.current) return false;
+    noteLeadSeq(seq);
+    holdSeqRef.current = seq;
+    holdCaptainIdRef.current = playerId;
+    return true;
+  }
+
+  function applyLeadToUi(playerId: string) {
+    setLobbyPlayers((current) => applyCaptainTransferToPlayers(current, playerId));
+    setSession((current) => {
+      const next = sessionAfterCaptainTransfer(current, playerId);
+      savePlayerSession(next);
+      return next;
+    });
+  }
 
   const localPauseKey = pauseStorageKey({
     inviteCode,
@@ -152,8 +172,10 @@ export function GameRoom({
     onTeamStatusChange: handleTeamStatusChange,
     onSessionSuperseded: () => setSessionSuperseded(true),
     onPlayersChange: (players) => {
-      setLobbyPlayers(players);
-      const me = players.find((player) => player.id === session.playerId);
+      const heldId = holdCaptainIdRef.current;
+      const nextPlayers = rosterWithHeldCaptain(players, heldId);
+      setLobbyPlayers(nextPlayers);
+      const me = nextPlayers.find((player) => player.id === session.playerId);
       if (!me) return;
       setSession((current) => {
         const next = applyRosterToSession(current, me);
@@ -165,14 +187,14 @@ export function GameRoom({
       if (event.event_type !== "captain_transferred") return;
       const newCaptainId = String(event.payload.new_captain_id ?? "");
       if (!newCaptainId) return;
-      setLobbyPlayers((current) =>
-        applyCaptainTransferToPlayers(current, newCaptainId),
-      );
-      setSession((current) => {
-        const next = sessionAfterCaptainTransfer(current, newCaptainId);
-        savePlayerSession(next);
-        return next;
-      });
+      const seq = parseLeadSeq(event.payload.seq);
+      if (!seq) {
+        if (holdCaptainIdRef.current) return;
+        if (!applyHeldLead(newCaptainId, nextLeadSeq())) return;
+      } else if (!applyHeldLead(newCaptainId, seq)) {
+        return;
+      }
+      applyLeadToUi(newCaptainId);
     },
     onResynced: handleResynced,
   });
@@ -520,21 +542,19 @@ export function GameRoom({
     setTransferPending(true);
     setError(null);
     setMorePanel(null);
-
-    setLobbyPlayers((current) =>
-      applyCaptainTransferToPlayers(current, targetPlayerId),
-    );
-    setSession((current) => {
-      const next = sessionAfterCaptainTransfer(current, targetPlayerId);
-      savePlayerSession(next);
-      return next;
-    });
+    const seq = nextLeadSeq();
+    if (!applyHeldLead(targetPlayerId, seq)) {
+      setTransferPending(false);
+      return;
+    }
+    applyLeadToUi(targetPlayerId);
     setTransferPending(false);
 
     void broadcast({
       type: "captain_transferred",
       new_captain_id: targetPlayerId,
       previous_captain_id: session.playerId,
+      seq,
     });
 
     void transferCaptain({
@@ -542,9 +562,15 @@ export function GameRoom({
       joinCode,
       sessionId: session.sessionId,
       targetPlayerId,
+      seq,
     }).then((result) => {
       if (!result.success) {
         setError(result.error);
+        return;
+      }
+      if (!applyHeldLead(result.data.newCaptainId, result.data.seq)) return;
+      if (result.data.newCaptainId !== targetPlayerId) {
+        applyLeadToUi(result.data.newCaptainId);
       }
     });
   }

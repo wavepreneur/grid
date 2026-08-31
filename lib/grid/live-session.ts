@@ -126,10 +126,19 @@ export function sessionAfterCaptainTransfer(
 export function rosterHonorsHeldCaptain(
   players: LobbyPlayer[],
   holdCaptainId: string | null,
-  untilMs: number,
 ): boolean {
-  if (!holdCaptainId || Date.now() > untilMs) return true;
+  if (!holdCaptainId) return true;
   return players.some(
     (player) => player.id === holdCaptainId && (player.is_captain || player.is_alpha),
   );
+}
+
+export function rosterWithHeldCaptain(
+  players: LobbyPlayer[],
+  holdCaptainId: string | null,
+): LobbyPlayer[] {
+  if (rosterHonorsHeldCaptain(players, holdCaptainId) || !holdCaptainId) {
+    return players;
+  }
+  return applyCaptainTransferToPlayers(players, holdCaptainId);
 }

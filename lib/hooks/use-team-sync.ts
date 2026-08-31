@@ -31,6 +31,7 @@ export type TeamBroadcastPayload = {
   new_captain_id?: string;
   previous_captain_id?: string;
   started_at?: string;
+  seq?: number;
 };
 
 type TeamRow = {
@@ -61,18 +62,19 @@ type TeamRoleRow = {
 function toLobbyPlayers(rows: PlayerRow[], team: TeamRoleRow | null): LobbyPlayer[] {
   return rows.map((player) => {
     const role = player.role ?? null;
-    const isAlpha =
-      player.is_captain || role === "alpha" || team?.captain_player_id === player.id;
+    const isAlpha = team?.captain_player_id
+      ? team.captain_player_id === player.id
+      : player.is_captain || role === "alpha";
     const isBeta = !isAlpha && (role === "beta" || team?.beta_player_id === player.id);
     const archetype_role = isAlpha ? "alpha" : isBeta ? "beta" : "gamma";
 
     return {
       id: player.id,
       display_name: player.display_name,
-      is_captain: player.is_captain,
+      is_captain: isAlpha,
       joined_at: player.joined_at,
       role: (role as LobbyPlayer["role"]) ?? undefined,
-      is_navigator: team?.navigator_player_id === player.id,
+      is_navigator: isAlpha || team?.navigator_player_id === player.id,
       is_alpha: isAlpha,
       is_beta: isBeta,
       is_gamma: archetype_role === "gamma",
@@ -276,6 +278,7 @@ export function useTeamSync({
               payload: {
                 new_captain_id: payload.new_captain_id,
                 previous_captain_id: payload.previous_captain_id,
+                seq: payload.seq ?? null,
               },
               actor_player_id: null,
               created_at: new Date().toISOString(),
