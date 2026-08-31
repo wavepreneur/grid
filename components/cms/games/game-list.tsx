@@ -27,10 +27,15 @@ import { prefetchStudioGame } from "@/lib/hooks/use-studio-game-detail";
 import { StudioBulkBar, StudioSelectCheckbox } from "@/components/cms/shared/studio-bulk-bar";
 import { StudioDeleteModal } from "@/components/cms/shared/studio-delete-modal";
 import { StudioDuplicateModal } from "@/components/cms/shared/studio-duplicate-modal";
+import { StudioSortMenu, type StudioSortOption } from "@/components/cms/shared/studio-sort-menu";
 import {
+  IconAlpha,
+  IconCalendar,
+  IconClock,
   IconCopy,
   IconDevices,
   IconKeyRound,
+  IconLive,
   IconMapPin,
   IconPlay,
   IconPlus,
@@ -66,11 +71,31 @@ type CreateMode = "blank" | "template";
 
 const SURFACE_OPTIONS: ContentMode[] = ["outdoor", "indoor", "online"];
 
-const SORT_OPTIONS: Array<{ id: GameSort; label: string }> = [
-  { id: "updated", label: "Zuletzt bearbeitet" },
-  { id: "created", label: "Zuletzt erstellt" },
-  { id: "status", label: "Status (Veröffentlicht → Entwurf)" },
-  { id: "name", label: "Name (A–Z)" },
+const SORT_OPTIONS: Array<StudioSortOption<GameSort>> = [
+  {
+    id: "updated",
+    label: "Zuletzt bearbeitet",
+    description: "Neueste Änderungen zuerst",
+    icon: <IconClock size={15} />,
+  },
+  {
+    id: "created",
+    label: "Zuletzt erstellt",
+    description: "Neue Spiele zuerst",
+    icon: <IconCalendar size={15} />,
+  },
+  {
+    id: "status",
+    label: "Status",
+    description: "Veröffentlicht → Entwurf",
+    icon: <IconLive size={15} />,
+  },
+  {
+    id: "name",
+    label: "Name (A–Z)",
+    description: "Alphabetisch nach Titel",
+    icon: <IconAlpha size={15} />,
+  },
 ];
 
 function sortGames<T extends StudioGame>(list: T[], sort: GameSort): T[] {
@@ -622,18 +647,11 @@ export function GameList({ initialGames, initialTemplates }: Props) {
                     : `${sortedGames.length} Spiele`}
                 </span>
               </div>
-              <StudioSelect
-                id="game-sort"
+              <StudioSortMenu
                 value={sort}
-                onChange={(e) => setSort(e.target.value as GameSort)}
-                className="mt-0 w-auto min-w-[200px] py-2 text-sm"
-              >
-                {SORT_OPTIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </StudioSelect>
+                options={SORT_OPTIONS}
+                onChange={setSort}
+              />
             </div>
 
             <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">

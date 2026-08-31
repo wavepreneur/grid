@@ -15,9 +15,14 @@ import { TaskTilePreview } from "@/components/cms/tasks/task-tile-preview";
 import { StudioBulkBar, StudioSelectCheckbox } from "@/components/cms/shared/studio-bulk-bar";
 import { StudioDeleteModal } from "@/components/cms/shared/studio-delete-modal";
 import { StudioDuplicateModal } from "@/components/cms/shared/studio-duplicate-modal";
+import { StudioSortMenu, type StudioSortOption } from "@/components/cms/shared/studio-sort-menu";
 import {
+  IconAlpha,
+  IconCalendar,
+  IconClock,
   IconCopy,
   IconLayers,
+  IconLive,
   IconSearch,
   IconTrash,
 } from "@/components/cms/studio-icons";
@@ -26,7 +31,6 @@ import {
   StudioButton,
   StudioError,
   StudioHint,
-  StudioSelect,
   StudioSuccess,
 } from "@/components/cms/studio-ui";
 import {
@@ -43,11 +47,31 @@ import type { StudioTask } from "@/lib/cms/types";
 
 type TaskSort = "updated" | "created" | "name" | "live";
 
-const SORT_OPTIONS: Array<{ id: TaskSort; label: string }> = [
-  { id: "updated", label: "Zuletzt bearbeitet" },
-  { id: "created", label: "Zuletzt erstellt" },
-  { id: "name", label: "Name (A–Z)" },
-  { id: "live", label: "Veröffentlicht zuerst" },
+const SORT_OPTIONS: Array<StudioSortOption<TaskSort>> = [
+  {
+    id: "updated",
+    label: "Zuletzt bearbeitet",
+    description: "Neueste Änderungen zuerst",
+    icon: <IconClock size={15} />,
+  },
+  {
+    id: "created",
+    label: "Zuletzt erstellt",
+    description: "Neue Aufgaben zuerst",
+    icon: <IconCalendar size={15} />,
+  },
+  {
+    id: "name",
+    label: "Name (A–Z)",
+    description: "Alphabetisch nach Titel",
+    icon: <IconAlpha size={15} />,
+  },
+  {
+    id: "live",
+    label: "Veröffentlicht zuerst",
+    description: "In veröffentlichten Spielen oben",
+    icon: <IconLive size={15} />,
+  },
 ];
 
 function sortTasks(list: TaskWithUsage[], sort: TaskSort): TaskWithUsage[] {
@@ -419,18 +443,11 @@ export function TaskLibrary({ initialTasks }: Props) {
                   : `${sortedTasks.length} Aufgaben`}
               </span>
             </div>
-            <StudioSelect
-              id="task-sort"
+            <StudioSortMenu
               value={sort}
-              onChange={(e) => setSort(e.target.value as TaskSort)}
-              className="mt-0 w-auto min-w-[200px] py-2 text-sm"
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.label}
-                </option>
-              ))}
-            </StudioSelect>
+              options={SORT_OPTIONS}
+              onChange={setSort}
+            />
           </div>
 
           <div className="space-y-2">

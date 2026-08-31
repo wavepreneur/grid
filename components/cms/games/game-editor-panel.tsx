@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   removeGameTemplate,
@@ -60,6 +60,11 @@ function toEditorState(game: StudioGame): GameEditorState {
 }
 
 const SURFACES: ContentMode[] = ["outdoor", "indoor", "online"];
+const DEFAULT_COUNTDOWN_MINUTES = 90;
+
+function lastPositiveDuration(minutes: number | null | undefined): number {
+  return minutes && minutes > 0 ? minutes : DEFAULT_COUNTDOWN_MINUTES;
+}
 
 function SurfaceIcon({ mode, active }: { mode: ContentMode; active: boolean }) {
   const cls = active ? "text-primary" : "text-muted-foreground";
@@ -82,6 +87,10 @@ export function GameEditorPanel({
   const surface = parseRuntimeProfiles(game.runtime_profiles).default_mode;
   const routeOrder = parseRuntimeProfiles(game.runtime_profiles).route_order;
   const countdownOn = Boolean(game.duration_minutes && game.duration_minutes > 0);
+  const lastCountdownMinutes = useRef(lastPositiveDuration(initialGame.duration_minutes));
+  if (game.duration_minutes && game.duration_minutes > 0) {
+    lastCountdownMinutes.current = game.duration_minutes;
+  }
 
   const settingsSnapshot = useMemo(
     () =>
@@ -411,9 +420,7 @@ export function GameEditorPanel({
                       setGame({
                         ...game,
                         duration_minutes: e.target.checked
-                          ? game.duration_minutes && game.duration_minutes > 0
-                            ? game.duration_minutes
-                            : 90
+                          ? lastCountdownMinutes.current
                           : null,
                       })
                     }
@@ -434,13 +441,18 @@ export function GameEditorPanel({
                     <StudioInput
                       type="number"
                       min={1}
-                      value={game.duration_minutes ?? 90}
-                      onChange={(e) =>
+                      value={game.duration_minutes ?? lastCountdownMinutes.current}
+                      onChange={(e) => {
+                        const next = Math.max(
+                          1,
+                          Number(e.target.value) || lastCountdownMinutes.current,
+                        );
+                        lastCountdownMinutes.current = next;
                         setGame({
                           ...game,
-                          duration_minutes: Math.max(1, Number(e.target.value) || 90),
-                        })
-                      }
+                          duration_minutes: next,
+                        });
+                      }}
                     />
                   </div>
                 ) : null}

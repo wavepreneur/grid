@@ -1,10 +1,14 @@
 import type { ComponentType } from "react";
 import type { LucideProps } from "lucide-react";
 import {
+  ALargeSmall,
   ArrowRight,
+  ArrowUpDown,
   Building2,
+  CalendarPlus,
   Check,
   ChevronDown,
+  Clock,
   Code2,
   Copy,
   Gamepad2,
@@ -20,6 +24,7 @@ import {
   Play,
   Plus,
   Puzzle,
+  Radio,
   RefreshCw,
   Route,
   Save,
@@ -105,6 +110,21 @@ export function IconArrowRight(props: IconProps) {
 }
 export function IconChevronDown(props: IconProps) {
   return wrap(ChevronDown, props);
+}
+export function IconSort(props: IconProps) {
+  return wrap(ArrowUpDown, props);
+}
+export function IconClock(props: IconProps) {
+  return wrap(Clock, props);
+}
+export function IconCalendar(props: IconProps) {
+  return wrap(CalendarPlus, props);
+}
+export function IconAlpha(props: IconProps) {
+  return wrap(ALargeSmall, props);
+}
+export function IconLive(props: IconProps) {
+  return wrap(Radio, props);
 }
 export function IconBuilding(props: IconProps) {
   return wrap(Building2, props);
