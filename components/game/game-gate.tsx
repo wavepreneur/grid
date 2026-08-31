@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { verifyTeamSession } from "@/app/actions/lobby";
 import { getEventContent, getEventContentRevision } from "@/app/actions/content";
 import { ensureTeamGameReady, getGameState } from "@/app/actions/game";
 import { GameRoom } from "@/components/game/game-room";
@@ -16,6 +17,10 @@ import {
   abandonTeamSession,
   resolveTeamSession,
 } from "@/lib/grid/session-recovery";
+import {
+  clearMissionStarting,
+  isMissionStarting,
+} from "@/lib/grid/mission-start-signal";
 import { teamEntryPath } from "@/lib/grid/team-routes";
 import type { ResolvedEventContent } from "@/lib/grid/level-types";
 import type { PlayerSession } from "@/lib/grid/types";
@@ -49,6 +54,26 @@ async function waitForContentReady(input: {
   }
 
   return getGameState(input);
+}
+
+async function waitForPlayingSession(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+}): Promise<PlayerSession | null> {
+  const deadline = Date.now() + 12_000;
+  while (Date.now() < deadline) {
+    const verified = await verifyTeamSession(input);
+    if (
+      verified.success &&
+      verified.data.session.teamStatus !== "lobby" &&
+      verified.data.session.teamStatus !== "setup"
+    ) {
+      return verified.data.session;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 200));
+  }
+  return null;
 }
 
 export function GameGate({
@@ -111,12 +136,33 @@ export function GameGate({
         });
       }
 
-      const syncedSession = resolved.session;
+      let syncedSession = resolved.session;
 
       if (syncedSession.teamStatus === "lobby" || syncedSession.teamStatus === "setup") {
-        router.replace(teamEntryPath(inviteCode, joinCode, syncedSession.teamStatus ?? "lobby"));
-        return;
+        if (isMissionStarting(inviteCode, joinCode)) {
+          const playing = await waitForPlayingSession({
+            inviteCode,
+            joinCode,
+            sessionId: syncedSession.sessionId,
+          });
+          if (cancelled) return;
+          if (!playing) {
+            clearMissionStarting(inviteCode, joinCode);
+            router.replace(
+              teamEntryPath(inviteCode, joinCode, syncedSession.teamStatus ?? "lobby"),
+            );
+            return;
+          }
+          syncedSession = playing;
+        } else {
+          router.replace(
+            teamEntryPath(inviteCode, joinCode, syncedSession.teamStatus ?? "lobby"),
+          );
+          return;
+        }
       }
+
+      clearMissionStarting(inviteCode, joinCode);
 
       const gameResult = await waitForContentReady({
         inviteCode,

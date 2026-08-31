@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   assignPlayerRole,
@@ -33,7 +33,17 @@ import {
   DEFAULT_ROLE_LABELS,
   type RoleDisplayLabels,
 } from "@/lib/grid/role-labels";
-import { applyRosterToSession, rosterNeedsSessionSync } from "@/lib/grid/live-session";
+import {
+  applyCaptainTransferToPlayers,
+  applyRosterToSession,
+  rosterHonorsHeldCaptain,
+  rosterNeedsSessionSync,
+  sessionAfterCaptainTransfer,
+} from "@/lib/grid/live-session";
+import {
+  clearMissionStarting,
+  markMissionStarting,
+} from "@/lib/grid/mission-start-signal";
 import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
 
@@ -89,6 +99,14 @@ export function LobbyRoom({
   const [busy, setBusy] = useState<{ title: string; subtitle?: string } | null>(
     null,
   );
+  const holdCaptainIdRef = useRef<string | null>(null);
+  const holdCaptainUntilRef = useRef(0);
+  const startInFlightRef = useRef(false);
+
+  function holdTransferredCaptain(playerId: string) {
+    holdCaptainIdRef.current = playerId;
+    holdCaptainUntilRef.current = Date.now() + 5000;
+  }
 
   useEffect(() => {
     if (!manageOpen) return;
@@ -117,6 +135,7 @@ export function LobbyRoom({
 
   const goToPlay = useCallback(() => {
     if (manageMode) return;
+    markMissionStarting(inviteCode, joinCode);
     setBusy((current) =>
       current ?? {
         title: "Mission startet…",
@@ -144,7 +163,18 @@ export function LobbyRoom({
       return;
     }
 
-    setSnapshot(result.data);
+    const heldId = holdCaptainIdRef.current;
+    const players = rosterHonorsHeldCaptain(
+      result.data.players,
+      heldId,
+      holdCaptainUntilRef.current,
+    )
+      ? result.data.players
+      : heldId
+        ? applyCaptainTransferToPlayers(result.data.players, heldId)
+        : result.data.players;
+
+    setSnapshot({ ...result.data, players });
     setCountdown(formatCountdown(result.data.lobby_auto_start_at));
   }, [goToPlay, inviteCode, joinCode, manageMode, session.sessionId]);
 
@@ -156,6 +186,15 @@ export function LobbyRoom({
     });
 
     if (verified.success) {
+      const held = holdCaptainIdRef.current;
+      if (held && Date.now() < holdCaptainUntilRef.current) {
+        const shouldBeLead = verified.data.session.playerId === held;
+        const isLead =
+          verified.data.session.isCaptain || verified.data.session.isAlpha;
+        if (isLead !== shouldBeLead) {
+          return;
+        }
+      }
       savePlayerSession(verified.data.session);
       setSession(verified.data.session);
     }
@@ -176,13 +215,24 @@ export function LobbyRoom({
 
   const handlePlayersChange = useCallback(
     (players: LobbySnapshot["players"]) => {
+      const heldId = holdCaptainIdRef.current;
+      const nextPlayers = rosterHonorsHeldCaptain(
+        players,
+        heldId,
+        holdCaptainUntilRef.current,
+      )
+        ? players
+        : heldId
+          ? applyCaptainTransferToPlayers(players, heldId)
+          : players;
+
       setSnapshot((current) => ({
         ...current,
-        players,
-        active_player_count: players.length,
+        players: nextPlayers,
+        active_player_count: nextPlayers.length,
       }));
 
-      const me = players.find((player) => player.id === session.playerId);
+      const me = nextPlayers.find((player) => player.id === session.playerId);
       if (!me) return;
 
       setSession((current) => {
@@ -198,7 +248,7 @@ export function LobbyRoom({
     [session, syncSessionFromServer],
   );
 
-  const { error: realtimeError, statusHint: realtimeHint } = useTeamSync({
+  const { error: realtimeError, statusHint: realtimeHint, broadcast } = useTeamSync({
     sessionId: session.sessionId,
     teamId: session.teamId,
     playerId: session.playerId,
@@ -213,8 +263,20 @@ export function LobbyRoom({
         return;
       }
       if (event.event_type === "captain_transferred") {
-        void refreshLobby();
-        void syncSessionFromServer();
+        const newCaptainId = String(event.payload.new_captain_id ?? "");
+        if (!newCaptainId) return;
+        holdTransferredCaptain(newCaptainId);
+        setSnapshot((current) => ({
+          ...current,
+          captain_player_id: newCaptainId,
+          navigator_player_id: newCaptainId,
+          players: applyCaptainTransferToPlayers(current.players, newCaptainId),
+        }));
+        setSession((current) => {
+          const next = sessionAfterCaptainTransfer(current, newCaptainId);
+          savePlayerSession(next);
+          return next;
+        });
       }
     },
     onSessionSuperseded: () => setSessionSuperseded(true),
@@ -250,12 +312,17 @@ export function LobbyRoom({
   }, [refreshLobby, snapshot.lobby_auto_start_at, snapshot.team_status]);
 
   function handleStartGame() {
+    if (startInFlightRef.current) return;
+    startInFlightRef.current = true;
     setError(null);
-    // Instant feedback outdoors — never leave the start button looking dead.
+    markMissionStarting(inviteCode, joinCode);
     setBusy({
       title: "Mission startet…",
       subtitle: "Alle Geräte springen jetzt in die Mission.",
     });
+
+    const startedAt = new Date().toISOString();
+    const sent = broadcast({ type: "game_started", started_at: startedAt });
 
     void startGameManually({
       inviteCode,
@@ -263,11 +330,24 @@ export function LobbyRoom({
       sessionId: session.sessionId,
     }).then((result) => {
       if (!result.success) {
+        startInFlightRef.current = false;
+        clearMissionStarting(inviteCode, joinCode);
         setBusy(null);
         setError(result.error);
         return;
       }
-      router.replace(eventPlayPath(inviteCode, joinCode));
+      if (manageMode) {
+        startInFlightRef.current = false;
+        setBusy(null);
+      }
+    });
+
+    void Promise.race([
+      sent,
+      new Promise((resolve) => window.setTimeout(resolve, 120)),
+    ]).then(() => {
+      if (!startInFlightRef.current || manageMode) return;
+      goToPlay();
     });
   }
 
@@ -297,63 +377,27 @@ export function LobbyRoom({
   function handleTransferCaptain(targetPlayerId: string) {
     setError(null);
     const target = snapshot.players.find((player) => player.id === targetPlayerId);
-    setBusy({
-      title: "Leitung wird übertragen…",
-      subtitle: target
-        ? `${target.display_name} ist jetzt Team-Leitung.`
-        : "Rollen werden aktualisiert.",
-    });
     setManageOpen(false);
+    holdTransferredCaptain(targetPlayerId);
 
-    // Optimistic UI — old lead loses Start rights immediately; roster flips now.
     setSnapshot((current) => ({
       ...current,
-      players: current.players.map((player) => {
-        if (player.id === targetPlayerId) {
-          return {
-            ...player,
-            is_captain: true,
-            is_alpha: true,
-            is_beta: false,
-            is_gamma: false,
-            is_navigator: true,
-            archetype_role: "alpha" as const,
-            role: "alpha",
-          };
-        }
-        if (player.id === session.playerId || player.is_captain || player.is_alpha) {
-          return {
-            ...player,
-            is_captain: false,
-            is_alpha: false,
-            is_beta: true,
-            is_gamma: false,
-            is_navigator: false,
-            archetype_role: "beta" as const,
-            role: "beta",
-          };
-        }
-        return player;
-      }),
+      captain_player_id: targetPlayerId,
+      navigator_player_id: targetPlayerId,
+      players: applyCaptainTransferToPlayers(current.players, targetPlayerId),
     }));
     setSession((current) => {
-      const next: PlayerSession = {
-        ...current,
-        isCaptain: false,
-        isAlpha: false,
-        isBeta: true,
-        isGamma: false,
-        isNavigator: false,
-        canManageTeam: false,
-        canUnlockGps: false,
-        archetypeRole: "beta",
-        effectiveBeta: true,
-      };
+      const next = sessionAfterCaptainTransfer(current, targetPlayerId);
       savePlayerSession(next);
       return next;
     });
-    // Optimistic UI is the feedback — don't hold the overlay for the network round-trip.
     setBusy(null);
+
+    void broadcast({
+      type: "captain_transferred",
+      new_captain_id: targetPlayerId,
+      previous_captain_id: session.playerId,
+    });
 
     void transferCaptain({
       inviteCode,
@@ -364,8 +408,6 @@ export function LobbyRoom({
       if (!result.success) {
         setError(result.error);
       }
-      void refreshLobby();
-      void syncSessionFromServer();
     });
   }
 

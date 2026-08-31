@@ -2,7 +2,6 @@
 
 import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createBootstrapGameState, parseTeamGameState } from "@/lib/grid/game-state";
 import {
   DEFAULT_LOBBY_AUTO_START_SECONDS,
   LOBBY_IDLE_RELEASE_MS,
@@ -210,7 +209,9 @@ async function getTeamByJoinCode(joinCode: string, eventId: string) {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("teams")
-    .select("*")
+    .select(
+      "id, event_id, join_code, name, max_size, department, region, status, lobby_opened_at, lobby_auto_start_at, started_at, captain_player_id, navigator_player_id, beta_player_id, current_level",
+    )
     .eq("join_code", normalizeCode(joinCode))
     .eq("event_id", eventId)
     .maybeSingle();
@@ -236,9 +237,11 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
   const supabase = createAdminClient();
   const { data: team } = await supabase
     .from("teams")
-    .select("id, status, lobby_auto_start_at, captain_player_id, event_id, max_size, game_state, current_level")
+    .select(
+      "id, status, lobby_auto_start_at, captain_player_id, event_id, max_size",
+    )
     .eq("id", teamId)
-    .single();
+    .maybeSingle();
 
   if (!team || team.status !== "lobby") return;
   if (!team.captain_player_id) return;
@@ -263,31 +266,31 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
   if (!startGate.success) return;
 
   const startedAt = new Date().toISOString();
-  const keepPrepared =
-    Boolean(team.game_state) &&
-    parseTeamGameState(team.game_state).content_ready !== false;
+  await supabase.from("team_sync_events").insert({
+    team_id: teamId,
+    event_type: "game_started",
+    actor_player_id: team.captain_player_id,
+    payload: { started_at: startedAt, source: "auto" },
+  });
+
   const { data: updated } = await supabase
     .from("teams")
     .update({
       status: "playing",
       started_at: startedAt,
-      ...(keepPrepared
-        ? {}
-        : { current_level: 1, game_state: createBootstrapGameState() }),
     })
     .eq("id", teamId)
     .eq("status", "lobby")
     .select("id")
     .maybeSingle();
 
-  if (updated) {
-    await supabase.from("team_sync_events").insert({
-      team_id: teamId,
-      event_type: "game_started",
-      actor_player_id: team.captain_player_id,
-      payload: { started_at: startedAt, source: "auto" },
-    });
-  }
+  if (!updated) return;
+
+  await supabase
+    .from("events")
+    .update({ status: "active", started_at: startedAt })
+    .eq("id", event.id)
+    .in("status", ["draft", "lobby"]);
 }
 
 export async function createEvent(input: {
@@ -969,7 +972,6 @@ export async function getLobbySnapshot(input: {
       });
     }
 
-    // Auto-start only while still in lobby — avoid extra DB work on every poll after start.
     if (team.status === "lobby") {
       await maybeAutoStartTeam(team.id);
     }
@@ -1043,18 +1045,20 @@ export async function startGameManually(input: {
 
     const startedAt = new Date().toISOString();
     const supabase = createAdminClient();
-    const keepPrepared =
-      Boolean(team.game_state) &&
-      parseTeamGameState(team.game_state).content_ready !== false;
+
+    // Kick every waiting device first — don't wait on the teams row (large game_state WAL).
+    await supabase.from("team_sync_events").insert({
+      team_id: team.id,
+      event_type: "game_started",
+      actor_player_id: player.id,
+      payload: { started_at: startedAt, source: "manual" },
+    });
 
     const { data: startedTeam, error } = await supabase
       .from("teams")
       .update({
         status: "playing",
         started_at: startedAt,
-        ...(keepPrepared
-          ? {}
-          : { current_level: 1, game_state: createBootstrapGameState() }),
       })
       .eq("id", team.id)
       .eq("status", "lobby")
@@ -1068,22 +1072,12 @@ export async function startGameManually(input: {
       return { success: false, error: "Das Team ist nicht mehr in der Lobby." };
     }
 
-    // Kick every waiting device immediately (Realtime on teams can lag behind).
-    await supabase.from("team_sync_events").insert({
-      team_id: team.id,
-      event_type: "game_started",
-      actor_player_id: player.id,
-      payload: { started_at: startedAt, source: "manual" },
-    });
-
-    // Mark event active without waiting for content compile.
     await supabase
       .from("events")
       .update({ status: "active", started_at: startedAt })
       .eq("id", event.id)
       .in("status", ["draft", "lobby"]);
 
-    // Heavy compile should already have run in the lobby via prepareTeamGame.
     return { success: true, data: { startedAt } };
   } catch (error) {
     return {

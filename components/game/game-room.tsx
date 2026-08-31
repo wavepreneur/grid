@@ -43,7 +43,7 @@ import type {
   ResolvedEventContent,
   SolveLevelPayload,
 } from "@/lib/grid/level-types";
-import { applyRosterToSession } from "@/lib/grid/live-session";
+import { applyCaptainTransferToPlayers, applyRosterToSession, sessionAfterCaptainTransfer } from "@/lib/grid/live-session";
 import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
 import type { LobbyPlayer, PlayerSession } from "@/lib/grid/types";
 import { usesPhasedPlay } from "@/lib/grid/play-slots";
@@ -143,7 +143,7 @@ export function GameRoom({
     });
   }, [inviteCode, joinCode, session.sessionId]);
 
-  const { isConnected, statusHint: realtimeHint, error: realtimeError } = useTeamSync({
+  const { isConnected, statusHint: realtimeHint, error: realtimeError, broadcast } = useTeamSync({
     sessionId: session.sessionId,
     teamId: session.teamId,
     playerId: session.playerId,
@@ -166,31 +166,10 @@ export function GameRoom({
       const newCaptainId = String(event.payload.new_captain_id ?? "");
       if (!newCaptainId) return;
       setLobbyPlayers((current) =>
-        current.map((player) => {
-          const isLead = player.id === newCaptainId;
-          return {
-            ...player,
-            is_captain: isLead,
-            is_alpha: isLead,
-            is_beta: !isLead && player.is_beta,
-            is_navigator: isLead,
-            archetype_role: isLead ? "alpha" : player.archetype_role === "alpha" ? "beta" : player.archetype_role,
-            role: isLead ? "alpha" : player.role === "alpha" ? "beta" : player.role,
-          };
-        }),
+        applyCaptainTransferToPlayers(current, newCaptainId),
       );
       setSession((current) => {
-        const next = applyRosterToSession(current, {
-          id: current.playerId,
-          display_name: current.displayName,
-          is_captain: current.playerId === newCaptainId,
-          is_alpha: current.playerId === newCaptainId,
-          is_beta: current.playerId !== newCaptainId,
-          is_gamma: false,
-          is_navigator: current.playerId === newCaptainId,
-          archetype_role: current.playerId === newCaptainId ? "alpha" : "beta",
-          joined_at: "",
-        });
+        const next = sessionAfterCaptainTransfer(current, newCaptainId);
         savePlayerSession(next);
         return next;
       });
@@ -543,51 +522,20 @@ export function GameRoom({
     setMorePanel(null);
 
     setLobbyPlayers((current) =>
-      current.map((player) => {
-        if (player.id === targetPlayerId) {
-          return {
-            ...player,
-            is_captain: true,
-            is_alpha: true,
-            is_beta: false,
-            is_gamma: false,
-            is_navigator: true,
-            archetype_role: "alpha" as const,
-            role: "alpha",
-          };
-        }
-        if (player.id === session.playerId || player.is_captain || player.is_alpha) {
-          return {
-            ...player,
-            is_captain: false,
-            is_alpha: false,
-            is_beta: true,
-            is_gamma: false,
-            is_navigator: false,
-            archetype_role: "beta" as const,
-            role: "beta",
-          };
-        }
-        return player;
-      }),
+      applyCaptainTransferToPlayers(current, targetPlayerId),
     );
     setSession((current) => {
-      const next: typeof current = {
-        ...current,
-        isCaptain: false,
-        isAlpha: false,
-        isBeta: true,
-        isGamma: false,
-        isNavigator: false,
-        canManageTeam: false,
-        canUnlockGps: false,
-        archetypeRole: "beta",
-        effectiveBeta: true,
-      };
+      const next = sessionAfterCaptainTransfer(current, targetPlayerId);
       savePlayerSession(next);
       return next;
     });
     setTransferPending(false);
+
+    void broadcast({
+      type: "captain_transferred",
+      new_captain_id: targetPlayerId,
+      previous_captain_id: session.playerId,
+    });
 
     void transferCaptain({
       inviteCode,

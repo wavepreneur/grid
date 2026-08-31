@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { type RealtimeChannel, type SupabaseClient } from "@supabase/supabase-js";
 import { getRealtimeAccessToken } from "@/app/actions/realtime";
 import { cacheTeamState, loadCachedTeamState } from "@/lib/grid/offline-state";
@@ -24,6 +24,13 @@ type UseTeamSyncOptions = {
   onSessionSuperseded?: () => void;
   /** Fired after Realtime is SUBSCRIBED again (e.g. after phone wake) — pull fresh state. */
   onResynced?: () => void;
+};
+
+export type TeamBroadcastPayload = {
+  type: TeamSyncEvent["event_type"] | "game_started" | "captain_transferred";
+  new_captain_id?: string;
+  previous_captain_id?: string;
+  started_at?: string;
 };
 
 type TeamRow = {
@@ -139,6 +146,7 @@ export function useTeamSync({
 
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let playerReloadTimer: ReturnType<typeof setTimeout> | null = null;
     let attempt = 0;
     let connecting = false;
     let subscribed = false;
@@ -149,6 +157,10 @@ export function useTeamSync({
         retryTimer = null;
       }
       subscribed = false;
+      if (playerReloadTimer) {
+        clearTimeout(playerReloadTimer);
+        playerReloadTimer = null;
+      }
       const channel = channelRef.current;
       channelRef.current = null;
       if (channel) {
@@ -226,16 +238,65 @@ export function useTeamSync({
         onTeamStatusChangeRef.current?.(cached.status);
       }
 
-      let channelBuilder = supabase.channel(`team-sync:${teamId}:${Date.now()}`).on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "teams",
-          filter: `id=eq.${teamId}`,
-        },
+      const reloadPlayersSoon = () => {
+        if (playerReloadTimer) clearTimeout(playerReloadTimer);
+        playerReloadTimer = setTimeout(() => {
+          void loadActiveLobbyPlayers(supabase, teamId).then((players) => {
+            if (!cancelled) onPlayersChangeRef.current?.(players);
+          });
+        }, 80);
+      };
+
+      let channelBuilder = supabase
+        .channel(`grid-team:${teamId}`, {
+          config: { broadcast: { ack: true, self: false } },
+        })
+        .on("broadcast", { event: "grid" }, (msg) => {
+          const payload = (msg.payload ?? {}) as TeamBroadcastPayload;
+          if (payload.type === "game_started" || payload.type === "game_finished") {
+            onSyncEventRef.current?.({
+              id: "broadcast",
+              team_id: teamId,
+              sequence: 0,
+              event_type: payload.type,
+              level: null,
+              payload: { started_at: payload.started_at ?? null },
+              actor_player_id: null,
+              created_at: new Date().toISOString(),
+            });
+            return;
+          }
+          if (payload.type === "captain_transferred") {
+            onSyncEventRef.current?.({
+              id: "broadcast",
+              team_id: teamId,
+              sequence: 0,
+              event_type: "captain_transferred",
+              level: null,
+              payload: {
+                new_captain_id: payload.new_captain_id,
+                previous_captain_id: payload.previous_captain_id,
+              },
+              actor_player_id: null,
+              created_at: new Date().toISOString(),
+            });
+          }
+        })
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "teams",
+            filter: `id=eq.${teamId}`,
+          },
         (payload) => {
           const row = payload.new as TeamRow;
+          onTeamStatusChangeRef.current?.(row.status);
+          // Start/finish: don't parse huge game_state JSON — devices are leaving the lobby.
+          if (row.status === "playing" || row.status === "finished") {
+            return;
+          }
           const gameState = parseTeamGameState(row.game_state);
           const nextState = {
             teamId: row.id,
@@ -248,12 +309,8 @@ export function useTeamSync({
           };
 
           cacheTeamState(nextState);
-          onTeamStatusChangeRef.current?.(row.status);
           onGameStateChangeRef.current?.(gameState, row.current_level);
-
-          void loadActiveLobbyPlayers(supabase, teamId).then((players) => {
-            onPlayersChangeRef.current?.(players);
-          });
+          reloadPlayersSoon();
         },
       );
 
@@ -285,9 +342,7 @@ export function useTeamSync({
             filter: `team_id=eq.${teamId}`,
           },
           () => {
-            void loadActiveLobbyPlayers(supabase, teamId).then((players) => {
-              onPlayersChangeRef.current?.(players);
-            });
+            reloadPlayersSoon();
           },
         )
         .on(
@@ -365,5 +420,11 @@ export function useTeamSync({
     };
   }, [enabled, playerId, sessionId, teamId]);
 
-  return { isConnected, statusHint, error };
+  const broadcast = useCallback((payload: TeamBroadcastPayload) => {
+    const channel = channelRef.current;
+    if (!channel) return Promise.resolve("error" as const);
+    return channel.send({ type: "broadcast", event: "grid", payload });
+  }, []);
+
+  return { isConnected, statusHint, error, broadcast };
 }
