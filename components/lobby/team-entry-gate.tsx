@@ -2,14 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { ArrowRight, User } from "lucide-react";
 import { joinTeamAsPlayer, listActiveTeamJoinRoster } from "@/app/actions/lobby";
 import {
   GridButton,
   GridError,
   GridHint,
-  GridInput,
-  GridLabel,
 } from "@/components/grid/grid-shell";
+import {
+  IdentityField,
+  LobbyPrimaryButton,
+} from "@/components/lobby/lobby-identity";
 import { SESSION_ACTIVE } from "@/lib/grid/session-codes";
 import {
   abandonTeamSession,
@@ -246,19 +249,22 @@ export function TeamEntryGate({
             </div>
           ) : (
             <>
-              <div>
-                <GridLabel hint="So siehst du im Team aus">Dein Name</GridLabel>
-                <GridInput
-                  value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  placeholder="z. B. Alex"
-                  required
-                  minLength={2}
-                  maxLength={32}
-                  autoComplete="nickname"
-                  className="text-base"
-                />
-              </div>
+              <IdentityField
+                label="Dein Name"
+                hint="So siehst du im Team aus"
+                previewHint="Dein Anzeigename"
+                tone="player"
+                icon={<User size={20} strokeWidth={2.25} />}
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder="z. B. Alex"
+                required
+                minLength={2}
+                maxLength={32}
+                autoComplete="nickname"
+                autoCapitalize="words"
+                enterKeyHint="done"
+              />
 
               {error ? <GridError message={error} /> : null}
 
@@ -275,10 +281,10 @@ export function TeamEntryGate({
                 </button>
               ) : null}
 
-              <GridButton
+              <LobbyPrimaryButton
                 type="button"
-                className="py-4 text-base"
-                disabled={isPending || displayName.trim().length < 2}
+                pending={isPending}
+                disabled={displayName.trim().length < 2}
                 onClick={() => completeJoin(false)}
               >
                 {isPending
@@ -288,7 +294,8 @@ export function TeamEntryGate({
                     : isLobby
                       ? "Zum Wartebereich"
                       : "Mitspielen"}
-              </GridButton>
+                {isPending ? null : <ArrowRight size={20} strokeWidth={2.5} />}
+              </LobbyPrimaryButton>
             </>
           )}
 

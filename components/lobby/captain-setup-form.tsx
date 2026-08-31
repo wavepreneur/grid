@@ -2,16 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { ArrowRight, Flag, User } from "lucide-react";
 import {
   createTeamAsCaptain,
   setupPrebookedTeamAsCaptain,
 } from "@/app/actions/lobby";
+import { GridError } from "@/components/grid/grid-shell";
 import {
-  GridButton,
-  GridError,
-  GridInput,
-  GridLabel,
-} from "@/components/grid/grid-shell";
+  IdentityField,
+  LobbyPrimaryButton,
+} from "@/components/lobby/lobby-identity";
 import { eventLobbyPath } from "@/lib/grid/event-routes";
 import { savePlayerSession } from "@/lib/grid/player-session";
 
@@ -65,48 +65,57 @@ export function CaptainSetupForm({
   }
 
   return (
-    <form action={handleSubmit} className="flex flex-col gap-5">
-      <p className="text-center text-sm leading-relaxed text-slate-500">
-        Zwei kurze Angaben — dann seid ihr im Wartebereich und könnt Mitspieler holen.
+    <form action={handleSubmit} className="flex flex-col gap-4">
+      <p className="text-center text-sm font-medium leading-relaxed text-slate-500">
+        Teamname fürs Ranking, dein Name fürs Team — dann ab in den Wartebereich.
       </p>
 
-      <div>
-        <GridLabel hint="So erscheint ihr im Ranking">Teamname</GridLabel>
-        <GridInput
-          name="teamName"
-          placeholder="z. B. Berlin Explorers"
-          required
-          minLength={2}
-          maxLength={48}
-          autoComplete="organization"
-          className="text-base"
-        />
-      </div>
+      <IdentityField
+        name="teamName"
+        label="Teamname"
+        hint="So erscheint ihr im Ranking"
+        previewHint="Ranking-Name"
+        step="1 / 2"
+        tone="team"
+        icon={<Flag size={20} strokeWidth={2.25} />}
+        placeholder="z. B. Berlin Explorers"
+        required
+        minLength={2}
+        maxLength={48}
+        autoComplete="organization"
+        autoCapitalize="words"
+        enterKeyHint="next"
+      />
 
-      <div>
-        <GridLabel hint="Dein Name im Team">Dein Name</GridLabel>
-        <GridInput
-          name="displayName"
-          placeholder="z. B. Dervis"
-          required
-          minLength={2}
-          maxLength={32}
-          autoComplete="nickname"
-          className="text-base"
-        />
-      </div>
+      <IdentityField
+        name="displayName"
+        label="Dein Name"
+        hint="Dein Name im Team"
+        previewHint="Dein Anzeigename"
+        step="2 / 2"
+        tone="player"
+        icon={<User size={20} strokeWidth={2.25} />}
+        placeholder="z. B. Dervis"
+        required
+        minLength={2}
+        maxLength={32}
+        autoComplete="nickname"
+        autoCapitalize="words"
+        enterKeyHint="done"
+      />
 
       <input type="hidden" name="department" value="Other" />
       <input type="hidden" name="region" value="DACH" />
 
       {error ? <GridError message={error} /> : null}
 
-      <GridButton type="submit" disabled={isPending} className="mt-1 py-4 text-base">
+      <LobbyPrimaryButton pending={isPending}>
         {isPending ? "Gleich geht’s los…" : "Weiter zum Wartebereich"}
-      </GridButton>
+        {isPending ? null : <ArrowRight size={20} strokeWidth={2.5} />}
+      </LobbyPrimaryButton>
 
       {studioTest || isPrebooked ? (
-        <p className="text-center text-xs text-slate-400">
+        <p className="text-center text-xs font-medium text-slate-400">
           {studioTest ? "Studio-Test" : `Team-Code ${joinCode}`}
         </p>
       ) : null}
