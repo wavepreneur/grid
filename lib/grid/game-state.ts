@@ -138,7 +138,9 @@ export type TeamSyncEventType =
   | "game_started"
   | "level_completed"
   | "modal_cleared"
-  | "game_finished";
+  | "game_finished"
+  | "captain_transferred"
+  | "content_ready";
 
 export type TeamSyncEvent = {
   id: string;

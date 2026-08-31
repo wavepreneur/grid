@@ -43,7 +43,8 @@ import type {
   ResolvedEventContent,
   SolveLevelPayload,
 } from "@/lib/grid/level-types";
-import { clearPlayerSession } from "@/lib/grid/player-session";
+import { applyRosterToSession } from "@/lib/grid/live-session";
+import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
 import type { LobbyPlayer, PlayerSession } from "@/lib/grid/types";
 import { usesPhasedPlay } from "@/lib/grid/play-slots";
 import { playPlaySfx, unlockPlayAudio } from "@/lib/grid/play-sfx";
@@ -52,7 +53,7 @@ import { useRouter } from "next/navigation";
 type GameRoomProps = {
   inviteCode: string;
   joinCode: string;
-  playerSession: PlayerSession;
+  session: PlayerSession;
   initialState: TeamRealtimeState;
   eventContent: ResolvedEventContent;
   teamName: string;
@@ -66,13 +67,14 @@ function countCompletedLevels(gameState: TeamGameState): number {
 export function GameRoom({
   inviteCode,
   joinCode,
-  playerSession,
+  session: initialSession,
   initialState,
   eventContent,
   teamName,
   eventTitle = "Mission",
 }: GameRoomProps) {
   const router = useRouter();
+  const [session, setSession] = useState(initialSession);
   const [teamState, setTeamState] = useState(initialState);
   const [error, setError] = useState<string | null>(null);
   const [solveFeedback, setSolveFeedback] = useState<SolveFeedbackState | null>(null);
@@ -90,7 +92,7 @@ export function GameRoom({
   const localPauseKey = pauseStorageKey({
     inviteCode,
     joinCode,
-    playerId: playerSession.playerId,
+    playerId: session.playerId,
   });
 
   // Restore device-local pause after app close / URL reopen.
@@ -133,23 +135,66 @@ export function GameRoom({
     void getGameState({
       inviteCode,
       joinCode,
-      sessionId: playerSession.sessionId,
+      sessionId: session.sessionId,
     }).then((result) => {
       if (!result.success) return;
       setTeamState(result.data);
       cacheTeamState(result.data);
     });
-  }, [inviteCode, joinCode, playerSession.sessionId]);
+  }, [inviteCode, joinCode, session.sessionId]);
 
   const { isConnected, statusHint: realtimeHint, error: realtimeError } = useTeamSync({
-    sessionId: playerSession.sessionId,
-    teamId: playerSession.teamId,
-    playerId: playerSession.playerId,
+    sessionId: session.sessionId,
+    teamId: session.teamId,
+    playerId: session.playerId,
     enabled: !sessionSuperseded,
     onGameStateChange: handleStateUpdate,
     onTeamStatusChange: handleTeamStatusChange,
     onSessionSuperseded: () => setSessionSuperseded(true),
-    onPlayersChange: setLobbyPlayers,
+    onPlayersChange: (players) => {
+      setLobbyPlayers(players);
+      const me = players.find((player) => player.id === session.playerId);
+      if (!me) return;
+      setSession((current) => {
+        const next = applyRosterToSession(current, me);
+        if (next !== current) savePlayerSession(next);
+        return next;
+      });
+    },
+    onSyncEvent: (event) => {
+      if (event.event_type !== "captain_transferred") return;
+      const newCaptainId = String(event.payload.new_captain_id ?? "");
+      if (!newCaptainId) return;
+      setLobbyPlayers((current) =>
+        current.map((player) => {
+          const isLead = player.id === newCaptainId;
+          return {
+            ...player,
+            is_captain: isLead,
+            is_alpha: isLead,
+            is_beta: !isLead && player.is_beta,
+            is_navigator: isLead,
+            archetype_role: isLead ? "alpha" : player.archetype_role === "alpha" ? "beta" : player.archetype_role,
+            role: isLead ? "alpha" : player.role === "alpha" ? "beta" : player.role,
+          };
+        }),
+      );
+      setSession((current) => {
+        const next = applyRosterToSession(current, {
+          id: current.playerId,
+          display_name: current.displayName,
+          is_captain: current.playerId === newCaptainId,
+          is_alpha: current.playerId === newCaptainId,
+          is_beta: current.playerId !== newCaptainId,
+          is_gamma: false,
+          is_navigator: current.playerId === newCaptainId,
+          archetype_role: current.playerId === newCaptainId ? "alpha" : "beta",
+          joined_at: "",
+        });
+        savePlayerSession(next);
+        return next;
+      });
+    },
     onResynced: handleResynced,
   });
 
@@ -163,12 +208,12 @@ export function GameRoom({
   useBonusQueueTick({
     inviteCode,
     joinCode,
-    sessionId: playerSession.sessionId,
+    sessionId: session.sessionId,
     gameState: teamState.gameState,
     walkStorageKey,
     enabled: !sessionSuperseded && !isFinished,
     // One tracker device (Alpha/GPS lead) — avoids split meter counters across phones.
-    trackMeters: playerSession.canUnlockGps,
+    trackMeters: session.canUnlockGps,
     onState: (state) => {
       setTeamState(state);
       cacheTeamState(state);
@@ -211,8 +256,8 @@ export function GameRoom({
   const currentLevelDefinition =
     eventContent.levels.find((level) => Number(level.level) === activeLevel) ??
     (eventContent.levels.length === 1 ? eventContent.levels[0] : null);
-  const isNavigator = playerSession.canUnlockGps || Boolean(teamState.isNavigator);
-  const soloAlpha = playerSession.isAlpha && playerSession.effectiveBeta;
+  const isNavigator = session.canUnlockGps || Boolean(teamState.isNavigator);
+  const soloAlpha = session.isAlpha && session.effectiveBeta;
   const purchasedTileHints = teamState.gameState.purchased_tile_hints[String(activeLevel)] ?? {};
   const solveDisabled = levelState?.status !== "active" || Boolean(modal) || isHintPending;
 
@@ -222,7 +267,7 @@ export function GameRoom({
       const result = await purchaseHint({
         inviteCode,
         joinCode,
-        sessionId: playerSession.sessionId,
+        sessionId: session.sessionId,
         tileId,
       });
       if (!result.success) {
@@ -268,7 +313,7 @@ export function GameRoom({
       const result = await solveCurrentLevel({
         inviteCode,
         joinCode,
-        sessionId: playerSession.sessionId,
+        sessionId: session.sessionId,
         payload,
       });
       if (!result.success) {
@@ -313,7 +358,7 @@ export function GameRoom({
       const result = await advanceFromHub({
         inviteCode,
         joinCode,
-        sessionId: playerSession.sessionId,
+        sessionId: session.sessionId,
         geolocation: input.geolocation,
         targetLevel: input.targetLevel,
         walkedMeters: input.walkedMeters,
@@ -345,7 +390,7 @@ export function GameRoom({
     void syncOutdoorWalkProgress({
       inviteCode,
       joinCode,
-      sessionId: playerSession.sessionId,
+      sessionId: session.sessionId,
       level,
       walkedMeters,
     }).then((result) => {
@@ -363,7 +408,7 @@ export function GameRoom({
         await advanceFromHub({
           inviteCode,
           joinCode,
-          sessionId: playerSession.sessionId,
+          sessionId: session.sessionId,
           targetLevel: levelNumber,
         }),
       );
@@ -377,7 +422,7 @@ export function GameRoom({
         await advanceFromHub({
           inviteCode,
           joinCode,
-          sessionId: playerSession.sessionId,
+          sessionId: session.sessionId,
           stationCode: code,
         }),
       );
@@ -391,7 +436,7 @@ export function GameRoom({
         await advanceFromHub({
           inviteCode,
           joinCode,
-          sessionId: playerSession.sessionId,
+          sessionId: session.sessionId,
           targetLevel: levelNumber,
         }),
       );
@@ -408,7 +453,7 @@ export function GameRoom({
         await submitArrivalQuiz({
           inviteCode,
           joinCode,
-          sessionId: playerSession.sessionId,
+          sessionId: session.sessionId,
           selectedOptionId: payload.selectedOptionId,
           selectedOptionIds: payload.selectedOptionIds,
         }),
@@ -423,7 +468,7 @@ export function GameRoom({
         await advanceQuizToLevel({
           inviteCode,
           joinCode,
-          sessionId: playerSession.sessionId,
+          sessionId: session.sessionId,
         }),
       );
     });
@@ -436,7 +481,7 @@ export function GameRoom({
         await submitBonusAnswer({
           inviteCode,
           joinCode,
-          sessionId: playerSession.sessionId,
+          sessionId: session.sessionId,
           selectedOptionId,
         }),
       );
@@ -450,7 +495,7 @@ export function GameRoom({
         await skipBonusPhase({
           inviteCode,
           joinCode,
-          sessionId: playerSession.sessionId,
+          sessionId: session.sessionId,
         }),
       );
     });
@@ -474,7 +519,7 @@ export function GameRoom({
     void dismissBonusNotice({
       inviteCode,
       joinCode,
-      sessionId: playerSession.sessionId,
+      sessionId: session.sessionId,
       noticeId,
     }).then((result) => {
       if (result.success && result.data) {
@@ -490,24 +535,69 @@ export function GameRoom({
     eventContent.missionDurationMinutes,
     paused,
   );
-  const isAlpha = Boolean(playerSession.isAlpha || teamState.isCaptain);
+  const isAlpha = session.isAlpha;
 
   function handleTransferAlpha(targetPlayerId: string) {
     setTransferPending(true);
     setError(null);
     setMorePanel(null);
+
+    setLobbyPlayers((current) =>
+      current.map((player) => {
+        if (player.id === targetPlayerId) {
+          return {
+            ...player,
+            is_captain: true,
+            is_alpha: true,
+            is_beta: false,
+            is_gamma: false,
+            is_navigator: true,
+            archetype_role: "alpha" as const,
+            role: "alpha",
+          };
+        }
+        if (player.id === session.playerId || player.is_captain || player.is_alpha) {
+          return {
+            ...player,
+            is_captain: false,
+            is_alpha: false,
+            is_beta: true,
+            is_gamma: false,
+            is_navigator: false,
+            archetype_role: "beta" as const,
+            role: "beta",
+          };
+        }
+        return player;
+      }),
+    );
+    setSession((current) => {
+      const next: typeof current = {
+        ...current,
+        isCaptain: false,
+        isAlpha: false,
+        isBeta: true,
+        isGamma: false,
+        isNavigator: false,
+        canManageTeam: false,
+        canUnlockGps: false,
+        archetypeRole: "beta",
+        effectiveBeta: true,
+      };
+      savePlayerSession(next);
+      return next;
+    });
+    setTransferPending(false);
+
     void transferCaptain({
       inviteCode,
       joinCode,
-      sessionId: playerSession.sessionId,
+      sessionId: session.sessionId,
       targetPlayerId,
     }).then((result) => {
-      setTransferPending(false);
       if (!result.success) {
         setError(result.error);
-        return;
       }
-      setError(null);
     });
   }
 
@@ -517,7 +607,7 @@ export function GameRoom({
       const result = await removePlayerFromLobby({
         inviteCode,
         joinCode,
-        sessionId: playerSession.sessionId,
+        sessionId: session.sessionId,
         targetPlayerId,
       });
       setReleasePending(false);
@@ -535,7 +625,7 @@ export function GameRoom({
       const result = await handoverSession({
         inviteCode,
         joinCode,
-        sessionId: playerSession.sessionId,
+        sessionId: session.sessionId,
       });
       setReleasePending(false);
       if (!result.success) {
@@ -554,7 +644,7 @@ export function GameRoom({
       const result = await dismissSyncModal({
         inviteCode,
         joinCode,
-        sessionId: playerSession.sessionId,
+        sessionId: session.sessionId,
         modalId: modal.id,
       });
       if (!result.success) {
@@ -576,8 +666,8 @@ export function GameRoom({
     <SessionHandoffScreen
       inviteCode={inviteCode}
       joinCode={joinCode}
-      playerId={playerSession.playerId}
-      displayName={playerSession.displayName}
+      playerId={session.playerId}
+      displayName={session.displayName}
     />
   ) : isFinished ? (
     <div className="cg-animate-rise-in space-y-6 px-5 pb-[max(2.5rem,calc(1.25rem+env(safe-area-inset-bottom)))] pt-[max(2.5rem,env(safe-area-inset-top))]">
@@ -623,11 +713,11 @@ export function GameRoom({
         gameState={teamState.gameState}
         activeLevel={activeLevel}
         teamName={teamName}
-        myName={playerSession.displayName}
-        myPlayerId={playerSession.playerId}
-        myRole={playerSession.archetypeRole}
+        myName={session.displayName}
+        myPlayerId={session.playerId}
+        myRole={session.archetypeRole}
         myRoleLabel={displayRoleLabel(
-          playerSession.archetypeRole,
+          session.archetypeRole,
           eventContent.roleLabels ?? DEFAULT_ROLE_LABELS,
         )}
         timeLabel={remainingLabel}
@@ -636,7 +726,7 @@ export function GameRoom({
         disabled={solveDisabled && teamState.gameState.current_phase !== "bonus"}
         isPending={isSolvePending || isHintPending}
         canUnlockGps={isNavigator}
-        effectiveBeta={playerSession.effectiveBeta}
+        effectiveBeta={session.effectiveBeta}
         soloAlpha={soloAlpha}
         levelStartedAt={levelStartedAt}
         teamStartedAt={teamState.startedAt}
@@ -648,7 +738,7 @@ export function GameRoom({
         onTogglePause={handleTogglePause}
         isAlpha={isAlpha}
         teammates={lobbyPlayers
-          .filter((p) => p.id !== playerSession.playerId)
+          .filter((p) => p.id !== session.playerId)
           .map((p) => ({
             id: p.id,
             name: p.display_name,
@@ -674,11 +764,11 @@ export function GameRoom({
                   : "gamma"),
             eventContent.roleLabels ?? DEFAULT_ROLE_LABELS,
           ),
-          isMe: p.id === playerSession.playerId,
+          isMe: p.id === session.playerId,
         }))}
         inviteCode={inviteCode}
         joinCode={joinCode}
-        sessionId={playerSession.sessionId}
+        sessionId={session.sessionId}
         onTransferAlpha={handleTransferAlpha}
         onReleasePlayerSeat={isAlpha ? handleReleasePlayerSeat : undefined}
         transferPending={transferPending}
@@ -708,12 +798,12 @@ export function GameRoom({
         disabled={solveDisabled}
         isPending={isSolvePending || isHintPending}
         canUnlockGps={isNavigator}
-        effectiveBeta={playerSession.effectiveBeta}
+        effectiveBeta={session.effectiveBeta}
         soloAlpha={soloAlpha}
         gpsCapability={eventContent.capabilities.gps}
         levelStartedAt={levelStartedAt}
         teamStartedAt={teamState.startedAt}
-        myPlayerId={playerSession.playerId}
+        myPlayerId={session.playerId}
         onSubmit={handleSolveLevel}
         onPurchaseHint={handlePurchaseHint}
         feedback={solveFeedback}
@@ -777,7 +867,7 @@ export function GameRoom({
         <IdentityBar
           inviteCode={inviteCode}
           joinCode={joinCode}
-          session={playerSession}
+          session={session}
           showCopyPlayLink
         />
         {!sessionSuperseded && !isFinished ? (

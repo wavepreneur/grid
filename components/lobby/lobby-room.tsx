@@ -33,6 +33,7 @@ import {
   DEFAULT_ROLE_LABELS,
   type RoleDisplayLabels,
 } from "@/lib/grid/role-labels";
+import { applyRosterToSession, rosterNeedsSessionSync } from "@/lib/grid/live-session";
 import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
 
@@ -110,6 +111,10 @@ export function LobbyRoom({
     return buildTeamInviteUrl(window.location.origin, inviteCode, joinCode);
   }, [inviteCode, joinCode]);
 
+  useEffect(() => {
+    router.prefetch(eventPlayPath(inviteCode, joinCode));
+  }, [inviteCode, joinCode, router]);
+
   const goToPlay = useCallback(() => {
     if (manageMode) return;
     setBusy((current) =>
@@ -180,59 +185,17 @@ export function LobbyRoom({
       const me = players.find((player) => player.id === session.playerId);
       if (!me) return;
 
-      const liveCanManage = Boolean(me.is_captain || me.is_alpha);
-      const liveIsAlpha = Boolean(me.is_alpha || me.is_captain);
-      const liveRole =
-        me.archetype_role ??
-        (liveIsAlpha ? "alpha" : me.is_beta ? "beta" : "gamma");
-
       setSession((current) => {
-        if (
-          current.canManageTeam === liveCanManage &&
-          current.isCaptain === Boolean(me.is_captain) &&
-          current.isAlpha === liveIsAlpha &&
-          current.isNavigator === Boolean(me.is_navigator) &&
-          current.archetypeRole === liveRole
-        ) {
-          return current;
-        }
-
-        const next: PlayerSession = {
-          ...current,
-          isCaptain: Boolean(me.is_captain),
-          isAlpha: liveIsAlpha,
-          isBeta: Boolean(me.is_beta),
-          isGamma: Boolean(me.is_gamma) || liveRole === "gamma",
-          isNavigator: Boolean(me.is_navigator),
-          canManageTeam: liveCanManage,
-          canUnlockGps: Boolean(me.is_navigator),
-          archetypeRole: liveRole as PlayerSession["archetypeRole"],
-          effectiveBeta: Boolean(me.is_beta) || liveCanManage,
-        };
-        savePlayerSession(next);
+        const next = applyRosterToSession(current, me);
+        if (next !== current) savePlayerSession(next);
         return next;
       });
 
-      // Always re-verify after roster role flips so Start/GPS rights match the server.
-      if (
-        session.canManageTeam !== liveCanManage ||
-        session.isCaptain !== Boolean(me.is_captain) ||
-        session.isAlpha !== liveIsAlpha ||
-        session.isNavigator !== Boolean(me.is_navigator) ||
-        session.archetypeRole !== liveRole
-      ) {
+      if (rosterNeedsSessionSync(session, me)) {
         void syncSessionFromServer();
       }
     },
-    [
-      session.archetypeRole,
-      session.canManageTeam,
-      session.isAlpha,
-      session.isCaptain,
-      session.isNavigator,
-      session.playerId,
-      syncSessionFromServer,
-    ],
+    [session, syncSessionFromServer],
   );
 
   const { error: realtimeError, statusHint: realtimeHint } = useTeamSync({
@@ -247,6 +210,11 @@ export function LobbyRoom({
     onSyncEvent: (event) => {
       if (event.event_type === "game_started" || event.event_type === "game_finished") {
         goToPlay();
+        return;
+      }
+      if (event.event_type === "captain_transferred") {
+        void refreshLobby();
+        void syncSessionFromServer();
       }
     },
     onSessionSuperseded: () => setSessionSuperseded(true),

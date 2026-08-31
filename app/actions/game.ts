@@ -867,6 +867,19 @@ export async function initializeTeamGameState(
   routeOverride: unknown,
   studioGameVersionId?: string | null,
 ) {
+  const supabase = createAdminClient();
+  const { data: current } = await supabase
+    .from("teams")
+    .select("game_state")
+    .eq("id", teamId)
+    .maybeSingle();
+  if (
+    current?.game_state &&
+    parseTeamGameState(current.game_state).content_ready !== false
+  ) {
+    return;
+  }
+
   const content = await loadResolvedEventContent({
     eventId,
     organizationId,
@@ -902,7 +915,6 @@ export async function initializeTeamGameState(
     ...(startPhase ? { current_phase: startPhase } : {}),
   };
 
-  const supabase = createAdminClient();
   await supabase
     .from("teams")
     .update({
@@ -911,7 +923,12 @@ export async function initializeTeamGameState(
     })
     .eq("id", teamId);
 
-  // Do not emit another game_started — lobby already broadcast that for redirects.
+  await insertSyncEvent({
+    teamId,
+    eventType: "content_ready",
+    actorPlayerId: actorPlayerId,
+    payload: { current_level: startLevel },
+  });
 }
 
 /**
@@ -930,7 +947,7 @@ export async function ensureTeamGameReady(input: {
     }
 
     const gameState = parseTeamGameState(team.game_state);
-    if (gameState.content_ready !== false) {
+    if (team.game_state && gameState.content_ready !== false) {
       return { success: true, data: buildRealtimeState(team, player) };
     }
 
@@ -946,6 +963,49 @@ export async function ensureTeamGameReady(input: {
     );
 
     return getGameState(input);
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
+
+/**
+ * Compile mission state while the team is still in the lobby.
+ * Start then only flips status — no 10–30s stall after “Los”.
+ */
+export async function prepareTeamGame(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+}): Promise<ActionResult<{ ready: boolean }>> {
+  try {
+    const { event, team, player } = await assertPlayerSession(input);
+    if (
+      team.status !== "lobby" &&
+      team.status !== "setup" &&
+      team.status !== "playing"
+    ) {
+      return { success: false, error: "Team ist nicht in der Lobby." };
+    }
+
+    if (team.game_state && parseTeamGameState(team.game_state).content_ready !== false) {
+      return { success: true, data: { ready: true } };
+    }
+
+    await initializeTeamGameState(
+      team.id,
+      player.id,
+      event.id,
+      event.organization_id,
+      event.city_id,
+      event.content_config,
+      event.route_override,
+      event.studio_game_version_id,
+    );
+
+    return { success: true, data: { ready: true } };
   } catch (error) {
     return {
       success: false,

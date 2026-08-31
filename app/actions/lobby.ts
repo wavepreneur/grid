@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createBootstrapGameState } from "@/lib/grid/game-state";
+import { createBootstrapGameState, parseTeamGameState } from "@/lib/grid/game-state";
 import {
   DEFAULT_LOBBY_AUTO_START_SECONDS,
   LOBBY_IDLE_RELEASE_MS,
@@ -236,7 +236,7 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
   const supabase = createAdminClient();
   const { data: team } = await supabase
     .from("teams")
-    .select("id, status, lobby_auto_start_at, captain_player_id, event_id, max_size")
+    .select("id, status, lobby_auto_start_at, captain_player_id, event_id, max_size, game_state, current_level")
     .eq("id", teamId)
     .single();
 
@@ -263,11 +263,17 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
   if (!startGate.success) return;
 
   const startedAt = new Date().toISOString();
+  const keepPrepared =
+    Boolean(team.game_state) &&
+    parseTeamGameState(team.game_state).content_ready !== false;
   const { data: updated } = await supabase
     .from("teams")
     .update({
       status: "playing",
       started_at: startedAt,
+      ...(keepPrepared
+        ? {}
+        : { current_level: 1, game_state: createBootstrapGameState() }),
     })
     .eq("id", teamId)
     .eq("status", "lobby")
@@ -275,24 +281,12 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
     .maybeSingle();
 
   if (updated) {
-    if (event) {
-      const bootstrap = createBootstrapGameState();
-      await supabase
-        .from("teams")
-        .update({
-          current_level: 1,
-          game_state: bootstrap,
-        })
-        .eq("id", teamId);
-
-      await supabase.from("team_sync_events").insert({
-        team_id: teamId,
-        event_type: "game_started",
-        actor_player_id: team.captain_player_id,
-        payload: { started_at: startedAt, source: "auto" },
-      });
-      // Full content compile runs on first GameGate ensureTeamGameReady — never block here.
-    }
+    await supabase.from("team_sync_events").insert({
+      team_id: teamId,
+      event_type: "game_started",
+      actor_player_id: team.captain_player_id,
+      payload: { started_at: startedAt, source: "auto" },
+    });
   }
 }
 
@@ -1049,15 +1043,18 @@ export async function startGameManually(input: {
 
     const startedAt = new Date().toISOString();
     const supabase = createAdminClient();
-    const bootstrap = createBootstrapGameState();
+    const keepPrepared =
+      Boolean(team.game_state) &&
+      parseTeamGameState(team.game_state).content_ready !== false;
 
     const { data: startedTeam, error } = await supabase
       .from("teams")
       .update({
         status: "playing",
         started_at: startedAt,
-        current_level: 1,
-        game_state: bootstrap,
+        ...(keepPrepared
+          ? {}
+          : { current_level: 1, game_state: createBootstrapGameState() }),
       })
       .eq("id", team.id)
       .eq("status", "lobby")
@@ -1086,8 +1083,7 @@ export async function startGameManually(input: {
       .eq("id", event.id)
       .in("status", ["draft", "lobby"]);
 
-    // Heavy content compile happens in GameGate via ensureTeamGameReady —
-    // never via after() (can block Server Actions on Vercel for 10–20s).
+    // Heavy compile should already have run in the lobby via prepareTeamGame.
     return { success: true, data: { startedAt } };
   } catch (error) {
     return {
@@ -1489,6 +1485,16 @@ export async function transferCaptain(input: {
     if (teamResult.error) {
       return { success: false, error: teamResult.error.message };
     }
+
+    await supabase.from("team_sync_events").insert({
+      team_id: team.id,
+      event_type: "captain_transferred",
+      actor_player_id: captain.id,
+      payload: {
+        new_captain_id: target.id,
+        previous_captain_id: captain.id,
+      },
+    });
 
     // No after()/rebalance here — that blocked Server Actions ~10s on Vercel.
     void writeAuditLog({

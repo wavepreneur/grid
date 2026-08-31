@@ -54,6 +54,7 @@ export default async function EventLobbyPage({ params, searchParams }: EventLobb
         briefingIframeUrl={content?.briefingIframeUrl}
         roleLabels={content?.roleLabels}
         studioTest={studioTest}
+        eventContent={content}
       />
     </GridShell>
   );

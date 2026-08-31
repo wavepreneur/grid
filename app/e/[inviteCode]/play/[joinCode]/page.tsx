@@ -1,5 +1,3 @@
-import { notFound } from "next/navigation";
-import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GameGate } from "@/components/game/game-gate";
 
 type EventPlayPageProps = {
@@ -8,24 +6,13 @@ type EventPlayPageProps = {
 
 export default async function EventPlayPage({ params }: EventPlayPageProps) {
   const { inviteCode, joinCode } = await params;
-  const normalizedInvite = inviteCode.toUpperCase();
-  const normalizedJoin = joinCode.toUpperCase();
-
-  const eventResult = await getEventInvite(normalizedInvite);
-  if (!eventResult.success) notFound();
-
-  const teamResult = await resolveTeamJoinCode({
-    inviteCode: normalizedInvite,
-    joinCode: normalizedJoin,
-  });
-  if (!teamResult.success) notFound();
 
   return (
     <GameGate
-      inviteCode={normalizedInvite}
-      joinCode={normalizedJoin}
-      teamName={teamResult.data.teamName}
-      eventTitle={eventResult.data.title}
+      inviteCode={inviteCode.toUpperCase()}
+      joinCode={joinCode.toUpperCase()}
+      teamName=""
+      eventTitle="Mission"
     />
   );
 }
