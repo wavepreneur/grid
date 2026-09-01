@@ -300,8 +300,10 @@ export function useTeamSync({
         (payload) => {
           const row = payload.new as TeamRow;
           onTeamStatusChangeRef.current?.(row.status);
-          // Start/finish: don't parse huge game_state JSON — devices are leaving the lobby.
-          if (row.status === "playing" || row.status === "finished") {
+          // Lobby has no game-state listener and is leaving on start — skip the
+          // heavy JSON. GameRoom MUST keep applying playing updates or solves
+          // never reach the other devices.
+          if (!onGameStateChangeRef.current) {
             return;
           }
           const gameState = parseTeamGameState(row.game_state);
