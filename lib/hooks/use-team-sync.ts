@@ -26,6 +26,8 @@ type UseTeamSyncOptions = {
   onResynced?: () => void;
   /** Lobby-only: show or drop the start overlay before the team is playing. */
   onStartOverlay?: (action: "show" | "hide") => void;
+  /** Live walk meters from the tracking device — not a full game_state pull. */
+  onWalkMeters?: (level: number, walkedMeters: number) => void;
   /**
    * lobby: status + start/lead only (do not parse game_state).
    * play: live solves. Default play so a missing flag cannot mute in-game sync.
@@ -39,12 +41,15 @@ export type TeamBroadcastPayload = {
     | "game_started"
     | "game_starting"
     | "start_aborted"
-    | "captain_transferred";
+    | "captain_transferred"
+    | "walk_meters";
   new_captain_id?: string;
   previous_captain_id?: string;
   started_at?: string;
   seq?: number;
   player_count?: number;
+  level?: number;
+  walked_meters?: number;
 };
 
 type TeamRow = {
@@ -135,6 +140,7 @@ export function useTeamSync({
   onSessionSuperseded,
   onResynced,
   onStartOverlay,
+  onWalkMeters,
 }: UseTeamSyncOptions) {
   const [isConnected, setIsConnected] = useState(false);
   /** Soft status for wake/reconnect — not a hard failure. */
@@ -151,6 +157,7 @@ export function useTeamSync({
   const onSessionSupersededRef = useRef(onSessionSuperseded);
   const onResyncedRef = useRef(onResynced);
   const onStartOverlayRef = useRef(onStartOverlay);
+  const onWalkMetersRef = useRef(onWalkMeters);
 
   onTeamStatusChangeRef.current = onTeamStatusChange;
   onGameStateChangeRef.current = onGameStateChange;
@@ -159,6 +166,7 @@ export function useTeamSync({
   onSessionSupersededRef.current = onSessionSuperseded;
   onResyncedRef.current = onResynced;
   onStartOverlayRef.current = onStartOverlay;
+  onWalkMetersRef.current = onWalkMeters;
 
   useEffect(() => {
     if (!enabled) return;
@@ -266,6 +274,15 @@ export function useTeamSync({
         })
         .on("broadcast", { event: "grid" }, (msg) => {
           const payload = (msg.payload ?? {}) as TeamBroadcastPayload;
+          if (payload.type === "walk_meters") {
+            if (
+              typeof payload.level === "number" &&
+              typeof payload.walked_meters === "number"
+            ) {
+              onWalkMetersRef.current?.(payload.level, payload.walked_meters);
+            }
+            return;
+          }
           if (payload.type === "game_starting") {
             onStartOverlayRef.current?.("show");
             return;

@@ -40,7 +40,9 @@ export function OutdoorWalkRing({
   onSimulateWalk,
 }: Props) {
   const progress = Math.min(1, walkedMeters / Math.max(1, targetMeters));
-  const remaining = Math.max(0, Math.ceil(targetMeters - walkedMeters - 0.001));
+  const targetShown = Math.max(0, Math.round(targetMeters));
+  const walkedShown = Math.min(targetShown, Math.max(0, Math.round(walkedMeters)));
+  const remaining = Math.max(0, targetShown - walkedShown);
   const complete = walkedMeters >= targetMeters - 0.05;
   const arrivedRef = useRef(false);
   const lastPulseRef = useRef(0);
@@ -119,7 +121,7 @@ export function OutdoorWalkRing({
               <p className="text-3xl font-bold tabular-nums text-[var(--cg-fg)]">{remaining}</p>
               <p className="mt-1 text-sm text-[var(--cg-muted)]">Meter übrig</p>
               <p className="mt-2 text-xs tabular-nums text-[var(--cg-muted)]">
-                {Math.round(walkedMeters)} / {Math.round(targetMeters)} m
+                {walkedShown} / {targetShown} m
               </p>
             </>
           )}

@@ -37,15 +37,20 @@ type Props = {
   isPending: boolean;
   /** Persist outdoor walk progress across remounts. */
   walkStorageKey?: string | null;
-  /** Server-held meters for the active distance unlock (team truth). */
+  /** Server-held meters for the active distance unlock (fallback if broadcast missed). */
   serverWalkedMeters?: number;
+  /** Team lead's phone is the only GPS counter; others mirror this. */
+  isWalkTracker?: boolean;
+  mirroredWalkedMeters?: number;
   onArriveOutdoor: (input: OutdoorArriveInput) => void;
   onSolveGpsCheckpoint: (input: OutdoorArriveInput) => void;
   onOpenStation: (levelNumber: number) => void;
   onSubmitStationCode: (code: string) => void;
   onStartMission: (levelNumber: number) => void;
-  /** Alpha reports walk progress to the server. */
+  /** Lead persists walk to the server (infrequent). */
   onReportWalkProgress?: (level: number, walkedMeters: number) => void;
+  /** Lead fans out live meters to teammates (no server round-trip). */
+  onBroadcastWalkProgress?: (level: number, walkedMeters: number) => void;
 };
 
 export function PlayHubView({
@@ -59,12 +64,15 @@ export function PlayHubView({
   isPending,
   walkStorageKey = null,
   serverWalkedMeters = 0,
+  isWalkTracker = false,
+  mirroredWalkedMeters = 0,
   onArriveOutdoor,
   onSolveGpsCheckpoint,
   onOpenStation,
   onSubmitStationCode,
   onStartMission,
   onReportWalkProgress,
+  onBroadcastWalkProgress,
 }: Props) {
   const meta = hubMeta(mode);
   const current = levels.find((l) => l.level === activeLevel) ?? levels[0];
@@ -94,11 +102,14 @@ export function PlayHubView({
         current={current}
         routeOrder={routeOrder}
         canUnlockGps={canUnlockGps}
+        isWalkTracker={isWalkTracker}
         disabled={disabled}
         isPending={isPending}
         walkStorageKey={walkStorageKey}
         serverWalkedMeters={serverWalkedMeters}
+        mirroredWalkedMeters={mirroredWalkedMeters}
         onReportWalkProgress={onReportWalkProgress}
+        onBroadcastWalkProgress={onBroadcastWalkProgress}
         onArrive={
           gpsOnly
             ? (input) => onSolveGpsCheckpoint(input)
@@ -289,24 +300,30 @@ function OutdoorHub({
   current,
   routeOrder,
   canUnlockGps,
+  isWalkTracker = false,
   disabled,
   isPending,
   walkStorageKey,
   serverWalkedMeters = 0,
+  mirroredWalkedMeters = 0,
   onArrive,
   onReportWalkProgress,
+  onBroadcastWalkProgress,
 }: {
   levels: LevelDefinition[];
   levelStatuses: Record<string, { status: GameLevelStatus }>;
   current: LevelDefinition;
   routeOrder: "linear" | "free";
   canUnlockGps: boolean;
+  isWalkTracker?: boolean;
   disabled: boolean;
   isPending: boolean;
   walkStorageKey?: string | null;
   serverWalkedMeters?: number;
+  mirroredWalkedMeters?: number;
   onArrive: (input: OutdoorArriveInput) => void;
   onReportWalkProgress?: (level: number, walkedMeters: number) => void;
+  onBroadcastWalkProgress?: (level: number, walkedMeters: number) => void;
 }) {
   const isWalkMode =
     current.triggers?.type === "distance" &&
@@ -316,7 +333,7 @@ function OutdoorHub({
     Boolean(current.triggers.after_minutes && current.triggers.after_minutes > 0);
   const isGpsMode = Boolean(current.location) && !isWalkMode;
 
-  const gpsEnabled = (isGpsMode || isWalkMode) && canUnlockGps;
+  const gpsEnabled = (isGpsMode && canUnlockGps) || (isWalkMode && isWalkTracker);
   const { sample } = useGeolocation(gpsEnabled && isGpsMode);
   const levelWalkKey =
     walkStorageKey && isWalkMode
@@ -330,6 +347,7 @@ function OutdoorHub({
   const [simBonus, setSimBonus] = useState(0);
   const arrivedPingRef = useRef(false);
   const lastReportRef = useRef(0);
+  const localWalkedRef = useRef(0);
 
   const waypoints = useMemo(
     () => buildGpsWaypoints(levels, levelStatuses),
@@ -374,24 +392,36 @@ function OutdoorHub({
 
   const targetMeters = current.triggers?.after_meters ?? 100;
   const localWalked = walk.displayMeters + simBonus;
-  const walkedMeters = Math.max(localWalked, serverWalkedMeters);
+  localWalkedRef.current = localWalked;
+  const walkedMeters = isWalkTracker
+    ? localWalked
+    : Math.max(mirroredWalkedMeters, serverWalkedMeters);
 
-  // Keep server progress warm so reopen / teammate devices share truth.
+  // Live fan-out to teammates — no server write.
   useEffect(() => {
-    if (!isWalkMode || !canUnlockGps || !onReportWalkProgress) return;
-    const meters = Math.max(walk.meters + simBonus, serverWalkedMeters);
+    if (!isWalkMode || !isWalkTracker || !onBroadcastWalkProgress) return;
+    const send = () =>
+      onBroadcastWalkProgress(current.level, Math.max(localWalkedRef.current, 0));
+    send();
+    const id = window.setInterval(send, 300);
+    return () => window.clearInterval(id);
+  }, [isWalkMode, isWalkTracker, onBroadcastWalkProgress, current.level]);
+
+  // Keep a server snapshot so reopen / crash still has a baseline.
+  useEffect(() => {
+    if (!isWalkMode || !isWalkTracker || !onReportWalkProgress) return;
+    const meters = walk.meters + simBonus;
     if (meters < 1) return;
     const now = Date.now();
-    if (now - lastReportRef.current < 4000) return;
+    if (now - lastReportRef.current < 8000) return;
     lastReportRef.current = now;
     onReportWalkProgress(current.level, meters);
   }, [
     isWalkMode,
-    canUnlockGps,
+    isWalkTracker,
     onReportWalkProgress,
     walk.meters,
     simBonus,
-    serverWalkedMeters,
     current.level,
   ]);
 
@@ -408,7 +438,11 @@ function OutdoorHub({
     onArrive({
       geolocation: position,
       targetLevel: level,
-      walkedMeters: isWalkMode ? Math.max(walk.meters + simBonus, serverWalkedMeters) : undefined,
+      walkedMeters: isWalkMode
+        ? isWalkTracker
+          ? walk.meters + simBonus
+          : Math.max(mirroredWalkedMeters, serverWalkedMeters)
+        : undefined,
       forceUnlock,
     });
   }
@@ -429,19 +463,18 @@ function OutdoorHub({
           disabled={disabled}
           isPending={isPending}
           gpsError={walk.error}
-          showForceOpen={canUnlockGps}
+          showForceOpen={isWalkTracker}
           onOpen={() => openWithSample(walk.sample, current.level)}
           onForceOpen={() => openWithSample(walk.sample, current.level, "distance")}
-          onSimulateWalk={() => setSimBonus((m) => m + 25)}
+          onSimulateWalk={
+            isWalkTracker ? () => setSimBonus((m) => m + 25) : undefined
+          }
         />
-        {!canUnlockGps ? (
-          <p className="px-5 pb-6 text-center text-sm text-[var(--cg-muted)]">
-            Nur Alpha / GPS-Leiter trackt die Strecke — bitte das Freigabe-Gerät nutzen.
-            {serverWalkedMeters > 0
-              ? ` Team-Stand: ca. ${Math.round(serverWalkedMeters)} m.`
-              : ""}
-          </p>
-        ) : null}
+        <p className="px-5 pb-6 text-center text-sm text-[var(--cg-muted)]">
+          {isWalkTracker
+            ? "Dein Handy zählt die Meter fürs ganze Team. Die anderen Geräte folgen diesem Stand."
+            : "Das Handy vom Team Lead zählt die Strecke. Euer Ring zeigt denselben Stand."}
+        </p>
       </section>
     );
   }

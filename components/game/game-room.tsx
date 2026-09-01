@@ -94,6 +94,9 @@ export function GameRoom({
   const [transferPending, setTransferPending] = useState(false);
   const [releasePending, setReleasePending] = useState(false);
   const [lobbyPlayers, setLobbyPlayers] = useState<LobbyPlayer[]>([]);
+  const [mirroredWalk, setMirroredWalk] = useState<{ level: number; meters: number } | null>(
+    null,
+  );
   const holdCaptainIdRef = useRef<string | null>(null);
   const holdSeqRef = useRef(0);
 
@@ -214,6 +217,9 @@ export function GameRoom({
       handleResynced();
     },
     onResynced: handleResynced,
+    onWalkMeters: (level, walkedMeters) => {
+      setMirroredWalk({ level, meters: walkedMeters });
+    },
   });
 
   useEffect(() => {
@@ -247,7 +253,7 @@ export function GameRoom({
     walkStorageKey,
     enabled: !sessionSuperseded && !isFinished,
     // One tracker device (Alpha/GPS lead) — avoids split meter counters across phones.
-    trackMeters: session.canUnlockGps,
+    trackMeters: session.isAlpha,
     onState: (state) => {
       setTeamState((current) => {
         const next = pickNewerTeamState(current, state);
@@ -455,9 +461,20 @@ export function GameRoom({
       walkedMeters,
     }).then((result) => {
       if (result.success && result.data) {
-        setTeamState(result.data);
-        cacheTeamState(result.data);
+        setTeamState((current) => {
+          const next = pickNewerTeamState(current, result.data!);
+          if (next !== current) cacheTeamState(next);
+          return next;
+        });
       }
+    });
+  }
+
+  function handleBroadcastWalkProgress(level: number, walkedMeters: number) {
+    void broadcast({
+      type: "walk_meters",
+      level,
+      walked_meters: walkedMeters,
     });
   }
 
@@ -880,6 +897,10 @@ export function GameRoom({
         onArriveOutdoor={handleArriveOutdoor}
         onSolveGpsCheckpoint={handleSolveGpsCheckpoint}
         onReportWalkProgress={handleReportWalkProgress}
+        onBroadcastWalkProgress={handleBroadcastWalkProgress}
+        mirroredWalkedMeters={
+          mirroredWalk?.level === activeLevel ? mirroredWalk.meters : 0
+        }
         onOpenStation={handleOpenStation}
         onSubmitStationCode={handleSubmitStationCode}
         onStartMission={handleStartMission}

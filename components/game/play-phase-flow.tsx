@@ -77,6 +77,8 @@ type Props = {
   onArriveOutdoor: (input: OutdoorArriveInput) => void;
   onSolveGpsCheckpoint: (input: OutdoorArriveInput) => void;
   onReportWalkProgress?: (level: number, walkedMeters: number) => void;
+  onBroadcastWalkProgress?: (level: number, walkedMeters: number) => void;
+  mirroredWalkedMeters?: number;
   onOpenStation: (levelNumber: number) => void;
   onSubmitStationCode: (code: string) => void;
   onStartMission: (levelNumber: number) => void;
@@ -147,6 +149,8 @@ export function PlayPhaseFlow({
   onArriveOutdoor,
   onSolveGpsCheckpoint,
   onReportWalkProgress,
+  onBroadcastWalkProgress,
+  mirroredWalkedMeters = 0,
   onOpenStation,
   onSubmitStationCode,
   onStartMission,
@@ -395,6 +399,7 @@ export function PlayPhaseFlow({
           activeLevel={activeLevel}
           routeOrder={eventContent.routeOrder ?? "linear"}
           canUnlockGps={canUnlockGps}
+          isWalkTracker={canPaceTeam}
           disabled={disabled || paused}
           isPending={isPending}
           walkStorageKey={walkStorageKey}
@@ -403,9 +408,11 @@ export function PlayPhaseFlow({
               ? gameState.outdoor_progress.walked_meters
               : 0
           }
+          mirroredWalkedMeters={mirroredWalkedMeters}
           onArriveOutdoor={onArriveOutdoor}
           onSolveGpsCheckpoint={onSolveGpsCheckpoint}
           onReportWalkProgress={onReportWalkProgress}
+          onBroadcastWalkProgress={onBroadcastWalkProgress}
           onOpenStation={onOpenStation}
           onSubmitStationCode={onSubmitStationCode}
           onStartMission={onStartMission}
