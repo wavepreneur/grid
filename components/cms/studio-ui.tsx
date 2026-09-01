@@ -1,6 +1,8 @@
 import Link from "next/link";
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import { inputCls } from "@/components/cms/ui";
+
+export { StudioSelect } from "@/components/cms/shared/studio-listbox";
 
 /* ── Form controls (City Games look) ───────────────────────────── */
 
@@ -24,21 +26,6 @@ export function StudioInput({
       className={`${inputCls} disabled:opacity-50 ${className}`}
       {...props}
     />
-  );
-}
-
-export function StudioSelect({
-  className = "",
-  children,
-  ...props
-}: SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <select
-      className={`${inputCls} disabled:opacity-50 ${className}`}
-      {...props}
-    >
-      {children}
-    </select>
   );
 }
 

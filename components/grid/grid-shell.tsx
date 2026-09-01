@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 
 type GridShellProps = {
   eyebrow?: string;
@@ -131,20 +131,7 @@ export function GridInput({
   );
 }
 
-export function GridSelect({
-  className = "",
-  children,
-  ...props
-}: SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <select
-      className={`grid-input w-full rounded-xl px-4 py-3.5 text-base outline-none ${className}`}
-      {...props}
-    >
-      {children}
-    </select>
-  );
-}
+export { StudioSelect as GridSelect } from "@/components/cms/shared/studio-listbox";
 
 export function GridLabel({ children, hint }: { children: ReactNode; hint?: string }) {
   return (

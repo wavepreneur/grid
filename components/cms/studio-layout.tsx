@@ -301,6 +301,13 @@ export function StudioLayout({ children }: { children: ReactNode }) {
             Spieleransicht
           </Link>
         </div>
+        <div className="border-b border-border bg-card px-4 py-2.5">
+          <OrgSwitcher
+            organizations={organizations}
+            currentSlug={orgSlug}
+            placement="bottom"
+          />
+        </div>
         <div className="flex gap-2 overflow-x-auto border-b border-border bg-card px-4 py-2">
           {NAV.map((item) => (
             <StudioNavLink

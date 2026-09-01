@@ -10,6 +10,7 @@ import {
   GridInput,
   GridLabel,
 } from "@/components/grid/grid-shell";
+import { StudioListbox } from "@/components/cms/shared/studio-listbox";
 import { buildEventInviteUrl } from "@/lib/grid/codes";
 import { cockpitPath, eventPath } from "@/lib/grid/event-routes";
 
@@ -18,6 +19,7 @@ export function CreateEventForm() {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [createdInviteCode, setCreatedInviteCode] = useState<string | null>(null);
+  const [blueprintSlug, setBlueprintSlug] = useState<"exitmania" | "tabbrain">("exitmania");
 
   function handleSubmit(formData: FormData) {
     setError(null);
@@ -27,7 +29,7 @@ export function CreateEventForm() {
       const result = await createEvent({
         title: String(formData.get("title") ?? ""),
         organizationName: String(formData.get("organizationName") ?? ""),
-        blueprintSlug: String(formData.get("blueprintSlug") ?? "exitmania") as "exitmania" | "tabbrain",
+        blueprintSlug,
       });
 
       if (!result.success) {
@@ -54,14 +56,15 @@ export function CreateEventForm() {
 
         <div>
           <GridLabel>Blueprint</GridLabel>
-          <select
-            name="blueprintSlug"
-            defaultValue="exitmania"
-            className="w-full rounded-lg border border-[var(--grid-border)] bg-black/35 px-3 py-2 text-sm text-white"
-          >
-            <option value="exitmania">Exitmania (GPS + Mission Shell)</option>
-            <option value="tabbrain">Tabbrain (Mission Shell, kein GPS)</option>
-          </select>
+          <StudioListbox
+            value={blueprintSlug}
+            onChange={(value) => setBlueprintSlug(value as "exitmania" | "tabbrain")}
+            options={[
+              { value: "exitmania", label: "Exitmania (GPS + Mission Shell)" },
+              { value: "tabbrain", label: "Tabbrain (Mission Shell, kein GPS)" },
+            ]}
+            aria-label="Blueprint"
+          />
         </div>
 
         <div>
