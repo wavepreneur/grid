@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { verifyTeamSession } from "@/app/actions/lobby";
 import { getEventContent, getEventContentRevision } from "@/app/actions/content";
-import { ensureTeamGameReady, getGameState } from "@/app/actions/game";
+import { getGameState, prepareTeamGame } from "@/app/actions/game";
 import { GameRoom } from "@/components/game/game-room";
 import { GameGateSkeleton } from "@/components/game/game-gate-skeleton";
 import { GridError } from "@/components/grid/grid-shell";
@@ -21,6 +20,7 @@ import {
   clearMissionStarting,
   isMissionStarting,
 } from "@/lib/grid/mission-start-signal";
+import { savePlayerSession } from "@/lib/grid/player-session";
 import { teamEntryPath } from "@/lib/grid/team-routes";
 import type { ResolvedEventContent } from "@/lib/grid/level-types";
 import type { PlayerSession } from "@/lib/grid/types";
@@ -42,11 +42,11 @@ async function waitForContentReady(input: {
     return first;
   }
 
-  void ensureTeamGameReady(input);
+  void prepareTeamGame(input);
 
-  const deadline = Date.now() + 20_000;
+  const deadline = Date.now() + 8_000;
   while (Date.now() < deadline) {
-    await new Promise((resolve) => window.setTimeout(resolve, 350));
+    await new Promise((resolve) => window.setTimeout(resolve, 200));
     const gameResult = await getGameState(input);
     if (gameResult.success && gameResult.data.gameState.content_ready !== false) {
       return gameResult;
@@ -54,26 +54,6 @@ async function waitForContentReady(input: {
   }
 
   return getGameState(input);
-}
-
-async function waitForPlayingSession(input: {
-  inviteCode: string;
-  joinCode: string;
-  sessionId: string;
-}): Promise<PlayerSession | null> {
-  const deadline = Date.now() + 12_000;
-  while (Date.now() < deadline) {
-    const verified = await verifyTeamSession(input);
-    if (
-      verified.success &&
-      verified.data.session.teamStatus !== "lobby" &&
-      verified.data.session.teamStatus !== "setup"
-    ) {
-      return verified.data.session;
-    }
-    await new Promise((resolve) => window.setTimeout(resolve, 200));
-  }
-  return null;
 }
 
 export function GameGate({
@@ -85,6 +65,7 @@ export function GameGate({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [progress, setProgress] = useState(6);
   const [session, setSession] = useState<PlayerSession | null>(null);
   const [eventContent, setEventContent] = useState<ResolvedEventContent | null>(null);
   const [contentRevision, setContentRevision] = useState(1);
@@ -98,9 +79,25 @@ export function GameGate({
   }, [contentRevision]);
 
   useEffect(() => {
+    if (ready) return;
+    const started = Date.now();
+    const id = window.setInterval(() => {
+      const elapsed = Date.now() - started;
+      const creep = Math.min(82, 8 + (elapsed / 3500) * 74);
+      setProgress((current) => Math.max(current, creep));
+    }, 80);
+    return () => window.clearInterval(id);
+  }, [ready]);
+
+  useEffect(() => {
     let cancelled = false;
 
+    function bump(next: number) {
+      setProgress((current) => Math.max(current, next));
+    }
+
     async function boot() {
+      bump(12);
       const cached = loadCachedEventContent(inviteCode);
       const [resolved, contentResult] = await Promise.all([
         resolveTeamSession(inviteCode, joinCode),
@@ -108,6 +105,7 @@ export function GameGate({
       ]);
 
       if (cancelled) return;
+      bump(32);
 
       if (!resolved) {
         abandonTeamSession();
@@ -136,33 +134,25 @@ export function GameGate({
         });
       }
 
+      bump(48);
+
       let syncedSession = resolved.session;
+      const starting = isMissionStarting(inviteCode, joinCode);
 
       if (syncedSession.teamStatus === "lobby" || syncedSession.teamStatus === "setup") {
-        if (isMissionStarting(inviteCode, joinCode)) {
-          const playing = await waitForPlayingSession({
-            inviteCode,
-            joinCode,
-            sessionId: syncedSession.sessionId,
-          });
-          if (cancelled) return;
-          if (!playing) {
-            clearMissionStarting(inviteCode, joinCode);
-            router.replace(
-              teamEntryPath(inviteCode, joinCode, syncedSession.teamStatus ?? "lobby"),
-            );
-            return;
-          }
-          syncedSession = playing;
-        } else {
+        if (!starting) {
           router.replace(
             teamEntryPath(inviteCode, joinCode, syncedSession.teamStatus ?? "lobby"),
           );
           return;
         }
+        // Start is already in flight — don't wait up to 12s for the DB row.
+        syncedSession = { ...syncedSession, teamStatus: "playing" };
+        savePlayerSession(syncedSession);
       }
 
       clearMissionStarting(inviteCode, joinCode);
+      bump(62);
 
       const gameResult = await waitForContentReady({
         inviteCode,
@@ -178,9 +168,13 @@ export function GameGate({
         return;
       }
 
+      bump(94);
       setSession(syncedSession);
       setEventContent(freshContent);
       setInitialState(gameResult);
+      setProgress(100);
+      await new Promise((resolve) => window.setTimeout(resolve, 280));
+      if (cancelled) return;
       setReady(true);
     }
 
@@ -221,6 +215,7 @@ export function GameGate({
       <GameGateSkeleton
         title="Alle Geräte laden…"
         subtitle="Die Mission startet gemeinsam — niemand legt allein los."
+        progress={progress}
       />
     );
   }

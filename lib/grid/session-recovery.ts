@@ -65,7 +65,7 @@ export async function resolveTeamSession(
 
     if (verified.success) {
       savePlayerSession(verified.data.session);
-      await attachResumeTokenToUrl(verified.data.session);
+      void attachResumeTokenToUrl(verified.data.session);
       return verified.data;
     }
   }
@@ -86,7 +86,7 @@ export async function resolveTeamSession(
   }
 
   savePlayerSession(recovered.data.session);
-  await attachResumeTokenToUrl(recovered.data.session);
+  void attachResumeTokenToUrl(recovered.data.session);
   return recovered.data;
 }
 
