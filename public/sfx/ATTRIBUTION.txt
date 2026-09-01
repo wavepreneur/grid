@@ -10,3 +10,4 @@ Mapped files:
 - complete.wav ← maximize_008 (mission complete)
 - arrive.wav   ← maximize_002
 - ping.wav     ← tick_002
+- bonus.wav    ← GRID original chime (bonus intro only)

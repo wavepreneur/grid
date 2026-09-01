@@ -59,7 +59,9 @@ export function PlayTransitionScreen({
 
   return (
     <section
-      className="flex min-h-[70vh] flex-col items-center justify-center px-6 pb-10 pt-8 text-center"
+      className={`flex min-h-[70vh] flex-col items-center justify-center px-6 pb-10 pt-8 text-center ${
+        kind === "bonus" ? "cg-animate-bonus-screen" : ""
+      }`}
       role="status"
       aria-live="polite"
     >

@@ -698,6 +698,13 @@ export function GameRoom({
 
   function handleDismissModal() {
     if (!modal) return;
+    const bonusIncoming = (teamState.gameState.bonus_queue ?? []).some(
+      (item) => item.for_team && (item.status === "ready" || item.status === "active"),
+    );
+    if (bonusIncoming) {
+      unlockPlayAudio();
+      playPlaySfx("bonus");
+    }
     startTransition(async () => {
       const result = await dismissSyncModal({
         inviteCode,

@@ -16,7 +16,7 @@ export type PlaySfxKind =
   | "arrive"
   | "bonus";
 
-const SFX_SRC: Record<Exclude<PlaySfxKind, "bonus">, string> = {
+const SFX_SRC: Record<PlaySfxKind, string> = {
   correct: "/sfx/correct.wav",
   wrong: "/sfx/wrong.wav",
   success: "/sfx/success.wav",
@@ -24,6 +24,7 @@ const SFX_SRC: Record<Exclude<PlaySfxKind, "bonus">, string> = {
   complete: "/sfx/complete.wav",
   ping: "/sfx/ping.wav",
   arrive: "/sfx/arrive.wav",
+  bonus: "/sfx/bonus.wav",
 };
 
 const VOLUME: Partial<Record<PlaySfxKind, number>> = {
@@ -31,6 +32,7 @@ const VOLUME: Partial<Record<PlaySfxKind, number>> = {
   arrive: 0.7,
   unlock: 0.85,
   complete: 0.9,
+  bonus: 0.95,
 };
 
 let sharedCtx: AudioContext | null = null;
@@ -145,7 +147,9 @@ function playSynthFallback(kind: PlaySfxKind): void {
   }
 }
 
-function getAudio(kind: Exclude<PlaySfxKind, "bonus">): HTMLAudioElement | null {
+let lastBonusPlayAt = 0;
+
+function getAudio(kind: PlaySfxKind): HTMLAudioElement | null {
   if (typeof window === "undefined") return null;
   let audio = cache.get(kind);
   if (audio) return audio;
@@ -164,15 +168,17 @@ function playHapticFor(kind: PlaySfxKind): void {
   else if (kind === "bonus") hapticBonus();
 }
 
-/** Fire-and-forget SFX (+ matching haptic). No-ops when reduced-motion. */
+/** Fire-and-forget SFX (+ matching haptic). Haptics skip when reduced-motion. */
 export function playPlaySfx(kind: PlaySfxKind): void {
-  if (prefersReducedMotion()) return;
-  playHapticFor(kind);
+  const reduced = prefersReducedMotion();
+  if (!reduced) playHapticFor(kind);
+  // Bonus must still be audible — iOS Reduce Motion was muting the surprise entirely.
+  if (reduced && kind !== "bonus") return;
 
-  // Bonus is synth-only so it never shares a file with unlock / correct / complete.
   if (kind === "bonus") {
-    playSynthFallback(kind);
-    return;
+    const now = Date.now();
+    if (now - lastBonusPlayAt < 1800) return;
+    lastBonusPlayAt = now;
   }
 
   try {
@@ -198,7 +204,7 @@ export function unlockPlayAudio(): void {
   try {
     const ctx = getCtx();
     void ctx?.resume();
-    (Object.keys(SFX_SRC) as Array<Exclude<PlaySfxKind, "bonus">>).forEach((kind) => {
+    (Object.keys(SFX_SRC) as PlaySfxKind[]).forEach((kind) => {
       getAudio(kind);
     });
   } catch {
