@@ -26,22 +26,6 @@ type GpsMissionMapProps = {
   isTracker?: boolean;
 };
 
-function CompassArrow({ degrees }: { degrees: number }) {
-  return (
-    <svg
-      viewBox="0 0 64 64"
-      className="h-14 w-14"
-      style={{ transform: `rotate(${degrees}deg)` }}
-      aria-hidden
-    >
-      <path
-        d="M32 6 L46 50 L32 40 L18 50 Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
 export function GpsMissionMap({
   waypoints,
   activeLevel,
@@ -56,10 +40,30 @@ export function GpsMissionMap({
   const mapRef = useRef<LeafletMap | null>(null);
   const overlayRef = useRef<Layer[]>([]);
   const viewKeyRef = useRef<string>("");
+  const startDistRef = useRef<number | null>(null);
+  const startLevelRef = useRef(activeLevel);
   const [mapReady, setMapReady] = useState(false);
+
+  if (startLevelRef.current !== activeLevel) {
+    startLevelRef.current = activeLevel;
+    startDistRef.current = null;
+  }
+  if (distanceToTarget !== null && startDistRef.current === null) {
+    startDistRef.current = Math.max(distanceToTarget, 1);
+  }
 
   const bearing =
     playerPosition && target ? bearingDegrees(playerPosition, target) : null;
+  const startDist = startDistRef.current;
+  const remaining = distanceToTarget !== null ? Math.max(0, Math.round(distanceToTarget)) : null;
+  const walked =
+    startDist !== null && distanceToTarget !== null
+      ? Math.max(0, Math.round(startDist - distanceToTarget))
+      : 0;
+  const progress =
+    startDist && startDist > 0 && distanceToTarget !== null
+      ? Math.min(1, Math.max(0, 1 - distanceToTarget / startDist))
+      : 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -78,12 +82,13 @@ export function GpsMissionMap({
         zoomSnap: 0.5,
       });
 
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png", {
-        maxZoom: 20,
-        subdomains: "abcd",
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      }).addTo(map);
+      L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+        {
+          maxZoom: 16,
+          attribution: "Tiles &copy; Esri",
+        },
+      ).addTo(map);
 
       mapRef.current = map;
       setMapReady(true);
@@ -173,7 +178,7 @@ export function GpsMissionMap({
               [playerPosition.lat, playerPosition.lng],
               [target.lat, target.lng],
             ],
-            { padding: [48, 48], maxZoom: 17, animate: false },
+            { padding: [48, 48], maxZoom: 16, animate: false },
           );
           viewKeyRef.current = viewKey;
         } else {
@@ -199,29 +204,82 @@ export function GpsMissionMap({
     withinRadius,
   ]);
 
-  const metersLabel =
-    distanceToTarget !== null ? `${Math.round(distanceToTarget)} m` : null;
+  const ringSize = 132;
+  const ringStroke = 10;
+  const ringRadius = (ringSize - ringStroke) / 2;
+  const ringCirc = 2 * Math.PI * ringRadius;
 
   return (
     <div className="relative isolate z-0 overflow-hidden rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-card)] shadow-[var(--cg-shadow-soft)]">
-      <div ref={containerRef} className="h-[min(46vh,320px)] w-full sm:h-[300px] lg:h-[260px]" />
+      <div ref={containerRef} className="h-[min(38vh,260px)] w-full sm:h-[240px]" />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-center gap-2 p-3">
-        {metersLabel ? (
-          <span
-            className={`rounded-full px-5 py-2 text-lg font-bold tabular-nums shadow-[var(--cg-shadow-lift)] ${
-              withinRadius
-                ? "bg-[var(--cg-success)] text-white"
-                : "bg-[var(--cg-fg)] text-[var(--cg-bg)]"
-            }`}
-          >
-            {withinRadius ? "Am Ziel" : metersLabel}
-          </span>
-        ) : null}
-        {showPlayer && playerPosition && target && bearing !== null && !withinRadius ? (
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--cg-fg)] text-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)]">
-            <CompassArrow degrees={bearing} />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-[var(--cg-card)] via-[var(--cg-card)]/90 to-transparent px-4 pb-3 pt-16">
+        <div className="flex items-end justify-center gap-4">
+          {showPlayer && playerPosition && target && bearing !== null && !withinRadius ? (
+            <div className="mb-2 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--cg-fg)] text-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)]">
+              <svg
+                viewBox="0 0 64 64"
+                className="h-8 w-8"
+                style={{ transform: `rotate(${bearing}deg)` }}
+                aria-hidden
+              >
+                <path d="M32 6 L46 50 L32 40 L18 50 Z" fill="currentColor" />
+              </svg>
+            </div>
+          ) : null}
+
+          <div className="relative">
+            <svg
+              width={ringSize}
+              height={ringSize}
+              viewBox={`0 0 ${ringSize} ${ringSize}`}
+              className="-rotate-90"
+              aria-hidden
+            >
+              <circle
+                cx={ringSize / 2}
+                cy={ringSize / 2}
+                r={ringRadius}
+                fill="none"
+                stroke="var(--cg-secondary)"
+                strokeWidth={ringStroke}
+              />
+              <circle
+                cx={ringSize / 2}
+                cy={ringSize / 2}
+                r={ringRadius}
+                fill="none"
+                stroke={withinRadius ? "var(--cg-success)" : "var(--cg-primary)"}
+                strokeWidth={ringStroke}
+                strokeLinecap="round"
+                strokeDasharray={ringCirc}
+                strokeDashoffset={ringCirc * (1 - (withinRadius ? 1 : progress))}
+                style={{ transition: "stroke-dashoffset 0.25s linear" }}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+              {withinRadius ? (
+                <p className="text-lg font-bold text-[var(--cg-success)]">Am Ziel</p>
+              ) : remaining !== null ? (
+                <>
+                  <p className="text-3xl font-bold tabular-nums leading-none text-[var(--cg-fg)]">
+                    {remaining}
+                  </p>
+                  <p className="mt-1 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--cg-muted)]">
+                    Meter
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-[var(--cg-muted)]">GPS…</p>
+              )}
+            </div>
           </div>
+        </div>
+        {!withinRadius && remaining !== null ? (
+          <p className="mt-2 text-center text-sm tabular-nums text-[var(--cg-muted)]">
+            {walked} m gelaufen
+            {startDist ? ` · Start ${Math.round(startDist)} m` : ""}
+          </p>
         ) : null}
       </div>
 
@@ -231,8 +289,8 @@ export function GpsMissionMap({
         ) : showPlayer && playerPosition ? (
           <p className="text-[var(--cg-muted)]">
             {isTracker
-              ? "Dein Handy zeigt den Weg fürs Team — folgt dem Pfeil."
-              : "Das Handy vom Team Lead zeigt den Weg — folgt dem Pfeil."}
+              ? "Dein Handy zählt die Meter fürs Team — folgt dem Pfeil."
+              : "Das Handy vom Team Lead zählt die Meter — folgt dem Pfeil."}
           </p>
         ) : (
           <p className="text-[var(--cg-muted)]">

@@ -478,7 +478,7 @@ export function LevelSolvePanel({
               </div>
             ) : null}
 
-            {level.type === "gps" && autoSubmitGps ? (
+            {level.type === "gps" && autoSubmitGps && !hideGpsStatus ? (
               <p className="text-center text-sm text-[var(--cg-muted)]">
                 {withinRadius
                   ? "Kein Tippen nötig — der Wegpunkt wird automatisch bestätigt."
@@ -499,7 +499,7 @@ export function LevelSolvePanel({
               </BigButton>
             )}
 
-            {level.type === "gps" && isNavigator ? (
+            {level.type === "gps" && isNavigator && !hideGpsStatus ? (
               <div className="space-y-2">
                 <BigButton
                   variant="outline"
@@ -608,7 +608,7 @@ export function LevelSolvePanel({
             </div>
           ) : null}
 
-          {level.type === "gps" && autoSubmitGps ? (
+          {level.type === "gps" && autoSubmitGps && !hideGpsStatus ? (
             <p className="mt-4 text-sm text-slate-500">
               {withinRadius
                 ? "Kein Tippen nötig — der Wegpunkt wird automatisch bestätigt."
@@ -631,7 +631,7 @@ export function LevelSolvePanel({
             </GridButton>
           )}
 
-          {level.type === "gps" && isNavigator ? (
+          {level.type === "gps" && isNavigator && !hideGpsStatus ? (
             <GridButton
               type="button"
               variant="secondary"

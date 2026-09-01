@@ -41,19 +41,29 @@ function asArrivalQuiz(level: LevelDefinition): ArrivalQuiz | undefined {
 /** Mission payload for the level phase (tiles + free-text answer). */
 export function missionFromLevel(level: LevelDefinition): LevelDefinition {
   const quiz = asArrivalQuiz(level);
-  if (!quiz) return level;
+  const hasPuzzle =
+    Boolean(level.answer?.trim()) || Boolean(level.tiles && level.tiles.length > 0);
+
+  let mission = level;
 
   // Strip MC unlock fields from the mission phase when they double as arrival quiz
-  if (level.arrival_quiz) return level;
+  if (quiz && !level.arrival_quiz) {
+    mission = {
+      ...level,
+      type: hasPuzzle ? "digital" : level.type,
+      options: undefined,
+      correct_option_id: undefined,
+      correct_option_ids: undefined,
+      question: level.question,
+    };
+  }
 
-  return {
-    ...level,
-    type: level.answer || level.tiles?.length ? "digital" : level.type,
-    options: undefined,
-    correct_option_id: undefined,
-    correct_option_ids: undefined,
-    question: level.question,
-  };
+  // GPS / station arrival lives on the hub. Once the task is open, only the puzzle remains.
+  if ((mission.type === "gps" || mission.type === "station") && hasPuzzle) {
+    return { ...mission, type: "digital" };
+  }
+
+  return mission;
 }
 
 export function resolveContentMode(input: {

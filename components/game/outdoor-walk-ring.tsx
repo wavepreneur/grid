@@ -118,15 +118,31 @@ export function OutdoorWalkRing({
             </>
           ) : (
             <>
-              <p className="text-3xl font-bold tabular-nums text-[var(--cg-fg)]">{remaining}</p>
-              <p className="mt-1 text-sm text-[var(--cg-muted)]">Meter übrig</p>
-              <p className="mt-2 text-xs tabular-nums text-[var(--cg-muted)]">
-                {walkedShown} / {targetShown} m
+              <p className="text-5xl font-bold tabular-nums leading-none text-[var(--cg-fg)]">
+                {remaining}
+              </p>
+              <p className="mt-1.5 text-sm font-semibold text-[var(--cg-muted)]">Meter übrig</p>
+              <p className="mt-2 text-sm tabular-nums font-medium text-[var(--cg-fg)]">
+                {walkedShown} m gelaufen
               </p>
             </>
           )}
         </div>
       </div>
+
+      {!complete ? (
+        <div className="mt-5 w-full max-w-[220px]">
+          <div className="h-2.5 overflow-hidden rounded-full bg-[var(--cg-secondary)]">
+            <div
+              className="h-full rounded-full bg-[var(--cg-primary)] transition-[width] duration-200"
+              style={{ width: `${Math.round(progress * 100)}%` }}
+            />
+          </div>
+          <p className="mt-1.5 text-center text-xs tabular-nums text-[var(--cg-muted)]">
+            {walkedShown} / {targetShown} m
+          </p>
+        </div>
+      ) : null}
 
       <p className="mt-6 max-w-sm text-center text-sm text-[var(--cg-muted)]">
         {complete
