@@ -352,6 +352,10 @@ export function LobbyRoom({
     }).then((result) => {
       if (!result.success) {
         startInFlightRef.current = false;
+        // The row may already be "playing" — clearing the start flag here
+        // sent the starter back to the waiting room while others entered.
+        const alreadyStarted = /nicht mehr in der Lobby/i.test(result.error);
+        if (alreadyStarted) return;
         clearMissionStarting(inviteCode, joinCode);
         setBusy(null);
         setError(result.error);

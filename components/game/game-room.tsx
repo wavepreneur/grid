@@ -199,10 +199,6 @@ export function GameRoom({
     onResynced: handleResynced,
   });
 
-  useEffect(() => {
-    void broadcast({ type: "gate_ready", player_id: session.playerId });
-  }, [broadcast, session.playerId]);
-
   const activeLevel = Number(teamState.currentLevel) || 1;
   const levelState = teamState.gameState.levels[String(activeLevel)];
   const levelStartedAt = levelState?.started_at ?? null;

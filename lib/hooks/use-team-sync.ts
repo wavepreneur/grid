@@ -27,12 +27,11 @@ type UseTeamSyncOptions = {
 };
 
 export type TeamBroadcastPayload = {
-  type: TeamSyncEvent["event_type"] | "game_started" | "captain_transferred" | "gate_ready";
+  type: TeamSyncEvent["event_type"] | "game_started" | "captain_transferred";
   new_captain_id?: string;
   previous_captain_id?: string;
   started_at?: string;
   seq?: number;
-  player_id?: string;
   player_count?: number;
 };
 
@@ -271,9 +270,6 @@ export function useTeamSync({
               actor_player_id: null,
               created_at: new Date().toISOString(),
             });
-            return;
-          }
-          if (payload.type === "gate_ready") {
             return;
           }
           if (payload.type === "captain_transferred") {

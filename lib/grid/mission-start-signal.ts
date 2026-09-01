@@ -61,10 +61,6 @@ export function missionStartBegunAt(inviteCode: string, joinCode: string): numbe
   return readMeta(inviteCode, joinCode)?.at ?? null;
 }
 
-export function missionStartPlayerCount(inviteCode: string, joinCode: string): number {
-  return readMeta(inviteCode, joinCode)?.playerCount ?? 0;
-}
-
 export function persistStartProgress(
   inviteCode: string,
   joinCode: string,

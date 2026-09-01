@@ -18,15 +18,11 @@ import {
 } from "@/lib/grid/session-recovery";
 import {
   clearMissionStarting,
-  isMissionStarting,
   missionStartBegunAt,
-  missionStartPlayerCount,
   missionStartProgress,
   persistStartProgress,
 } from "@/lib/grid/mission-start-signal";
-import { waitForTeamGateReady } from "@/lib/grid/mission-gate-sync";
 import { savePlayerSession } from "@/lib/grid/player-session";
-import { teamEntryPath } from "@/lib/grid/team-routes";
 import type { ResolvedEventContent } from "@/lib/grid/level-types";
 import type { PlayerSession } from "@/lib/grid/types";
 
@@ -71,10 +67,7 @@ export function GameGate({
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [progress, setProgress] = useState(() =>
-    typeof window === "undefined" ? 75 : missionStartProgress(inviteCode, joinCode),
-  );
-  const [statusLine, setStatusLine] = useState(
-    "Die Mission startet gemeinsam — niemand legt allein los.",
+    typeof window === "undefined" ? 8 : missionStartProgress(inviteCode, joinCode),
   );
   const [session, setSession] = useState<PlayerSession | null>(null);
   const [eventContent, setEventContent] = useState<ResolvedEventContent | null>(null);
@@ -154,21 +147,15 @@ export function GameGate({
       bump(48);
 
       let syncedSession = resolved.session;
-      const starting = isMissionStarting(inviteCode, joinCode);
 
+      // Play route is sticky: never bounce back to the lobby because the DB
+      // row is still "lobby" or the start flag was cleared. That ping-pong
+      // left phones in the waiting room while desktop was already in-game.
       if (syncedSession.teamStatus === "lobby" || syncedSession.teamStatus === "setup") {
-        if (!starting) {
-          router.replace(
-            teamEntryPath(inviteCode, joinCode, syncedSession.teamStatus ?? "lobby"),
-          );
-          return;
-        }
-        // Start is already in flight — don't wait up to 12s for the DB row.
         syncedSession = { ...syncedSession, teamStatus: "playing" };
         savePlayerSession(syncedSession);
       }
 
-      // Keep the start timestamp until the gate is ready so the bar does not reset.
       bump(62);
 
       const gameResult = await waitForContentReady({
@@ -180,23 +167,8 @@ export function GameGate({
       if (cancelled) return;
 
       if (!gameResult.success) {
-        abandonTeamSession();
-        router.replace(eventTeamJoinPath(inviteCode, joinCode));
+        setError(gameResult.error);
         return;
-      }
-
-      bump(90);
-      const expectedCount = missionStartPlayerCount(inviteCode, joinCode);
-      if (expectedCount > 1) {
-        setStatusLine("Warten auf die anderen Geräte…");
-        await waitForTeamGateReady({
-          sessionId: syncedSession.sessionId,
-          teamId: syncedSession.teamId,
-          playerId: syncedSession.playerId,
-          expectedCount,
-          startedAt: missionStartBegunAt(inviteCode, joinCode) ?? Date.now(),
-        });
-        if (cancelled) return;
       }
 
       bump(100);
@@ -205,7 +177,7 @@ export function GameGate({
       setInitialState(gameResult);
       setProgress(100);
       persistStartProgress(inviteCode, joinCode, 100);
-      await new Promise((resolve) => window.setTimeout(resolve, 220));
+      await new Promise((resolve) => window.setTimeout(resolve, 180));
       if (cancelled) return;
       clearMissionStarting(inviteCode, joinCode);
       setReady(true);
@@ -247,7 +219,7 @@ export function GameGate({
     return (
       <GameGateSkeleton
         title="Alle Geräte laden…"
-        subtitle={statusLine}
+        subtitle="Die Mission startet gemeinsam — niemand legt allein los."
         progress={progress}
       />
     );
