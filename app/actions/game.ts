@@ -538,18 +538,13 @@ export async function solveCurrentLevel(input: {
         updated_at: armedAt.toISOString(),
         bonus_walked_meters: armedMeterBonus ? 0 : gameState.outdoor_progress?.bonus_walked_meters,
       },
-      modal:
-        // Immediate team bonus owns the next screen — skip the Gelöst-modal so
-        // the surprise is not buried under „Weiter“ → next hub.
-        teamBonus
-          ? null
-          : buildLevelCompletedModal({
-              level: currentLevel,
-              solvedBy,
-              pointsEarned,
-              successTitle: levelDefinition.success_title,
-              successInfo: input.payload?.revealSolution ? null : levelDefinition.success_info,
-            }),
+      modal: buildLevelCompletedModal({
+        level: currentLevel,
+        solvedBy,
+        pointsEarned,
+        successTitle: levelDefinition.success_title,
+        successInfo: input.payload?.revealSolution ? null : levelDefinition.success_info,
+      }),
       levels: progressionLevels,
     };
 
