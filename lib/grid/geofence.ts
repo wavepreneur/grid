@@ -62,3 +62,18 @@ export function formatDistance(meters: number): string {
   }
   return `${(meters / 1000).toFixed(1)} km`;
 }
+
+/** Compass bearing in degrees (0 = north, clockwise). Map is north-up. */
+export function bearingDegrees(
+  from: Pick<GeolocationSample, "lat" | "lng">,
+  to: Pick<LevelLocation, "lat" | "lng">,
+): number {
+  const lat1 = (from.lat * Math.PI) / 180;
+  const lat2 = (to.lat * Math.PI) / 180;
+  const deltaLng = ((to.lng - from.lng) * Math.PI) / 180;
+  const y = Math.sin(deltaLng) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLng);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}

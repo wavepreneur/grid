@@ -23,6 +23,7 @@ import type {
   SolveLevelPayload,
 } from "@/lib/grid/level-types";
 import { buildPlaySlot, missionFromLevel } from "@/lib/grid/play-slots";
+import type { GpsFixPayload } from "@/lib/hooks/use-team-sync";
 import {
   bonusAudienceHeadline,
   DEFAULT_ROLE_LABELS,
@@ -79,6 +80,8 @@ type Props = {
   onReportWalkProgress?: (level: number, walkedMeters: number) => void;
   onBroadcastWalkProgress?: (level: number, walkedMeters: number) => void;
   mirroredWalkedMeters?: number;
+  mirroredGps?: GpsFixPayload | null;
+  onBroadcastGpsFix?: (fix: GpsFixPayload) => void;
   onOpenStation: (levelNumber: number) => void;
   onSubmitStationCode: (code: string) => void;
   onStartMission: (levelNumber: number) => void;
@@ -151,6 +154,8 @@ export function PlayPhaseFlow({
   onReportWalkProgress,
   onBroadcastWalkProgress,
   mirroredWalkedMeters = 0,
+  mirroredGps = null,
+  onBroadcastGpsFix,
   onOpenStation,
   onSubmitStationCode,
   onStartMission,
@@ -409,10 +414,12 @@ export function PlayPhaseFlow({
               : 0
           }
           mirroredWalkedMeters={mirroredWalkedMeters}
+          mirroredGps={mirroredGps}
           onArriveOutdoor={onArriveOutdoor}
           onSolveGpsCheckpoint={onSolveGpsCheckpoint}
           onReportWalkProgress={onReportWalkProgress}
           onBroadcastWalkProgress={onBroadcastWalkProgress}
+          onBroadcastGpsFix={onBroadcastGpsFix}
           onOpenStation={onOpenStation}
           onSubmitStationCode={onSubmitStationCode}
           onStartMission={onStartMission}
@@ -479,6 +486,8 @@ export function PlayPhaseFlow({
         canPaceTeam={canPaceTeam}
         leadLabel={leadLabel}
         onReveal={onRevealLevel}
+        mirroredGps={mirroredGps}
+        onBroadcastGpsFix={onBroadcastGpsFix}
       />
     </>
   );

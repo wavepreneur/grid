@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap, Layer } from "leaflet";
 import type { GameLevelStatus } from "@/lib/grid/game-state";
 import type { GeolocationSample, LevelLocation } from "@/lib/grid/level-types";
-import { distanceMeters, formatDistance } from "@/lib/grid/geofence";
+import { bearingDegrees, distanceMeters } from "@/lib/grid/geofence";
 
 export type GpsMapWaypoint = {
   level: number;
@@ -22,12 +22,24 @@ type GpsMissionMapProps = {
   showPlayer: boolean;
   distanceToTarget: number | null;
   withinRadius: boolean;
+  /** Team-lead device owns GPS; others only mirror. */
+  isTracker?: boolean;
 };
 
-function markerColor(status: GameLevelStatus, isActive: boolean): string {
-  if (isActive) return "#34d399";
-  if (status === "completed") return "#60a5fa";
-  return "#94a3b8";
+function CompassArrow({ degrees }: { degrees: number }) {
+  return (
+    <svg
+      viewBox="0 0 64 64"
+      className="h-14 w-14"
+      style={{ transform: `rotate(${degrees}deg)` }}
+      aria-hidden
+    >
+      <path
+        d="M32 6 L46 50 L32 40 L18 50 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
 export function GpsMissionMap({
@@ -38,10 +50,16 @@ export function GpsMissionMap({
   showPlayer,
   distanceToTarget,
   withinRadius,
+  isTracker = false,
 }: GpsMissionMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const overlayRef = useRef<Layer[]>([]);
+  const viewKeyRef = useRef<string>("");
+  const [mapReady, setMapReady] = useState(false);
+
+  const bearing =
+    playerPosition && target ? bearingDegrees(playerPosition, target) : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -57,14 +75,18 @@ export function GpsMissionMap({
       const map = L.map(containerRef.current, {
         zoomControl: false,
         attributionControl: true,
+        zoomSnap: 0.5,
       });
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png", {
+        maxZoom: 20,
+        subdomains: "abcd",
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
       }).addTo(map);
 
       mapRef.current = map;
+      setMapReady(true);
     }
 
     void init();
@@ -74,11 +96,13 @@ export function GpsMissionMap({
       mapRef.current?.remove();
       mapRef.current = null;
       overlayRef.current = [];
+      viewKeyRef.current = "";
+      setMapReady(false);
     };
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapReady || !mapRef.current) return;
 
     void import("leaflet").then(({ default: L }) => {
       const map = mapRef.current;
@@ -89,54 +113,39 @@ export function GpsMissionMap({
       }
       overlayRef.current = [];
 
-      const boundsPoints: [number, number][] = [];
+      const active = waypoints.find((waypoint) => waypoint.level === activeLevel);
+      const focusLat = playerPosition?.lat ?? active?.lat ?? target?.lat;
+      const focusLng = playerPosition?.lng ?? active?.lng ?? target?.lng;
 
-      for (const waypoint of waypoints) {
-        const isActive = waypoint.level === activeLevel;
-        const color = markerColor(waypoint.status, isActive);
-
-        const zone = L.circle([waypoint.lat, waypoint.lng], {
-          radius: waypoint.radiusMeters,
-          color,
-          weight: isActive ? 2 : 1,
-          fillColor: color,
-          fillOpacity: isActive ? 0.18 : 0.08,
+      if (active) {
+        const zone = L.circle([active.lat, active.lng], {
+          radius: Math.min(active.radiusMeters, 40),
+          color: "#166534",
+          weight: 2,
+          fillColor: "#22c55e",
+          fillOpacity: 0.12,
         }).addTo(map);
         overlayRef.current.push(zone);
 
-        const marker = L.circleMarker([waypoint.lat, waypoint.lng], {
-          radius: isActive ? 11 : 8,
+        const marker = L.circleMarker([active.lat, active.lng], {
+          radius: 10,
           color: "#ffffff",
-          weight: 2,
-          fillColor: color,
+          weight: 3,
+          fillColor: withinRadius ? "#16a34a" : "#166534",
           fillOpacity: 1,
         }).addTo(map);
-        marker.bindTooltip(`Level ${waypoint.level}`, { direction: "top", offset: [0, -8] });
         overlayRef.current.push(marker);
-
-        boundsPoints.push([waypoint.lat, waypoint.lng]);
       }
 
       if (showPlayer && playerPosition) {
         const player = L.circleMarker([playerPosition.lat, playerPosition.lng], {
-          radius: 9,
+          radius: 8,
           color: "#ffffff",
           weight: 3,
-          fillColor: "#166534",
+          fillColor: "#0f172a",
           fillOpacity: 1,
         }).addTo(map);
         overlayRef.current.push(player);
-
-        if (playerPosition.accuracy && playerPosition.accuracy > 0) {
-          const accuracy = L.circle([playerPosition.lat, playerPosition.lng], {
-            radius: playerPosition.accuracy,
-            color: "#166534",
-            weight: 1,
-            fillColor: "#22c55e",
-            fillOpacity: 0.1,
-          }).addTo(map);
-          overlayRef.current.push(accuracy);
-        }
 
         if (target) {
           const route = L.polyline(
@@ -145,83 +154,94 @@ export function GpsMissionMap({
               [target.lat, target.lng],
             ],
             {
-              color: withinRadius ? "#16a34a" : "#166534",
-              weight: 4,
-              opacity: 0.85,
-              dashArray: withinRadius ? undefined : "10 10",
+              color: withinRadius ? "#16a34a" : "#0f172a",
+              weight: 3,
+              opacity: 0.55,
+              dashArray: withinRadius ? undefined : "8 10",
               lineCap: "round",
             },
           ).addTo(map);
           overlayRef.current.push(route);
-
-          if (distanceToTarget !== null) {
-            const midLat = (playerPosition.lat + target.lat) / 2;
-            const midLng = (playerPosition.lng + target.lng) / 2;
-            const label = L.marker([midLat, midLng], {
-              interactive: false,
-              icon: L.divIcon({
-                className: "cg-map-distance-label",
-                html: `<div style="
-                  background:#0f172a;color:#fff;font:600 12px/1.2 system-ui,sans-serif;
-                  padding:6px 10px;border-radius:999px;white-space:nowrap;
-                  box-shadow:0 8px 20px rgba(15,23,42,.25);
-                ">noch ${Math.round(distanceToTarget)} m</div>`,
-                iconSize: [0, 0],
-                iconAnchor: [0, 0],
-              }),
-            }).addTo(map);
-            overlayRef.current.push(label);
-          }
         }
-
-        boundsPoints.push([playerPosition.lat, playerPosition.lng]);
       }
 
-      if (boundsPoints.length > 0) {
-        map.fitBounds(boundsPoints, { padding: [36, 36], maxZoom: 16 });
-      } else if (target) {
-        map.setView([target.lat, target.lng], 15);
+      const viewKey = `${activeLevel}:${playerPosition ? "p" : "n"}`;
+      if (playerPosition && target) {
+        if (viewKeyRef.current !== viewKey) {
+          map.fitBounds(
+            [
+              [playerPosition.lat, playerPosition.lng],
+              [target.lat, target.lng],
+            ],
+            { padding: [48, 48], maxZoom: 17, animate: false },
+          );
+          viewKeyRef.current = viewKey;
+        } else {
+          map.panTo([playerPosition.lat, playerPosition.lng], {
+            animate: true,
+            duration: 0.35,
+          });
+        }
+      } else if (focusLat !== undefined && focusLng !== undefined) {
+        if (viewKeyRef.current !== viewKey) {
+          map.setView([focusLat, focusLng], 16, { animate: false });
+          viewKeyRef.current = viewKey;
+        }
       }
     });
-  }, [waypoints, activeLevel, playerPosition, showPlayer, target, distanceToTarget, withinRadius]);
+  }, [
+    mapReady,
+    waypoints,
+    activeLevel,
+    playerPosition,
+    showPlayer,
+    target,
+    withinRadius,
+  ]);
+
+  const metersLabel =
+    distanceToTarget !== null ? `${Math.round(distanceToTarget)} m` : null;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-card)] shadow-[var(--cg-shadow-soft)]">
-      <div ref={containerRef} className="h-[min(52vh,360px)] w-full sm:h-[320px] lg:h-[280px]" />
-      {showPlayer && target && distanceToTarget !== null ? (
-        <div className="pointer-events-none absolute left-1/2 top-3 z-[500] -translate-x-1/2">
+    <div className="relative isolate z-0 overflow-hidden rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-card)] shadow-[var(--cg-shadow-soft)]">
+      <div ref={containerRef} className="h-[min(46vh,320px)] w-full sm:h-[300px] lg:h-[260px]" />
+
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-center gap-2 p-3">
+        {metersLabel ? (
           <span
-            className={`rounded-full px-4 py-2 text-sm font-bold shadow-[var(--cg-shadow-lift)] ${
+            className={`rounded-full px-5 py-2 text-lg font-bold tabular-nums shadow-[var(--cg-shadow-lift)] ${
               withinRadius
                 ? "bg-[var(--cg-success)] text-white"
                 : "bg-[var(--cg-fg)] text-[var(--cg-bg)]"
             }`}
           >
-            {withinRadius ? "Am Ziel" : `noch ${Math.round(distanceToTarget)} m`}
+            {withinRadius ? "Am Ziel" : metersLabel}
           </span>
-        </div>
-      ) : null}
-      {showPlayer && target ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--cg-border)] bg-[var(--cg-secondary)]/60 px-4 py-3 text-sm">
+        ) : null}
+        {showPlayer && playerPosition && target && bearing !== null && !withinRadius ? (
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--cg-fg)] text-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)]">
+            <CompassArrow degrees={bearing} />
+          </div>
+        ) : null}
+      </div>
+
+      <div className="border-t border-[var(--cg-border)] bg-[var(--cg-secondary)]/60 px-4 py-2.5 text-center text-sm">
+        {withinRadius ? (
+          <p className="font-medium text-[var(--cg-success)]">Ihr seid am Wegpunkt.</p>
+        ) : showPlayer && playerPosition ? (
           <p className="text-[var(--cg-muted)]">
-            Entfernung zum Ziel:{" "}
-            <span className="font-semibold text-[var(--cg-fg)]">
-              {distanceToTarget !== null ? formatDistance(distanceToTarget) : "—"}
-            </span>
+            {isTracker
+              ? "Dein Handy zeigt den Weg fürs Team — folgt dem Pfeil."
+              : "Das Handy vom Team Lead zeigt den Weg — folgt dem Pfeil."}
           </p>
-          <p>
-            {withinRadius ? (
-              <span className="font-medium text-[var(--cg-success)]">Am Wegpunkt</span>
-            ) : (
-              <span className="text-[var(--cg-accent)]">Unterwegs — folgt der Linie</span>
-            )}
+        ) : (
+          <p className="text-[var(--cg-muted)]">
+            {isTracker
+              ? "GPS wird gesucht…"
+              : "Warten auf die Position vom Team Lead."}
           </p>
-        </div>
-      ) : (
-        <div className="border-t border-[var(--cg-border)] bg-[var(--cg-secondary)]/60 px-4 py-3 text-sm text-[var(--cg-muted)]">
-          Kartenübersicht — der Team-Leiter navigiert zum hervorgehobenen Wegpunkt.
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

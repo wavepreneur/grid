@@ -47,7 +47,7 @@ export function TileHintModal({
 
   return (
     <div
-      className="city-game fixed inset-0 z-[130] flex items-end justify-center bg-[var(--cg-ink)]/70 p-4 backdrop-blur-sm sm:items-center"
+      className="city-game fixed inset-0 z-[2000] flex items-end justify-center bg-[var(--cg-ink)]/70 p-4 backdrop-blur-sm sm:items-center"
       onClick={onClose}
     >
       <div

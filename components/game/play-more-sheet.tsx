@@ -85,7 +85,7 @@ export function PlayMoreSheet({
 
       {!showBriefingDoc && !showFaqDoc ? (
         <div
-          className="fixed inset-0 z-[120] flex items-end justify-center bg-[var(--cg-ink)]/50 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+          className="fixed inset-0 z-[2000] flex items-end justify-center bg-[var(--cg-ink)]/50 p-0 backdrop-blur-sm sm:items-center sm:p-6"
           onClick={onClose}
         >
           <div
@@ -398,7 +398,7 @@ export function PauseBanner({
   onResume: () => void;
 }): ReactNode {
   return (
-    <div className="fixed inset-x-0 top-0 z-[110] bg-[var(--cg-primary)] px-4 py-3 text-center text-[var(--cg-primary-fg)] shadow-[var(--cg-shadow-lift)]">
+    <div className="fixed inset-x-0 top-0 z-[2000] bg-[var(--cg-primary)] px-4 py-3 text-center text-[var(--cg-primary-fg)] shadow-[var(--cg-shadow-lift)]">
       <p className="text-sm font-bold">Spiel pausiert</p>
       <button type="button" onClick={onResume} className="mt-1 text-xs font-semibold underline">
         Tippen zum Weiterspielen

@@ -36,7 +36,7 @@ import { SessionHandoffScreen } from "@/components/player/session-handoff-screen
 import { GridError } from "@/components/grid/grid-shell";
 import { cockpitShowPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
 import { transferCaptain, handoverSession, removePlayerFromLobby } from "@/app/actions/lobby";
-import { useTeamSync } from "@/lib/hooks/use-team-sync";
+import { useTeamSync, type GpsFixPayload } from "@/lib/hooks/use-team-sync";
 import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
 import { cacheTeamState, readLocalPaused, writeLocalPaused, pauseStorageKey } from "@/lib/grid/offline-state";
 import { displayRoleLabel, bonusAudienceHeadline, DEFAULT_ROLE_LABELS } from "@/lib/grid/role-labels";
@@ -97,6 +97,7 @@ export function GameRoom({
   const [mirroredWalk, setMirroredWalk] = useState<{ level: number; meters: number } | null>(
     null,
   );
+  const [mirroredGps, setMirroredGps] = useState<GpsFixPayload | null>(null);
   const holdCaptainIdRef = useRef<string | null>(null);
   const holdSeqRef = useRef(0);
 
@@ -219,6 +220,9 @@ export function GameRoom({
     onResynced: handleResynced,
     onWalkMeters: (level, walkedMeters) => {
       setMirroredWalk({ level, meters: walkedMeters });
+    },
+    onGpsFix: (fix) => {
+      setMirroredGps(fix);
     },
   });
 
@@ -475,6 +479,18 @@ export function GameRoom({
       type: "walk_meters",
       level,
       walked_meters: walkedMeters,
+    });
+  }
+
+  function handleBroadcastGpsFix(fix: GpsFixPayload) {
+    void broadcast({
+      type: "gps_fix",
+      level: fix.level,
+      lat: fix.lat,
+      lng: fix.lng,
+      accuracy: fix.accuracy ?? undefined,
+      distance_m: fix.distance_m,
+      within_radius: fix.within_radius,
     });
   }
 
@@ -901,6 +917,8 @@ export function GameRoom({
         mirroredWalkedMeters={
           mirroredWalk?.level === activeLevel ? mirroredWalk.meters : 0
         }
+        mirroredGps={mirroredGps?.level === activeLevel ? mirroredGps : null}
+        onBroadcastGpsFix={handleBroadcastGpsFix}
         onOpenStation={handleOpenStation}
         onSubmitStationCode={handleSubmitStationCode}
         onStartMission={handleStartMission}
@@ -943,6 +961,8 @@ export function GameRoom({
         canPaceTeam={isAlpha}
         leadLabel={leadLabel}
         onReveal={handleRevealLevel}
+        mirroredGps={mirroredGps?.level === activeLevel ? mirroredGps : null}
+        onBroadcastGpsFix={handleBroadcastGpsFix}
       />
     ) : (
       <LevelPanel

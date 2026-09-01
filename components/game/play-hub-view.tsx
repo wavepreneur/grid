@@ -17,6 +17,7 @@ import type { OutdoorForceUnlock } from "@/lib/grid/outdoor-unlock";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 import type { GameLevelStatus } from "@/lib/grid/game-state";
 import type { LevelDefinition, GeolocationSample } from "@/lib/grid/level-types";
+import type { GpsFixPayload } from "@/lib/hooks/use-team-sync";
 import { hubMeta } from "@/lib/grid/play-slots";
 
 export type OutdoorArriveInput = {
@@ -51,6 +52,8 @@ type Props = {
   onReportWalkProgress?: (level: number, walkedMeters: number) => void;
   /** Lead fans out live meters to teammates (no server round-trip). */
   onBroadcastWalkProgress?: (level: number, walkedMeters: number) => void;
+  mirroredGps?: GpsFixPayload | null;
+  onBroadcastGpsFix?: (fix: GpsFixPayload) => void;
 };
 
 export function PlayHubView({
@@ -73,6 +76,8 @@ export function PlayHubView({
   onStartMission,
   onReportWalkProgress,
   onBroadcastWalkProgress,
+  mirroredGps = null,
+  onBroadcastGpsFix,
 }: Props) {
   const meta = hubMeta(mode);
   const current = levels.find((l) => l.level === activeLevel) ?? levels[0];
@@ -108,8 +113,10 @@ export function PlayHubView({
         walkStorageKey={walkStorageKey}
         serverWalkedMeters={serverWalkedMeters}
         mirroredWalkedMeters={mirroredWalkedMeters}
+        mirroredGps={mirroredGps}
         onReportWalkProgress={onReportWalkProgress}
         onBroadcastWalkProgress={onBroadcastWalkProgress}
+        onBroadcastGpsFix={onBroadcastGpsFix}
         onArrive={
           gpsOnly
             ? (input) => onSolveGpsCheckpoint(input)
@@ -306,9 +313,11 @@ function OutdoorHub({
   walkStorageKey,
   serverWalkedMeters = 0,
   mirroredWalkedMeters = 0,
+  mirroredGps = null,
   onArrive,
   onReportWalkProgress,
   onBroadcastWalkProgress,
+  onBroadcastGpsFix,
 }: {
   levels: LevelDefinition[];
   levelStatuses: Record<string, { status: GameLevelStatus }>;
@@ -321,9 +330,11 @@ function OutdoorHub({
   walkStorageKey?: string | null;
   serverWalkedMeters?: number;
   mirroredWalkedMeters?: number;
+  mirroredGps?: GpsFixPayload | null;
   onArrive: (input: OutdoorArriveInput) => void;
   onReportWalkProgress?: (level: number, walkedMeters: number) => void;
   onBroadcastWalkProgress?: (level: number, walkedMeters: number) => void;
+  onBroadcastGpsFix?: (fix: GpsFixPayload) => void;
 }) {
   const isWalkMode =
     current.triggers?.type === "distance" &&
@@ -333,8 +344,21 @@ function OutdoorHub({
     Boolean(current.triggers.after_minutes && current.triggers.after_minutes > 0);
   const isGpsMode = Boolean(current.location) && !isWalkMode;
 
-  const gpsEnabled = (isGpsMode && canUnlockGps) || (isWalkMode && isWalkTracker);
-  const { sample } = useGeolocation(gpsEnabled && isGpsMode);
+  const gpsEnabled = (isGpsMode || isWalkMode) && isWalkTracker;
+  const { sample: leadSample } = useGeolocation(gpsEnabled && isGpsMode);
+  const sampleRef = useRef(leadSample);
+  sampleRef.current = leadSample;
+  const sample = useMemo((): GeolocationSample | null => {
+    if (isWalkTracker) return leadSample;
+    if (mirroredGps && mirroredGps.level === current.level) {
+      return {
+        lat: mirroredGps.lat,
+        lng: mirroredGps.lng,
+        accuracy: mirroredGps.accuracy ?? 20,
+      };
+    }
+    return null;
+  }, [isWalkTracker, leadSample, mirroredGps, current.level]);
   const levelWalkKey =
     walkStorageKey && isWalkMode
       ? `${walkStorageKey}:L${current.level}`
@@ -365,11 +389,18 @@ function OutdoorHub({
     return hit ?? current;
   }, [isGpsMode, routeOrder, sample, levels, levelStatuses, current]);
 
-  const distanceToTarget = computeTargetDistance(sample, targetLevel.location);
-  const withinRadius =
-    sample && targetLevel.location
-      ? isWithinGeofenceForPlay(sample, targetLevel.location)
-      : false;
+  const distanceToTarget = isWalkTracker
+    ? computeTargetDistance(sample, targetLevel.location)
+    : mirroredGps?.level === targetLevel.level
+      ? mirroredGps.distance_m
+      : null;
+  const withinRadius = isWalkTracker
+    ? Boolean(
+        sample &&
+          targetLevel.location &&
+          isWithinGeofenceForPlay(sample, targetLevel.location),
+      )
+    : Boolean(mirroredGps?.level === targetLevel.level && mirroredGps.within_radius);
   const playRadius = targetLevel.location
     ? Math.round(playGeofenceRadiusMeters(targetLevel.location, sample?.accuracy))
     : 40;
@@ -406,6 +437,34 @@ function OutdoorHub({
     const id = window.setInterval(send, 300);
     return () => window.clearInterval(id);
   }, [isWalkMode, isWalkTracker, onBroadcastWalkProgress, current.level]);
+
+  useEffect(() => {
+    if (!isGpsMode || !isWalkTracker || !onBroadcastGpsFix) return;
+    const send = () => {
+      const geo = sampleRef.current;
+      const loc = targetLevel.location;
+      if (!geo || !loc) return;
+      const dist = computeTargetDistance(geo, loc);
+      if (dist === null) return;
+      onBroadcastGpsFix({
+        level: targetLevel.level,
+        lat: geo.lat,
+        lng: geo.lng,
+        accuracy: geo.accuracy,
+        distance_m: dist,
+        within_radius: isWithinGeofenceForPlay(geo, loc),
+      });
+    };
+    send();
+    const id = window.setInterval(send, 400);
+    return () => window.clearInterval(id);
+  }, [
+    isGpsMode,
+    isWalkTracker,
+    onBroadcastGpsFix,
+    targetLevel.level,
+    targetLevel.location,
+  ]);
 
   // Keep a server snapshot so reopen / crash still has a baseline.
   useEffect(() => {
@@ -505,8 +564,8 @@ function OutdoorHub({
           </h1>
           <p className="mt-1 text-sm text-[var(--cg-muted)]">
             {routeOrder === "free"
-              ? "Alle offenen Punkte sind anlaufbar — Marker und Linie zeigen euer Ziel."
-              : "Folgt der Linie zum hervorgehobenen Ziel. Die Distanz aktualisiert sich live."}
+              ? "Lauft zum nächsten offenen Punkt — Pfeil und Meter kommen vom Team Lead."
+              : "Folgt dem Pfeil. Die Meter zählen auf dem Handy vom Team Lead."}
           </p>
         </header>
       </div>
@@ -518,24 +577,18 @@ function OutdoorHub({
             activeLevel={targetLevel.level}
             target={targetLevel.location}
             playerPosition={sample}
-            showPlayer={gpsEnabled}
+            showPlayer
             distanceToTarget={distanceToTarget}
             withinRadius={withinRadius}
+            isTracker={isWalkTracker}
           />
         ) : null}
       </div>
 
       <div className="z-20 space-y-3 rounded-t-3xl bg-[var(--cg-card)] px-4 pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom)))] pt-4 shadow-[var(--cg-shadow-lift)]">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-          <div className="min-w-0">
-            <SectionLabel>Euer Ziel</SectionLabel>
-            <p className="truncate text-lg font-bold text-[var(--cg-fg)]">{targetLevel.title}</p>
-          </div>
-          {distanceToTarget !== null ? (
-            <span className="shrink-0 rounded-full bg-[var(--cg-secondary)] px-3 py-1.5 text-sm font-semibold">
-              ca. {Math.round(distanceToTarget)} m
-            </span>
-          ) : null}
+        <div className="min-w-0">
+          <SectionLabel>Euer Ziel</SectionLabel>
+          <p className="truncate text-lg font-bold text-[var(--cg-fg)]">{targetLevel.title}</p>
         </div>
 
         {withinRadius ? (

@@ -48,7 +48,7 @@ export function ContentMediaSheet({
 
   return (
     <div
-      className="city-game fixed inset-0 z-[120] flex items-stretch justify-center bg-[var(--cg-ink)]/80 sm:items-center sm:p-3"
+      className="city-game fixed inset-0 z-[2000] flex items-stretch justify-center bg-[var(--cg-ink)]/80 sm:items-center sm:p-3"
       onClick={onClose}
     >
       <div

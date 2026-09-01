@@ -28,6 +28,8 @@ type UseTeamSyncOptions = {
   onStartOverlay?: (action: "show" | "hide") => void;
   /** Live walk meters from the tracking device — not a full game_state pull. */
   onWalkMeters?: (level: number, walkedMeters: number) => void;
+  /** Live GPS pin from the team-lead device — teammates mirror, no server poll. */
+  onGpsFix?: (fix: GpsFixPayload) => void;
   /**
    * lobby: status + start/lead only (do not parse game_state).
    * play: live solves. Default play so a missing flag cannot mute in-game sync.
@@ -42,7 +44,8 @@ export type TeamBroadcastPayload = {
     | "game_starting"
     | "start_aborted"
     | "captain_transferred"
-    | "walk_meters";
+    | "walk_meters"
+    | "gps_fix";
   new_captain_id?: string;
   previous_captain_id?: string;
   started_at?: string;
@@ -50,6 +53,20 @@ export type TeamBroadcastPayload = {
   player_count?: number;
   level?: number;
   walked_meters?: number;
+  lat?: number;
+  lng?: number;
+  accuracy?: number;
+  distance_m?: number;
+  within_radius?: boolean;
+};
+
+export type GpsFixPayload = {
+  level: number;
+  lat: number;
+  lng: number;
+  accuracy?: number | null;
+  distance_m: number;
+  within_radius: boolean;
 };
 
 type TeamRow = {
@@ -141,6 +158,7 @@ export function useTeamSync({
   onResynced,
   onStartOverlay,
   onWalkMeters,
+  onGpsFix,
 }: UseTeamSyncOptions) {
   const [isConnected, setIsConnected] = useState(false);
   /** Soft status for wake/reconnect — not a hard failure. */
@@ -158,6 +176,7 @@ export function useTeamSync({
   const onResyncedRef = useRef(onResynced);
   const onStartOverlayRef = useRef(onStartOverlay);
   const onWalkMetersRef = useRef(onWalkMeters);
+  const onGpsFixRef = useRef(onGpsFix);
 
   onTeamStatusChangeRef.current = onTeamStatusChange;
   onGameStateChangeRef.current = onGameStateChange;
@@ -167,6 +186,7 @@ export function useTeamSync({
   onResyncedRef.current = onResynced;
   onStartOverlayRef.current = onStartOverlay;
   onWalkMetersRef.current = onWalkMeters;
+  onGpsFixRef.current = onGpsFix;
 
   useEffect(() => {
     if (!enabled) return;
@@ -280,6 +300,24 @@ export function useTeamSync({
               typeof payload.walked_meters === "number"
             ) {
               onWalkMetersRef.current?.(payload.level, payload.walked_meters);
+            }
+            return;
+          }
+          if (payload.type === "gps_fix") {
+            if (
+              typeof payload.level === "number" &&
+              typeof payload.lat === "number" &&
+              typeof payload.lng === "number" &&
+              typeof payload.distance_m === "number"
+            ) {
+              onGpsFixRef.current?.({
+                level: payload.level,
+                lat: payload.lat,
+                lng: payload.lng,
+                accuracy: payload.accuracy,
+                distance_m: payload.distance_m,
+                within_radius: Boolean(payload.within_radius),
+              });
             }
             return;
           }
