@@ -22,6 +22,7 @@ import { usesMissionShell } from "@/lib/grid/blueprints";
 import { CityPlayShell } from "@/components/game/city/play-shell";
 import { BigButton } from "@/components/game/city/ui";
 import { BonusCompleteToast } from "@/components/game/bonus-complete-toast";
+import { BonusSpectatorView } from "@/components/game/bonus-spectator-view";
 import { ExitmaniaLevelView } from "@/components/game/exitmania-level-view";
 import { GameHud } from "@/components/game/game-hud";
 import { LevelPanel } from "@/components/game/level-panel";
@@ -38,7 +39,8 @@ import { transferCaptain, handoverSession, removePlayerFromLobby } from "@/app/a
 import { useTeamSync } from "@/lib/hooks/use-team-sync";
 import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
 import { cacheTeamState, readLocalPaused, writeLocalPaused, pauseStorageKey } from "@/lib/grid/offline-state";
-import { displayRoleLabel, DEFAULT_ROLE_LABELS } from "@/lib/grid/role-labels";
+import { displayRoleLabel, bonusAudienceHeadline, DEFAULT_ROLE_LABELS } from "@/lib/grid/role-labels";
+import { findForeignActiveBonuses } from "@/lib/grid/bonus-queue";
 import { useBonusQueueTick } from "@/lib/hooks/use-bonus-queue-tick";
 import { clearWalkedDistanceStorage } from "@/lib/hooks/use-walked-distance";
 import type { TeamGameState, TeamRealtimeState } from "@/lib/grid/game-state";
@@ -595,6 +597,30 @@ export function GameRoom({
     "alpha",
     eventContent.roleLabels ?? DEFAULT_ROLE_LABELS,
   );
+  const roleLabels = eventContent.roleLabels ?? DEFAULT_ROLE_LABELS;
+  const foreignBonusToasts = useMemo(() => {
+    return findForeignActiveBonuses(teamState.gameState, session.archetypeRole, {
+      claimUnassigned: soloAlpha,
+    }).map((item) => ({
+      bonusId: item.bonus_id,
+      solverName:
+        teamState.gameState.bonus_sessions?.[item.bonus_id]?.solver_name ||
+        lobbyPlayers.find((p) => {
+          const role =
+            p.archetype_role ??
+            (p.is_alpha || p.is_captain ? "alpha" : p.is_beta ? "beta" : "gamma");
+          return role === item.for_role;
+        })?.display_name ||
+        bonusAudienceHeadline({ for_role: item.for_role, for_team: false }, roleLabels),
+      reveal: teamState.gameState.bonus_sessions?.[item.bonus_id]?.reveal ?? null,
+    }));
+  }, [
+    teamState.gameState,
+    session.archetypeRole,
+    soloAlpha,
+    lobbyPlayers,
+    roleLabels,
+  ]);
 
   function handleTransferAlpha(targetPlayerId: string) {
     setTransferPending(true);
@@ -905,6 +931,7 @@ export function GameRoom({
             </div>
           ) : null}
         </CityPlayShell>
+        <BonusSpectatorView items={foreignBonusToasts} />
         <BonusCompleteToast
           notice={teamState.gameState.bonus_notice}
           onDismiss={handleDismissBonusNotice}

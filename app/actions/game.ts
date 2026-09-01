@@ -1821,7 +1821,16 @@ async function finishRevealedBonus(input: {
     active_bonus: nextActive,
     bonus_queue: nextQueue,
     bonus_sessions: clearBonusSession(gameState.bonus_sessions, bonusId),
-    bonus_notice: null,
+    bonus_notice: active.for_team
+      ? null
+      : {
+          id: `bonus-${now.getTime()}-${reveal.answered_by_player_id.slice(0, 8)}`,
+          by: reveal.answered_by,
+          correct: reveal.correct,
+          reward: reveal.reward,
+          created_at: now.toISOString(),
+          bonus_id: bonusId,
+        },
     levels,
   };
 
@@ -2538,7 +2547,20 @@ export async function advanceBonusAfterReveal(input: {
       return { success: false, error: "Das Spiel läuft noch nicht." };
     }
     const gameState = parseTeamGameState(team.game_state);
-    if (!(await playerCanPaceTeam(team.id, player))) {
+    const bonusId =
+      input.bonusId ??
+      Object.keys(gameState.bonus_sessions ?? {}).find(
+        (id) => Boolean(gameState.bonus_sessions?.[id]?.reveal),
+      ) ??
+      null;
+    const queued = bonusId
+      ? (gameState.bonus_queue ?? []).find((item) => item.bonus_id === bonusId)
+      : null;
+    const isTeamBonus =
+      Boolean(queued?.for_team) ||
+      Boolean(gameState.active_bonus?.for_team) ||
+      gameState.current_phase === "bonus";
+    if (isTeamBonus && !(await playerCanPaceTeam(team.id, player))) {
       return { success: false, error: "Nur die Team-Leitung kann weitergehen." };
     }
     return finishRevealedBonus({

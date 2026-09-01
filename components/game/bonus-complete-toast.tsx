@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { IconGift } from "@/components/game/city/icons";
+import { hasSeenBonusResult } from "@/components/game/bonus-spectator-view";
 import type { BonusNoticeState } from "@/lib/grid/game-state";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 
@@ -41,7 +42,7 @@ export function BonusCompleteToast({ notice, onDismiss }: Props) {
   useEffect(() => {
     if (!notice?.id) return;
     if (seenRef.current === notice.id) return;
-    if (hasSeenNotice(notice.id)) {
+    if (hasSeenNotice(notice.id) || hasSeenBonusResult(notice.bonus_id)) {
       seenRef.current = notice.id;
       return;
     }

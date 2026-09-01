@@ -103,6 +103,7 @@ export type BonusNoticeState = {
   correct: boolean;
   reward: number;
   created_at: string;
+  bonus_id?: string;
 };
 
 export type PurchasedTileHint = {
@@ -493,6 +494,7 @@ function parseBonusNotice(value: unknown): BonusNoticeState | null | undefined {
     correct: Boolean(c.correct),
     reward: Math.max(0, Math.round(Number(c.reward) || 0)),
     created_at: String(c.created_at),
+    bonus_id: typeof c.bonus_id === "string" && c.bonus_id ? c.bonus_id : undefined,
   };
 }
 
