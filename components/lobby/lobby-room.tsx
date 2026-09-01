@@ -339,13 +339,13 @@ export function LobbyRoom({
     if (startInFlightRef.current) return;
     startInFlightRef.current = true;
     setError(null);
-
-    const startedAt = new Date().toISOString();
-    void broadcast({
-      type: "game_started",
-      started_at: startedAt,
-      player_count: snapshot.players.length,
+    markMissionStarting(inviteCode, joinCode, snapshot.players.length);
+    setBusy({
+      title: "Alle Geräte laden…",
+      subtitle: "Die Mission startet gemeinsam — niemand legt allein los.",
+      variant: "start",
     });
+
     void startGameManually({
       inviteCode,
       joinCode,
@@ -353,22 +353,28 @@ export function LobbyRoom({
     }).then((result) => {
       if (!result.success) {
         startInFlightRef.current = false;
-        // The row may already be "playing" — clearing the start flag here
-        // sent the starter back to the waiting room while others entered.
         const alreadyStarted = /nicht mehr in der Lobby/i.test(result.error);
-        if (alreadyStarted) return;
+        if (alreadyStarted) {
+          void broadcast({
+            type: "game_started",
+            started_at: new Date().toISOString(),
+            player_count: snapshot.players.length,
+          });
+          goToPlay();
+          return;
+        }
         clearMissionStarting(inviteCode, joinCode);
         setBusy(null);
         setError(result.error);
         return;
       }
-      if (manageMode) {
-        startInFlightRef.current = false;
-        setBusy(null);
-      }
+      void broadcast({
+        type: "game_started",
+        started_at: result.data.startedAt,
+        player_count: snapshot.players.length,
+      });
+      goToPlay();
     });
-
-    goToPlay();
   }
 
   function handleHandover() {

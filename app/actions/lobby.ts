@@ -266,13 +266,6 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
   if (!startGate.success) return;
 
   const startedAt = new Date().toISOString();
-  await supabase.from("team_sync_events").insert({
-    team_id: teamId,
-    event_type: "game_started",
-    actor_player_id: team.captain_player_id,
-    payload: { started_at: startedAt, source: "auto" },
-  });
-
   const { data: updated } = await supabase
     .from("teams")
     .update({
@@ -285,6 +278,13 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
     .maybeSingle();
 
   if (!updated) return;
+
+  await supabase.from("team_sync_events").insert({
+    team_id: teamId,
+    event_type: "game_started",
+    actor_player_id: team.captain_player_id,
+    payload: { started_at: startedAt, source: "auto" },
+  });
 
   await supabase
     .from("events")
@@ -1046,14 +1046,6 @@ export async function startGameManually(input: {
     const startedAt = new Date().toISOString();
     const supabase = createAdminClient();
 
-    // Kick every waiting device first — don't wait on the teams row (large game_state WAL).
-    await supabase.from("team_sync_events").insert({
-      team_id: team.id,
-      event_type: "game_started",
-      actor_player_id: player.id,
-      payload: { started_at: startedAt, source: "manual" },
-    });
-
     const { data: startedTeam, error } = await supabase
       .from("teams")
       .update({
@@ -1071,6 +1063,13 @@ export async function startGameManually(input: {
     if (!startedTeam) {
       return { success: false, error: "Das Team ist nicht mehr in der Lobby." };
     }
+
+    await supabase.from("team_sync_events").insert({
+      team_id: team.id,
+      event_type: "game_started",
+      actor_player_id: player.id,
+      payload: { started_at: startedAt, source: "manual" },
+    });
 
     await supabase
       .from("events")

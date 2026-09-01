@@ -41,7 +41,7 @@ function isPlayReady(result: Awaited<ReturnType<typeof getGameState>>): boolean 
   );
 }
 
-/** Do not open GameRoom while the team is still "lobby" — OK would fail. */
+/** Open GameRoom only after the team row is playing (and content is ready). */
 async function waitForPlayReady(
   input: {
     inviteCode: string;
@@ -50,11 +50,16 @@ async function waitForPlayReady(
   },
   isCancelled: () => boolean,
 ) {
-  void prepareTeamGame(input);
-
   let last = await getGameState(input);
   while (!isCancelled() && !isPlayReady(last)) {
-    await new Promise((resolve) => window.setTimeout(resolve, 200));
+    if (
+      last.success &&
+      (last.data.status === "playing" || last.data.status === "finished") &&
+      last.data.gameState.content_ready === false
+    ) {
+      void prepareTeamGame(input);
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 150));
     last = await getGameState(input);
   }
   return last;
