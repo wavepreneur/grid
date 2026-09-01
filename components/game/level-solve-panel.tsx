@@ -23,9 +23,8 @@ import { LevelScoringBar } from "@/components/game/level-scoring-bar";
 import { CodeBoxesInput } from "@/components/game/code-boxes-input";
 import { hasLiveLevelScoring } from "@/lib/grid/level-scoring";
 import { formatLevelSolution } from "@/lib/grid/level-solution";
-import { playPlaySfx } from "@/lib/grid/play-sfx";
 import type { LevelDefinition, SolveLevelPayload } from "@/lib/grid/level-types";
-import type { LevelRevealState, MissionRevealState } from "@/lib/grid/game-state";
+import type { LevelRevealState } from "@/lib/grid/game-state";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
 
 type LevelSolvePanelProps = {
@@ -45,11 +44,9 @@ type LevelSolvePanelProps = {
   /** Wrong / correct burst after submit. */
   feedback?: SolveFeedbackState | null;
   teamReveal?: LevelRevealState | null;
-  missionReveal?: MissionRevealState | null;
   canPaceTeam?: boolean;
   leadLabel?: string;
   onReveal?: () => void;
-  onAdvanceMission?: () => void;
 };
 
 export function LevelSolvePanel({
@@ -66,11 +63,9 @@ export function LevelSolvePanel({
   hideScoring = false,
   feedback = null,
   teamReveal = null,
-  missionReveal = null,
   canPaceTeam = false,
   leadLabel = "Team Lead",
   onReveal,
-  onAdvanceMission,
 }: LevelSolvePanelProps) {
   const [answer, setAnswer] = useState("");
   const [numberParts, setNumberParts] = useState<string[]>(() =>
@@ -87,9 +82,6 @@ export function LevelSolvePanel({
   onSubmitRef.current = onSubmit;
   const onRevealRef = useRef(onReveal);
   onRevealRef.current = onReveal;
-  const onAdvanceMissionRef = useRef(onAdvanceMission);
-  onAdvanceMissionRef.current = onAdvanceMission;
-  const missionSfxRef = useRef<string | null>(null);
 
   const allowReveal = Boolean(level.scoring?.allow_reveal_solution);
   const scoringSnapshot = useLevelScoringTimer(
@@ -111,16 +103,7 @@ export function LevelSolvePanel({
   const isCodeBoxes = inputMode === "boxes" || inputMode === "number";
   const numberFieldCount = level.number_fields ?? 1;
   const solutionText = formatLevelSolution(level);
-  const giveUpShown = solutionRevealed || Boolean(teamReveal);
-  const missionShown = Boolean(missionReveal);
-  const solutionShown = giveUpShown || missionShown;
-
-  useEffect(() => {
-    if (!missionReveal) return;
-    if (missionSfxRef.current === missionReveal.revealed_at) return;
-    missionSfxRef.current = missionReveal.revealed_at;
-    playPlaySfx("correct");
-  }, [missionReveal]);
+  const solutionShown = solutionRevealed || Boolean(teamReveal);
 
   useEffect(() => {
     setAutoTriggered(false);
@@ -215,8 +198,7 @@ export function LevelSolvePanel({
   }
 
   function handleSubmit() {
-    if (missionShown) return;
-    if (giveUpShown) {
+    if (solutionShown) {
       submitRevealSolution();
       return;
     }
@@ -239,66 +221,7 @@ export function LevelSolvePanel({
     }
   }
 
-  function submitMissionAdvance() {
-    if (!missionReveal || disabled || isPending || !canPaceTeam) return;
-    onAdvanceMissionRef.current?.();
-  }
-
-  const revealBlock = missionShown && missionReveal ? (
-    <div className="space-y-3">
-      <div
-        className={
-          cityStyle
-            ? "rounded-2xl bg-[var(--cg-success)]/15 px-4 py-4 text-center ring-2 ring-[var(--cg-success)]/40"
-            : "rounded-2xl bg-emerald-50 px-4 py-4 text-center"
-        }
-        role="status"
-      >
-        <p className="text-sm font-bold text-[var(--cg-fg)]">
-          {missionReveal.answered_by} hat die Aufgabe gelöst
-        </p>
-        {missionReveal.points_earned > 0 ? (
-          <p className="mt-1 text-sm font-semibold text-[var(--cg-muted)]">
-            +{missionReveal.points_earned} Punkte für das Team
-          </p>
-        ) : null}
-      </div>
-      <p
-        className={
-          cityStyle
-            ? "flex items-center justify-center gap-2 rounded-2xl bg-[var(--cg-secondary)] py-4 text-base font-semibold text-[var(--cg-fg)]"
-            : "flex items-center justify-center gap-2 rounded-2xl bg-slate-100 py-4 text-base font-semibold text-slate-800"
-        }
-      >
-        <Check className="h-5 w-5 text-[var(--cg-success)]" />
-        Lösung: {missionReveal.solution_label || solutionText}
-      </p>
-      {missionReveal.attempt_label &&
-      missionReveal.attempt_label !== missionReveal.solution_label ? (
-        <p className="text-center text-sm text-[var(--cg-muted)]">
-          Eingabe von {missionReveal.answered_by}:{" "}
-          <span className="font-bold text-[var(--cg-fg)]">{missionReveal.attempt_label}</span>
-        </p>
-      ) : null}
-      {canPaceTeam ? (
-        cityStyle ? (
-          <BigButton disabled={disabled || isPending} onClick={submitMissionAdvance}>
-            {isPending ? "Sende…" : "Weiter"}
-          </BigButton>
-        ) : (
-          <GridButton
-            type="button"
-            disabled={disabled || isPending}
-            onClick={submitMissionAdvance}
-          >
-            {isPending ? "Sende…" : "Weiter"}
-          </GridButton>
-        )
-      ) : (
-        <TeamPaceHint canPaceTeam={false} leadLabel={leadLabel} />
-      )}
-    </div>
-  ) : giveUpShown ? (
+  const revealBlock = solutionShown ? (
     <div className="space-y-3">
       <p
         className={
@@ -381,9 +304,6 @@ export function LevelSolvePanel({
     feedback?.kind === "correct" && formLooksEmpty ? null : feedback;
 
   if (level.type === "gps" && !isNavigator) {
-    if (solutionShown) {
-      return cityStyle ? <LevelTaskCard>{revealBlock}</LevelTaskCard> : revealBlock;
-    }
     if (cityStyle) {
       return (
         <LevelTaskCard>

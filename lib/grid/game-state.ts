@@ -42,17 +42,6 @@ export type LevelRevealState = {
   revealed_at: string;
 };
 
-/** Correct mission solve — who + solution stay on the task until the team lead continues. */
-export type MissionRevealState = {
-  level: number;
-  answered_by: string;
-  answered_by_player_id: string;
-  solution_label: string | null;
-  attempt_label: string | null;
-  points_earned: number;
-  revealed_at: string;
-};
-
 /**
  * Role-only bonus that runs while the rest of the team continues on the hub.
  * Team-wide bonuses still use current_phase === "bonus".
@@ -141,8 +130,6 @@ export type TeamGameState = {
   quiz_reveal?: QuizRevealState | null;
   /** Give-up solution on the current mission — wait for team lead before completing. */
   level_reveal?: LevelRevealState | null;
-  /** Correct solve on the current mission — wait for team lead before the Gelöst-card. */
-  mission_reveal?: MissionRevealState | null;
   /** Asymmetric bonus overlay while team is already on the next hub. */
   active_bonus?: ActiveBonusState | null;
   /** Layer-3 surprise queue (armed / ready / done). */
@@ -230,7 +217,6 @@ export function createInitialGameState(
     current_phase: "hub",
     quiz_reveal: null,
     level_reveal: null,
-    mission_reveal: null,
     active_bonus: null,
     bonus_queue: [],
     bonus_sessions: {},
@@ -280,7 +266,6 @@ export function parseTeamGameState(value: unknown): TeamGameState {
         : undefined,
     quiz_reveal: parseQuizReveal(candidate.quiz_reveal),
     level_reveal: parseLevelReveal(candidate.level_reveal),
-    mission_reveal: parseMissionReveal(candidate.mission_reveal),
     active_bonus: parseActiveBonus(candidate.active_bonus),
     bonus_queue: parseBonusQueue(candidate.bonus_queue),
     bonus_sessions: parseBonusSessions(
@@ -334,35 +319,6 @@ function parseLevelReveal(value: unknown): LevelRevealState | null | undefined {
     level: c.level,
     revealed_by: String(c.revealed_by),
     revealed_by_player_id: String(c.revealed_by_player_id),
-    revealed_at: String(c.revealed_at),
-  };
-}
-
-function parseMissionReveal(value: unknown): MissionRevealState | null | undefined {
-  if (value === null) return null;
-  if (!value || typeof value !== "object") return undefined;
-  const c = value as Partial<MissionRevealState>;
-  if (
-    typeof c.level !== "number" ||
-    !c.answered_by ||
-    !c.answered_by_player_id ||
-    !c.revealed_at
-  ) {
-    return null;
-  }
-  return {
-    level: c.level,
-    answered_by: String(c.answered_by),
-    answered_by_player_id: String(c.answered_by_player_id),
-    solution_label:
-      typeof c.solution_label === "string" && c.solution_label.trim()
-        ? c.solution_label
-        : null,
-    attempt_label:
-      typeof c.attempt_label === "string" && c.attempt_label.trim()
-        ? c.attempt_label
-        : null,
-    points_earned: Math.max(0, Math.round(Number(c.points_earned) || 0)),
     revealed_at: String(c.revealed_at),
   };
 }

@@ -104,11 +104,6 @@ export function mergeBonusQueue(
   return [...keep.filter((i) => !ids.has(i.bonus_id)), ...incoming];
 }
 
-/** Team-wide bonus waits until who-solved + Gelöst-card are confirmed. */
-export function teamBonusWaitsForMissionReveal(gameState: TeamGameState): boolean {
-  return Boolean(gameState.mission_reveal) || gameState.modal?.type === "puzzle_solved";
-}
-
 export function findPresentableBonusForRole(
   gameState: TeamGameState,
   role: string | null | undefined,
