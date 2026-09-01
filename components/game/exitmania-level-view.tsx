@@ -13,7 +13,7 @@ import { LevelScoringBar } from "@/components/game/level-scoring-bar";
 import { MediaModal } from "@/components/game/media-modal";
 import { HintUnlockToast } from "@/components/game/hint-unlock-toast";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
-import type { GameLevelStatus, LevelRevealState, PurchasedTileHint } from "@/lib/grid/game-state";
+import type { GameLevelStatus, LevelRevealState, MissionRevealState, PurchasedTileHint } from "@/lib/grid/game-state";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
 import { isWithinGeofenceForPlay } from "@/lib/grid/geofence";
 import type { LevelContentTile, LevelDefinition, SolveLevelPayload } from "@/lib/grid/level-types";
@@ -37,9 +37,11 @@ type ExitmaniaLevelViewProps = {
   onPurchaseHint: (tileId: string) => void;
   feedback?: SolveFeedbackState | null;
   teamReveal?: LevelRevealState | null;
+  missionReveal?: MissionRevealState | null;
   canPaceTeam?: boolean;
   leadLabel?: string;
   onReveal?: () => void;
+  onAdvanceMission?: () => void;
 };
 
 export function ExitmaniaLevelView({
@@ -61,9 +63,11 @@ export function ExitmaniaLevelView({
   onPurchaseHint,
   feedback = null,
   teamReveal = null,
+  missionReveal = null,
   canPaceTeam = false,
   leadLabel = "Team Lead",
   onReveal,
+  onAdvanceMission,
 }: ExitmaniaLevelViewProps) {
   void _effectiveBeta;
   const [activeTile, setActiveTile] = useState<LevelContentTile | null>(null);
@@ -159,9 +163,11 @@ export function ExitmaniaLevelView({
           hideScoring
           feedback={feedback}
           teamReveal={teamReveal}
+          missionReveal={missionReveal}
           canPaceTeam={canPaceTeam}
           leadLabel={leadLabel}
           onReveal={onReveal}
+          onAdvanceMission={onAdvanceMission}
         />
       </div>
 

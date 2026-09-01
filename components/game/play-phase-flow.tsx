@@ -15,7 +15,7 @@ import {
 import { PlayQuizView } from "@/components/game/play-quiz-view";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
 import { canPresentBonus, resolveBonusForPlay } from "@/lib/grid/bonus";
-import { findPresentableBonusForRole } from "@/lib/grid/bonus-queue";
+import { findPresentableBonusForRole, teamBonusWaitsForMissionReveal } from "@/lib/grid/bonus-queue";
 import type { PurchasedTileHint, TeamGameState } from "@/lib/grid/game-state";
 import type {
   LevelDefinition,
@@ -92,6 +92,7 @@ type Props = {
   onContinueBonus: (bonusId: string) => void;
   onSkipBonus: () => void;
   onRevealLevel?: () => void;
+  onAdvanceMission?: () => void;
   canPaceTeam?: boolean;
   leadLabel?: string;
 };
@@ -159,6 +160,7 @@ export function PlayPhaseFlow({
   onContinueBonus,
   onSkipBonus,
   onRevealLevel,
+  onAdvanceMission,
   canPaceTeam = false,
   leadLabel = "Team Lead",
 }: Props) {
@@ -276,6 +278,7 @@ export function PlayPhaseFlow({
     );
     if (
       bonus &&
+      !(presentBonusMeta.for_team && teamBonusWaitsForMissionReveal(gameState)) &&
       (presentBonusMeta.for_team || canPresentBonus(bonus, myRole, { claimUnassigned }))
     ) {
       const bonusId = presentBonusMeta.bonus_id ?? `legacy-${presentBonusMeta.from_level}`;
@@ -469,9 +472,13 @@ export function PlayPhaseFlow({
         teamReveal={
           gameState.level_reveal?.level === activeLevel ? gameState.level_reveal : null
         }
+        missionReveal={
+          gameState.mission_reveal?.level === activeLevel ? gameState.mission_reveal : null
+        }
         canPaceTeam={canPaceTeam}
         leadLabel={leadLabel}
         onReveal={onRevealLevel}
+        onAdvanceMission={onAdvanceMission}
       />
     </>
   );

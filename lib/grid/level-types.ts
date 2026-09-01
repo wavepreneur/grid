@@ -315,6 +315,8 @@ export type SolveLevelPayload = {
   geolocation?: GeolocationSample;
   /** Skip after revealing solution — awards 0 points when scoring allows it. */
   revealSolution?: boolean;
+  /** Team lead confirmed the shared solve reveal — complete the level. */
+  confirmMissionReveal?: boolean;
   /** Alpha lead override when GPS fails — server audits. */
   forceUnlock?: "geofence" | "distance";
 };

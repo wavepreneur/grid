@@ -349,15 +349,38 @@ export function GameRoom({
         }
         return;
       }
-      const hasSuccessNote = Boolean(result.data?.gameState.modal?.body?.trim());
-      if (!hasSuccessNote) {
-        setSolveFeedback({
-          id: Date.now(),
-          kind: "correct",
-        });
-      } else {
+      if (result.data?.gameState.mission_reveal) {
         setSolveFeedback(null);
+      } else {
+        const hasSuccessNote = Boolean(result.data?.gameState.modal?.body?.trim());
+        if (!hasSuccessNote) {
+          setSolveFeedback({
+            id: Date.now(),
+            kind: "correct",
+          });
+        } else {
+          setSolveFeedback(null);
+        }
       }
+      setTeamState(result.data!);
+      cacheTeamState(result.data!);
+    });
+  }
+
+  function handleAdvanceMission() {
+    setError(null);
+    startSolveTransition(async () => {
+      const result = await solveCurrentLevel({
+        inviteCode,
+        joinCode,
+        sessionId: session.sessionId,
+        payload: { confirmMissionReveal: true },
+      });
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      setSolveFeedback(null);
       setTeamState(result.data!);
       cacheTeamState(result.data!);
     });
@@ -858,6 +881,7 @@ export function GameRoom({
         onContinueBonus={handleContinueBonus}
         onSkipBonus={handleSkipBonus}
         onRevealLevel={handleRevealLevel}
+        onAdvanceMission={handleAdvanceMission}
         canPaceTeam={isAlpha}
         leadLabel={leadLabel}
       />
@@ -885,9 +909,15 @@ export function GameRoom({
             ? teamState.gameState.level_reveal
             : null
         }
+        missionReveal={
+          teamState.gameState.mission_reveal?.level === activeLevel
+            ? teamState.gameState.mission_reveal
+            : null
+        }
         canPaceTeam={isAlpha}
         leadLabel={leadLabel}
         onReveal={handleRevealLevel}
+        onAdvanceMission={handleAdvanceMission}
       />
     ) : (
       <LevelPanel

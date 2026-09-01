@@ -25,6 +25,7 @@ import {
   resolveProgressionAfterSolve,
 } from "@/lib/grid/logic-engine";
 import { computeLevelReward } from "@/lib/grid/level-scoring";
+import { formatLevelAttemptLabel, formatLevelSolution } from "@/lib/grid/level-solution";
 import {
   getLevelDefinition,
   validateArrivalQuiz,
@@ -67,6 +68,7 @@ import {
   mergeBonusQueue,
   pickBonusToActivate,
   promoteArmedBonuses,
+  teamBonusWaitsForMissionReveal,
 } from "@/lib/grid/bonus-queue";
 
 function buildRealtimeState(
@@ -172,6 +174,21 @@ export async function solveCurrentLevel(input: {
         error: "Die Lösung liegt schon offen. Die Team-Leitung geht weiter.",
       };
     }
+    if (
+      gameState.mission_reveal?.level === currentLevel &&
+      input.payload?.revealSolution
+    ) {
+      return {
+        success: false,
+        error: "Die Aufgabe ist schon gelöst. Die Team-Leitung geht weiter.",
+      };
+    }
+    if (
+      !input.payload?.confirmMissionReveal &&
+      gameState.mission_reveal?.level === currentLevel
+    ) {
+      return { success: true, data: buildRealtimeState(team, player) };
+    }
     if (input.payload?.revealSolution && !(await playerCanPaceTeam(team.id, player))) {
       return { success: false, error: "Nur die Team-Leitung kann weitergehen." };
     }
@@ -206,6 +223,7 @@ export async function solveCurrentLevel(input: {
       gpsEnabled: blueprint.capabilities.gps,
     });
     const forceUnlock = input.payload?.forceUnlock;
+    const confirmingReveal = Boolean(input.payload?.confirmMissionReveal);
     if (forceUnlock && !archetype.canUnlockGps) {
       return {
         success: false,
@@ -213,19 +231,27 @@ export async function solveCurrentLevel(input: {
       };
     }
 
-    const validation = validateLevelSolution(levelDefinition, input.payload ?? {}, {
-      isCaptain: player.is_captain,
-      isNavigator: team.navigator_player_id === player.id,
-      canUnlockGps: archetype.canUnlockGps,
-      effectiveBeta: archetype.effectiveBeta,
-      archetypeRole: archetype.archetypeRole,
-      playerRole,
-      gpsEnabled: content.capabilities.gps,
-      forceUnlock,
-    });
+    if (confirmingReveal) {
+      if (gameState.mission_reveal?.level !== currentLevel) {
+        return { success: false, error: "Aufgabe noch nicht gelöst." };
+      }
+      if (!(await playerCanPaceTeam(team.id, player))) {
+        return { success: false, error: "Nur die Team-Leitung kann weitergehen." };
+      }
+    } else {
+      const validation = validateLevelSolution(levelDefinition, input.payload ?? {}, {
+        isCaptain: player.is_captain,
+        isNavigator: team.navigator_player_id === player.id,
+        canUnlockGps: archetype.canUnlockGps,
+        effectiveBeta: archetype.effectiveBeta,
+        archetypeRole: archetype.archetypeRole,
+        playerRole,
+        gpsEnabled: content.capabilities.gps,
+        forceUnlock,
+      });
 
-    if (!validation.ok) {
-      const durations = computeAttemptDurations({
+      if (!validation.ok) {
+        const durations = computeAttemptDurations({
         levelStartedAt: levelState.started_at,
         teamStartedAt: team.started_at,
       });
@@ -272,10 +298,67 @@ export async function solveCurrentLevel(input: {
         },
       });
       return { success: false, error: validation.error };
+      }
+    }
+
+    if (!input.payload?.revealSolution && !confirmingReveal) {
+      const pointsPreview = computeLevelReward(
+        levelDefinition.scoring,
+        levelState.started_at,
+      );
+      const durations = computeAttemptDurations({
+        levelStartedAt: levelState.started_at,
+        teamStartedAt: team.started_at,
+      });
+      await logPlayAttempt({
+        organizationId: event.organization_id,
+        eventId: event.id,
+        teamId: team.id,
+        playerId: player.id,
+        playerName: player.display_name,
+        playerRole: player.role,
+        level: currentLevel,
+        phase: "level",
+        correct: true,
+        answer: input.payload?.answer ?? null,
+        selectedOptionId: input.payload?.selectedOptionId ?? null,
+        selectedOptionIds: input.payload?.selectedOptionIds ?? null,
+        error: null,
+        durationMs: durations.durationMs,
+        elapsedMissionMs: durations.elapsedMissionMs,
+        contentMode: content.contentMode,
+        levelTitle: levelDefinition.title ?? null,
+      });
+
+      const nextRevealState: TeamGameState = {
+        ...gameState,
+        version: gameState.version + 1,
+        mission_reveal: {
+          level: currentLevel,
+          answered_by: player.display_name,
+          answered_by_player_id: player.id,
+          solution_label: formatLevelSolution(levelDefinition),
+          attempt_label: formatLevelAttemptLabel(levelDefinition, input.payload ?? {}),
+          points_earned: pointsPreview,
+          revealed_at: new Date().toISOString(),
+        },
+      };
+
+      return persistPlayingGameState({
+        teamId: team.id,
+        player,
+        gameState: nextRevealState,
+        expectedVersion: gameState.version,
+      });
     }
 
     const solvedBy = Array.from(
-      new Set([...(levelState.completed_by ?? []), player.display_name]),
+      new Set([
+        ...(levelState.completed_by ?? []),
+        confirmingReveal
+          ? (gameState.mission_reveal?.answered_by ?? player.display_name)
+          : player.display_name,
+      ]),
     );
 
     const compiledLogic = content.compiledLogic;
@@ -347,7 +430,9 @@ export async function solveCurrentLevel(input: {
 
     const pointsEarned = input.payload?.revealSolution
       ? 0
-      : computeLevelReward(levelDefinition.scoring, levelState.started_at);
+      : confirmingReveal
+        ? (gameState.mission_reveal?.points_earned ?? 0)
+        : computeLevelReward(levelDefinition.scoring, levelState.started_at);
 
     const bonusDefsRaw = resolveBonusDefinitions(levelDefinition);
     // Dedupe by id — duplicate Studio bindings must not arm the same surprise twice.
@@ -468,18 +553,10 @@ export async function solveCurrentLevel(input: {
     let teamCurrentLevel = isFinished ? currentLevel : nextLevel;
 
     if (teamBonus && immediateTeam) {
-      // Whole team stays on this slot in bonus phase after the Gelöst-modal.
-      nextPhase = "bonus";
+      // Stay on the solved slot under the Gelöst-card; bonus starts after Weiter.
+      nextPhase = "level";
       pendingNext = isFinished ? null : nextLevel;
       teamCurrentLevel = currentLevel;
-      immediateTeam.status = "active";
-      activeBonus = {
-        from_level: currentLevel,
-        for_role: immediateTeam.for_role,
-        for_team: true,
-        started_at: armedAt.toISOString(),
-        bonus_id: immediateTeam.bonus_id,
-      };
     } else if (soloBonus && immediateSolo) {
       // Team advances; assigned role gets an overlay via active_bonus.
       const nextSlot = getLevelDefinition(content, isFinished ? currentLevel : nextLevel);
@@ -528,6 +605,7 @@ export async function solveCurrentLevel(input: {
       pending_next_level: pendingNext,
       quiz_reveal: null,
       level_reveal: null,
+      mission_reveal: null,
       active_bonus: activeBonus,
       bonus_queue: mergedQueue,
       bonus_sessions: bonusSessions,
@@ -538,18 +616,15 @@ export async function solveCurrentLevel(input: {
         updated_at: armedAt.toISOString(),
         bonus_walked_meters: armedMeterBonus ? 0 : gameState.outdoor_progress?.bonus_walked_meters,
       },
-      modal:
-        // Immediate team bonus owns the next screen — skip the Gelöst-modal so
-        // the surprise is not buried under „Weiter“ → next hub.
-        teamBonus
-          ? null
-          : buildLevelCompletedModal({
-              level: currentLevel,
-              solvedBy,
-              pointsEarned,
-              successTitle: levelDefinition.success_title,
-              successInfo: input.payload?.revealSolution ? null : levelDefinition.success_info,
-            }),
+      modal: input.payload?.revealSolution
+        ? null
+        : buildLevelCompletedModal({
+            level: currentLevel,
+            solvedBy,
+            pointsEarned,
+            successTitle: levelDefinition.success_title,
+            successInfo: levelDefinition.success_info,
+          }),
       levels: progressionLevels,
     };
 
@@ -785,6 +860,12 @@ export async function revealLevelSolution(input: {
     if (gameState.level_reveal?.level === currentLevel) {
       return { success: true, data: buildRealtimeState(team, player) };
     }
+    if (gameState.mission_reveal?.level === currentLevel) {
+      return {
+        success: false,
+        error: "Die Aufgabe ist schon gelöst. Die Team-Leitung geht weiter.",
+      };
+    }
 
     const content = await loadResolvedEventContent({
       eventId: event.id,
@@ -920,6 +1001,7 @@ export async function dismissSyncModal(input: {
       version: gameState.version + 1,
       modal: null,
       quiz_reveal: null,
+      mission_reveal: null,
       current_phase: nextPhase,
       active_bonus: activeBonus,
       pending_next_level: pendingNext,
@@ -2197,10 +2279,13 @@ export async function activateReadyBonuses(input: {
     let currentPhase = gameState.current_phase;
     let pendingNext = gameState.pending_next_level;
     let currentLevel = team.current_level ?? 1;
+    const holdTeamBonus = teamBonusWaitsForMissionReveal(gameState);
 
     if (!activeBonus) {
       const readySolos = queue.filter((item) => item.status === "ready" && !item.for_team);
-      const readyTeam = queue.find((item) => item.status === "ready" && item.for_team);
+      const readyTeam = holdTeamBonus
+        ? undefined
+        : queue.find((item) => item.status === "ready" && item.for_team);
 
       // Parallel role pack: activate every ready solo bonus at once.
       for (const item of readySolos) {
@@ -2223,7 +2308,7 @@ export async function activateReadyBonuses(input: {
           started_at: nowIso,
           bonus_id: readyTeam.bonus_id,
         };
-      } else if (pick) {
+      } else if (pick && !(pick.for_team && holdTeamBonus)) {
         queue = markBonusActive(queue, pick.bonus_id);
         activeBonus = {
           from_level: pick.from_level,
