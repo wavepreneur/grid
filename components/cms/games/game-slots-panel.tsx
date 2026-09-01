@@ -527,12 +527,30 @@ export function GameSlotsPanel({
               overrides.visible_to === "gamma"
                 ? overrides.visible_to
                 : "team";
+            const meta = [
+              slot.quiz
+                ? `Schlüssel: ${slot.quiz.title ?? "Einstiegsfrage"}${
+                    slot.quiz.points ? ` · ${slot.quiz.points} P` : ""
+                  }`
+                : "Ohne Einstiegsfrage",
+              slot.bonusLink
+                ? `Bonus: ${slot.bonusLink.task.title}${
+                    bonusOverrides?.role ? ` (${roleLabelShort(bonusOverrides.role)})` : ""
+                  }`
+                : "Ohne Bonus",
+              surface === "outdoor" ? outdoorActivationLabel(overrides) : null,
+              routeOrder === "free" ? "Frei" : "Linear",
+              visible === "team" ? "Alle" : roleLabelShort(visible),
+              overrides.ends_game ? "Abschluss" : null,
+            ]
+              .filter((part): part is string => Boolean(part))
+              .join(" · ");
             return (
               <div
                 key={slot.levelLink.id}
                 className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">
                       #{slot.index}
@@ -540,29 +558,11 @@ export function GameSlotsPanel({
                     <h3 className="mt-1 truncate text-base font-semibold text-slate-900">
                       {slot.levelLink.task.title}
                     </h3>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {slot.quiz
-                        ? `Schlüssel: ${slot.quiz.title ?? "Einstiegsfrage"}${slot.quiz.points ? ` · ${slot.quiz.points} P` : ""}`
-                        : "Ohne Einstiegsfrage"}
-                      {" · "}
-                      {slot.bonusLink
-                        ? `Bonus: ${slot.bonusLink.task.title}${
-                            bonusOverrides?.role
-                              ? ` (${roleLabelShort(bonusOverrides.role)})`
-                              : ""
-                          }`
-                        : "Ohne Bonus"}
-                      {surface === "outdoor"
-                        ? ` · ${outdoorActivationLabel(overrides)}`
-                        : ""}
-                      {" · "}
-                      {routeOrder === "free" ? "Frei" : "Linear"}
-                      {" · "}
-                      {visible === "team" ? "Alle" : roleLabelShort(visible)}
-                      {overrides.ends_game ? " · Abschluss" : ""}
+                    <p className="mt-1 truncate text-xs text-slate-500" title={meta}>
+                      {meta}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex shrink-0 flex-nowrap gap-2">
                     <StudioButton
                       type="button"
                       variant="ghost"
