@@ -1029,6 +1029,7 @@ export async function startGameManually(input: {
       player!.team_id === team.id &&
       (player!.is_captain ||
         player!.role === "alpha" ||
+        player!.role === "captain" ||
         team.captain_player_id === player!.id);
     if (!player || player.team_id !== team.id || !isLead) {
       return { success: false, error: "Nur Alpha (Team Lead) kann die Mission starten." };

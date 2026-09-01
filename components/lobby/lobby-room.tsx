@@ -64,6 +64,12 @@ type LobbyRoomProps = {
   studioTest?: boolean;
 };
 
+function playerIsTeamLead(snapshot: LobbySnapshot, session: PlayerSession): boolean {
+  if (snapshot.captain_player_id === session.playerId) return true;
+  const me = snapshot.players.find((player) => player.id === session.playerId);
+  return Boolean(me?.is_captain || me?.is_alpha);
+}
+
 function formatCountdown(targetIso: string | null): string {
   if (!targetIso) return "—";
   const diffMs = new Date(targetIso).getTime() - Date.now();
@@ -350,6 +356,7 @@ export function LobbyRoom({
 
   function handleStartGame() {
     if (startInFlightRef.current) return;
+    if (!playerIsTeamLead(snapshot, session)) return;
     startInFlightRef.current = true;
     setError(null);
     markMissionStarting(inviteCode, joinCode, snapshot.players.length);
@@ -381,9 +388,12 @@ export function LobbyRoom({
           return;
         }
         void broadcast({ type: "start_aborted" });
+        holdCaptainIdRef.current = null;
         clearMissionStarting(inviteCode, joinCode);
         setBusy(null);
         setError(result.error);
+        void refreshLobby();
+        void syncSessionFromServer();
         return;
       }
       void broadcast({
@@ -509,10 +519,7 @@ export function LobbyRoom({
   }
 
   const meLive = snapshot.players.find((player) => player.id === session.playerId);
-  const isAlpha =
-    session.canManageTeam ||
-    Boolean(meLive?.is_captain) ||
-    Boolean(meLive?.is_alpha);
+  const isAlpha = playerIsTeamLead(snapshot, session);
   const isLobby = snapshot.team_status === "lobby";
   const isPlaying = snapshot.team_status === "playing";
   const playerCount = snapshot.active_player_count;
