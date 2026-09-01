@@ -95,6 +95,9 @@ type Props = {
   onBeginBonus: (bonusId: string) => void;
   onContinueBonus: (bonusId: string) => void;
   onSkipBonus: () => void;
+  onRevealLevel?: () => void;
+  canPaceTeam?: boolean;
+  leadLabel?: string;
 };
 
 function scrollPlayToTop() {
@@ -159,6 +162,9 @@ export function PlayPhaseFlow({
   onBeginBonus,
   onContinueBonus,
   onSkipBonus,
+  onRevealLevel,
+  canPaceTeam = false,
+  leadLabel = "Team Lead",
 }: Props) {
   const mode = eventContent.contentMode;
   const phase = gameState.current_phase ?? "level";
@@ -294,6 +300,8 @@ export function PlayPhaseFlow({
             disabled={disabled}
             isPending={isPending}
             teamSession={gameState.bonus_sessions?.[bonusId] ?? null}
+            canPaceTeam={canPaceTeam}
+            leadLabel={leadLabel}
             onBegin={() => onBeginBonus(bonusId)}
             onSubmit={onSubmitBonus}
             onContinue={() => onContinueBonus(bonusId)}
@@ -325,6 +333,8 @@ export function PlayPhaseFlow({
           myName={myName}
           myRoleLabel={myRoleLabel}
           isPending={isPending}
+          canPaceTeam={canPaceTeam}
+          leadLabel={leadLabel}
           onContinue={onContinueBonus}
         />
       </>
@@ -362,6 +372,8 @@ export function PlayPhaseFlow({
             disabled={disabled}
             isPending={isPending}
             teamSession={gameState.bonus_sessions?.[bonusId] ?? null}
+            canPaceTeam={canPaceTeam}
+            leadLabel={leadLabel}
             onBegin={() => onBeginBonus(bonusId)}
             onSubmit={onSubmitBonus}
             onContinue={() => onContinueBonus(bonusId)}
@@ -454,6 +466,8 @@ export function PlayPhaseFlow({
           disabled={disabled || paused}
           isPending={isPending}
           teamReveal={gameState.quiz_reveal}
+          canPaceTeam={canPaceTeam}
+          leadLabel={leadLabel}
           onSubmit={onSubmitQuiz}
           onAdvanceToLevel={onAdvanceQuizToLevel}
         />
@@ -485,6 +499,12 @@ export function PlayPhaseFlow({
         onSubmit={onSolveLevel}
         onPurchaseHint={onPurchaseHint}
         feedback={solveFeedback}
+        teamReveal={
+          gameState.level_reveal?.level === activeLevel ? gameState.level_reveal : null
+        }
+        canPaceTeam={canPaceTeam}
+        leadLabel={leadLabel}
+        onReveal={onRevealLevel}
       />
     </>
   );

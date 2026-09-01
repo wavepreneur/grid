@@ -162,6 +162,20 @@ export async function solveCurrentLevel(input: {
       return { success: false, error: "Bitte zuerst die Synchronisations-Meldung schließen." };
     }
 
+    const giveUpReveal =
+      gameState.level_reveal && gameState.level_reveal.level === currentLevel
+        ? gameState.level_reveal
+        : null;
+    if (giveUpReveal && !input.payload?.revealSolution) {
+      return {
+        success: false,
+        error: "Die Lösung liegt schon offen. Die Team-Leitung geht weiter.",
+      };
+    }
+    if (input.payload?.revealSolution && !(await playerCanPaceTeam(team.id, player))) {
+      return { success: false, error: "Nur die Team-Leitung kann weitergehen." };
+    }
+
     const content = await loadResolvedEventContent({
       eventId: event.id,
       organizationId: event.organization_id,
@@ -513,6 +527,7 @@ export async function solveCurrentLevel(input: {
       current_phase: nextPhase,
       pending_next_level: pendingNext,
       quiz_reveal: null,
+      level_reveal: null,
       active_bonus: activeBonus,
       bonus_queue: mergedQueue,
       bonus_sessions: bonusSessions,
@@ -750,6 +765,65 @@ export async function purchaseHint(input: {
   }
 }
 
+/** Show the mission solution on every device without completing — team lead continues. */
+export async function revealLevelSolution(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    const { event, team, player } = await assertPlayerSession(input);
+    if (team.status !== "playing") {
+      return { success: false, error: "Das Spiel läuft noch nicht." };
+    }
+
+    const gameState = parseTeamGameState(team.game_state);
+    const currentLevel = team.current_level || 1;
+    if (gameState.modal) {
+      return { success: false, error: "Bitte zuerst die Synchronisations-Meldung schließen." };
+    }
+    if (gameState.level_reveal?.level === currentLevel) {
+      return { success: true, data: buildRealtimeState(team, player) };
+    }
+
+    const content = await loadResolvedEventContent({
+      eventId: event.id,
+      organizationId: event.organization_id,
+      cityId: event.city_id,
+      contentConfig: event.content_config,
+      routeOverride: event.route_override,
+      studioGameVersionId: event.studio_game_version_id,
+    });
+    const levelDefinition = getLevelDefinition(content, currentLevel);
+    if (!levelDefinition?.scoring?.allow_reveal_solution) {
+      return { success: false, error: "Lösung anzeigen ist hier nicht erlaubt." };
+    }
+
+    const nextGameState: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      level_reveal: {
+        level: currentLevel,
+        revealed_by: player.display_name,
+        revealed_by_player_id: player.id,
+        revealed_at: new Date().toISOString(),
+      },
+    };
+
+    return persistPlayingGameState({
+      teamId: team.id,
+      player,
+      gameState: nextGameState,
+      expectedVersion: gameState.version,
+    });
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Lösung konnte nicht gezeigt werden.",
+    };
+  }
+}
+
 export async function dismissSyncModal(input: {
   inviteCode: string;
   joinCode: string;
@@ -766,6 +840,10 @@ export async function dismissSyncModal(input: {
         return current;
       }
       return current;
+    }
+
+    if (!(await playerCanPaceTeam(team.id, player))) {
+      return { success: false, error: "Nur die Team-Leitung kann weitergehen." };
     }
 
     const content = await loadResolvedEventContent({
@@ -1065,6 +1143,14 @@ function normalizePlayRole(
   if (role === "captain" || role === "navigator" || role === "alpha") return "alpha";
   if (role === "beta") return "beta";
   return "gamma";
+}
+
+async function playerCanPaceTeam(
+  teamId: string,
+  player: { is_captain: boolean },
+): Promise<boolean> {
+  if (player.is_captain) return true;
+  return (await countActivePlayers(teamId)) <= 1;
 }
 
 /** First-writer wins on bonus intro/reveal (JSON version must still match). */
@@ -1579,6 +1665,9 @@ export async function advanceQuizToLevel(input: {
     if (!gameState.quiz_reveal) {
       return { success: false, error: "Quiz noch nicht beantwortet." };
     }
+    if (!(await playerCanPaceTeam(team.id, player))) {
+      return { success: false, error: "Nur die Team-Leitung kann weitergehen." };
+    }
 
     const nextGameState: TeamGameState = {
       ...gameState,
@@ -1679,7 +1768,6 @@ async function finishRevealedBonus(input: {
   const allDoneLevels = Object.values(gameState.levels).every(
     (entry) => entry.status === "completed",
   );
-  const noticeId = `bonus-${Date.now()}-${reveal.answered_by_player_id.slice(0, 8)}`;
   const now = new Date();
   let nextQueue = markBonusDone(gameState.bonus_queue ?? [], bonusId, now);
   const stillActive = nextQueue.find((item) => item.status === "active");
@@ -1733,13 +1821,7 @@ async function finishRevealedBonus(input: {
     active_bonus: nextActive,
     bonus_queue: nextQueue,
     bonus_sessions: clearBonusSession(gameState.bonus_sessions, bonusId),
-    bonus_notice: {
-      id: noticeId,
-      by: reveal.answered_by,
-      correct: reveal.correct,
-      reward: reveal.reward,
-      created_at: now.toISOString(),
-    },
+    bonus_notice: null,
     levels,
   };
 
@@ -2456,6 +2538,9 @@ export async function advanceBonusAfterReveal(input: {
       return { success: false, error: "Das Spiel läuft noch nicht." };
     }
     const gameState = parseTeamGameState(team.game_state);
+    if (!(await playerCanPaceTeam(team.id, player))) {
+      return { success: false, error: "Nur die Team-Leitung kann weitergehen." };
+    }
     return finishRevealedBonus({
       event,
       team,

@@ -24,6 +24,8 @@ import { CodeBoxesInput } from "@/components/game/code-boxes-input";
 import { hasLiveLevelScoring } from "@/lib/grid/level-scoring";
 import { formatLevelSolution } from "@/lib/grid/level-solution";
 import type { LevelDefinition, SolveLevelPayload } from "@/lib/grid/level-types";
+import type { LevelRevealState } from "@/lib/grid/game-state";
+import { TeamPaceHint } from "@/components/game/team-pace-hint";
 
 type LevelSolvePanelProps = {
   level: LevelDefinition;
@@ -41,6 +43,10 @@ type LevelSolvePanelProps = {
   hideScoring?: boolean;
   /** Wrong / correct burst after submit. */
   feedback?: SolveFeedbackState | null;
+  teamReveal?: LevelRevealState | null;
+  canPaceTeam?: boolean;
+  leadLabel?: string;
+  onReveal?: () => void;
 };
 
 export function LevelSolvePanel({
@@ -56,6 +62,10 @@ export function LevelSolvePanel({
   cityStyle = false,
   hideScoring = false,
   feedback = null,
+  teamReveal = null,
+  canPaceTeam = false,
+  leadLabel = "Team Lead",
+  onReveal,
 }: LevelSolvePanelProps) {
   const [answer, setAnswer] = useState("");
   const [numberParts, setNumberParts] = useState<string[]>(() =>
@@ -70,6 +80,8 @@ export function LevelSolvePanel({
   const revealSubmittedRef = useRef(false);
   const onSubmitRef = useRef(onSubmit);
   onSubmitRef.current = onSubmit;
+  const onRevealRef = useRef(onReveal);
+  onRevealRef.current = onReveal;
 
   const allowReveal = Boolean(level.scoring?.allow_reveal_solution);
   const scoringSnapshot = useLevelScoringTimer(
@@ -91,6 +103,7 @@ export function LevelSolvePanel({
   const isCodeBoxes = inputMode === "boxes" || inputMode === "number";
   const numberFieldCount = level.number_fields ?? 1;
   const solutionText = formatLevelSolution(level);
+  const solutionShown = solutionRevealed || Boolean(teamReveal);
 
   useEffect(() => {
     setAutoTriggered(false);
@@ -116,42 +129,35 @@ export function LevelSolvePanel({
   }, [feedback?.id, feedback?.kind, numberFieldCount]);
 
   function submitRevealSolution() {
-    if (revealSubmittedRef.current || disabled || isPending) return;
+    if (revealSubmittedRef.current || disabled || isPending || !canPaceTeam) return;
     revealSubmittedRef.current = true;
     onSubmitRef.current({ revealSolution: true });
   }
 
   function revealAndSkip() {
-    if (!allowReveal || disabled || isPending || solutionRevealed) return;
+    if (!allowReveal || disabled || isPending || solutionShown) return;
     setSolutionRevealed(true);
+    onRevealRef.current?.();
   }
-
-  useEffect(() => {
-    if (!solutionRevealed) return;
-    const timer = window.setTimeout(() => {
-      submitRevealSolution();
-    }, 1800);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- submit once after reveal
-  }, [solutionRevealed]);
 
   useEffect(() => {
     if (
       !allowReveal ||
       !scoringSnapshot?.isExpired ||
       !scoringSnapshot.hasCountdown ||
-      solutionRevealed ||
+      solutionShown ||
       disabled ||
       isPending
     ) {
       return;
     }
     setSolutionRevealed(true);
+    onRevealRef.current?.();
   }, [
     allowReveal,
     scoringSnapshot?.isExpired,
     scoringSnapshot?.hasCountdown,
-    solutionRevealed,
+    solutionShown,
     disabled,
     isPending,
   ]);
@@ -165,7 +171,7 @@ export function LevelSolvePanel({
       disabled ||
       isPending ||
       autoTriggered ||
-      solutionRevealed
+      solutionShown
     ) {
       return;
     }
@@ -180,7 +186,7 @@ export function LevelSolvePanel({
     disabled,
     isPending,
     autoTriggered,
-    solutionRevealed,
+    solutionShown,
   ]);
 
   function digitalAnswerValue(): string {
@@ -192,7 +198,7 @@ export function LevelSolvePanel({
   }
 
   function handleSubmit() {
-    if (solutionRevealed) {
+    if (solutionShown) {
       submitRevealSolution();
       return;
     }
@@ -215,7 +221,7 @@ export function LevelSolvePanel({
     }
   }
 
-  const revealBlock = solutionRevealed ? (
+  const revealBlock = solutionShown ? (
     <div className="space-y-3">
       <p
         className={
@@ -236,24 +242,28 @@ export function LevelSolvePanel({
       >
         Aufgabe abgeschlossen · 0 Punkte
       </p>
-      {cityStyle ? (
-        <BigButton disabled={disabled || isPending} onClick={submitRevealSolution}>
-          {isPending ? "Sende…" : "Weiter"}
-        </BigButton>
+      {canPaceTeam ? (
+        cityStyle ? (
+          <BigButton disabled={disabled || isPending} onClick={submitRevealSolution}>
+            {isPending ? "Sende…" : "Weiter"}
+          </BigButton>
+        ) : (
+          <GridButton
+            type="button"
+            disabled={disabled || isPending}
+            onClick={submitRevealSolution}
+          >
+            {isPending ? "Sende…" : "Weiter"}
+          </GridButton>
+        )
       ) : (
-        <GridButton
-          type="button"
-          disabled={disabled || isPending}
-          onClick={submitRevealSolution}
-        >
-          {isPending ? "Sende…" : "Weiter"}
-        </GridButton>
+        <TeamPaceHint canPaceTeam={false} leadLabel={leadLabel} />
       )}
     </div>
   ) : null;
 
   const revealButton =
-    allowReveal && !solutionRevealed ? (
+    allowReveal && !solutionShown ? (
       <RevealSolutionControl
         disabled={disabled || isPending}
         onConfirmReveal={revealAndSkip}
@@ -396,7 +406,7 @@ export function LevelSolvePanel({
         {scoringBlock}
         {gpsStatus}
 
-        {solutionRevealed ? (
+        {solutionShown ? (
           revealBlock
         ) : (
           <div key={feedback?.id ?? "idle"} className={`space-y-4 ${formMotionClass}`}>
@@ -531,7 +541,7 @@ export function LevelSolvePanel({
       {scoringBlock ? <div className="mb-4">{scoringBlock}</div> : null}
       {gpsStatus ? <div className="mb-4">{gpsStatus}</div> : null}
 
-      {solutionRevealed ? (
+      {solutionShown ? (
         revealBlock
       ) : (
         <>

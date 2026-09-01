@@ -18,8 +18,7 @@ import type { ContentMode } from "@/lib/cms/layer-model";
 import { hubMeta } from "@/lib/grid/play-slots";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 import { CityTeamBar } from "@/components/game/city/team-bar";
-
-const BONUS_ADVANCE_MS = 2800;
+import { TeamPaceHint } from "@/components/game/team-pace-hint";
 
 type Props = {
   bonus: BonusTask;
@@ -35,6 +34,8 @@ type Props = {
   disabled: boolean;
   isPending: boolean;
   teamSession?: BonusSessionState | null;
+  canPaceTeam?: boolean;
+  leadLabel?: string;
   onBegin: () => void;
   onSubmit: (selectedOptionId: string) => void;
   onContinue: () => void;
@@ -54,6 +55,8 @@ export function PlayBonusView({
   disabled,
   isPending,
   teamSession = null,
+  canPaceTeam = false,
+  leadLabel = "Team Lead",
   onBegin,
   onSubmit,
   onContinue,
@@ -71,9 +74,6 @@ export function PlayBonusView({
   const [submitting, setSubmitting] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const sfxPlayedRef = useRef<string | null>(null);
-  const autoAdvanceRef = useRef<string | null>(null);
-  const onContinueRef = useRef(onContinue);
-  onContinueRef.current = onContinue;
 
   const reveal = teamSession?.reveal ?? null;
   const introDone = Boolean(teamSession?.intro_done || localIntro || reveal);
@@ -126,18 +126,6 @@ export function PlayBonusView({
     }
   }, [reveal]);
 
-  useEffect(() => {
-    if (!reveal || continuing || disabled || isPending) return;
-    if (autoAdvanceRef.current === reveal.revealed_at) return;
-    const timer = window.setTimeout(() => {
-      if (autoAdvanceRef.current === reveal.revealed_at) return;
-      autoAdvanceRef.current = reveal.revealed_at;
-      setContinuing(true);
-      onContinueRef.current();
-    }, BONUS_ADVANCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [reveal, continuing, disabled, isPending]);
-
   function beginIntro() {
     if (introDone) return;
     setLocalIntro(true);
@@ -154,8 +142,7 @@ export function PlayBonusView({
   }
 
   function handleContinue() {
-    if (continuing || !reveal) return;
-    autoAdvanceRef.current = reveal.revealed_at;
+    if (continuing || !reveal || !canPaceTeam) return;
     setContinuing(true);
     onContinue();
   }
@@ -379,7 +366,7 @@ export function PlayBonusView({
                       </p>
                     ) : null}
                     <p className="mt-0.5 text-sm leading-snug text-[var(--cg-muted)]">
-                      Keine Punkte — es geht direkt weiter.
+                      Keine Extra-Punkte — {leadLabel} geht weiter, wenn ihr soweit seid.
                     </p>
                   </div>
                 </div>
@@ -393,9 +380,13 @@ export function PlayBonusView({
               </>
             )}
 
-            <BigButton disabled={isPending || continuing} onClick={handleContinue}>
-              {asymmetricOverlay ? "Zurück zum Team" : `Weiter zur ${hub.hubLabelDe}`}
-            </BigButton>
+            {canPaceTeam ? (
+              <BigButton disabled={isPending || continuing} onClick={handleContinue}>
+                {asymmetricOverlay ? "Zurück zum Team" : `Weiter zur ${hub.hubLabelDe}`}
+              </BigButton>
+            ) : (
+              <TeamPaceHint canPaceTeam={false} leadLabel={leadLabel} />
+            )}
           </div>
         )}
       </div>

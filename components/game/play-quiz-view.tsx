@@ -6,6 +6,7 @@ import { IconCheck, IconKey, IconX } from "@/components/game/city/icons";
 import type { ArrivalQuiz } from "@/lib/grid/level-types";
 import type { QuizRevealState } from "@/lib/grid/game-state";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { TeamPaceHint } from "@/components/game/team-pace-hint";
 
 type Props = {
   title: string;
@@ -19,6 +20,8 @@ type Props = {
   onSubmit: (payload: { selectedOptionId?: string; selectedOptionIds?: string[] }) => void;
   /** After shared reveal, open the unlock transition for everyone. */
   onAdvanceToLevel: () => void;
+  canPaceTeam?: boolean;
+  leadLabel?: string;
 };
 
 export function PlayQuizView({
@@ -31,6 +34,8 @@ export function PlayQuizView({
   teamReveal = null,
   onSubmit,
   onAdvanceToLevel,
+  canPaceTeam = false,
+  leadLabel = "Team Lead",
 }: Props) {
   const multi = Boolean(quiz.correct_option_ids?.length);
   const [picked, setPicked] = useState<string | null>(null);
@@ -96,7 +101,7 @@ export function PlayQuizView({
   }, [teamReveal]);
 
   function handleAdvance() {
-    if (advancing || disabled || isPending) return;
+    if (advancing || disabled || isPending || !canPaceTeam) return;
     setAdvancing(true);
     onAdvanceToLevel();
   }
@@ -229,13 +234,17 @@ export function PlayQuizView({
             </div>
           ) : null}
 
-          <BigButton
-            variant="accent"
-            disabled={disabled || isPending || advancing}
-            onClick={handleAdvance}
-          >
-            {advancing || isPending ? "Öffnet…" : openLabel}
-          </BigButton>
+          {canPaceTeam ? (
+            <BigButton
+              variant="accent"
+              disabled={disabled || isPending || advancing}
+              onClick={handleAdvance}
+            >
+              {advancing || isPending ? "Öffnet…" : openLabel}
+            </BigButton>
+          ) : (
+            <TeamPaceHint canPaceTeam={false} leadLabel={leadLabel} />
+          )}
         </div>
       ) : null}
     </section>

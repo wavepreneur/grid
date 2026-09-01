@@ -34,6 +34,14 @@ export type QuizRevealState = {
   revealed_at: string;
 };
 
+/** Shared give-up: solution is on the task screen until the team lead continues. */
+export type LevelRevealState = {
+  level: number;
+  revealed_by: string;
+  revealed_by_player_id: string;
+  revealed_at: string;
+};
+
 /**
  * Role-only bonus that runs while the rest of the team continues on the hub.
  * Team-wide bonuses still use current_phase === "bonus".
@@ -119,6 +127,8 @@ export type TeamGameState = {
   pending_next_level?: number | null;
   /** Team-wide entry-quiz reveal while still in phase "quiz". */
   quiz_reveal?: QuizRevealState | null;
+  /** Give-up solution on the current mission — wait for team lead before completing. */
+  level_reveal?: LevelRevealState | null;
   /** Asymmetric bonus overlay while team is already on the next hub. */
   active_bonus?: ActiveBonusState | null;
   /** Layer-3 surprise queue (armed / ready / done). */
@@ -205,6 +215,7 @@ export function createInitialGameState(
     score: DEFAULT_STARTING_SCORE,
     current_phase: "hub",
     quiz_reveal: null,
+    level_reveal: null,
     active_bonus: null,
     bonus_queue: [],
     bonus_sessions: {},
@@ -253,6 +264,7 @@ export function parseTeamGameState(value: unknown): TeamGameState {
         ? candidate.pending_next_level
         : undefined,
     quiz_reveal: parseQuizReveal(candidate.quiz_reveal),
+    level_reveal: parseLevelReveal(candidate.level_reveal),
     active_bonus: parseActiveBonus(candidate.active_bonus),
     bonus_queue: parseBonusQueue(candidate.bonus_queue),
     bonus_sessions: parseBonusSessions(
@@ -286,6 +298,26 @@ function parseQuizReveal(value: unknown): QuizRevealState | null | undefined {
       ? c.selected_option_ids.map(String)
       : [],
     points_earned: Math.max(0, Math.round(Number(c.points_earned) || 0)),
+    revealed_at: String(c.revealed_at),
+  };
+}
+
+function parseLevelReveal(value: unknown): LevelRevealState | null | undefined {
+  if (value === null) return null;
+  if (!value || typeof value !== "object") return undefined;
+  const c = value as Partial<LevelRevealState>;
+  if (
+    typeof c.level !== "number" ||
+    !c.revealed_by ||
+    !c.revealed_by_player_id ||
+    !c.revealed_at
+  ) {
+    return null;
+  }
+  return {
+    level: c.level,
+    revealed_by: String(c.revealed_by),
+    revealed_by_player_id: String(c.revealed_by_player_id),
     revealed_at: String(c.revealed_at),
   };
 }

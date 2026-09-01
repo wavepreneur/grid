@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { BigButton } from "@/components/game/city/ui";
 import { CityTeamBar } from "@/components/game/city/team-bar";
 import { IconGift } from "@/components/game/city/icons";
 import { SectionLabel } from "@/components/game/city/ui";
+import { TeamPaceHint } from "@/components/game/team-pace-hint";
 import type { BonusRevealState } from "@/lib/grid/game-state";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 
@@ -19,13 +21,14 @@ type Props = {
   myName: string;
   myRoleLabel: string;
   isPending: boolean;
+  canPaceTeam?: boolean;
+  leadLabel?: string;
   onContinue: (bonusId: string) => void;
 };
 
-const BONUS_ADVANCE_MS = 2800;
-
 /**
  * Role-only bonus: everyone else sees who is solving — then the result.
+ * Team lead confirms before the team leaves this screen.
  */
 export function BonusSpectatorView({
   items,
@@ -33,12 +36,12 @@ export function BonusSpectatorView({
   myName,
   myRoleLabel,
   isPending,
+  canPaceTeam = false,
+  leadLabel = "Team Lead",
   onContinue,
 }: Props) {
-  const onContinueRef = useRef(onContinue);
-  onContinueRef.current = onContinue;
-  const advancedRef = useRef<Set<string>>(new Set());
   const sfxRef = useRef<Set<string>>(new Set());
+  const revealedItem = items.find((item) => item.reveal) ?? items[0];
 
   useEffect(() => {
     for (const item of items) {
@@ -51,27 +54,8 @@ export function BonusSpectatorView({
     }
   }, [items]);
 
-  useEffect(() => {
-    if (isPending) return;
-    const timers: number[] = [];
-    for (const item of items) {
-      const reveal = item.reveal;
-      if (!reveal) continue;
-      if (advancedRef.current.has(reveal.revealed_at)) continue;
-      const timer = window.setTimeout(() => {
-        if (advancedRef.current.has(reveal.revealed_at)) return;
-        advancedRef.current.add(reveal.revealed_at);
-        onContinueRef.current(item.bonusId);
-      }, BONUS_ADVANCE_MS);
-      timers.push(timer);
-    }
-    return () => {
-      for (const timer of timers) window.clearTimeout(timer);
-    };
-  }, [items, isPending]);
-
   return (
-    <section className="mx-auto flex w-full max-w-md flex-col px-4 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-5 sm:px-5">
+    <section className="mx-auto flex min-h-[70vh] w-full max-w-md flex-col bg-[var(--cg-bg)] px-4 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-5 sm:px-5">
       <CityTeamBar teamName={teamName} meName={myName} meRoleLabel={myRoleLabel} compact />
 
       <div className="mt-10 flex flex-col items-center text-center">
@@ -106,7 +90,7 @@ export function BonusSpectatorView({
                       {item.solverName} konnte die Aufgabe nicht beantworten
                     </p>
                     <p className="mt-2 text-sm text-[var(--cg-muted)]">
-                      Keine Extra-Punkte — es geht weiter.
+                      Keine Extra-Punkte. {leadLabel} geht weiter, wenn ihr soweit seid.
                     </p>
                   </>
                 )
@@ -116,7 +100,7 @@ export function BonusSpectatorView({
                     {item.solverName} löst gerade eine Bonusaufgabe
                   </p>
                   <p className="mt-2 text-sm text-[var(--cg-muted)]">
-                    Ihr könnt warten — das Ergebnis erscheint gleich hier.
+                    Das Ergebnis erscheint hier — ihr bleibt auf diesem Bildschirm.
                   </p>
                 </>
               )}
@@ -124,6 +108,21 @@ export function BonusSpectatorView({
           );
         })}
       </div>
+
+      {revealedItem?.reveal ? (
+        <div className="mt-auto space-y-3 pt-8">
+          {canPaceTeam ? (
+            <BigButton
+              disabled={isPending}
+              onClick={() => onContinue(revealedItem.bonusId)}
+            >
+              Weiter
+            </BigButton>
+          ) : (
+            <TeamPaceHint canPaceTeam={false} leadLabel={leadLabel} />
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }

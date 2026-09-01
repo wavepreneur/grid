@@ -8,6 +8,7 @@ import {
   dismissSyncModal,
   getGameState,
   purchaseHint,
+  revealLevelSolution,
   skipBonusPhase,
   beginBonusPresentation,
   advanceBonusAfterReveal,
@@ -360,6 +361,15 @@ export function GameRoom({
     });
   }
 
+  function handleRevealLevel() {
+    setError(null);
+    void revealLevelSolution({
+      inviteCode,
+      joinCode,
+      sessionId: session.sessionId,
+    }).then(applyTeamResult);
+  }
+
   function applyTeamResult(result: { success: boolean; data?: TeamRealtimeState; error?: string }) {
     if (!result.success) {
       setError(result.error ?? "Aktion fehlgeschlagen.");
@@ -581,6 +591,10 @@ export function GameRoom({
     paused,
   );
   const isAlpha = session.isAlpha;
+  const leadLabel = displayRoleLabel(
+    "alpha",
+    eventContent.roleLabels ?? DEFAULT_ROLE_LABELS,
+  );
 
   function handleTransferAlpha(targetPlayerId: string) {
     setTransferPending(true);
@@ -817,6 +831,9 @@ export function GameRoom({
         onBeginBonus={handleBeginBonus}
         onContinueBonus={handleContinueBonus}
         onSkipBonus={handleSkipBonus}
+        onRevealLevel={handleRevealLevel}
+        canPaceTeam={isAlpha}
+        leadLabel={leadLabel}
       />
     ) : usesMissionShell(eventContent) ? (
       <ExitmaniaLevelView
@@ -837,6 +854,14 @@ export function GameRoom({
         onSubmit={handleSolveLevel}
         onPurchaseHint={handlePurchaseHint}
         feedback={solveFeedback}
+        teamReveal={
+          teamState.gameState.level_reveal?.level === activeLevel
+            ? teamState.gameState.level_reveal
+            : null
+        }
+        canPaceTeam={isAlpha}
+        leadLabel={leadLabel}
+        onReveal={handleRevealLevel}
       />
     ) : (
       <LevelPanel
@@ -885,7 +910,13 @@ export function GameRoom({
           onDismiss={handleDismissBonusNotice}
         />
         {modal && !sessionSuperseded ? (
-          <SyncModal modal={modal} onDismiss={handleDismissModal} isPending={isPending} />
+          <SyncModal
+            modal={modal}
+            onDismiss={handleDismissModal}
+            isPending={isPending}
+            canPaceTeam={isAlpha}
+            leadLabel={leadLabel}
+          />
         ) : null}
       </>
     );
@@ -923,7 +954,13 @@ export function GameRoom({
         {error ? <GridError message={error} /> : null}
       </div>
       {modal && !sessionSuperseded ? (
-        <SyncModal modal={modal} onDismiss={handleDismissModal} isPending={isPending} />
+        <SyncModal
+          modal={modal}
+          onDismiss={handleDismissModal}
+          isPending={isPending}
+          canPaceTeam={isAlpha}
+          leadLabel={leadLabel}
+        />
       ) : null}
     </>
   );

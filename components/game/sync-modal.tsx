@@ -5,14 +5,23 @@ import { PartyPopper } from "lucide-react";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 import type { GameModalState } from "@/lib/grid/game-state";
+import { TeamPaceHint } from "@/components/game/team-pace-hint";
 
 type SyncModalProps = {
   modal: GameModalState;
   onDismiss: () => void;
   isPending?: boolean;
+  canPaceTeam?: boolean;
+  leadLabel?: string;
 };
 
-export function SyncModal({ modal, onDismiss, isPending }: SyncModalProps) {
+export function SyncModal({
+  modal,
+  onDismiss,
+  isPending,
+  canPaceTeam = false,
+  leadLabel = "Team Lead",
+}: SyncModalProps) {
   const points =
     modal.points_earned !== undefined
       ? `${modal.points_earned >= 0 ? "+" : ""}${modal.points_earned} Punkte`
@@ -82,9 +91,13 @@ export function SyncModal({ modal, onDismiss, isPending }: SyncModalProps) {
         ) : null}
 
         <div className="relative mt-8">
-          <BigButton variant="accent" disabled={isPending} onClick={onDismiss}>
-            Weiter
-          </BigButton>
+          {canPaceTeam ? (
+            <BigButton variant="accent" disabled={isPending} onClick={onDismiss}>
+              Weiter
+            </BigButton>
+          ) : (
+            <TeamPaceHint canPaceTeam={false} leadLabel={leadLabel} />
+          )}
         </div>
       </div>
     </div>
