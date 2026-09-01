@@ -34,6 +34,7 @@ import {
   IconClock,
   IconCopy,
   IconDevices,
+  IconGamepad,
   IconKeyRound,
   IconLive,
   IconMapPin,
@@ -805,77 +806,101 @@ function GameRow({
 
   return (
     <article
-      className={`rounded-3xl bg-card p-5 shadow-soft transition ${
+      className={`overflow-hidden rounded-3xl bg-card shadow-soft transition ${
         selected ? "ring-2 ring-primary/40" : ""
       }`}
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <StudioSelectCheckbox
-          checked={selected}
-          onChange={onToggle}
-          label={`${game.name} auswählen`}
-        />
-        <Chip tone="bg-primary/12 text-primary">{surfaceChip}</Chip>
-        {game.liveEventCount > 0 ? (
-          <Chip tone="bg-success/20 text-success-foreground">Live</Chip>
-        ) : null}
-        <GameStatusSwitch
-          gameId={game.id}
-          status={game.status}
-          publishedVersionNumber={game.published_version_number}
-          liveEventCount={game.liveEventCount}
-          compact
-        />
-      </div>
+      <Link
+        href={`/admin/games/${game.id}`}
+        prefetch
+        onMouseEnter={() => void prefetchStudioGame(queryClient, game.id)}
+        onFocus={() => void prefetchStudioGame(queryClient, game.id)}
+        className="relative block aspect-[2/1] bg-secondary"
+        aria-label={`${game.name} öffnen`}
+      >
+        {game.logo_url?.trim() ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={game.logo_url}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <span className="flex h-full items-center justify-center text-muted-foreground">
+            <IconGamepad size={36} />
+          </span>
+        )}
+      </Link>
 
-      <h2 className="mt-3 text-xl font-bold">{game.name}</h2>
-      <p className="text-sm text-muted-foreground">
-        Version {game.published_version_number} · {game.slug}
-      </p>
+      <div className="p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <StudioSelectCheckbox
+            checked={selected}
+            onChange={onToggle}
+            label={`${game.name} auswählen`}
+          />
+          <Chip tone="bg-primary/12 text-primary">{surfaceChip}</Chip>
+          {game.liveEventCount > 0 ? (
+            <Chip tone="bg-success/20 text-success-foreground">Live</Chip>
+          ) : null}
+          <GameStatusSwitch
+            gameId={game.id}
+            status={game.status}
+            publishedVersionNumber={game.published_version_number}
+            liveEventCount={game.liveEventCount}
+            compact
+          />
+        </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link
-          href={`/admin/games/${game.id}`}
-          prefetch
-          onMouseEnter={() => void prefetchStudioGame(queryClient, game.id)}
-          onFocus={() => void prefetchStudioGame(queryClient, game.id)}
-          className="tap-lift rounded-2xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
-        >
-          Öffnen
-        </Link>
-        <StudioButton
-          type="button"
-          size="sm"
-          variant="secondary"
-          icon={<IconPlay size={16} />}
-          disabled={!canTest}
-          title={
-            canTest
-              ? "Testen mit aktuellem Editor-Stand"
-              : "Archivierte Spiele können nicht getestet werden"
-          }
-          onClick={() => setTestOpen(true)}
-        >
-          Testen
-        </StudioButton>
-        <StudioButton
-          type="button"
-          size="sm"
-          variant="ghost"
-          icon={<IconCopy size={16} />}
-          onClick={onDuplicate}
-        >
-          Duplizieren
-        </StudioButton>
-        <StudioButton
-          type="button"
-          size="sm"
-          variant="outline"
-          icon={<IconTrash size={16} />}
-          onClick={onDelete}
-        >
-          Löschen
-        </StudioButton>
+        <h2 className="mt-3 text-xl font-bold">{game.name}</h2>
+        <p className="text-sm text-muted-foreground">
+          Version {game.published_version_number} · {game.slug}
+        </p>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href={`/admin/games/${game.id}`}
+            prefetch
+            onMouseEnter={() => void prefetchStudioGame(queryClient, game.id)}
+            onFocus={() => void prefetchStudioGame(queryClient, game.id)}
+            className="tap-lift rounded-2xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+          >
+            Öffnen
+          </Link>
+          <StudioButton
+            type="button"
+            size="sm"
+            variant="secondary"
+            icon={<IconPlay size={16} />}
+            disabled={!canTest}
+            title={
+              canTest
+                ? "Testen mit aktuellem Editor-Stand"
+                : "Archivierte Spiele können nicht getestet werden"
+            }
+            onClick={() => setTestOpen(true)}
+          >
+            Testen
+          </StudioButton>
+          <StudioButton
+            type="button"
+            size="sm"
+            variant="ghost"
+            icon={<IconCopy size={16} />}
+            onClick={onDuplicate}
+          >
+            Duplizieren
+          </StudioButton>
+          <StudioButton
+            type="button"
+            size="sm"
+            variant="outline"
+            icon={<IconTrash size={16} />}
+            onClick={onDelete}
+          >
+            Löschen
+          </StudioButton>
+        </div>
       </div>
 
       {canTest ? (
