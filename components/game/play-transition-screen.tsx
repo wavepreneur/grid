@@ -38,7 +38,7 @@ export function PlayTransitionScreen({
   onDoneRef.current = onDone;
 
   useEffect(() => {
-    playPlaySfx(kind === "unlock" ? "unlock" : "ping");
+    playPlaySfx(kind === "bonus" ? "bonus" : "unlock");
   }, [kind]);
 
   useEffect(() => {
@@ -67,7 +67,7 @@ export function PlayTransitionScreen({
         className={`flex h-24 w-24 items-center justify-center rounded-[1.75rem] shadow-[var(--cg-shadow-lift)] ${
           kind === "unlock"
             ? "cg-animate-key-turn bg-[var(--cg-accent)] text-[var(--cg-accent-fg)]"
-            : "cg-animate-pop-in bg-[var(--cg-primary)] text-[var(--cg-primary-fg)]"
+            : "cg-animate-bonus-gift bg-[var(--cg-primary)] text-[var(--cg-primary-fg)]"
         }`}
       >
         {kind === "unlock" ? <IconKey size={44} /> : <IconGift size={44} />}
@@ -79,7 +79,11 @@ export function PlayTransitionScreen({
       </h1>
 
       {highlight ? (
-        <p className="cg-animate-pop-in mt-4 text-xl font-extrabold uppercase tracking-[0.12em] text-[var(--cg-primary)]">
+        <p
+          className={`${
+            kind === "bonus" ? "cg-animate-score-pop" : "cg-animate-pop-in"
+          } mt-4 text-xl font-extrabold uppercase tracking-[0.12em] text-[var(--cg-primary)]`}
+        >
           {highlight}
         </p>
       ) : null}

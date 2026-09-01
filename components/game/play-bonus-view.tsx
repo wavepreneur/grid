@@ -106,11 +106,6 @@ export function PlayBonusView({
         : Boolean(typed);
 
   useEffect(() => {
-    if (!isMine) return;
-    playPlaySfx("unlock");
-  }, [isMine, bonusId]);
-
-  useEffect(() => {
     if (reveal) return;
     if (!isPending) {
       setSubmitting(false);

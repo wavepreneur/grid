@@ -77,3 +77,8 @@ export function hapticWalkProgress(progress: number): void {
 export function hapticArrive(): void {
   vibrate([40, 40, 80, 40, 120]);
 }
+
+/** Bonus surprise — lighter, quicker than unlock or mission complete. */
+export function hapticBonus(): void {
+  vibrate([18, 28, 18, 28, 36, 40, 80]);
+}

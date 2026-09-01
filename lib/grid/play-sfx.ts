@@ -4,7 +4,7 @@
  * Safe to call from click/submit handlers (unlocks autoplay after gesture).
  */
 
-import { hapticCorrect, hapticWrong, hapticUnlock, hapticComplete, hapticArrive } from "@/lib/grid/haptics";
+import { hapticCorrect, hapticWrong, hapticUnlock, hapticComplete, hapticArrive, hapticBonus } from "@/lib/grid/haptics";
 
 export type PlaySfxKind =
   | "wrong"
@@ -13,9 +13,10 @@ export type PlaySfxKind =
   | "unlock"
   | "complete"
   | "ping"
-  | "arrive";
+  | "arrive"
+  | "bonus";
 
-const SFX_SRC: Record<PlaySfxKind, string> = {
+const SFX_SRC: Record<Exclude<PlaySfxKind, "bonus">, string> = {
   correct: "/sfx/correct.wav",
   wrong: "/sfx/wrong.wav",
   success: "/sfx/success.wav",
@@ -107,6 +108,14 @@ function playSynthFallback(kind: PlaySfxKind): void {
       tone(ctx, { frequency: 880, start: t0, duration: 0.08, type: "sine", gain: 0.09 });
       return;
     }
+    if (kind === "bonus") {
+      tone(ctx, { frequency: 659.25, start: t0, duration: 0.1, type: "triangle", gain: 0.11 });
+      tone(ctx, { frequency: 830.61, start: t0 + 0.08, duration: 0.11, type: "triangle", gain: 0.1 });
+      tone(ctx, { frequency: 987.77, start: t0 + 0.17, duration: 0.13, type: "sine", gain: 0.1 });
+      tone(ctx, { frequency: 1318.5, start: t0 + 0.28, duration: 0.28, type: "triangle", gain: 0.09 });
+      tone(ctx, { frequency: 1975.5, start: t0 + 0.42, duration: 0.2, type: "sine", gain: 0.06 });
+      return;
+    }
     if (kind === "arrive" || kind === "unlock") {
       tone(ctx, { frequency: 523.25, start: t0, duration: 0.1, type: "sine", gain: 0.12 });
       tone(ctx, { frequency: 784, start: t0 + 0.09, duration: 0.14, type: "triangle", gain: 0.11 });
@@ -152,12 +161,19 @@ function playHapticFor(kind: PlaySfxKind): void {
   else if (kind === "unlock") hapticUnlock();
   else if (kind === "complete" || kind === "success") hapticComplete();
   else if (kind === "arrive") hapticArrive();
+  else if (kind === "bonus") hapticBonus();
 }
 
 /** Fire-and-forget SFX (+ matching haptic). No-ops when reduced-motion. */
 export function playPlaySfx(kind: PlaySfxKind): void {
   if (prefersReducedMotion()) return;
   playHapticFor(kind);
+
+  // Bonus is synth-only so it never shares a file with unlock / correct / complete.
+  if (kind === "bonus") {
+    playSynthFallback(kind);
+    return;
+  }
 
   try {
     const audio = getAudio(kind);
@@ -182,7 +198,7 @@ export function unlockPlayAudio(): void {
   try {
     const ctx = getCtx();
     void ctx?.resume();
-    (Object.keys(SFX_SRC) as PlaySfxKind[]).forEach((kind) => {
+    (Object.keys(SFX_SRC) as Array<Exclude<PlaySfxKind, "bonus">>).forEach((kind) => {
       getAudio(kind);
     });
   } catch {
