@@ -308,6 +308,19 @@ export function LobbyRoom({
       void refreshLobby();
       void syncSessionFromServer();
     },
+    onStartOverlay: (action) => {
+      if (action === "show") {
+        markMissionStarting(inviteCode, joinCode, snapshot.players.length);
+        setBusy({
+          title: "Alle Geräte laden…",
+          subtitle: "Die Mission startet gemeinsam — niemand legt allein los.",
+          variant: "start",
+        });
+        return;
+      }
+      clearMissionStarting(inviteCode, joinCode);
+      setBusy(null);
+    },
   });
 
   // Belt-and-suspenders: any path that marks the snapshot as playing must leave the lobby.
@@ -345,6 +358,10 @@ export function LobbyRoom({
       subtitle: "Die Mission startet gemeinsam — niemand legt allein los.",
       variant: "start",
     });
+    void broadcast({
+      type: "game_starting",
+      player_count: snapshot.players.length,
+    });
 
     void startGameManually({
       inviteCode,
@@ -363,6 +380,7 @@ export function LobbyRoom({
           goToPlay();
           return;
         }
+        void broadcast({ type: "start_aborted" });
         clearMissionStarting(inviteCode, joinCode);
         setBusy(null);
         setError(result.error);

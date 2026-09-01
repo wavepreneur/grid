@@ -24,6 +24,8 @@ type UseTeamSyncOptions = {
   onSessionSuperseded?: () => void;
   /** Fired after Realtime is SUBSCRIBED again (e.g. after phone wake) — pull fresh state. */
   onResynced?: () => void;
+  /** Lobby-only: show or drop the start overlay before the team is playing. */
+  onStartOverlay?: (action: "show" | "hide") => void;
   /**
    * lobby: status + start/lead only (do not parse game_state).
    * play: live solves. Default play so a missing flag cannot mute in-game sync.
@@ -32,7 +34,12 @@ type UseTeamSyncOptions = {
 };
 
 export type TeamBroadcastPayload = {
-  type: TeamSyncEvent["event_type"] | "game_started" | "captain_transferred";
+  type:
+    | TeamSyncEvent["event_type"]
+    | "game_started"
+    | "game_starting"
+    | "start_aborted"
+    | "captain_transferred";
   new_captain_id?: string;
   previous_captain_id?: string;
   started_at?: string;
@@ -127,6 +134,7 @@ export function useTeamSync({
   onPlayersChange,
   onSessionSuperseded,
   onResynced,
+  onStartOverlay,
 }: UseTeamSyncOptions) {
   const [isConnected, setIsConnected] = useState(false);
   /** Soft status for wake/reconnect — not a hard failure. */
@@ -142,6 +150,7 @@ export function useTeamSync({
   const onPlayersChangeRef = useRef(onPlayersChange);
   const onSessionSupersededRef = useRef(onSessionSuperseded);
   const onResyncedRef = useRef(onResynced);
+  const onStartOverlayRef = useRef(onStartOverlay);
 
   onTeamStatusChangeRef.current = onTeamStatusChange;
   onGameStateChangeRef.current = onGameStateChange;
@@ -149,6 +158,7 @@ export function useTeamSync({
   onPlayersChangeRef.current = onPlayersChange;
   onSessionSupersededRef.current = onSessionSuperseded;
   onResyncedRef.current = onResynced;
+  onStartOverlayRef.current = onStartOverlay;
 
   useEffect(() => {
     if (!enabled) return;
@@ -256,6 +266,14 @@ export function useTeamSync({
         })
         .on("broadcast", { event: "grid" }, (msg) => {
           const payload = (msg.payload ?? {}) as TeamBroadcastPayload;
+          if (payload.type === "game_starting") {
+            onStartOverlayRef.current?.("show");
+            return;
+          }
+          if (payload.type === "start_aborted") {
+            onStartOverlayRef.current?.("hide");
+            return;
+          }
           if (payload.type === "game_started" || payload.type === "game_finished") {
             onSyncEventRef.current?.({
               id: "broadcast",
