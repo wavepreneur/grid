@@ -19,6 +19,8 @@ import {
 import {
   clearMissionStarting,
   isMissionStarting,
+  missionStartBegunAt,
+  missionStartProgress,
 } from "@/lib/grid/mission-start-signal";
 import { savePlayerSession } from "@/lib/grid/player-session";
 import { teamEntryPath } from "@/lib/grid/team-routes";
@@ -65,7 +67,9 @@ export function GameGate({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [progress, setProgress] = useState(6);
+  const [progress, setProgress] = useState(() =>
+    typeof window === "undefined" ? 8 : missionStartProgress(inviteCode, joinCode),
+  );
   const [session, setSession] = useState<PlayerSession | null>(null);
   const [eventContent, setEventContent] = useState<ResolvedEventContent | null>(null);
   const [contentRevision, setContentRevision] = useState(1);
@@ -80,14 +84,14 @@ export function GameGate({
 
   useEffect(() => {
     if (ready) return;
-    const started = Date.now();
+    const started = missionStartBegunAt(inviteCode, joinCode) ?? Date.now();
     const id = window.setInterval(() => {
       const elapsed = Date.now() - started;
       const creep = Math.min(82, 8 + (elapsed / 3500) * 74);
       setProgress((current) => Math.max(current, creep));
     }, 80);
     return () => window.clearInterval(id);
-  }, [ready]);
+  }, [ready, inviteCode, joinCode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -151,7 +155,7 @@ export function GameGate({
         savePlayerSession(syncedSession);
       }
 
-      clearMissionStarting(inviteCode, joinCode);
+      // Keep the start timestamp until the gate is ready so the bar does not reset.
       bump(62);
 
       const gameResult = await waitForContentReady({
@@ -175,6 +179,7 @@ export function GameGate({
       setProgress(100);
       await new Promise((resolve) => window.setTimeout(resolve, 280));
       if (cancelled) return;
+      clearMissionStarting(inviteCode, joinCode);
       setReady(true);
     }
 

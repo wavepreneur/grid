@@ -12,6 +12,7 @@ import {
   verifyTeamSession,
 } from "@/app/actions/lobby";
 import { LobbyBusyOverlay } from "@/components/lobby/lobby-busy-overlay";
+import { GameGateSkeleton } from "@/components/game/game-gate-skeleton";
 import {
   CopyInviteLink,
   QrInviteImage,
@@ -44,6 +45,7 @@ import { nextLeadSeq, noteLeadSeq, parseLeadSeq } from "@/lib/grid/lead-seq";
 import {
   clearMissionStarting,
   markMissionStarting,
+  missionStartProgress,
 } from "@/lib/grid/mission-start-signal";
 import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
@@ -97,9 +99,12 @@ export function LobbyRoom({
     formatCountdown(initialSnapshot.lobby_auto_start_at),
   );
   const [isPending, startTransition] = useTransition();
-  const [busy, setBusy] = useState<{ title: string; subtitle?: string } | null>(
-    null,
-  );
+  const [busy, setBusy] = useState<{
+    title: string;
+    subtitle?: string;
+    variant?: "start";
+  } | null>(null);
+  const [startProgress, setStartProgress] = useState(8);
   const holdCaptainIdRef = useRef<string | null>(null);
   const holdSeqRef = useRef(0);
   const startInFlightRef = useRef(false);
@@ -154,14 +159,22 @@ export function LobbyRoom({
   const goToPlay = useCallback(() => {
     if (manageMode) return;
     markMissionStarting(inviteCode, joinCode);
-    setBusy((current) =>
-      current ?? {
-        title: "Mission startet…",
-        subtitle: "Gleich geht’s weiter — Mission wird geladen.",
-      },
-    );
+    setBusy({
+      title: "Alle Geräte laden…",
+      subtitle: "Die Mission startet gemeinsam — niemand legt allein los.",
+      variant: "start",
+    });
     router.replace(eventPlayPath(inviteCode, joinCode));
   }, [inviteCode, joinCode, manageMode, router]);
+
+  useEffect(() => {
+    if (busy?.variant !== "start") return;
+    setStartProgress(missionStartProgress(inviteCode, joinCode));
+    const id = window.setInterval(() => {
+      setStartProgress(missionStartProgress(inviteCode, joinCode));
+    }, 80);
+    return () => window.clearInterval(id);
+  }, [busy?.variant, inviteCode, joinCode]);
 
   const refreshLobby = useCallback(async () => {
     const result = await getLobbySnapshot({
@@ -313,15 +326,9 @@ export function LobbyRoom({
     if (startInFlightRef.current) return;
     startInFlightRef.current = true;
     setError(null);
-    markMissionStarting(inviteCode, joinCode);
-    setBusy({
-      title: "Mission startet…",
-      subtitle: "Alle Geräte springen jetzt in die Mission.",
-    });
 
     const startedAt = new Date().toISOString();
-    const sent = broadcast({ type: "game_started", started_at: startedAt });
-
+    void broadcast({ type: "game_started", started_at: startedAt });
     void startGameManually({
       inviteCode,
       joinCode,
@@ -340,13 +347,7 @@ export function LobbyRoom({
       }
     });
 
-    void Promise.race([
-      sent,
-      new Promise((resolve) => window.setTimeout(resolve, 120)),
-    ]).then(() => {
-      if (!startInFlightRef.current || manageMode) return;
-      goToPlay();
-    });
+    goToPlay();
   }
 
   function handleHandover() {
@@ -497,7 +498,17 @@ export function LobbyRoom({
 
   return (
     <div className="flex flex-col gap-5">
-      {busy ? <LobbyBusyOverlay title={busy.title} subtitle={busy.subtitle} /> : null}
+      {busy?.variant === "start" ? (
+        <div className="fixed inset-0 z-[200] bg-[var(--cg-bg,#f7f4ee)]">
+          <GameGateSkeleton
+            title="Alle Geräte laden…"
+            subtitle="Die Mission startet gemeinsam — niemand legt allein los."
+            progress={startProgress}
+          />
+        </div>
+      ) : busy ? (
+        <LobbyBusyOverlay title={busy.title} subtitle={busy.subtitle} />
+      ) : null}
       <PlayDocSheet
         open={briefingOpen}
         title="Kurzinformationen"
@@ -679,11 +690,7 @@ export function LobbyRoom({
               disabled={Boolean(busy) || isPending || !canStart}
               onClick={handleStartGame}
             >
-              {busy?.title.startsWith("Mission")
-                ? "Startet…"
-                : aloneNow
-                  ? "Spiel starten"
-                  : "Spiel starten"}
+              {busy?.variant === "start" ? "Startet…" : aloneNow ? "Spiel starten" : "Spiel starten"}
             </GridButton>
           ) : null}
 
