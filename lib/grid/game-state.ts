@@ -198,6 +198,23 @@ export type TeamRealtimeState = {
   isNavigator?: boolean;
 };
 
+/** Keep the device on the newest team snapshot — never roll back a missed Realtime tick. */
+export function pickNewerTeamState(
+  current: TeamRealtimeState,
+  incoming: TeamRealtimeState,
+): TeamRealtimeState {
+  const currentVersion = current.gameState.version ?? 0;
+  const incomingVersion = incoming.gameState.version ?? 0;
+  if (incomingVersion < currentVersion) return current;
+  if (
+    incomingVersion === currentVersion &&
+    incoming.currentLevel < current.currentLevel
+  ) {
+    return current;
+  }
+  return incoming;
+}
+
 export function createInitialGameState(
   totalLevels = EXITMANIA_TOTAL_LEVELS,
 ): TeamGameState {

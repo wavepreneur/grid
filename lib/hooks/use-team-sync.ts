@@ -322,12 +322,19 @@ export function useTeamSync({
 
           // Incomplete Realtime payloads must not become a fresh level-1 stub.
           const rawState = row.game_state;
+          const rawVersion =
+            rawState && typeof rawState === "object" && !Array.isArray(rawState)
+              ? (rawState as { version?: unknown }).version
+              : undefined;
           if (
             !rawState ||
             typeof rawState !== "object" ||
             Array.isArray(rawState) ||
-            !("levels" in rawState)
+            !("levels" in rawState) ||
+            typeof row.current_level !== "number" ||
+            typeof rawVersion !== "number"
           ) {
+            onResyncedRef.current?.();
             return;
           }
 

@@ -43,7 +43,7 @@ import { displayRoleLabel, bonusAudienceHeadline, DEFAULT_ROLE_LABELS } from "@/
 import { findForeignActiveBonuses } from "@/lib/grid/bonus-queue";
 import { useBonusQueueTick } from "@/lib/hooks/use-bonus-queue-tick";
 import { clearWalkedDistanceStorage } from "@/lib/hooks/use-walked-distance";
-import type { TeamGameState, TeamRealtimeState } from "@/lib/grid/game-state";
+import { pickNewerTeamState, type TeamGameState, type TeamRealtimeState } from "@/lib/grid/game-state";
 import type {
   ResolvedEventContent,
   SolveLevelPayload,
@@ -141,8 +141,9 @@ export function GameRoom({
 
   const handleStateUpdate = useCallback((gameState: TeamGameState, currentLevel: number) => {
     setTeamState((current) => {
-      const next = { ...current, gameState, currentLevel };
-      cacheTeamState(next);
+      const incoming: TeamRealtimeState = { ...current, gameState, currentLevel };
+      const next = pickNewerTeamState(current, incoming);
+      if (next !== current) cacheTeamState(next);
       return next;
     });
   }, []);
@@ -155,17 +156,24 @@ export function GameRoom({
     });
   }, []);
 
+  const resyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleResynced = useCallback(() => {
-    // Background pull — must not touch solve isPending (desktop reconnect spam).
-    void getGameState({
-      inviteCode,
-      joinCode,
-      sessionId: session.sessionId,
-    }).then((result) => {
-      if (!result.success) return;
-      setTeamState(result.data);
-      cacheTeamState(result.data);
-    });
+    if (resyncTimerRef.current) return;
+    resyncTimerRef.current = setTimeout(() => {
+      resyncTimerRef.current = null;
+      void getGameState({
+        inviteCode,
+        joinCode,
+        sessionId: session.sessionId,
+      }).then((result) => {
+        if (!result.success || !result.data) return;
+        setTeamState((current) => {
+          const next = pickNewerTeamState(current, result.data!);
+          if (next !== current) cacheTeamState(next);
+          return next;
+        });
+      });
+    }, 250);
   }, [inviteCode, joinCode, session.sessionId]);
 
   const { isConnected, statusHint: realtimeHint, error: realtimeError, broadcast } = useTeamSync({
@@ -208,6 +216,22 @@ export function GameRoom({
     onResynced: handleResynced,
   });
 
+  useEffect(() => {
+    return () => {
+      if (resyncTimerRef.current) clearTimeout(resyncTimerRef.current);
+    };
+  }, []);
+
+  // Phones can stay "SUBSCRIBED" while missing postgres_changes — pull the live row.
+  useEffect(() => {
+    if (sessionSuperseded || teamState.status === "finished") return;
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      handleResynced();
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [handleResynced, sessionSuperseded, teamState.status]);
+
   const activeLevel = Number(teamState.currentLevel) || 1;
   const levelState = teamState.gameState.levels[String(activeLevel)];
   const levelStartedAt = levelState?.started_at ?? null;
@@ -225,8 +249,11 @@ export function GameRoom({
     // One tracker device (Alpha/GPS lead) — avoids split meter counters across phones.
     trackMeters: session.canUnlockGps,
     onState: (state) => {
-      setTeamState(state);
-      cacheTeamState(state);
+      setTeamState((current) => {
+        const next = pickNewerTeamState(current, state);
+        if (next !== current) cacheTeamState(next);
+        return next;
+      });
     },
   });
 
