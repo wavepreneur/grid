@@ -276,6 +276,7 @@ export function LobbyRoom({
     // Keep sync alive until we leave the lobby route — disabling on status flip
     // used to drop the "playing" redirect when only the poll noticed the start.
     enabled: !sessionSuperseded,
+    surface: "lobby",
     onTeamStatusChange: handleTeamStatusChange,
     onPlayersChange: handlePlayersChange,
     onSyncEvent: (event) => {

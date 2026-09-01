@@ -33,28 +33,31 @@ type GameGateProps = {
   eventTitle?: string;
 };
 
-async function waitForContentReady(input: {
-  inviteCode: string;
-  joinCode: string;
-  sessionId: string;
-}) {
-  const first = await getGameState(input);
-  if (first.success && first.data.gameState.content_ready !== false) {
-    return first;
-  }
+function isPlayReady(result: Awaited<ReturnType<typeof getGameState>>): boolean {
+  return (
+    result.success &&
+    (result.data.status === "playing" || result.data.status === "finished") &&
+    result.data.gameState.content_ready !== false
+  );
+}
 
+/** Do not open GameRoom while the team is still "lobby" — OK would fail. */
+async function waitForPlayReady(
+  input: {
+    inviteCode: string;
+    joinCode: string;
+    sessionId: string;
+  },
+  isCancelled: () => boolean,
+) {
   void prepareTeamGame(input);
 
-  const deadline = Date.now() + 8_000;
-  while (Date.now() < deadline) {
+  let last = await getGameState(input);
+  while (!isCancelled() && !isPlayReady(last)) {
     await new Promise((resolve) => window.setTimeout(resolve, 200));
-    const gameResult = await getGameState(input);
-    if (gameResult.success && gameResult.data.gameState.content_ready !== false) {
-      return gameResult;
-    }
+    last = await getGameState(input);
   }
-
-  return getGameState(input);
+  return last;
 }
 
 export function GameGate({
@@ -144,25 +147,16 @@ export function GameGate({
         });
       }
 
-      bump(48);
-
-      let syncedSession = resolved.session;
-
-      // Play route is sticky: never bounce back to the lobby because the DB
-      // row is still "lobby" or the start flag was cleared. That ping-pong
-      // left phones in the waiting room while desktop was already in-game.
-      if (syncedSession.teamStatus === "lobby" || syncedSession.teamStatus === "setup") {
-        syncedSession = { ...syncedSession, teamStatus: "playing" };
-        savePlayerSession(syncedSession);
-      }
-
       bump(62);
 
-      const gameResult = await waitForContentReady({
-        inviteCode,
-        joinCode,
-        sessionId: syncedSession.sessionId,
-      });
+      const gameResult = await waitForPlayReady(
+        {
+          inviteCode,
+          joinCode,
+          sessionId: resolved.session.sessionId,
+        },
+        () => cancelled,
+      );
 
       if (cancelled) return;
 
@@ -170,6 +164,14 @@ export function GameGate({
         setError(gameResult.error);
         return;
       }
+
+      if (!isPlayReady(gameResult)) return;
+
+      const syncedSession = {
+        ...resolved.session,
+        teamStatus: gameResult.data.status as PlayerSession["teamStatus"],
+      };
+      savePlayerSession(syncedSession);
 
       bump(100);
       setSession(syncedSession);

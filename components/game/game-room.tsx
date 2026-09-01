@@ -168,6 +168,7 @@ export function GameRoom({
     teamId: session.teamId,
     playerId: session.playerId,
     enabled: !sessionSuperseded,
+    surface: "play",
     onGameStateChange: handleStateUpdate,
     onTeamStatusChange: handleTeamStatusChange,
     onSessionSuperseded: () => setSessionSuperseded(true),
@@ -184,17 +185,20 @@ export function GameRoom({
       });
     },
     onSyncEvent: (event) => {
-      if (event.event_type !== "captain_transferred") return;
-      const newCaptainId = String(event.payload.new_captain_id ?? "");
-      if (!newCaptainId) return;
-      const seq = parseLeadSeq(event.payload.seq);
-      if (!seq) {
-        if (holdCaptainIdRef.current) return;
-        if (!applyHeldLead(newCaptainId, nextLeadSeq())) return;
-      } else if (!applyHeldLead(newCaptainId, seq)) {
+      if (event.event_type === "captain_transferred") {
+        const newCaptainId = String(event.payload.new_captain_id ?? "");
+        if (!newCaptainId) return;
+        const seq = parseLeadSeq(event.payload.seq);
+        if (!seq) {
+          if (holdCaptainIdRef.current) return;
+          if (!applyHeldLead(newCaptainId, nextLeadSeq())) return;
+        } else if (!applyHeldLead(newCaptainId, seq)) {
+          return;
+        }
+        applyLeadToUi(newCaptainId);
         return;
       }
-      applyLeadToUi(newCaptainId);
+      handleResynced();
     },
     onResynced: handleResynced,
   });
@@ -318,12 +322,26 @@ export function GameRoom({
         payload,
       });
       if (!result.success) {
+        const answerRejected = /Falsche Antwort|Bitte eine Antwort|Bitte alle richtigen|Nicht alle richtigen/i.test(
+          result.error,
+        );
         setSolveFeedback({
           id: Date.now(),
           kind: "wrong",
           message: result.error,
-          attemptedAnswer,
+          attemptedAnswer: answerRejected ? attemptedAnswer : null,
         });
+        if (!answerRejected) {
+          void getGameState({
+            inviteCode,
+            joinCode,
+            sessionId: session.sessionId,
+          }).then((fresh) => {
+            if (!fresh.success) return;
+            setTeamState(fresh.data);
+            cacheTeamState(fresh.data);
+          });
+        }
         return;
       }
       const hasSuccessNote = Boolean(result.data?.gameState.modal?.body?.trim());

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type RealtimeChannel, type SupabaseClient } from "@supabase/supabase-js";
 import { getRealtimeAccessToken } from "@/app/actions/realtime";
-import { cacheTeamState, loadCachedTeamState } from "@/lib/grid/offline-state";
+import { cacheTeamState } from "@/lib/grid/offline-state";
 import {
   parseTeamGameState,
   type TeamGameState,
@@ -24,6 +24,11 @@ type UseTeamSyncOptions = {
   onSessionSuperseded?: () => void;
   /** Fired after Realtime is SUBSCRIBED again (e.g. after phone wake) — pull fresh state. */
   onResynced?: () => void;
+  /**
+   * lobby: status + start/lead only (do not parse game_state).
+   * play: live solves. Default play so a missing flag cannot mute in-game sync.
+   */
+  surface?: "lobby" | "play";
 };
 
 export type TeamBroadcastPayload = {
@@ -115,6 +120,7 @@ export function useTeamSync({
   teamId,
   playerId,
   enabled = true,
+  surface = "play",
   onTeamStatusChange,
   onGameStateChange,
   onSyncEvent,
@@ -235,12 +241,6 @@ export function useTeamSync({
 
       clientRef.current = supabase;
 
-      const cached = loadCachedTeamState(teamId);
-      if (cached) {
-        onGameStateChangeRef.current?.(cached.gameState, cached.currentLevel);
-        onTeamStatusChangeRef.current?.(cached.status);
-      }
-
       const reloadPlayersSoon = () => {
         if (playerReloadTimer) clearTimeout(playerReloadTimer);
         playerReloadTimer = setTimeout(() => {
@@ -300,13 +300,20 @@ export function useTeamSync({
         (payload) => {
           const row = payload.new as TeamRow;
           onTeamStatusChangeRef.current?.(row.status);
-          // Lobby has no game-state listener and is leaving on start — skip the
-          // heavy JSON. GameRoom MUST keep applying playing updates or solves
-          // never reach the other devices.
-          if (!onGameStateChangeRef.current) {
+          if (surface === "lobby") return;
+
+          // Incomplete Realtime payloads must not become a fresh level-1 stub.
+          const rawState = row.game_state;
+          if (
+            !rawState ||
+            typeof rawState !== "object" ||
+            Array.isArray(rawState) ||
+            !("levels" in rawState)
+          ) {
             return;
           }
-          const gameState = parseTeamGameState(row.game_state);
+
+          const gameState = parseTeamGameState(rawState);
           const nextState = {
             teamId: row.id,
             status: row.status,
@@ -314,7 +321,6 @@ export function useTeamSync({
             gameState,
             startedAt: row.started_at,
             lobbyAutoStartAt: row.lobby_auto_start_at,
-            isCaptain: cached?.isCaptain,
           };
 
           cacheTeamState(nextState);
@@ -427,7 +433,7 @@ export function useTeamSync({
       void teardown();
       setIsConnected(false);
     };
-  }, [enabled, playerId, sessionId, teamId]);
+  }, [enabled, playerId, sessionId, surface, teamId]);
 
   const broadcast = useCallback((payload: TeamBroadcastPayload) => {
     const channel = channelRef.current;
