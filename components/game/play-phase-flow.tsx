@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ExitmaniaLevelView } from "@/components/game/exitmania-level-view";
 import { CityStatusHud } from "@/components/game/city/status-hud";
 import { CityTeamBar } from "@/components/game/city/team-bar";
+import { BonusSpectatorView } from "@/components/game/bonus-spectator-view";
 import { PlayBonusView } from "@/components/game/play-bonus-view";
 import { PlayHubView, type OutdoorArriveInput } from "@/components/game/play-hub-view";
 import {
@@ -15,7 +16,10 @@ import {
 import { PlayQuizView } from "@/components/game/play-quiz-view";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
 import { canPresentBonus, resolveBonusForPlay } from "@/lib/grid/bonus";
-import { findPresentableBonusForRole } from "@/lib/grid/bonus-queue";
+import {
+  findForeignActiveBonuses,
+  findPresentableBonusForRole,
+} from "@/lib/grid/bonus-queue";
 import type { PurchasedTileHint, TeamGameState } from "@/lib/grid/game-state";
 import type {
   LevelDefinition,
@@ -30,7 +34,12 @@ import {
 } from "@/lib/grid/role-labels";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 
-type Teammate = { id: string; name: string; roleLabel: string };
+type Teammate = {
+  id: string;
+  name: string;
+  roleLabel: string;
+  role?: string;
+};
 
 type Props = {
   eventContent: ResolvedEventContent;
@@ -83,6 +92,8 @@ type Props = {
   onSolveLevel: (payload: SolveLevelPayload) => void;
   onPurchaseHint: (tileId: string) => void;
   onSubmitBonus: (selectedOptionId: string) => void;
+  onBeginBonus: (bonusId: string) => void;
+  onContinueBonus: (bonusId: string) => void;
   onSkipBonus: () => void;
 };
 
@@ -145,6 +156,8 @@ export function PlayPhaseFlow({
   onSolveLevel,
   onPurchaseHint,
   onSubmitBonus,
+  onBeginBonus,
+  onContinueBonus,
   onSkipBonus,
 }: Props) {
   const mode = eventContent.contentMode;
@@ -263,12 +276,14 @@ export function PlayPhaseFlow({
       bonus &&
       (presentBonusMeta.for_team || canPresentBonus(bonus, myRole, { claimUnassigned }))
     ) {
+      const bonusId = presentBonusMeta.bonus_id ?? `legacy-${presentBonusMeta.from_level}`;
       return (
         <>
           {sheets}
           <PlayBonusView
-            key={presentBonusMeta.bonus_id}
+            key={bonusId}
             bonus={bonus}
+            bonusId={bonusId}
             mode={mode}
             isMine
             myName={myName}
@@ -278,12 +293,42 @@ export function PlayPhaseFlow({
             asymmetricOverlay={!presentBonusMeta.for_team}
             disabled={disabled}
             isPending={isPending}
+            teamSession={gameState.bonus_sessions?.[bonusId] ?? null}
+            onBegin={() => onBeginBonus(bonusId)}
             onSubmit={onSubmitBonus}
+            onContinue={() => onContinueBonus(bonusId)}
             onSkipWaiting={onSkipBonus}
           />
         </>
       );
     }
+  }
+
+  const foreignBonuses = findForeignActiveBonuses(gameState, myRole, { claimUnassigned });
+  if (foreignBonuses.length > 0) {
+    return (
+      <>
+        {sheets}
+        <BonusSpectatorView
+          items={foreignBonuses.map((item) => ({
+            bonusId: item.bonus_id,
+            solverName:
+              gameState.bonus_sessions?.[item.bonus_id]?.solver_name ||
+              roster?.find((p) => p.role === item.for_role)?.name ||
+              bonusAudienceHeadline(
+                { for_role: item.for_role, for_team: false },
+                roleLabels,
+              ),
+            reveal: gameState.bonus_sessions?.[item.bonus_id]?.reveal ?? null,
+          }))}
+          teamName={teamName}
+          myName={myName}
+          myRoleLabel={myRoleLabel}
+          isPending={isPending}
+          onContinue={onContinueBonus}
+        />
+      </>
+    );
   }
 
   if (phase === "bonus" && level) {
@@ -299,13 +344,15 @@ export function PlayPhaseFlow({
     );
     if (bonus && activeItem) {
       const mine = canPresentBonus(bonus, myRole, { claimUnassigned });
+      const bonusId = activeItem.bonus_id;
       return (
         <>
           {chrome}
           {sheets}
           <PlayBonusView
-            key={activeItem.bonus_id}
+            key={bonusId}
             bonus={bonus}
+            bonusId={bonusId}
             mode={mode}
             isMine={mine}
             myName={myName}
@@ -314,7 +361,10 @@ export function PlayPhaseFlow({
             roleLabels={roleLabels}
             disabled={disabled}
             isPending={isPending}
+            teamSession={gameState.bonus_sessions?.[bonusId] ?? null}
+            onBegin={() => onBeginBonus(bonusId)}
             onSubmit={onSubmitBonus}
+            onContinue={() => onContinueBonus(bonusId)}
             onSkipWaiting={onSkipBonus}
           />
         </>

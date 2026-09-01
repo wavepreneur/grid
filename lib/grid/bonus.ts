@@ -189,6 +189,18 @@ export function isBonusAnswerCorrect(bonus: BonusTask, submission: string): bool
   return correctIds.includes(submission);
 }
 
+/** What the team sees as the submitted attempt (choice label or typed text). */
+export function formatBonusAttemptLabel(bonus: BonusTask, submission: string): string | null {
+  const mode =
+    bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
+  if (mode === "choice" || mode === "confirm") {
+    const label = bonus.options.find((opt) => opt.id === submission)?.label?.trim();
+    return label || submission || null;
+  }
+  const typed = submission.trim();
+  return typed || null;
+}
+
 /** Human-readable solution for post-answer reveal on bonus tasks. */
 export function formatBonusSolution(bonus: BonusTask): string | null {
   const mode =

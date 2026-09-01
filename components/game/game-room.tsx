@@ -9,6 +9,8 @@ import {
   getGameState,
   purchaseHint,
   skipBonusPhase,
+  beginBonusPresentation,
+  advanceBonusAfterReveal,
   solveCurrentLevel,
   submitArrivalQuiz,
   advanceQuizToLevel,
@@ -507,6 +509,30 @@ export function GameRoom({
     });
   }
 
+  function handleBeginBonus(bonusId: string) {
+    setError(null);
+    void beginBonusPresentation({
+      inviteCode,
+      joinCode,
+      sessionId: session.sessionId,
+      bonusId,
+    }).then(applyTeamResult);
+  }
+
+  function handleContinueBonus(bonusId: string) {
+    setError(null);
+    startSolveTransition(async () => {
+      applyTeamResult(
+        await advanceBonusAfterReveal({
+          inviteCode,
+          joinCode,
+          sessionId: session.sessionId,
+          bonusId,
+        }),
+      );
+    });
+  }
+
   function handleSkipBonus() {
     setError(null);
     startSolveTransition(async () => {
@@ -731,33 +757,43 @@ export function GameRoom({
         isAlpha={isAlpha}
         teammates={lobbyPlayers
           .filter((p) => p.id !== session.playerId)
-          .map((p) => ({
-            id: p.id,
-            name: p.display_name,
-            roleLabel: displayRoleLabel(
+          .map((p) => {
+            const role =
               p.archetype_role ??
-                (p.is_alpha || p.is_captain
-                  ? "alpha"
-                  : p.is_beta
-                    ? "beta"
-                    : "gamma"),
-              eventContent.roleLabels ?? DEFAULT_ROLE_LABELS,
-            ),
-          }))}
-        roster={lobbyPlayers.map((p) => ({
-          id: p.id,
-          name: p.display_name,
-          roleLabel: displayRoleLabel(
-            p.archetype_role ??
               (p.is_alpha || p.is_captain
                 ? "alpha"
                 : p.is_beta
                   ? "beta"
-                  : "gamma"),
-            eventContent.roleLabels ?? DEFAULT_ROLE_LABELS,
-          ),
-          isMe: p.id === session.playerId,
-        }))}
+                  : "gamma");
+            return {
+              id: p.id,
+              name: p.display_name,
+              role,
+              roleLabel: displayRoleLabel(
+                role,
+                eventContent.roleLabels ?? DEFAULT_ROLE_LABELS,
+              ),
+            };
+          })}
+        roster={lobbyPlayers.map((p) => {
+          const role =
+            p.archetype_role ??
+            (p.is_alpha || p.is_captain
+              ? "alpha"
+              : p.is_beta
+                ? "beta"
+                : "gamma");
+          return {
+            id: p.id,
+            name: p.display_name,
+            role,
+            roleLabel: displayRoleLabel(
+              role,
+              eventContent.roleLabels ?? DEFAULT_ROLE_LABELS,
+            ),
+            isMe: p.id === session.playerId,
+          };
+        })}
         inviteCode={inviteCode}
         joinCode={joinCode}
         sessionId={session.sessionId}
@@ -778,6 +814,8 @@ export function GameRoom({
         onSolveLevel={handleSolveLevel}
         onPurchaseHint={handlePurchaseHint}
         onSubmitBonus={handleSubmitBonus}
+        onBeginBonus={handleBeginBonus}
+        onContinueBonus={handleContinueBonus}
         onSkipBonus={handleSkipBonus}
       />
     ) : usesMissionShell(eventContent) ? (

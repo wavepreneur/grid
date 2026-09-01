@@ -12,6 +12,10 @@ import {
   createInitialGameState,
   parseTeamGameState,
   activateLevelEntry,
+  bonusSessionId,
+  clearBonusSession,
+  ensureBonusSession,
+  patchBonusSession,
   type TeamGameState,
   type TeamRealtimeState,
 } from "@/lib/grid/game-state";
@@ -52,10 +56,10 @@ import {
 } from "@/lib/grid/outdoor-unlock";
 import {
   canPresentBonus,
+  formatBonusAttemptLabel,
   isBonusAnswerCorrect,
   resolveBonusDefinitions,
   resolveBonusForPlay,
-  resolveBonusTask,
 } from "@/lib/grid/bonus";
 import {
   markBonusActive,
@@ -69,10 +73,10 @@ function buildRealtimeState(
   team: {
     id: string;
     status: string;
-    current_level: number;
+    current_level: number | null;
     game_state: unknown;
     started_at: string | null;
-    lobby_auto_start_at: string | null;
+    lobby_auto_start_at?: string | null;
     navigator_player_id?: string | null;
   },
   player: { id: string; is_captain: boolean },
@@ -80,10 +84,10 @@ function buildRealtimeState(
   return {
     teamId: team.id,
     status: team.status,
-    currentLevel: team.current_level,
+    currentLevel: team.current_level ?? 1,
     gameState: parseTeamGameState(team.game_state),
     startedAt: team.started_at,
-    lobbyAutoStartAt: team.lobby_auto_start_at,
+    lobbyAutoStartAt: team.lobby_auto_start_at ?? null,
     isCaptain: player.is_captain,
     isNavigator: team.navigator_player_id === player.id,
   };
@@ -493,6 +497,14 @@ export async function solveCurrentLevel(input: {
       (item) => typeof item.meters_required === "number" && item.meters_required > 0,
     );
 
+    const mergedQueue = mergeBonusQueue(gameState.bonus_queue, bonusQueue);
+    let bonusSessions = { ...(gameState.bonus_sessions ?? {}) };
+    for (const item of mergedQueue) {
+      if (item.status === "active") {
+        bonusSessions = ensureBonusSession(bonusSessions, item.bonus_id);
+      }
+    }
+
     const nextGameState: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
@@ -502,7 +514,8 @@ export async function solveCurrentLevel(input: {
       pending_next_level: pendingNext,
       quiz_reveal: null,
       active_bonus: activeBonus,
-      bonus_queue: mergeBonusQueue(gameState.bonus_queue, bonusQueue),
+      bonus_queue: mergedQueue,
+      bonus_sessions: bonusSessions,
       bonus_notice: null,
       outdoor_progress: {
         level: isFinished ? currentLevel : nextLevel,
@@ -817,6 +830,13 @@ export async function dismissSyncModal(input: {
       }
     }
 
+    let bonusSessions = { ...(gameState.bonus_sessions ?? {}) };
+    for (const item of queue) {
+      if (item.status === "active") {
+        bonusSessions = ensureBonusSession(bonusSessions, item.bonus_id);
+      }
+    }
+
     const nextGameState: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
@@ -826,6 +846,7 @@ export async function dismissSyncModal(input: {
       active_bonus: activeBonus,
       pending_next_level: pendingNext,
       bonus_queue: queue,
+      bonus_sessions: bonusSessions,
     };
 
     const supabase = createAdminClient();
@@ -1036,6 +1057,65 @@ async function persistPhaseState(input: {
   }
 
   return { success: true, data: buildRealtimeState(updatedTeam, input.player) };
+}
+
+function normalizePlayRole(
+  role: string | null | undefined,
+): "alpha" | "beta" | "gamma" {
+  if (role === "captain" || role === "navigator" || role === "alpha") return "alpha";
+  if (role === "beta") return "beta";
+  return "gamma";
+}
+
+/** First-writer wins on bonus intro/reveal (JSON version must still match). */
+async function persistPlayingGameState(input: {
+  teamId: string;
+  player: { id: string; is_captain: boolean };
+  gameState: TeamGameState;
+  expectedVersion: number;
+  patch?: {
+    current_level?: number;
+    status?: string;
+    finished_at?: string | null;
+  };
+}): Promise<ActionResult<TeamRealtimeState>> {
+  const supabase = createAdminClient();
+  const update: Record<string, unknown> = { game_state: input.gameState };
+  if (input.patch?.current_level != null) update.current_level = input.patch.current_level;
+  if (input.patch?.status) update.status = input.patch.status;
+  if (input.patch && "finished_at" in input.patch) {
+    update.finished_at = input.patch.finished_at;
+  }
+
+  const { data, error } = await supabase
+    .from("teams")
+    .update(update)
+    .eq("id", input.teamId)
+    .eq("status", "playing")
+    .filter("game_state->>version", "eq", String(input.expectedVersion))
+    .select(
+      "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
+    )
+    .maybeSingle();
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+  if (data) {
+    return { success: true, data: buildRealtimeState(data, input.player) };
+  }
+
+  const { data: latest } = await supabase
+    .from("teams")
+    .select(
+      "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
+    )
+    .eq("id", input.teamId)
+    .single();
+  if (!latest) {
+    return { success: false, error: "Team nicht gefunden." };
+  }
+  return { success: true, data: buildRealtimeState(latest, input.player) };
 }
 
 /**
@@ -1521,6 +1601,161 @@ export async function advanceQuizToLevel(input: {
   }
 }
 
+async function finishRevealedBonus(input: {
+  event: {
+    id: string;
+    organization_id: string;
+    city_id: string | null;
+    content_config: unknown;
+    route_override: unknown;
+    studio_game_version_id?: string | null;
+  };
+  team: {
+    id: string;
+    status: string;
+    current_level: number | null;
+    game_state: unknown;
+    started_at: string | null;
+  };
+  player: {
+    id: string;
+    display_name: string;
+    role: string | null;
+    is_captain: boolean;
+  };
+  gameState: TeamGameState;
+  bonusId?: string;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  const { event, team, player, gameState } = input;
+  const sessions = gameState.bonus_sessions ?? {};
+  const bonusId =
+    input.bonusId ??
+    Object.keys(sessions).find((id) => Boolean(sessions[id]?.reveal)) ??
+    null;
+  if (!bonusId) {
+    return { success: false, error: "Bonus noch nicht beantwortet." };
+  }
+  const reveal = sessions[bonusId]?.reveal;
+  if (!reveal) {
+    // Lost the write race — another device already finished.
+    if (!sessions[bonusId] && !(gameState.bonus_queue ?? []).some((item) => item.bonus_id === bonusId && item.status === "active")) {
+      return { success: true, data: buildRealtimeState(team, player) };
+    }
+    return { success: false, error: "Bonus noch nicht beantwortet." };
+  }
+
+  const fromQueue = (gameState.bonus_queue ?? []).find((item) => item.bonus_id === bonusId);
+  if (fromQueue && fromQueue.status !== "active") {
+    return { success: true, data: buildRealtimeState(team, player) };
+  }
+
+  const overlay =
+    gameState.active_bonus && bonusSessionId(gameState.active_bonus) === bonusId
+      ? gameState.active_bonus
+      : null;
+  const active = fromQueue
+    ? {
+        from_level: fromQueue.from_level,
+        for_role: fromQueue.for_role,
+        for_team: fromQueue.for_team,
+        started_at: fromQueue.armed_at,
+        bonus_id: fromQueue.bonus_id,
+      }
+    : overlay;
+
+  if (!active) {
+    return { success: true, data: buildRealtimeState(team, player) };
+  }
+
+  const content = await loadResolvedEventContent({
+    eventId: event.id,
+    organizationId: event.organization_id,
+    cityId: event.city_id,
+    contentConfig: event.content_config,
+    routeOverride: event.route_override,
+    studioGameVersionId: event.studio_game_version_id,
+  });
+
+  const allDoneLevels = Object.values(gameState.levels).every(
+    (entry) => entry.status === "completed",
+  );
+  const noticeId = `bonus-${Date.now()}-${reveal.answered_by_player_id.slice(0, 8)}`;
+  const now = new Date();
+  let nextQueue = markBonusDone(gameState.bonus_queue ?? [], bonusId, now);
+  const stillActive = nextQueue.find((item) => item.status === "active");
+  const nextActive = stillActive
+    ? {
+        from_level: stillActive.from_level,
+        for_role: stillActive.for_role,
+        for_team: stillActive.for_team,
+        started_at: stillActive.armed_at,
+        bonus_id: stillActive.bonus_id,
+      }
+    : null;
+
+  const wasTeamPhase =
+    Boolean(active.for_team) || gameState.current_phase === "bonus";
+  let nextPhase = gameState.current_phase;
+  let pendingNext = gameState.pending_next_level ?? null;
+  let nextLevel = team.current_level || active.from_level;
+  let levels = gameState.levels;
+  let finished = false;
+
+  if (wasTeamPhase && !nextActive) {
+    const pending = gameState.pending_next_level;
+    finished =
+      pending === null ||
+      pending === undefined ||
+      pending > content.levels.length ||
+      allDoneLevels;
+    nextLevel = finished ? active.from_level : (pending ?? active.from_level + 1);
+    const nextSlot = getLevelDefinition(content, nextLevel);
+    nextPhase = finished
+      ? gameState.current_phase
+      : nextSlot && usesPhasedPlay(content)
+        ? initialPhaseForSurface(
+            content.contentMode,
+            buildPlaySlot(nextSlot, content.contentMode),
+            nextSlot,
+          )
+        : "hub";
+    pendingNext = null;
+    if (!finished) {
+      levels = activateLevelEntry(levels, String(nextLevel));
+    }
+  }
+
+  const nextGameState: TeamGameState = {
+    ...gameState,
+    version: gameState.version + 1,
+    current_phase: nextPhase,
+    pending_next_level: pendingNext,
+    active_bonus: nextActive,
+    bonus_queue: nextQueue,
+    bonus_sessions: clearBonusSession(gameState.bonus_sessions, bonusId),
+    bonus_notice: {
+      id: noticeId,
+      by: reveal.answered_by,
+      correct: reveal.correct,
+      reward: reveal.reward,
+      created_at: now.toISOString(),
+    },
+    levels,
+  };
+
+  return persistPlayingGameState({
+    teamId: team.id,
+    player,
+    gameState: nextGameState,
+    expectedVersion: gameState.version,
+    patch: {
+      current_level: wasTeamPhase && !nextActive ? nextLevel : team.current_level ?? undefined,
+      status: finished || allDoneLevels ? "finished" : "playing",
+      finished_at: finished || allDoneLevels ? now.toISOString() : null,
+    },
+  });
+}
+
 async function completeActiveBonus(input: {
   event: {
     id: string;
@@ -1637,6 +1872,76 @@ async function completeActiveBonus(input: {
     reward = correct ? bonus.reward : 0;
   }
 
+  const bonusId = bonusSessionId(active);
+  const existingReveal = gameState.bonus_sessions?.[bonusId]?.reveal ?? null;
+  if (!input.skip) {
+    if (existingReveal) {
+      return { success: true, data: buildRealtimeState(team, player) };
+    }
+
+    const levelState = gameState.levels[String(active.from_level)];
+    const durations = computeAttemptDurations({
+      levelStartedAt: levelState?.started_at,
+      teamStartedAt: team.started_at,
+    });
+    await logPlayAttempt({
+      organizationId: event.organization_id,
+      eventId: event.id,
+      teamId: team.id,
+      playerId: player.id,
+      playerName: player.display_name,
+      playerRole: player.role,
+      level: active.from_level,
+      phase: "bonus",
+      correct,
+      selectedOptionId: input.selectedOptionId ?? null,
+      error: correct ? null : "falsche_antwort",
+      durationMs: durations.durationMs,
+      elapsedMissionMs: durations.elapsedMissionMs,
+      contentMode: content.contentMode,
+      levelTitle: levelDefinition?.title ?? null,
+    });
+
+    const nowIso = new Date().toISOString();
+    const nextRevealState: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      score: gameState.score + reward,
+      bonus_sessions: patchBonusSession(gameState.bonus_sessions, bonusId, {
+        intro_done: true,
+        solver_name: player.display_name,
+        solver_player_id: player.id,
+        reveal: {
+          bonus_id: bonusId,
+          answered_by: player.display_name,
+          answered_by_player_id: player.id,
+          correct,
+          reward,
+          selected_option_id: input.selectedOptionId ?? "",
+          attempt_label: formatBonusAttemptLabel(bonus, input.selectedOptionId ?? ""),
+          revealed_at: nowIso,
+        },
+      }),
+    };
+
+    return persistPlayingGameState({
+      teamId: team.id,
+      player,
+      gameState: nextRevealState,
+      expectedVersion: gameState.version,
+    });
+  }
+
+  if (existingReveal) {
+    return finishRevealedBonus({
+      event,
+      team,
+      player,
+      gameState,
+      bonusId,
+    });
+  }
+
   const allDoneLevels = Object.values(gameState.levels).every(
     (entry) => entry.status === "completed",
   );
@@ -1699,6 +2004,7 @@ async function completeActiveBonus(input: {
     pending_next_level: pendingNext,
     active_bonus: nextActive,
     bonus_queue: nextQueue,
+    bonus_sessions: clearBonusSession(gameState.bonus_sessions, bonusId),
     bonus_notice: {
       id: noticeId,
       by: player.display_name,
@@ -1854,11 +2160,19 @@ export async function activateReadyBonuses(input: {
       };
     }
 
+    let bonusSessions = { ...(gameState.bonus_sessions ?? {}) };
+    for (const item of queue) {
+      if (item.status === "active") {
+        bonusSessions = ensureBonusSession(bonusSessions, item.bonus_id);
+      }
+    }
+
     const nextGameState: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
       bonus_queue: queue,
       active_bonus: activeBonus,
+      bonus_sessions: bonusSessions,
       outdoor_progress: outdoorProgress,
     };
 
@@ -1908,6 +2222,36 @@ async function leaveBonusPhase(input: {
     return { success: false, error: "Keine Bonusphase aktiv." };
   }
 
+  const bonusLevel = team.current_level || 1;
+  const activeQueued = (gameState.bonus_queue ?? []).find(
+    (item) => item.status === "active" && item.from_level === bonusLevel,
+  );
+  const bonusId =
+    activeQueued?.bonus_id ??
+    (gameState.active_bonus ? bonusSessionId(gameState.active_bonus) : `legacy-${bonusLevel}`);
+  const existingReveal = gameState.bonus_sessions?.[bonusId]?.reveal ?? null;
+
+  if (!input.skip) {
+    return completeActiveBonus({
+      event,
+      team,
+      player,
+      gameState,
+      selectedOptionId: input.selectedOptionId,
+      skip: false,
+    });
+  }
+
+  if (existingReveal) {
+    return finishRevealedBonus({
+      event,
+      team,
+      player,
+      gameState,
+      bonusId,
+    });
+  }
+
   const content = await loadResolvedEventContent({
     eventId: event.id,
     organizationId: event.organization_id,
@@ -1916,32 +2260,6 @@ async function leaveBonusPhase(input: {
     routeOverride: event.route_override,
     studioGameVersionId: event.studio_game_version_id,
   });
-
-  const bonusLevel = team.current_level || 1;
-  const levelDefinition = getLevelDefinition(content, bonusLevel);
-  const activeQueued = (gameState.bonus_queue ?? []).find(
-    (item) => item.status === "active" && item.from_level === bonusLevel,
-  );
-  const bonus = resolveBonusForPlay(
-    levelDefinition,
-    activeQueued?.bonus_id,
-    activeQueued?.task_snapshot,
-  ) ?? resolveBonusTask(levelDefinition);
-
-  let reward = 0;
-  let correct = false;
-  if (!input.skip && bonus) {
-    const playerRole = (player.role ?? "gamma") as PlayerRole;
-    const claimUnassigned = (await countActivePlayers(team.id)) <= 1;
-    if (!canPresentBonus(bonus, playerRole, { claimUnassigned })) {
-      return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
-    }
-    if (!input.selectedOptionId?.trim()) {
-      return { success: false, error: "Bitte eine Antwort eingeben." };
-    }
-    correct = isBonusAnswerCorrect(bonus, input.selectedOptionId);
-    reward = correct ? bonus.reward : 0;
-  }
 
   const pending = gameState.pending_next_level;
   const isFinished =
@@ -1966,7 +2284,6 @@ async function leaveBonusPhase(input: {
     levels = activateLevelEntry(levels, String(nextLevel));
   }
 
-  const noticeId = `bonus-${Date.now()}-${player.id.slice(0, 8)}`;
   const now = new Date();
   let queue = gameState.bonus_queue ?? [];
   const activeItem = queue.find(
@@ -1979,47 +2296,31 @@ async function leaveBonusPhase(input: {
   const nextGameState: TeamGameState = {
     ...gameState,
     version: gameState.version + 1,
-    score: gameState.score + reward,
     current_phase: isFinished ? gameState.current_phase : hubPhase,
     pending_next_level: null,
     active_bonus: null,
     bonus_queue: queue,
-    bonus_notice: input.skip
-      ? null
-      : {
-          id: noticeId,
-          by: player.display_name,
-          correct,
-          reward,
-          created_at: new Date().toISOString(),
-        },
+    bonus_sessions: activeItem
+      ? clearBonusSession(gameState.bonus_sessions, activeItem.bonus_id)
+      : gameState.bonus_sessions,
+    bonus_notice: null,
     levels,
   };
 
-  const supabase = createAdminClient();
-  const { data: updatedTeam, error } = await supabase
-    .from("teams")
-    .update({
+  return persistPlayingGameState({
+    teamId: team.id,
+    player,
+    gameState: nextGameState,
+    expectedVersion: gameState.version,
+    patch: {
       current_level: nextLevel,
-      game_state: nextGameState,
       status: isFinished ? "finished" : "playing",
-      finished_at: isFinished ? new Date().toISOString() : null,
-    })
-    .eq("id", team.id)
-    .eq("status", "playing")
-    .select(
-      "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
-    )
-    .single();
-
-  if (error || !updatedTeam) {
-    return { success: false, error: error?.message ?? "Bonus-Update fehlgeschlagen." };
-  }
-
-  return { success: true, data: buildRealtimeState(updatedTeam, player) };
+      finished_at: isFinished ? now.toISOString() : null,
+    },
+  });
 }
 
-/** Submit Layer-3 bonus answer (assigned role only). Wrong answers still continue. */
+/** Submit Layer-3 bonus answer. First submit wins; result stays on every device until continue. */
 export async function submitBonusAnswer(input: {
   inviteCode: string;
   joinCode: string;
@@ -2027,28 +2328,77 @@ export async function submitBonusAnswer(input: {
   selectedOptionId: string;
 }): Promise<ActionResult<TeamRealtimeState>> {
   try {
-    // Allow wrong answers to continue — validate only presence, award if correct
     const { event, team, player } = await assertPlayerSession(input);
     if (team.status !== "playing") {
       return { success: false, error: "Das Spiel läuft noch nicht." };
     }
 
     const gameState = parseTeamGameState(team.game_state);
-
-    // Overlay (role or team) while the rest of the team may already be on the hub.
-    if (gameState.active_bonus) {
-      return completeActiveBonus({
-        event,
-        team,
-        player,
-        gameState,
-        selectedOptionId: input.selectedOptionId,
-        skip: false,
-      });
+    const hasLiveBonus =
+      Boolean(gameState.active_bonus) ||
+      gameState.current_phase === "bonus" ||
+      (gameState.bonus_queue ?? []).some((item) => item.status === "active");
+    if (!hasLiveBonus) {
+      return { success: false, error: "Keine Bonusphase aktiv." };
     }
 
-    if (gameState.current_phase !== "bonus") {
-      return { success: false, error: "Keine Bonusphase aktiv." };
+    return completeActiveBonus({
+      event,
+      team,
+      player,
+      gameState,
+      selectedOptionId: input.selectedOptionId,
+      skip: false,
+    });
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Bonus fehlgeschlagen.",
+    };
+  }
+}
+
+/** One player taps start — the bonus task appears on every assigned device. */
+export async function beginBonusPresentation(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  bonusId?: string;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    const { event, team, player } = await assertPlayerSession(input);
+    if (team.status !== "playing") {
+      return { success: false, error: "Das Spiel läuft noch nicht." };
+    }
+
+    const gameState = parseTeamGameState(team.game_state);
+    const claimUnassigned = (await countActivePlayers(team.id)) <= 1;
+    const normalizedRole = normalizePlayRole(player.role);
+    const fromQueue = (gameState.bonus_queue ?? []).find((item) => {
+      if (item.status !== "active") return false;
+      if (input.bonusId) return item.bonus_id === input.bonusId;
+      return (
+        item.for_team || item.for_role === normalizedRole || claimUnassigned
+      );
+    });
+    const active = fromQueue
+      ? {
+          from_level: fromQueue.from_level,
+          for_role: fromQueue.for_role,
+          for_team: fromQueue.for_team,
+          started_at: fromQueue.armed_at,
+          bonus_id: fromQueue.bonus_id,
+        }
+      : gameState.active_bonus;
+
+    if (!active) {
+      return { success: false, error: "Kein aktiver Bonus." };
+    }
+
+    const bonusId = fromQueue?.bonus_id ?? bonusSessionId(active);
+    const existing = gameState.bonus_sessions?.[bonusId];
+    if (existing?.intro_done || existing?.reveal) {
+      return { success: true, data: buildRealtimeState(team, player) };
     }
 
     const content = await loadResolvedEventContent({
@@ -2059,134 +2409,69 @@ export async function submitBonusAnswer(input: {
       routeOverride: event.route_override,
       studioGameVersionId: event.studio_game_version_id,
     });
-
-    const bonusLevel = team.current_level || 1;
-    const levelDefinition = getLevelDefinition(content, bonusLevel);
-    const activeQueued = (gameState.bonus_queue ?? []).find(
-      (item) => item.status === "active" && item.from_level === bonusLevel,
+    const levelDefinition = getLevelDefinition(content, active.from_level);
+    const bonus = resolveBonusForPlay(
+      levelDefinition,
+      bonusId,
+      fromQueue?.task_snapshot,
     );
-    const bonus =
-      resolveBonusForPlay(
-        levelDefinition,
-        activeQueued?.bonus_id,
-        activeQueued?.task_snapshot,
-      ) ?? resolveBonusTask(levelDefinition);
-    if (!bonus) {
-      return leaveBonusPhase({ ...input, skip: true });
-    }
-
-    const playerRole = (player.role ?? "gamma") as PlayerRole;
-    const claimUnassigned = (await countActivePlayers(team.id)) <= 1;
-    if (!canPresentBonus(bonus, playerRole, { claimUnassigned })) {
+    if (bonus && !canPresentBonus(bonus, player.role as PlayerRole, { claimUnassigned })) {
       return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
-    }
-
-    if (!input.selectedOptionId?.trim()) {
-      return { success: false, error: "Bitte eine Antwort eingeben." };
-    }
-
-    const correct = isBonusAnswerCorrect(bonus, input.selectedOptionId);
-    const reward = correct ? bonus.reward : 0;
-    const levelState = gameState.levels[String(bonusLevel)];
-    const durations = computeAttemptDurations({
-      levelStartedAt: levelState?.started_at,
-      teamStartedAt: team.started_at,
-    });
-    await logPlayAttempt({
-      organizationId: event.organization_id,
-      eventId: event.id,
-      teamId: team.id,
-      playerId: player.id,
-      playerName: player.display_name,
-      playerRole: player.role,
-      level: bonusLevel,
-      phase: "bonus",
-      correct,
-      selectedOptionId: input.selectedOptionId,
-      error: correct ? null : "falsche_antwort",
-      durationMs: durations.durationMs,
-      elapsedMissionMs: durations.elapsedMissionMs,
-      contentMode: content.contentMode,
-      levelTitle: levelDefinition?.title ?? null,
-    });
-
-    const pending = gameState.pending_next_level;
-    const nextLevel =
-      pending === null || pending === undefined ? bonusLevel + 1 : pending;
-    const finished = nextLevel > content.levels.length;
-    const nextSlot = getLevelDefinition(content, finished ? bonusLevel : nextLevel);
-    const hubPhase: PlayPhase =
-      !finished && nextSlot && usesPhasedPlay(content)
-        ? initialPhaseForSurface(
-            content.contentMode,
-            buildPlaySlot(nextSlot, content.contentMode),
-            nextSlot,
-          )
-        : "hub";
-
-    let levels = gameState.levels;
-    if (!finished) {
-      levels = activateLevelEntry(levels, String(nextLevel));
-    }
-
-    const noticeId = `bonus-${Date.now()}-${player.id.slice(0, 8)}`;
-    const now = new Date();
-    let queue = gameState.bonus_queue ?? [];
-    const activeItem = queue.find(
-      (item) => item.status === "active" && item.from_level === bonusLevel,
-    );
-    if (activeItem) {
-      queue = markBonusDone(queue, activeItem.bonus_id, now);
     }
 
     const nextGameState: TeamGameState = {
       ...gameState,
       version: gameState.version + 1,
-      score: gameState.score + reward,
-      current_phase: finished ? gameState.current_phase : hubPhase,
-      pending_next_level: null,
-      active_bonus: null,
-      bonus_queue: queue,
-      bonus_notice: {
-        id: noticeId,
-        by: player.display_name,
-        correct,
-        reward,
-        created_at: now.toISOString(),
-      },
-      levels,
+      bonus_sessions: patchBonusSession(gameState.bonus_sessions, bonusId, {
+        intro_done: true,
+        solver_name: player.display_name,
+        solver_player_id: player.id,
+      }),
     };
 
-    const supabase = createAdminClient();
-    const { data: updatedTeam, error } = await supabase
-      .from("teams")
-      .update({
-        current_level: finished ? bonusLevel : nextLevel,
-        game_state: nextGameState,
-        status: finished ? "finished" : "playing",
-        finished_at: finished ? new Date().toISOString() : null,
-      })
-      .eq("id", team.id)
-      .eq("status", "playing")
-      .select(
-        "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
-      )
-      .single();
-
-    if (error || !updatedTeam) {
-      return { success: false, error: error?.message ?? "Bonus-Update fehlgeschlagen." };
-    }
-
-    return { success: true, data: buildRealtimeState(updatedTeam, player) };
+    return persistPlayingGameState({
+      teamId: team.id,
+      player,
+      gameState: nextGameState,
+      expectedVersion: gameState.version,
+    });
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Bonus fehlgeschlagen.",
+      error: error instanceof Error ? error.message : "Bonus-Start fehlgeschlagen.",
     };
   }
 }
 
-/** Skip bonus (non-assigned roles waiting, or empty bonus). Advances team to next hub. */
+/** After the shared reveal, advance the team (idempotent). */
+export async function advanceBonusAfterReveal(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  bonusId?: string;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    const { event, team, player } = await assertPlayerSession(input);
+    if (team.status !== "playing") {
+      return { success: false, error: "Das Spiel läuft noch nicht." };
+    }
+    const gameState = parseTeamGameState(team.game_state);
+    return finishRevealedBonus({
+      event,
+      team,
+      player,
+      gameState,
+      bonusId: input.bonusId,
+    });
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Bonus konnte nicht beendet werden.",
+    };
+  }
+}
+
+/** Skip bonus (empty bonus). Revealed bonuses finish instead of skipping. */
 export async function skipBonusPhase(input: {
   inviteCode: string;
   joinCode: string;
@@ -2195,6 +2480,18 @@ export async function skipBonusPhase(input: {
   try {
     const { event, team, player } = await assertPlayerSession(input);
     const gameState = parseTeamGameState(team.game_state);
+    const revealedId = Object.keys(gameState.bonus_sessions ?? {}).find(
+      (id) => Boolean(gameState.bonus_sessions?.[id]?.reveal),
+    );
+    if (revealedId) {
+      return finishRevealedBonus({
+        event,
+        team,
+        player,
+        gameState,
+        bonusId: revealedId,
+      });
+    }
     if (gameState.active_bonus) {
       return completeActiveBonus({
         event,

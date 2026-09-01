@@ -1,17 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
 import { IconCheck, IconGift, IconUser, IconX } from "@/components/game/city/icons";
-import { CityTeamBar } from "@/components/game/city/team-bar";
 import { CodeBoxesInput } from "@/components/game/code-boxes-input";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
 import type { BonusTask } from "@/lib/grid/level-types";
-import {
-  formatBonusSolution,
-  isBonusAnswerCorrect,
-} from "@/lib/grid/bonus";
+import type { BonusSessionState } from "@/lib/grid/game-state";
+import { formatBonusSolution } from "@/lib/grid/bonus";
 import {
   bonusAudienceHeadline,
   bonusAudienceIconCount,
@@ -20,9 +17,13 @@ import {
 import type { ContentMode } from "@/lib/cms/layer-model";
 import { hubMeta } from "@/lib/grid/play-slots";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { CityTeamBar } from "@/components/game/city/team-bar";
+
+const BONUS_ADVANCE_MS = 2800;
 
 type Props = {
   bonus: BonusTask;
+  bonusId: string;
   mode: ContentMode;
   isMine: boolean;
   myName: string;
@@ -33,12 +34,16 @@ type Props = {
   asymmetricOverlay?: boolean;
   disabled: boolean;
   isPending: boolean;
+  teamSession?: BonusSessionState | null;
+  onBegin: () => void;
   onSubmit: (selectedOptionId: string) => void;
+  onContinue: () => void;
   onSkipWaiting: () => void;
 };
 
 export function PlayBonusView({
   bonus,
+  bonusId,
   mode,
   isMine,
   myName,
@@ -48,32 +53,47 @@ export function PlayBonusView({
   asymmetricOverlay = false,
   disabled,
   isPending,
+  teamSession = null,
+  onBegin,
   onSubmit,
+  onContinue,
   onSkipWaiting,
 }: Props) {
   const answerMode = bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
   const boxCount = bonus.number_fields ?? Math.min(4, Math.max(1, (bonus.answer ?? "").length || 4));
 
-  const [introDone, setIntroDone] = useState(false);
+  const [localIntro, setLocalIntro] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
   const [textAnswer, setTextAnswer] = useState("");
   const [numberParts, setNumberParts] = useState<string[]>(() =>
     Array.from({ length: boxCount }, () => ""),
   );
-  const [submitted, setSubmitted] = useState(false);
-  const [revealed, setRevealed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [continuing, setContinuing] = useState(false);
+  const sfxPlayedRef = useRef<string | null>(null);
+  const autoAdvanceRef = useRef<string | null>(null);
+  const onContinueRef = useRef(onContinue);
+  onContinueRef.current = onContinue;
+
+  const reveal = teamSession?.reveal ?? null;
+  const introDone = Boolean(teamSession?.intro_done || localIntro || reveal);
+  const show = Boolean(reveal);
+  const correct = reveal?.correct ?? false;
+  const locked = show || disabled || isPending || submitting;
+  const selectedId = reveal?.selected_option_id ?? picked ?? "";
+  const attemptLabel =
+    reveal?.attempt_label ??
+    (answerMode === "choice" || answerMode === "confirm"
+      ? bonus.options.find((o) => o.id === selectedId)?.label ?? selectedId
+      : answerMode === "boxes"
+        ? numberParts.map((p) => p.trim()).join("")
+        : textAnswer.trim());
 
   const typed =
     answerMode === "boxes"
       ? numberParts.map((p) => p.trim()).join("")
       : textAnswer.trim();
 
-  const submission =
-    answerMode === "choice" || answerMode === "confirm" ? (picked ?? "") : typed;
-  const correct = revealed ? isBonusAnswerCorrect(bonus, submission) : false;
-  const solutionLabel = formatBonusSolution(bonus);
-
-  const show = revealed;
   const hub = hubMeta(mode);
   const audience = bonusAudienceIconCount(bonus);
   const audienceLabel = bonusAudienceHeadline(bonus, roleLabels);
@@ -88,31 +108,59 @@ export function PlayBonusView({
   useEffect(() => {
     if (!isMine) return;
     playPlaySfx("unlock");
-  }, [isMine]);
+  }, [isMine, bonusId]);
 
   useEffect(() => {
-    if (!show) return;
-    playPlaySfx(correct ? "correct" : "wrong");
-  }, [show, correct]);
+    if (reveal) return;
+    if (!isPending) {
+      setSubmitting(false);
+      setContinuing(false);
+    }
+  }, [reveal, isPending]);
 
-  function checkAnswer() {
-    if (!canCheck || revealed || submitted) return;
-    setRevealed(true);
+  useEffect(() => {
+    if (!reveal) return;
+    if (sfxPlayedRef.current !== reveal.revealed_at) {
+      sfxPlayedRef.current = reveal.revealed_at;
+      playPlaySfx(reveal.correct ? "correct" : "wrong");
+    }
+  }, [reveal]);
+
+  useEffect(() => {
+    if (!reveal || continuing || disabled || isPending) return;
+    if (autoAdvanceRef.current === reveal.revealed_at) return;
+    const timer = window.setTimeout(() => {
+      if (autoAdvanceRef.current === reveal.revealed_at) return;
+      autoAdvanceRef.current = reveal.revealed_at;
+      setContinuing(true);
+      onContinueRef.current();
+    }, BONUS_ADVANCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [reveal, continuing, disabled, isPending]);
+
+  function beginIntro() {
+    if (introDone) return;
+    setLocalIntro(true);
+    onBegin();
   }
 
-  function finish() {
-    if (submitted) return;
+  function checkAnswer() {
+    if (!canCheck || show || submitting) return;
     const payload =
-      answerMode === "choice" || answerMode === "confirm"
-        ? picked
-        : typed || picked;
+      answerMode === "choice" || answerMode === "confirm" ? picked : typed || picked;
     if (!payload) return;
-    setSubmitted(true);
+    setSubmitting(true);
     onSubmit(payload);
   }
 
+  function handleContinue() {
+    if (continuing || !reveal) return;
+    autoAdvanceRef.current = reveal.revealed_at;
+    setContinuing(true);
+    onContinue();
+  }
+
   if (!isMine) {
-    // Role-only: others stay on hub (asymmetric). Team bonus: rare wait if somehow not mine.
     if (asymmetricOverlay || bonus.for_team) {
       return null;
     }
@@ -157,7 +205,7 @@ export function PlayBonusView({
             : "Nur auf deinem Handy. Danach bist du wieder bei deinem Team."
         }
         audienceIcons={audience}
-        onDone={() => setIntroDone(true)}
+        onDone={beginIntro}
       />
     );
   }
@@ -167,6 +215,8 @@ export function PlayBonusView({
     : correct
       ? "border-[var(--cg-success)]"
       : "border-[var(--cg-destructive)]";
+  const solutionLabel = formatBonusSolution(bonus);
+  const answerer = reveal?.answered_by ?? myName;
 
   return (
     <section className="mx-auto flex w-full max-w-md flex-col px-4 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-5 sm:px-5">
@@ -194,7 +244,7 @@ export function PlayBonusView({
       >
         <p className="rounded-2xl bg-[var(--cg-accent)]/15 px-4 py-3 text-center text-base font-semibold text-[var(--cg-fg)]">
           {bonus.for_team
-            ? "Diese Bonusaufgabe sehen alle im Team."
+            ? "Diese Bonusaufgabe sehen alle im Team. Eine Antwort gilt für alle."
             : `Nur du siehst diese Aufgabe, ${myName}.`}
         </p>
 
@@ -222,13 +272,13 @@ export function PlayBonusView({
         {answerMode === "choice" || answerMode === "confirm" ? (
           <div className={`grid gap-3 ${bonus.options.length > 2 ? "grid-cols-2" : "grid-cols-1"}`}>
             {bonus.options.map((opt) => {
-              const isPicked = picked === opt.id;
+              const isPicked = selectedId === opt.id;
               const isRight = opt.id === bonus.correct_option_id;
               return (
                 <button
                   key={opt.id}
                   type="button"
-                  disabled={show || disabled || isPending || submitted}
+                  disabled={locked}
                   onClick={() => setPicked(opt.id)}
                   className={`cg-tap-lift flex items-center justify-center gap-2 rounded-2xl border-2 py-6 text-xl font-bold ${
                     show && isRight
@@ -251,10 +301,10 @@ export function PlayBonusView({
 
         {answerMode === "text" ? (
           <input
-            value={textAnswer}
+            value={show ? attemptLabel : textAnswer}
             onChange={(e) => setTextAnswer(e.target.value)}
             placeholder="Antwort eintragen…"
-            disabled={show || disabled || isPending || submitted}
+            disabled={locked}
             className={`w-full rounded-2xl border-2 bg-[var(--cg-bg)] px-4 py-4 text-center text-xl font-bold text-[var(--cg-fg)] outline-none focus:border-[var(--cg-primary)] disabled:opacity-70 ${inputTone}`}
           />
         ) : null}
@@ -271,9 +321,13 @@ export function PlayBonusView({
           >
             <CodeBoxesInput
               count={boxCount}
-              values={numberParts}
+              values={
+                show && attemptLabel
+                  ? Array.from({ length: boxCount }, (_, i) => attemptLabel[i] ?? "")
+                  : numberParts
+              }
               onChange={setNumberParts}
-              disabled={show || disabled || isPending || submitted}
+              disabled={locked}
             />
           </div>
         ) : null}
@@ -281,10 +335,7 @@ export function PlayBonusView({
 
       <div className="mt-auto space-y-3 pt-6">
         {!show ? (
-          <BigButton
-            disabled={disabled || isPending || !canCheck}
-            onClick={checkAnswer}
-          >
+          <BigButton disabled={locked || !canCheck} onClick={checkAnswer}>
             Antwort prüfen
           </BigButton>
         ) : (
@@ -300,9 +351,11 @@ export function PlayBonusView({
                   <Check className="h-4 w-4" strokeWidth={2.5} />
                 </span>
                 <div className="min-w-0 pt-0.5">
-                  <p className="text-sm font-bold text-[var(--cg-fg)]">Richtig — stark!</p>
+                  <p className="text-sm font-bold text-[var(--cg-fg)]">
+                    {answerer} hat {reveal?.reward ?? bonus.reward} Punkte gerade geholt
+                  </p>
                   <p className="mt-0.5 text-sm text-[var(--cg-muted)]">
-                    +{bonus.reward} Punkte für das Team.
+                    +{reveal?.reward ?? bonus.reward} Punkte für das Team.
                   </p>
                 </div>
               </div>
@@ -317,16 +370,12 @@ export function PlayBonusView({
                   </span>
                   <div className="min-w-0 pt-0.5">
                     <p className="text-sm font-bold text-[var(--cg-destructive)]">
-                      Diesmal daneben
+                      {answerer} konnte die Aufgabe nicht beantworten
                     </p>
-                    {typed || picked ? (
+                    {attemptLabel ? (
                       <p className="mt-1 text-sm leading-snug text-[var(--cg-fg)]">
-                        Eure Eingabe:{" "}
-                        <span className="font-bold tracking-wide">
-                          {answerMode === "choice" || answerMode === "confirm"
-                            ? bonus.options.find((o) => o.id === picked)?.label ?? picked
-                            : typed}
-                        </span>
+                        Eingabe von {answerer}:{" "}
+                        <span className="font-bold tracking-wide">{attemptLabel}</span>
                       </p>
                     ) : null}
                     <p className="mt-0.5 text-sm leading-snug text-[var(--cg-muted)]">
@@ -344,8 +393,8 @@ export function PlayBonusView({
               </>
             )}
 
-            <BigButton disabled={isPending || submitted} onClick={finish}>
-              {asymmetricOverlay ? "Zurück zum Team" : `Zurück zur ${hub.hubLabelDe}`}
+            <BigButton disabled={isPending || continuing} onClick={handleContinue}>
+              {asymmetricOverlay ? "Zurück zum Team" : `Weiter zur ${hub.hubLabelDe}`}
             </BigButton>
           </div>
         )}

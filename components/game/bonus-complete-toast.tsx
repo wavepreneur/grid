@@ -87,10 +87,9 @@ export function BonusCompleteToast({ notice, onDismiss }: Props) {
             Bonus erledigt
           </p>
           <p className="mt-0.5 text-sm font-semibold text-[var(--cg-fg)]">
-            {visible.by} ·{" "}
             {visible.correct
-              ? `+${visible.reward} Punkte fürs Team`
-              : "Ohne Extrpunkte — weiter geht’s"}
+              ? `${visible.by} hat ${visible.reward} Punkte gerade geholt`
+              : `${visible.by} konnte die Aufgabe nicht beantworten`}
           </p>
         </div>
         <button

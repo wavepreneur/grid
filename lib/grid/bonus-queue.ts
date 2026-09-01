@@ -133,3 +133,26 @@ export function findPresentableBonusForRole(
     ) ?? null
   );
 }
+
+/** Role-only bonuses currently being solved by someone else. */
+export function findForeignActiveBonuses(
+  gameState: TeamGameState,
+  role: string | null | undefined,
+  options?: { claimUnassigned?: boolean },
+): BonusQueueItem[] {
+  if (options?.claimUnassigned) return [];
+  const queue = gameState.bonus_queue ?? [];
+  const normalized =
+    role === "captain" || role === "navigator"
+      ? "alpha"
+      : role === "solver"
+        ? "gamma"
+        : role;
+
+  return queue.filter(
+    (item) =>
+      item.status === "active" &&
+      !item.for_team &&
+      item.for_role !== normalized,
+  );
+}

@@ -67,6 +67,27 @@ export type BonusQueueItem = {
   task_snapshot?: import("@/lib/grid/level-types").BonusTask;
 };
 
+/** Shared bonus answer — first submit wins; every device shows the same result. */
+export type BonusRevealState = {
+  bonus_id: string;
+  answered_by: string;
+  answered_by_player_id: string;
+  correct: boolean;
+  reward: number;
+  selected_option_id: string;
+  attempt_label: string | null;
+  revealed_at: string;
+};
+
+/** Per-bonus live session (intro + reveal) while the item is still active. */
+export type BonusSessionState = {
+  bonus_id: string;
+  intro_done: boolean;
+  solver_name?: string | null;
+  solver_player_id?: string | null;
+  reveal?: BonusRevealState | null;
+};
+
 /** Short team broadcast after a bonus is finished. */
 export type BonusNoticeState = {
   id: string;
@@ -102,6 +123,8 @@ export type TeamGameState = {
   active_bonus?: ActiveBonusState | null;
   /** Layer-3 surprise queue (armed / ready / done). */
   bonus_queue?: BonusQueueItem[];
+  /** Live intro/reveal per active bonus_id — first start and first answer sync. */
+  bonus_sessions?: Record<string, BonusSessionState>;
   /** Ephemeral toast payload after bonus completes. */
   bonus_notice?: BonusNoticeState | null;
   /**
@@ -184,6 +207,7 @@ export function createInitialGameState(
     quiz_reveal: null,
     active_bonus: null,
     bonus_queue: [],
+    bonus_sessions: {},
     bonus_notice: null,
     content_ready: true,
     outdoor_progress: null,
@@ -231,6 +255,10 @@ export function parseTeamGameState(value: unknown): TeamGameState {
     quiz_reveal: parseQuizReveal(candidate.quiz_reveal),
     active_bonus: parseActiveBonus(candidate.active_bonus),
     bonus_queue: parseBonusQueue(candidate.bonus_queue),
+    bonus_sessions: parseBonusSessions(
+      candidate.bonus_sessions,
+      (candidate as { bonus_session?: unknown }).bonus_session,
+    ),
     bonus_notice: parseBonusNotice(candidate.bonus_notice),
     content_ready: candidate.content_ready === false ? false : true,
     outdoor_progress:
@@ -318,6 +346,108 @@ function parseBonusQueue(value: unknown): BonusQueueItem[] | undefined {
     });
   }
   return items;
+}
+
+function parseBonusReveal(value: unknown): BonusRevealState | null {
+  if (!value || typeof value !== "object") return null;
+  const c = value as Partial<BonusRevealState>;
+  if (!c.bonus_id || !c.answered_by || !c.answered_by_player_id || !c.revealed_at) {
+    return null;
+  }
+  return {
+    bonus_id: String(c.bonus_id),
+    answered_by: String(c.answered_by),
+    answered_by_player_id: String(c.answered_by_player_id),
+    correct: Boolean(c.correct),
+    reward: Math.max(0, Math.round(Number(c.reward) || 0)),
+    selected_option_id: String(c.selected_option_id ?? ""),
+    attempt_label:
+      typeof c.attempt_label === "string" && c.attempt_label.trim()
+        ? c.attempt_label
+        : null,
+    revealed_at: String(c.revealed_at),
+  };
+}
+
+function parseOneBonusSession(
+  value: unknown,
+  fallbackId?: string,
+): BonusSessionState | null {
+  if (!value || typeof value !== "object") return null;
+  const c = value as Partial<BonusSessionState>;
+  const bonusId =
+    typeof c.bonus_id === "string" && c.bonus_id
+      ? c.bonus_id
+      : fallbackId;
+  if (!bonusId) return null;
+  return {
+    bonus_id: bonusId,
+    intro_done: Boolean(c.intro_done),
+    solver_name:
+      typeof c.solver_name === "string" && c.solver_name.trim()
+        ? c.solver_name
+        : null,
+    solver_player_id:
+      typeof c.solver_player_id === "string" && c.solver_player_id
+        ? c.solver_player_id
+        : null,
+    reveal: parseBonusReveal(c.reveal),
+  };
+}
+
+function parseBonusSessions(
+  value: unknown,
+  legacySingular?: unknown,
+): Record<string, BonusSessionState> {
+  const out: Record<string, BonusSessionState> = {};
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+      const parsed = parseOneBonusSession(raw, key);
+      if (parsed) out[parsed.bonus_id] = parsed;
+    }
+  }
+  const legacy = parseOneBonusSession(legacySingular);
+  if (legacy && !out[legacy.bonus_id]) {
+    out[legacy.bonus_id] = legacy;
+  }
+  return out;
+}
+
+export function bonusSessionId(active: {
+  bonus_id?: string;
+  from_level: number;
+}): string {
+  return active.bonus_id ?? `legacy-${active.from_level}`;
+}
+
+export function ensureBonusSession(
+  sessions: Record<string, BonusSessionState> | null | undefined,
+  bonusId: string,
+): Record<string, BonusSessionState> {
+  const next = { ...(sessions ?? {}) };
+  if (!next[bonusId]) {
+    next[bonusId] = { bonus_id: bonusId, intro_done: false, reveal: null };
+  }
+  return next;
+}
+
+export function patchBonusSession(
+  sessions: Record<string, BonusSessionState> | null | undefined,
+  bonusId: string,
+  patch: Partial<BonusSessionState>,
+): Record<string, BonusSessionState> {
+  const next = ensureBonusSession(sessions, bonusId);
+  next[bonusId] = { ...next[bonusId], bonus_id: bonusId, ...patch };
+  return next;
+}
+
+export function clearBonusSession(
+  sessions: Record<string, BonusSessionState> | null | undefined,
+  bonusId: string,
+): Record<string, BonusSessionState> {
+  const next = { ...(sessions ?? {}) };
+  delete next[bonusId];
+  return next;
 }
 
 function parseBonusNotice(value: unknown): BonusNoticeState | null | undefined {
