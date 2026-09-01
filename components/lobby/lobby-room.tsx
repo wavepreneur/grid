@@ -46,6 +46,7 @@ import {
   clearMissionStarting,
   markMissionStarting,
   missionStartProgress,
+  persistStartProgress,
 } from "@/lib/grid/mission-start-signal";
 import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
@@ -158,20 +159,25 @@ export function LobbyRoom({
 
   const goToPlay = useCallback(() => {
     if (manageMode) return;
-    markMissionStarting(inviteCode, joinCode);
+    markMissionStarting(inviteCode, joinCode, snapshot.players.length);
     setBusy({
       title: "Alle Geräte laden…",
       subtitle: "Die Mission startet gemeinsam — niemand legt allein los.",
       variant: "start",
     });
     router.replace(eventPlayPath(inviteCode, joinCode));
-  }, [inviteCode, joinCode, manageMode, router]);
+  }, [inviteCode, joinCode, manageMode, router, snapshot.players.length]);
 
   useEffect(() => {
     if (busy?.variant !== "start") return;
     setStartProgress(missionStartProgress(inviteCode, joinCode));
     const id = window.setInterval(() => {
-      setStartProgress(missionStartProgress(inviteCode, joinCode));
+      const next = persistStartProgress(
+        inviteCode,
+        joinCode,
+        missionStartProgress(inviteCode, joinCode),
+      );
+      setStartProgress(next);
     }, 80);
     return () => window.clearInterval(id);
   }, [busy?.variant, inviteCode, joinCode]);
@@ -274,6 +280,12 @@ export function LobbyRoom({
     onPlayersChange: handlePlayersChange,
     onSyncEvent: (event) => {
       if (event.event_type === "game_started" || event.event_type === "game_finished") {
+        const count = Number(event.payload.player_count);
+        markMissionStarting(
+          inviteCode,
+          joinCode,
+          Number.isFinite(count) && count > 0 ? count : snapshot.players.length,
+        );
         goToPlay();
         return;
       }
@@ -328,7 +340,11 @@ export function LobbyRoom({
     setError(null);
 
     const startedAt = new Date().toISOString();
-    void broadcast({ type: "game_started", started_at: startedAt });
+    void broadcast({
+      type: "game_started",
+      started_at: startedAt,
+      player_count: snapshot.players.length,
+    });
     void startGameManually({
       inviteCode,
       joinCode,
