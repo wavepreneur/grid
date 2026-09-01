@@ -145,7 +145,7 @@ function playSynthFallback(kind: PlaySfxKind): void {
   }
 }
 
-function getAudio(kind: PlaySfxKind): HTMLAudioElement | null {
+function getAudio(kind: Exclude<PlaySfxKind, "bonus">): HTMLAudioElement | null {
   if (typeof window === "undefined") return null;
   let audio = cache.get(kind);
   if (audio) return audio;
