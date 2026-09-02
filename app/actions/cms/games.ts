@@ -1280,8 +1280,8 @@ export async function listGameStationCodes(
     }
 
     const linksResult = await listGameTasks(gameId);
-    if (!linksResult.success || !linksResult.data) {
-      return { success: false, error: linksResult.error ?? "Aufgaben nicht geladen." };
+    if (!linksResult.success) {
+      return { success: false, error: linksResult.error };
     }
     const slots = buildGameSlots(linksResult.data);
     const cards = slots.map((slot) => {
