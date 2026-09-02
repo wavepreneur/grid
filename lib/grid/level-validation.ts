@@ -80,7 +80,11 @@ export function validateLevelSolution(
       return { ok: true };
     }
     if (!payload.geolocation) {
-      return { ok: false, error: "GPS-Position erforderlich. Bitte Standort freigeben." };
+      return {
+        ok: false,
+        error:
+          "Kein Standort empfangen. Oben im Browser auf „Zulassen“ tippen und die Seite einmal neu laden.",
+      };
     }
     const healthTarget = withHealthRadiusBonus(
       level.location,

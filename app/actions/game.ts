@@ -43,6 +43,7 @@ import { findLevelByStationCode } from "@/lib/grid/content-loader";
 import {
   buildPlaySlot,
   initialPhaseForSurface,
+  missionFromLevel,
   usesPhasedPlay,
 } from "@/lib/grid/play-slots";
 import type { PlayPhase } from "@/lib/grid/play-surface";
@@ -213,7 +214,10 @@ export async function solveCurrentLevel(input: {
       };
     }
 
-    const validation = validateLevelSolution(levelDefinition, input.payload ?? {}, {
+    const validation = validateLevelSolution(
+      missionFromLevel(levelDefinition),
+      input.payload ?? {},
+      {
       isCaptain: player.is_captain,
       isNavigator: team.navigator_player_id === player.id,
       canUnlockGps: archetype.canUnlockGps,
@@ -1312,7 +1316,11 @@ export async function advanceFromHub(input: {
     if (content.contentMode === "outdoor" && unlockMode === "geofence" && levelDefinition.location) {
       if (!input.forceUnlock) {
         if (!input.geolocation) {
-          return { success: false, error: "GPS-Position erforderlich." };
+          return {
+            success: false,
+            error:
+              "Kein Standort empfangen. Oben im Browser auf „Zulassen“ tippen und die Seite einmal neu laden.",
+          };
         }
         const healthTarget = withHealthRadiusBonus(
           levelDefinition.location,

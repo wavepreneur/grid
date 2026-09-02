@@ -1,6 +1,18 @@
 /**
- * Post-game follow-up (Layer-3 Micro-Pulse / Slack) stored on studio_games.feature_flags.
- * Billing stays in Exitmania/Tabbrain — GRID only stores the coupling.
+ * Follow-up **intent** (not dispatch).
+ *
+ * Studio writes `feature_flags.follow_up_trigger` on the game. Publish freezes it
+ * into the version snapshot. The live loader copies it onto `EventContent.followUpTrigger`.
+ *
+ * Later dispatch (do not invent a second JSON shape):
+ * 1. Source of arming = `teams.status === "finished"` + `teams.finished_at` (existing columns).
+ *    Do not add an FSM step or a write in front of a correct solve.
+ * 2. Due time = `followUpDueAt(finished_at, cadence_days)` — derived, not stored on the game.
+ * 3. Provision = existing Pulse REST (`POST /api/v1/pulse/sessions`) with `program_slug`,
+ *    `channel`, idempotent `booking_reference`. Slack/Teams bots live outside GRID.
+ * 4. Billing / shop stay Exitmania or Tabbrain. GRID never checkouts.
+ *
+ * Stable key: `follow_up_trigger`. Do not rename; later workers will read snapshots.
  */
 
 export const FOLLOW_UP_KINDS = ["none", "micro_pulse", "slack_program"] as const;
@@ -89,4 +101,16 @@ export function withFollowUpTrigger(
     cta_url: trigger.cta_url,
   };
   return next;
+}
+
+/** When a later worker should provision Pulse — not stored, computed from finish + cadence. */
+export function followUpDueAt(
+  finishedAtIso: string | null | undefined,
+  cadenceDays: number | null,
+): string | null {
+  if (cadenceDays === null || cadenceDays < 1) return null;
+  if (!finishedAtIso) return null;
+  const started = Date.parse(finishedAtIso);
+  if (!Number.isFinite(started)) return null;
+  return new Date(started + cadenceDays * 86_400_000).toISOString();
 }

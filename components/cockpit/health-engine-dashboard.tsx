@@ -29,32 +29,36 @@ const HEALING_LOOP = ["Signal erkannt", "Regel geprüft", "Eingriff ausgelöst",
 const HEALING_RULES = [
   {
     icon: Radar,
-    signal: "GPS-Signal fällt aus",
-    action: "Radius wird automatisch erweitert (Lead-Gerät, max. 80 m), danach Code-Fallback.",
+    signal: "GPS greift nicht / Ort ungenau",
+    action:
+      "Technik: Radius weitet sich am Lead-Gerät (nahe, aber draußen, max. +80 m). Spieler wählen: wir stehen davor → Alpha schaltet frei, oder GPS defekt → Einstellungen prüfen, ohne GPS weiter, in der Nähe bleiben.",
     live: true,
   },
   {
     icon: Activity,
-    signal: "Keine Eingabe > 5 Minuten",
-    action: "In-App-Nudge an die aktive Rolle, danach kostenfreier Tipp.",
-    live: false,
+    signal: "Keine Eingabe > 5 Minuten (Rätsel)",
+    action:
+      "Hinweis auf ungenutzten Tipp, sonst auf Freischalten / Lösung anzeigen. Nicht auf der Karte — Laufen zählt nicht als Hängen.",
+    live: true,
   },
   {
     icon: XCircle,
     signal: "3 ähnliche Fehlversuche",
-    action: "Tipp-Vorschlag mit Rabatt, dritte Stufe: Lösung freigeben.",
-    live: false,
+    action:
+      "Hinweis auf Tipp, falls noch nicht gekauft. „Was ist los?“ und FAQ führen zu Freischalten — kein Ticket.",
+    live: true,
   },
   {
     icon: Wifi,
-    signal: "Netzstörung / Reconnect",
-    action: "Session-Handoff und Restore führen die Runde ohne Operator weiter.",
+    signal: "Netzstörung / anderes Gerät",
+    action: "Session wiederherstellen, Weiterspiel-Link, Leitung übergeben. Menü → Team.",
     live: true,
   },
   {
     icon: Cpu,
-    signal: "Aufgabe blockiert (kein Fortschritt)",
-    action: "Fallback-Unlock, wenn der Hub hängt — ohne neuen FSM-Schritt.",
+    signal: "Verständnis / feststecken",
+    action:
+      "Auswahl im Spiel: GPS, Lösung, Verbindung, FAQ. Operator sieht hier die Regel — kein Fern-Support.",
     live: true,
   },
   {
@@ -107,7 +111,7 @@ export function HealthEngineDashboard() {
     <StudioPage
       eyebrow="Autonome Health-Engine"
       title="GRID Cockpit"
-      description="Kein Mensch überwacht hier etwas. Das System erkennt Störungen selbst und greift über In-App-Nudges, automatische Radius-Erweiterungen und Fallback-Trigger ein. Ziel: 0 % menschliche Interventionsquote."
+      description="Technik heilt sich selbst. Menschliche Störungen (Warten, falsche Antworten) bekommen im Spiel einen Klick-Hebel. Hier steht, was wirklich live ist — nicht die Roadmap als Fakt."
     >
       {isPending ? (
         <p className="text-sm text-muted-foreground">Live-Sessions werden gelesen…</p>
@@ -142,7 +146,7 @@ export function HealthEngineDashboard() {
 
           <Panel
             title="Self-Healing-Loop"
-            subtitle="Jede Störung durchläuft diesen Kreislauf — ohne Ticket, ohne Support."
+            subtitle="So greifen die Live-Regeln — ohne Operator-Ticket."
           >
             <div className="grid gap-2 sm:grid-cols-4">
               {HEALING_LOOP.map((step, index) => (
@@ -157,8 +161,34 @@ export function HealthEngineDashboard() {
           </Panel>
 
           <Panel
+            title="Technik vs. Mensch"
+            subtitle="Zwei Klassen von Störungen — beide enden in einem Klick, nicht in einem Ticket."
+          >
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="rounded-2xl bg-secondary px-4 py-3">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  Technik
+                </p>
+                <p className="mt-1 text-sm">
+                  GPS, Netz, Session, Multiplayer-Gerät. Heal läuft still (Radius, Restore) oder
+                  über eine Auswahl: freischalten / Einstellungen / Team-Menü.
+                </p>
+              </div>
+              <div className="rounded-2xl bg-secondary px-4 py-3">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  Mensch
+                </p>
+                <p className="mt-1 text-sm">
+                  5 Minuten keine Eingabe im Rätsel, oder drei ähnliche Fehlversuche. Dann Tipp,
+                  Freischalten oder FAQ — gebunden an die Bedingung, nicht an einen Operator.
+                </p>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel
             title="Aktive Regeln"
-            subtitle="Systemisch hinterlegt. Live-Regeln greifen schon; der Rest ist die Produkt-Roadmap."
+            subtitle="Genau das, was Spieler im Client sehen oder das Gerät selbst heilt. „Roadmap“ ist noch nicht im Spiel."
           >
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {HEALING_RULES.map((rule) => (

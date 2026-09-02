@@ -12,8 +12,10 @@ import {
   PlayMoreTrigger,
   type PlayMorePanel,
 } from "@/components/game/play-more-sheet";
+import { PlayHelpNudge } from "@/components/game/play-help-nudge";
 import { PlayQuizView } from "@/components/game/play-quiz-view";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
+import { levelAllowsSkip, levelHasUnusedTileHint } from "@/lib/grid/play-help";
 import { canPresentBonus, resolveBonusForPlay } from "@/lib/grid/bonus";
 import { findPresentableBonusForRole } from "@/lib/grid/bonus-queue";
 import type { PurchasedTileHint, TeamGameState } from "@/lib/grid/game-state";
@@ -249,6 +251,31 @@ export function PlayPhaseFlow({
         onReclaimSession={onReclaimSession}
         onReleaseMySeat={onReleaseMySeat}
         releasePending={releasePending}
+        canUnlockGps={phase === "hub" && canUnlockGps}
+        onForceUnlockGps={
+          phase === "hub" && canUnlockGps
+            ? () => {
+                const walkHub =
+                  Boolean(level?.triggers?.after_meters) &&
+                  level?.triggers?.type === "distance";
+                const payload = {
+                  forceUnlock: (walkHub ? "distance" : "geofence") as
+                    | "distance"
+                    | "geofence",
+                  geolocation: { lat: 0, lng: 0, accuracy: 50 },
+                };
+                const gpsOnly =
+                  Boolean(level) &&
+                  level!.type === "gps" &&
+                  !level!.arrival_quiz &&
+                  !level!.answer &&
+                  !(level!.tiles && level!.tiles.length > 0) &&
+                  !(level!.options && level!.options.length > 0);
+                if (gpsOnly) onSolveGpsCheckpoint(payload);
+                else onArriveOutdoor(payload);
+              }
+            : undefined
+        }
       />
     </>
   );
@@ -433,6 +460,14 @@ export function PlayPhaseFlow({
       <>
         {chrome}
         {sheets}
+        <PlayHelpNudge
+          key={`quiz-${activeLevel}`}
+          hasUnusedHint={false}
+          canSkip={false}
+          paused={paused || disabled}
+          onOpenHelp={() => onMorePanel("help")}
+          onOpenFaq={() => onMorePanel("faq")}
+        />
         <PlayQuizView
           title={level.title}
           spotLabel={
@@ -462,6 +497,15 @@ export function PlayPhaseFlow({
     <>
       {chrome}
       {sheets}
+      <PlayHelpNudge
+        key={`level-${activeLevel}`}
+        feedback={solveFeedback}
+        hasUnusedHint={levelHasUnusedTileHint(mission, purchasedHints)}
+        canSkip={levelAllowsSkip(mission) && Boolean(onRevealLevel)}
+        paused={paused || disabled}
+        onOpenHelp={() => onMorePanel("help")}
+        onOpenFaq={() => onMorePanel("faq")}
+      />
       <ExitmaniaLevelView
         level={mission}
         allLevels={eventContent.levels}

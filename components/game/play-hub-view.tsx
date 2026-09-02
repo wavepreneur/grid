@@ -23,6 +23,7 @@ import type { GameLevelStatus } from "@/lib/grid/game-state";
 import type { LevelDefinition, GeolocationSample } from "@/lib/grid/level-types";
 import type { GpsFixPayload } from "@/lib/hooks/use-team-sync";
 import { hubMeta } from "@/lib/grid/play-slots";
+import { GPS_SETTINGS_TIP } from "@/lib/grid/play-help";
 
 export type OutdoorArriveInput = {
   geolocation?: GeolocationSample;
@@ -350,7 +351,7 @@ function OutdoorHub({
   const isGpsMode = Boolean(current.location) && !isWalkMode;
 
   const gpsEnabled = (isGpsMode || isWalkMode) && isWalkTracker;
-  const { sample: leadSample } = useGeolocation(gpsEnabled && isGpsMode);
+  const { sample: leadSample, error: gpsError } = useGeolocation(gpsEnabled && isGpsMode);
   const sampleRef = useRef(leadSample);
   sampleRef.current = leadSample;
   const sample = useMemo((): GeolocationSample | null => {
@@ -676,30 +677,18 @@ function OutdoorHub({
                 GPS ungenau — Radius automatisch um {effectiveHealthBonus} m erweitert.
               </p>
             ) : null}
-            {canUnlockGps ? (
-              <div className="space-y-2">
-                <BigButton
-                  variant="outline"
-                  disabled={disabled || isPending}
-                  onClick={() =>
-                    openWithSample(
-                      sample,
-                      routeOrder === "free" ? targetLevel.level : undefined,
-                      "geofence",
-                    )
-                  }
-                >
-                  Wir sind am Punkt
-                </BigButton>
-                <p className="text-center text-xs text-[var(--cg-muted)]">
-                  Wenn GPS hängt oder der Radius nicht greift — Alpha öffnet fürs Team.
-                </p>
-              </div>
-            ) : (
-              <p className="text-center text-sm text-[var(--cg-muted)]">
-                Nur Alpha / GPS-Leiter kann den Wegpunkt freischalten.
-              </p>
-            )}
+            <GpsTroubleBlock
+              canUnlock={canUnlockGps}
+              disabled={disabled || isPending}
+              gpsError={isWalkTracker ? gpsError : null}
+              onUnlock={() =>
+                openWithSample(
+                  sample,
+                  routeOrder === "free" ? targetLevel.level : undefined,
+                  "geofence",
+                )
+              }
+            />
             {process.env.NODE_ENV === "development" && targetLevel.location ? (
               <BigButton
                 variant="outline"
@@ -796,5 +785,101 @@ function OutdoorTimeWait({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function GpsTroubleBlock({
+  canUnlock,
+  disabled,
+  gpsError,
+  onUnlock,
+}: {
+  canUnlock: boolean;
+  disabled: boolean;
+  gpsError: string | null;
+  onUnlock: () => void;
+}) {
+  const [userOpen, setUserOpen] = useState<boolean | null>(null);
+  const [choice, setChoice] = useState<"here" | "broken" | null>(null);
+  const open = userOpen ?? Boolean(gpsError);
+  const effectiveChoice = choice ?? (gpsError ? "broken" : null);
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => {
+          setUserOpen(!open);
+          if (open) setChoice(null);
+        }}
+        className="tap-lift w-full rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3 text-left"
+      >
+        <span className="block text-sm font-bold text-[var(--cg-fg)]">GPS-Problem?</span>
+        <span className="mt-0.5 block text-xs text-[var(--cg-muted)]">
+          Wir stehen davor, oder der Standort kommt nicht — kurze Auswahl.
+        </span>
+      </button>
+
+      {open ? (
+        <div className="space-y-2 rounded-2xl bg-[var(--cg-secondary)] px-3 py-3">
+          <button
+            type="button"
+            onClick={() => setChoice("here")}
+            className={`tap-lift w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${
+              effectiveChoice === "here"
+                ? "bg-[var(--cg-card)] text-[var(--cg-fg)] ring-1 ring-[var(--cg-primary)]/40"
+                : "text-[var(--cg-fg)]"
+            }`}
+          >
+            Wir stehen direkt davor — GPS greift nicht
+          </button>
+          <button
+            type="button"
+            onClick={() => setChoice("broken")}
+            className={`tap-lift w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${
+              effectiveChoice === "broken"
+                ? "bg-[var(--cg-card)] text-[var(--cg-fg)] ring-1 ring-[var(--cg-primary)]/40"
+                : "text-[var(--cg-fg)]"
+            }`}
+          >
+            GPS funktioniert nicht richtig
+          </button>
+
+          {effectiveChoice === "here" ? (
+            <div className="space-y-2 pt-1">
+              {canUnlock ? (
+                <BigButton variant="outline" disabled={disabled} onClick={onUnlock}>
+                  Aufgabe freischalten
+                </BigButton>
+              ) : (
+                <p className="text-center text-xs text-[var(--cg-muted)]">
+                  Alpha / GPS-Leiter schaltet den Punkt fürs Team frei.
+                </p>
+              )}
+            </div>
+          ) : null}
+
+          {effectiveChoice === "broken" ? (
+            <div className="space-y-2 pt-1">
+              {gpsError ? (
+                <p className="text-center text-xs font-semibold text-[var(--cg-fg)]">{gpsError}</p>
+              ) : null}
+              <p className="text-center text-xs leading-snug text-[var(--cg-muted)]">
+                {GPS_SETTINGS_TIP}
+              </p>
+              {canUnlock ? (
+                <BigButton variant="outline" disabled={disabled} onClick={onUnlock}>
+                  Ohne GPS freischalten
+                </BigButton>
+              ) : (
+                <p className="text-center text-xs text-[var(--cg-muted)]">
+                  Ohne GPS: Alpha tippt „Aufgabe freischalten“.
+                </p>
+              )}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }

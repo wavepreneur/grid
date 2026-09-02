@@ -228,12 +228,12 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
 
       <Panel
         title="Health-Engine"
-        subtitle="Radius-Fallback und Nudge laufen auf dem GPS-Lead-Gerät — ohne neuen FSM-Schritt. Manuelle Hebel bleiben unten unter Legacy."
+        subtitle="Technik heilt still. Menschliche Störungen bekommen im Spiel einen Klick. Kein neuer FSM-Schritt. Manuelle Hebel bleiben unter Legacy."
       >
         <p className="text-sm leading-6 text-muted-foreground">
-          Hängt ein Team länger als 90 s knapp außerhalb des Geofence, erweitert das Lead-Handy den
-          Radius schrittweise (max. 80 m) und zeigt einen In-App-Hinweis. Session-Handoff bleibt
-          der bestehende Self-Heal-Pfad.
+          GPS: Lead-Radius nach 90 s nahe am Punkt (max. +80 m), plus Auswahl „wir stehen davor“ /
+          Einstellungen. Rätsel: 5 min ohne Eingabe oder 3 Fehlversuche → Tipp, Freischalten oder
+          FAQ. Session-Handoff bleibt der Netz-Pfad.
         </p>
         <ul className="mt-4 flex flex-col gap-2">
           {sortedTeams.filter((team) => team.status === "playing").length === 0 ? (

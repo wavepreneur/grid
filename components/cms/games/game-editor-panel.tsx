@@ -361,8 +361,9 @@ export function GameEditorPanel({
               <section className="rounded-3xl bg-secondary/60 p-4 sm:p-5">
                 <p className="text-base font-bold text-foreground">Folge-Trigger</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Optional. Nach Spielende koppelbar mit Micro-Pulse / Slack. Billing bleibt bei
-                  Exitmania oder Tabbrain — GRID speichert nur die Kopplung im Snapshot.
+                  Absicht für später — GRID spielt noch nichts aus. Speichern + Publish legt die
+                  Kopplung im Snapshot ab. Dispatch (Pulse-REST, Slack/Teams) kommt in einem eigenen
+                  Schritt. Billing bleibt Exitmania oder Tabbrain.
                 </p>
                 <label className="mt-4 flex items-center gap-2 text-sm font-medium">
                   <input

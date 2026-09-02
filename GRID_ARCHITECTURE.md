@@ -21,8 +21,8 @@ GRID ist **keine Content-Plattform** (kein Canva, kein B2B-Kahoot, **kein Loquiz
 
 | Produkt | IST | Ziel |
 |---|---|---|
-| **GRID Studio** | Aufgaben, Spiele, GPS, Publish-Snapshots, Tickets. Optionales Feld `feature_flags.follow_up_trigger` im Snapshot. | Folge-Trigger verpflichtend; Pulse-Provisioning bleibt Exitmania/Tabbrain. **Kein** Checkout in GRID. |
-| **GRID Cockpit** | Live-Übersicht + **manuelle** Operator-Hebel (Legacy/Dev). Lead-Gerät erweitert Radius + Nudge, wenn der Geofence hängt. Session/Device-Handoff heilt sich selbst. | Volle autonome Health-Engine, 0 % Support. Operator-Hebel bleiben für GPS-Tests. |
+| **GRID Studio** | Aufgaben, Spiele, GPS, Publish-Snapshots, Tickets. Optionales Feld `feature_flags.follow_up_trigger` = **Absicht** im Snapshot (noch kein Dispatch). | Dispatch später: fertiges Team + Pulse-REST. Billing bleibt Exitmania/Tabbrain. **Kein** Checkout in GRID. |
+| **GRID Cockpit** | Live-Übersicht + **manuelle** Operator-Hebel (Legacy/Dev). Technik: Lead-Radius, Session-Handoff, GPS-Auswahl (freischalten / Einstellungen). Mensch: Idle 5 min und 3 Fehlversuche → Tipp / Freischalten / FAQ im Spiel. | Volle autonome Health-Engine, 0 % Support. Operator-Hebel bleiben für GPS-Tests. |
 | **GRID Data** | `/data` leitet Indizes nach `finished` aus `play_attempt_*` / Hints ab. Org-Schnitt + Feld-Baseline. | Branchenschnitt, Filter nach Abteilung, fertiges Buyer-Dashboard. |
 
 Die Live-Engine (`/e/{code}`, FSM, Rollen, GPS-Lead, Hub → Quiz → Level) bleibt das Fundament und wird für den Produktumbau **nicht** ersetzt.
@@ -175,6 +175,8 @@ Zwei Deployment-Säulen unter **einer Engine**:
 
 Micro-Pulses dürfen **keine permanenten WebSockets** nutzen. Fortschritt = stateless `pulse_player_states`.
 
+**Folge-Trigger (Absicht vs. Dispatch):** Studio speichert nur Intent im Publish-Snapshot (`lib/grid/follow-up-trigger.ts`). Ausspielen kommt später und dockt an **bestehende** Daten: `teams.status = finished` / `finished_at`, `cadence_days` → `followUpDueAt()`, dann `POST /api/v1/pulse/sessions` (`program_slug`, `channel`, idempotente `booking_reference`). **Nicht** in den Play-Write-Path (Solve/OK) und **nicht** als neuer FSM-Schritt. Slack/Teams-Bot und Checkout bleiben Partner-Produkte.
+
 **Global Team Intelligence Score** = `stress_index` (sync) − `collaboration_streak` (async) — beide in `domain_telemetry_metrics`.
 
 ### Ist-Stand
@@ -263,7 +265,7 @@ Bei jedem Release prüfen:
 | Content | `lib/grid/content-loader.ts`, `lib/grid/level-types.ts` |
 | Operator | `app/actions/cockpit.ts`, `components/cockpit/event-cockpit-show.tsx` |
 | Telemetrie | `lib/grid/audit-log.ts`, `supabase/migrations/20260615120000_architecture_foundation.sql` |
-| Booking / Tabbrain-Integration | `app/api/v1/bookings/route.ts`, `lib/grid/organizations.ts` |
+| Follow-up Intent | `lib/grid/follow-up-trigger.ts` — Snapshot-JSON, Dispatch später über Pulse-REST |
 | Layer profile UI | `components/cms/games/game-layer-profile-panel.tsx` |
 | Marketing-Kompass | `components/marketing/grid-landing-page.tsx` |
 

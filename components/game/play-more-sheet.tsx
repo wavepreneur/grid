@@ -4,8 +4,18 @@ import { useEffect, useState, type ReactNode } from "react";
 import { BigButton } from "@/components/game/city/ui";
 import { PlayDocSheet } from "@/components/game/play-doc-sheet";
 import { PersonalResumeLinkCard } from "@/components/player/personal-resume-link-card";
+import { GPS_SETTINGS_TIP } from "@/lib/grid/play-help";
 
-export type PlayMorePanel = "menu" | "briefing" | "faq" | "support" | "pause" | "team" | null;
+export type PlayMorePanel =
+  | "menu"
+  | "briefing"
+  | "faq"
+  | "help"
+  | "gps"
+  | "support"
+  | "pause"
+  | "team"
+  | null;
 
 type Props = {
   open: PlayMorePanel;
@@ -30,6 +40,9 @@ type Props = {
   onReclaimSession?: () => void;
   onReleaseMySeat?: () => void;
   releasePending?: boolean;
+  /** Hub only — Alpha / GPS-lead can unlock the waypoint from this sheet. */
+  canUnlockGps?: boolean;
+  onForceUnlockGps?: () => void;
 };
 
 /**
@@ -58,6 +71,8 @@ export function PlayMoreSheet({
   onReclaimSession,
   onReleaseMySeat,
   releasePending,
+  canUnlockGps = false,
+  onForceUnlockGps,
 }: Props) {
   const showBriefingDoc = open === "briefing" && Boolean(briefingIframeUrl?.trim());
   const showFaqDoc = open === "faq" && Boolean(faqIframeUrl?.trim());
@@ -114,6 +129,11 @@ export function PlayMoreSheet({
                     onClick={() => onOpen("briefing")}
                   />
                   <MenuRow
+                    title="Steckt ihr fest?"
+                    hint="GPS, Lösung, Verbindung — kurze Auswahl, dann der passende Hebel"
+                    onClick={() => onOpen("help")}
+                  />
+                  <MenuRow
                     title="FAQ"
                     hint="Technik, Störungen und Tipps, wenn ihr nicht weiterkommt"
                     onClick={() => onOpen("faq")}
@@ -152,6 +172,91 @@ export function PlayMoreSheet({
                   </p>
                   <BigButton variant="ghost" onClick={onClose}>
                     Verstanden
+                  </BigButton>
+                </div>
+              ) : null}
+
+              {open === "help" ? (
+                <div className="space-y-2">
+                  <p className="mb-3 text-sm leading-relaxed text-[var(--cg-muted)]">
+                    Sagt kurz, was hakt. Technische Störungen heilt das Spiel selbst; bei Rätsel
+                    oder Verständnis gibt es Tipps, Freischalten und FAQ — ohne Support-Ticket.
+                  </p>
+                  <MenuRow
+                    title="Standort / GPS"
+                    hint="Wir stehen davor, oder das Gerät liefert keinen Ort"
+                    onClick={() => onOpen("gps")}
+                  />
+                  <MenuRow
+                    title="Wir kommen bei der Lösung nicht weiter"
+                    hint="Tipp auf einer Kachel, oder unten Lösung anzeigen"
+                    onClick={onClose}
+                  />
+                  <MenuRow
+                    title="Verbindung oder anderes Gerät"
+                    hint="Seite neu laden, Weiterspiel-Link, Leitung übergeben"
+                    onClick={() => onOpen("team")}
+                  />
+                  <MenuRow
+                    title="Wie funktioniert das Spiel?"
+                    hint="FAQ und Kurzinfo"
+                    onClick={() => onOpen("faq")}
+                  />
+                </div>
+              ) : null}
+
+              {open === "gps" ? (
+                <div className="space-y-3">
+                  <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
+                    Was trifft zu? Technische GPS-Störungen heilt das Spiel mit, oder ihr schaltet
+                    den Punkt frei.
+                  </p>
+                  <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
+                    <p className="font-bold text-[var(--cg-fg)]">
+                      Wir stehen direkt davor — GPS greift nicht
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--cg-muted)]">
+                      Radius-Heal läuft automatisch. Wenn ihr klar am Punkt seid, schaltet die
+                      Team-Leitung frei.
+                    </p>
+                    {canUnlockGps && onForceUnlockGps ? (
+                      <div className="mt-3">
+                        <BigButton
+                          disabled={busy}
+                          onClick={() => {
+                            onForceUnlockGps();
+                            onClose();
+                          }}
+                        >
+                          Aufgabe freischalten
+                        </BigButton>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm font-semibold text-[var(--cg-fg)]">
+                        Alpha / GPS-Leiter tippt auf der Karte „Wir sind am Punkt“.
+                      </p>
+                    )}
+                  </div>
+                  <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
+                    <p className="font-bold text-[var(--cg-fg)]">GPS funktioniert nicht richtig</p>
+                    <p className="mt-1 text-sm text-[var(--cg-muted)]">{GPS_SETTINGS_TIP}</p>
+                    {canUnlockGps && onForceUnlockGps ? (
+                      <div className="mt-3">
+                        <BigButton
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => {
+                            onForceUnlockGps();
+                            onClose();
+                          }}
+                        >
+                          Trotzdem freischalten
+                        </BigButton>
+                      </div>
+                    ) : null}
+                  </div>
+                  <BigButton variant="ghost" onClick={() => onOpen("help")}>
+                    Zurück
                   </BigButton>
                 </div>
               ) : null}
@@ -353,6 +458,10 @@ function panelTitle(panel: Exclude<PlayMorePanel, null>): string {
       return "Spiel-Menü";
     case "briefing":
       return "Kurzinformationen";
+    case "help":
+      return "Steckt ihr fest?";
+    case "gps":
+      return "Standort / GPS";
     case "faq":
       return "FAQ";
     case "support":

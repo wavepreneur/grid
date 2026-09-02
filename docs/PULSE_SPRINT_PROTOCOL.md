@@ -96,8 +96,18 @@ Pulse-Progress schreibt direkt `pulse_collaboration_streak` (`async_pulse`).
 3. **Exitmania unberührt** — Pulse ist Tabbrain/Slack-Pfad; Macro bleibt Booking-API.
 4. Slack/Teams-Bots sind **Integration Layer** — rufen nur REST, nicht GRID-FSM.
 
+## Studio-Kopplung (noch kein Cron)
+
+Macro-Events können im Spiel-Snapshot `feature_flags.follow_up_trigger` tragen (Absicht). Dispatch ist **nicht** gebaut. Wenn er kommt:
+
+- Arming-Quelle: `teams.finished_at`, nicht ein neuer Game-FSM-Schritt
+- Fälligkeit: `followUpDueAt(finished_at, cadence_days)` in `lib/grid/follow-up-trigger.ts`
+- Provision: diese REST-API (`program_slug` + `channel` + `booking_reference`)
+- JSON-Key nicht umbenennen (`follow_up_trigger`)
+
 ## Nächste Schritte (Produkt)
 
 - [ ] Org-Dashboard: Intelligence Score aus `domain_telemetry_metrics` aggregieren
 - [ ] Slack App / Teams Bot → `POST .../progress`
 - [ ] `pulse_programs` Admin-UI (Jahres-Landing)
+- [ ] Worker: finished Teams mit Follow-up-Intent → Pulse-Session (ohne Play-Write-Path)
