@@ -204,101 +204,92 @@ export function GpsMissionMap({
     withinRadius,
   ]);
 
-  const ringSize = 132;
-  const ringStroke = 10;
+  const ringSize = 72;
+  const ringStroke = 7;
   const ringRadius = (ringSize - ringStroke) / 2;
   const ringCirc = 2 * Math.PI * ringRadius;
 
   return (
-    <div className="relative isolate z-0 overflow-hidden rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-card)] shadow-[var(--cg-shadow-soft)]">
-      <div ref={containerRef} className="h-[min(38vh,260px)] w-full sm:h-[240px]" />
-
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-[var(--cg-card)] via-[var(--cg-card)]/90 to-transparent px-4 pb-3 pt-16">
-        <div className="flex items-end justify-center gap-4">
-          {showPlayer && playerPosition && target && bearing !== null && !withinRadius ? (
-            <div className="mb-2 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--cg-fg)] text-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)]">
-              <svg
-                viewBox="0 0 64 64"
-                className="h-8 w-8"
-                style={{ transform: `rotate(${bearing}deg)` }}
-                aria-hidden
-              >
-                <path d="M32 6 L46 50 L32 40 L18 50 Z" fill="currentColor" />
-              </svg>
-            </div>
-          ) : null}
-
-          <div className="relative">
+    <div className="overflow-hidden rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-card)] shadow-[var(--cg-shadow-soft)]">
+      <div className="relative">
+        <div ref={containerRef} className="h-[min(36vh,240px)] w-full sm:h-[220px]" />
+        {showPlayer && playerPosition && target && bearing !== null && !withinRadius ? (
+          <div className="pointer-events-none absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--cg-fg)] text-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)]">
             <svg
-              width={ringSize}
-              height={ringSize}
-              viewBox={`0 0 ${ringSize} ${ringSize}`}
-              className="-rotate-90"
+              viewBox="0 0 64 64"
+              className="h-7 w-7"
+              style={{ transform: `rotate(${bearing}deg)` }}
               aria-hidden
             >
-              <circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={ringRadius}
-                fill="none"
-                stroke="var(--cg-secondary)"
-                strokeWidth={ringStroke}
-              />
-              <circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={ringRadius}
-                fill="none"
-                stroke={withinRadius ? "var(--cg-success)" : "var(--cg-primary)"}
-                strokeWidth={ringStroke}
-                strokeLinecap="round"
-                strokeDasharray={ringCirc}
-                strokeDashoffset={ringCirc * (1 - (withinRadius ? 1 : progress))}
-                style={{ transition: "stroke-dashoffset 0.25s linear" }}
-              />
+              <path d="M32 6 L46 50 L32 40 L18 50 Z" fill="currentColor" />
             </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-              {withinRadius ? (
-                <p className="text-lg font-bold text-[var(--cg-success)]">Am Ziel</p>
-              ) : remaining !== null ? (
-                <>
-                  <p className="text-3xl font-bold tabular-nums leading-none text-[var(--cg-fg)]">
-                    {remaining}
-                  </p>
-                  <p className="mt-1 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--cg-muted)]">
-                    Meter
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-[var(--cg-muted)]">GPS…</p>
-              )}
-            </div>
           </div>
-        </div>
-        {!withinRadius && remaining !== null ? (
-          <p className="mt-2 text-center text-sm tabular-nums text-[var(--cg-muted)]">
-            {walked} m gelaufen
-            {startDist ? ` · Start ${Math.round(startDist)} m` : ""}
-          </p>
         ) : null}
       </div>
 
-      <div className="border-t border-[var(--cg-border)] bg-[var(--cg-secondary)]/60 px-4 py-2.5 text-center text-sm">
-        {withinRadius ? (
-          <p className="font-medium text-[var(--cg-success)]">Ihr seid am Wegpunkt.</p>
-        ) : showPlayer && playerPosition ? (
-          <p className="text-[var(--cg-muted)]">
-            {isTracker
-              ? "Dein Handy zählt die Meter fürs Team — folgt dem Pfeil."
-              : "Das Handy vom Team Lead zählt die Meter — folgt dem Pfeil."}
-          </p>
-        ) : (
-          <p className="text-[var(--cg-muted)]">
-            {isTracker
-              ? "GPS wird gesucht…"
-              : "Warten auf die Position vom Team Lead."}
-          </p>
-        )}
+      <div className="flex items-center gap-3 border-t border-[var(--cg-border)] px-4 py-3">
+        <div className="relative shrink-0">
+          <svg
+            width={ringSize}
+            height={ringSize}
+            viewBox={`0 0 ${ringSize} ${ringSize}`}
+            className="-rotate-90"
+            aria-hidden
+          >
+            <circle
+              cx={ringSize / 2}
+              cy={ringSize / 2}
+              r={ringRadius}
+              fill="none"
+              stroke="var(--cg-secondary)"
+              strokeWidth={ringStroke}
+            />
+            <circle
+              cx={ringSize / 2}
+              cy={ringSize / 2}
+              r={ringRadius}
+              fill="none"
+              stroke={withinRadius ? "var(--cg-success)" : "var(--cg-primary)"}
+              strokeWidth={ringStroke}
+              strokeLinecap="round"
+              strokeDasharray={ringCirc}
+              strokeDashoffset={ringCirc * (1 - (withinRadius ? 1 : progress))}
+              style={{ transition: "stroke-dashoffset 0.25s linear" }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            {withinRadius ? (
+              <p className="text-[0.65rem] font-bold text-[var(--cg-success)]">Ziel</p>
+            ) : remaining !== null ? (
+              <p className="text-base font-bold tabular-nums leading-none text-[var(--cg-fg)]">
+                {remaining}
+              </p>
+            ) : (
+              <p className="text-[0.65rem] text-[var(--cg-muted)]">GPS</p>
+            )}
+          </div>
+        </div>
+        <div className="min-w-0 flex-1 text-sm">
+          {withinRadius ? (
+            <p className="font-medium text-[var(--cg-success)]">Ihr seid am Punkt.</p>
+          ) : remaining !== null ? (
+            <>
+              <p className="font-semibold tabular-nums text-[var(--cg-fg)]">
+                {walked} m gelaufen
+                {startDist ? ` · Start ${Math.round(startDist)} m` : ""}
+              </p>
+              <p className="mt-0.5 text-[var(--cg-muted)]">
+                {isTracker
+                  ? "Dein Handy zählt die Meter fürs Team."
+                  : "Das Handy vom Team Lead zählt die Meter."}
+              </p>
+            </>
+          ) : (
+            <p className="text-[var(--cg-muted)]">
+              {isTracker ? "GPS wird gesucht…" : "Warten auf die Position vom Team Lead."}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

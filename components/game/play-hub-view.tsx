@@ -572,7 +572,7 @@ function OutdoorHub({
         <div className="space-y-1 px-4 pb-2 pt-2">
           <SectionLabel>Stadtjagd · Strecke</SectionLabel>
           <h1 className="text-xl font-bold text-[var(--cg-fg)]">
-            Wegpunkt {current.level} von {levels.length}
+            Aufgabe {current.level} von {levels.length}
           </h1>
         </div>
         <OutdoorWalkRing
@@ -613,14 +613,14 @@ function OutdoorHub({
   }
 
   return (
-    <section className="flex min-h-[70vh] flex-col">
+    <section className="flex flex-col">
       <div className="space-y-3 px-4 pb-3 pt-2">
         <header>
           <SectionLabel>Stadtjagd</SectionLabel>
           <h1 className="text-xl font-bold text-[var(--cg-fg)]">
             {routeOrder === "free"
-              ? `${openCount} von ${levels.length} Wegpunkten offen`
-              : `Wegpunkt ${current.level} von ${levels.length}`}
+              ? `${openCount} von ${levels.length} Aufgaben offen`
+              : `Aufgabe ${current.level} von ${levels.length}`}
           </h1>
           <p className="mt-1 text-sm text-[var(--cg-muted)]">
             {routeOrder === "free"
@@ -630,7 +630,7 @@ function OutdoorHub({
         </header>
       </div>
 
-      <div className="relative min-h-[280px] flex-1 px-4">
+      <div className="px-4">
         {waypoints.length > 0 ? (
           <GpsMissionMap
             waypoints={waypoints}
@@ -645,7 +645,7 @@ function OutdoorHub({
         ) : null}
       </div>
 
-      <div className="z-20 space-y-3 rounded-t-3xl bg-[var(--cg-card)] px-4 pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom)))] pt-4 shadow-[var(--cg-shadow-lift)]">
+      <div className="mt-3 space-y-3 px-4 pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom)))] pt-1">
         <div className="min-w-0">
           <SectionLabel>Euer Ziel</SectionLabel>
           <p className="truncate text-lg font-bold text-[var(--cg-fg)]">{targetLevel.title}</p>
@@ -758,7 +758,7 @@ function OutdoorTimeWait({
     <section className="flex min-h-[70vh] flex-col px-5 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-2">
       <SectionLabel>Stadtjagd · Wartezeit</SectionLabel>
       <h1 className="mt-1 text-xl font-bold text-[var(--cg-fg)]">
-        Wegpunkt {levelIndex} von {total}
+        Aufgabe {levelIndex} von {total}
       </h1>
       <p className="mt-6 text-center text-lg font-bold text-[var(--cg-fg)]">{title}</p>
       <p className="mt-8 text-center text-4xl font-bold tabular-nums text-[var(--cg-fg)]">
