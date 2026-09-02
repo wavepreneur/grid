@@ -469,7 +469,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
   }, [deleteStatuses]);
 
   return (
-    <div className="space-y-7 pb-24">
+    <div className="space-y-5 pb-24">
       {error ? <StudioError message={error} /> : null}
       {message ? <StudioSuccess message={message} /> : null}
 
@@ -595,69 +595,66 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         <button
           type="button"
           onClick={() => openCreateForm("blank")}
-          className="tap-lift flex w-full items-center justify-center gap-2 rounded-3xl border border-dashed border-border bg-card px-6 py-8 text-sm font-bold text-primary shadow-soft"
+          className="tap-lift flex w-full items-center justify-center gap-2 rounded-3xl border border-dashed border-border bg-card px-5 py-5 text-sm font-bold text-primary shadow-soft"
         >
           <IconPlus size={18} />
           Neues Spiel erstellen
         </button>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+      <div className="rounded-3xl bg-card p-3 shadow-soft sm:p-4">
         <div className="relative">
-          <IconSearch className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <IconSearch className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Spiel oder Stadt suchen…"
-            className={`${inputCls} mt-0 pl-11`}
+            className={`${inputCls} mt-0 border-0 bg-secondary pl-11 shadow-none`}
           />
         </div>
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
-            {(
-              [
-                ["alle", "Aktiv"],
-                ["published", "Veröffentlicht"],
-                ["draft", "Entwurf"],
-                ["archived", "Archiv"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setStatusTab(id)}
-                className={`tap-lift rounded-full px-4 py-2 text-sm font-bold ${
-                  statusTab === id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-secondary-foreground"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {(
-              [
-                ["alle", "Alle Flächen"],
-                ...SURFACE_OPTIONS.map((mode) => [mode, surfaceLabelDe(mode)] as const),
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setSurfaceTab(id)}
-                className={`tap-lift rounded-full px-4 py-2 text-sm font-bold ${
-                  surfaceTab === id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-secondary-foreground"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <FilterTrack
+            aria-label="Status"
+            value={statusTab}
+            onChange={setStatusTab}
+            options={[
+              { id: "alle", label: "Aktiv" },
+              { id: "published", label: "Veröffentlicht" },
+              { id: "draft", label: "Entwurf" },
+              { id: "archived", label: "Archiv" },
+            ]}
+          />
+          <FilterTrack
+            aria-label="Spielfläche"
+            value={surfaceTab}
+            onChange={setSurfaceTab}
+            options={[
+              { id: "alle", label: "Alle" },
+              ...SURFACE_OPTIONS.map((mode) => ({
+                id: mode,
+                label: surfaceLabelDe(mode),
+              })),
+            ]}
+          />
         </div>
+        {gamesWithLive.length > 0 && sortedGames.length > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
+            <div className="flex items-center gap-3">
+              <StudioSelectCheckbox
+                checked={allSelected}
+                indeterminate={someSelected}
+                onChange={toggleAll}
+                label="Alle auf dieser Seite auswählen"
+              />
+              <span className="text-sm text-muted-foreground">
+                {selectedIds.size > 0
+                  ? `${selectedIds.size} ausgewählt`
+                  : `${sortedGames.length} Spiele`}
+              </span>
+            </div>
+            <StudioSortMenu value={sort} options={SORT_OPTIONS} onChange={setSort} />
+          </div>
+        ) : null}
       </div>
 
       <section>
@@ -666,41 +663,18 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         ) : sortedGames.length === 0 ? (
           <Empty>Keine Treffer für diese Filter.</Empty>
         ) : (
-          <>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <StudioSelectCheckbox
-                  checked={allSelected}
-                  indeterminate={someSelected}
-                  onChange={toggleAll}
-                  label="Alle auf dieser Seite auswählen"
-                />
-                <span className="text-sm text-muted-foreground">
-                  {selectedIds.size > 0
-                    ? `${selectedIds.size} ausgewählt`
-                    : `${sortedGames.length} Spiele`}
-                </span>
-              </div>
-              <StudioSortMenu
-                value={sort}
-                options={SORT_OPTIONS}
-                onChange={setSort}
+          <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+            {sortedGames.map((game) => (
+              <GameRow
+                key={game.id}
+                game={game}
+                selected={selectedIds.has(game.id)}
+                onToggle={(checked) => toggleOne(game.id, checked)}
+                onDuplicate={() => openDuplicateModal([game.id])}
+                onDelete={() => openDeleteModal([game.id])}
               />
-            </div>
-
-            <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-              {sortedGames.map((game) => (
-                <GameRow
-                  key={game.id}
-                  game={game}
-                  selected={selectedIds.has(game.id)}
-                  onToggle={(checked) => toggleOne(game.id, checked)}
-                  onDuplicate={() => openDuplicateModal([game.id])}
-                  onDelete={() => openDeleteModal([game.id])}
-                />
-              ))}
-            </div>
-          </>
+            ))}
+          </div>
         )}
       </section>
 
@@ -809,6 +783,46 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         }
         onConfirm={confirmDelete}
       />
+    </div>
+  );
+}
+
+function FilterTrack<T extends string>({
+  value,
+  options,
+  onChange,
+  "aria-label": ariaLabel,
+}: {
+  value: T;
+  options: ReadonlyArray<{ id: T; label: string }>;
+  onChange: (id: T) => void;
+  "aria-label": string;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label={ariaLabel}
+      className="inline-flex max-w-full flex-wrap rounded-2xl bg-secondary p-1"
+    >
+      {options.map((opt) => {
+        const active = value === opt.id;
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(opt.id)}
+            className={`tap-lift rounded-xl px-3 py-1.5 text-xs font-bold sm:px-3.5 ${
+              active
+                ? "bg-card text-foreground shadow-soft"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

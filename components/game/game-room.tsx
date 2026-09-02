@@ -497,18 +497,25 @@ export function GameRoom({
     });
   }
 
-  function handleOpenStation(levelNumber: number, stationCode?: string) {
+  function handleOpenStation(levelNumber: number, stationCode?: string): Promise<boolean> {
     setError(null);
-    startSolveTransition(async () => {
-      applyTeamResult(
-        await advanceFromHub({
+    return new Promise((resolve) => {
+      startSolveTransition(async () => {
+        const result = await advanceFromHub({
           inviteCode,
           joinCode,
           sessionId: session.sessionId,
           targetLevel: levelNumber,
           stationCode,
-        }),
-      );
+        });
+        if (!result.success || !result.data) {
+          resolve(false);
+          return;
+        }
+        setTeamState(result.data);
+        cacheTeamState(result.data);
+        resolve(true);
+      });
     });
   }
 

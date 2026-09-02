@@ -84,7 +84,7 @@ type Props = {
   mirroredWalkedMeters?: number;
   mirroredGps?: GpsFixPayload | null;
   onBroadcastGpsFix?: (fix: GpsFixPayload) => void;
-  onOpenStation: (levelNumber: number, stationCode?: string) => void;
+  onOpenStation: (levelNumber: number, stationCode?: string) => Promise<boolean>;
   onSubmitStationCode: (code: string) => void;
   onStartMission: (levelNumber: number) => void;
   onSubmitQuiz: (payload: {

@@ -8,7 +8,7 @@ import {
 } from "@/components/game/gps-mission-map";
 import { OutdoorWalkRing } from "@/components/game/outdoor-walk-ring";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
-import { IconCheck, IconLock } from "@/components/game/city/icons";
+import { IconCheck, IconLock, IconX } from "@/components/game/city/icons";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
 import { useWalkedDistance } from "@/lib/hooks/use-walked-distance";
 import type { ContentMode } from "@/lib/cms/layer-model";
@@ -54,7 +54,7 @@ type Props = {
   mirroredWalkedMeters?: number;
   onArriveOutdoor: (input: OutdoorArriveInput) => void;
   onSolveGpsCheckpoint: (input: OutdoorArriveInput) => void;
-  onOpenStation: (levelNumber: number, stationCode?: string) => void;
+  onOpenStation: (levelNumber: number, stationCode?: string) => Promise<boolean>;
   onSubmitStationCode: (code: string) => void;
   onStartMission: (levelNumber: number) => void;
   /** Lead persists walk to the server (infrequent). */
@@ -92,6 +92,15 @@ export function PlayHubView({
   const current = levels.find((l) => l.level === activeLevel) ?? levels[0];
   const [code, setCode] = useState("");
   const [codeFor, setCodeFor] = useState<number | null>(null);
+  const [codeWrong, setCodeWrong] = useState(false);
+  const wrongResetRef = useRef<number | null>(null);
+  const codeInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (wrongResetRef.current != null) window.clearTimeout(wrongResetRef.current);
+    };
+  }, []);
 
   // Outdoor GPS pin OR walk/time trigger → dedicated outdoor hub.
   const outdoorTriggered =
@@ -165,9 +174,7 @@ export function PlayHubView({
                 className={`h-2.5 flex-1 rounded-full ${
                   status === "completed"
                     ? "bg-[var(--cg-success)]"
-                    : status === "active"
-                      ? "bg-[var(--cg-primary)]"
-                      : "bg-[var(--cg-secondary)]"
+                    : "bg-[var(--cg-secondary)]"
                 }`}
               />
             );
@@ -181,23 +188,31 @@ export function PlayHubView({
             const locked = !free && status === "locked";
             const isNext = !isDone && !locked && (free || status === "active");
             const asking = codeFor === s.level;
+            const flashWrong = asking && codeWrong;
             return (
               <li key={s.level} className="relative">
                 <div
                   className={`overflow-hidden rounded-3xl border-2 ${
                     isDone
                       ? "border-[var(--cg-success)]/50 bg-[var(--cg-success)]/10"
-                      : asking
-                        ? "border-[var(--cg-primary)] bg-[var(--cg-card)] shadow-[var(--cg-shadow-lift)]"
-                        : isNext
-                          ? "border-[var(--cg-primary)]/70 bg-[var(--cg-card)]"
-                          : "border-[var(--cg-border)] bg-[var(--cg-secondary)]"
+                      : flashWrong
+                        ? "cg-animate-shake border-[var(--cg-destructive)] bg-[var(--cg-destructive)]/12"
+                        : asking
+                          ? "border-[var(--cg-primary)] bg-[var(--cg-card)] shadow-[var(--cg-shadow-lift)]"
+                          : isNext
+                            ? "border-[var(--cg-primary)]/70 bg-[var(--cg-card)]"
+                            : "border-[var(--cg-border)] bg-[var(--cg-secondary)]"
                   }`}
                 >
                   <button
                     type="button"
-                    disabled={disabled || isPending || locked || isDone}
+                    disabled={disabled || isPending || locked || isDone || codeWrong}
                     onClick={() => {
+                      if (wrongResetRef.current != null) {
+                        window.clearTimeout(wrongResetRef.current);
+                        wrongResetRef.current = null;
+                      }
+                      setCodeWrong(false);
                       setCodeFor(s.level);
                       setCode("");
                     }}
@@ -207,23 +222,41 @@ export function PlayHubView({
                       className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-xl font-extrabold ${
                         isDone
                           ? "bg-[var(--cg-success)] text-white"
-                          : locked
-                            ? "bg-[var(--cg-card)] text-[var(--cg-muted)]"
-                            : "bg-[var(--cg-primary)] text-[var(--cg-primary-fg)]"
+                          : flashWrong
+                            ? "bg-[var(--cg-destructive)] text-white"
+                            : locked
+                              ? "bg-[var(--cg-card)] text-[var(--cg-muted)]"
+                              : "bg-[var(--cg-primary)] text-[var(--cg-primary-fg)]"
                       }`}
                     >
-                      {isDone ? <IconCheck size={28} /> : locked ? <IconLock size={24} /> : s.level}
+                      {isDone ? (
+                        <IconCheck size={28} />
+                      ) : flashWrong ? (
+                        <IconX size={28} />
+                      ) : locked ? (
+                        <IconLock size={24} />
+                      ) : (
+                        s.level
+                      )}
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate text-lg font-bold text-[var(--cg-fg)]">
                         {s.station?.name ?? s.title}
                       </span>
-                      <span className="block truncate text-sm text-[var(--cg-muted)]">
+                      <span
+                        className={`block truncate text-sm ${
+                          flashWrong
+                            ? "font-semibold text-[var(--cg-destructive)]"
+                            : "text-[var(--cg-muted)]"
+                        }`}
+                      >
                         {isDone
                           ? "Gelöst"
-                          : locked
-                            ? "Noch gesperrt — erst die Station davor"
-                            : s.station?.place?.trim() || "Zettel suchen, dann Code"}
+                          : flashWrong
+                            ? "Falsch"
+                            : locked
+                              ? "Noch gesperrt — erst die Station davor"
+                              : s.station?.place?.trim() || "Zettel suchen, dann Code"}
                       </span>
                     </span>
                   </button>
@@ -233,25 +266,56 @@ export function PlayHubView({
                   ) : null}
 
                   {asking && !isDone && !locked ? (
-                    <div className="space-y-2 border-t border-[var(--cg-border)] px-4 pb-4 pt-3">
-                      <p className="text-sm text-[var(--cg-muted)]">
-                        Code vom Zettel dieser Station — 4 Zeichen, Zahlen und Buchstaben.
-                      </p>
-                      <input
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        placeholder="CODE"
-                        autoComplete="off"
-                        autoCapitalize="characters"
-                        className="w-full rounded-2xl border-2 border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3 text-center text-xl font-bold uppercase tracking-[0.28em] outline-none focus:border-[var(--cg-primary)]"
-                      />
-                      <BigButton
-                        variant="accent"
-                        disabled={disabled || isPending || code.trim().length < 4}
-                        onClick={() => onOpenStation(s.level, code)}
-                      >
-                        Code prüfen
-                      </BigButton>
+                    <div
+                      className={`space-y-2 border-t px-4 pb-4 pt-3 ${
+                        flashWrong
+                          ? "border-[var(--cg-destructive)]/30"
+                          : "border-[var(--cg-border)]"
+                      }`}
+                    >
+                      {flashWrong ? (
+                        <p className="py-2 text-center text-lg font-extrabold uppercase tracking-wide text-[var(--cg-destructive)]">
+                          Falsch
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-sm text-[var(--cg-muted)]">
+                            Code vom Zettel dieser Station — 4 Zeichen, Zahlen und Buchstaben.
+                          </p>
+                          <input
+                            ref={codeInputRef}
+                            value={code}
+                            onChange={(e) => setCode(e.target.value)}
+                            placeholder="CODE"
+                            autoComplete="off"
+                            autoCapitalize="characters"
+                            className="w-full rounded-2xl border-2 border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3 text-center text-xl font-bold uppercase tracking-[0.28em] outline-none focus:border-[var(--cg-primary)]"
+                          />
+                          <BigButton
+                            variant="accent"
+                            disabled={disabled || isPending || code.trim().length < 4}
+                            onClick={async () => {
+                              const ok = await onOpenStation(s.level, code);
+                              if (ok) return;
+                              playPlaySfx("wrong");
+                              setCodeWrong(true);
+                              if (wrongResetRef.current != null) {
+                                window.clearTimeout(wrongResetRef.current);
+                              }
+                              wrongResetRef.current = window.setTimeout(() => {
+                                setCodeWrong(false);
+                                setCode("");
+                                wrongResetRef.current = null;
+                                requestAnimationFrame(() => {
+                                  codeInputRef.current?.focus({ preventScroll: true });
+                                });
+                              }, 850);
+                            }}
+                          >
+                            Code prüfen
+                          </BigButton>
+                        </>
+                      )}
                     </div>
                   ) : null}
                 </div>
