@@ -31,6 +31,7 @@ import {
   StudioInput,
   StudioLabel,
   StudioSectionTitle,
+  StudioSelect,
   StudioSuccess,
   StudioTextarea,
 } from "@/components/cms/studio-ui";
@@ -47,6 +48,11 @@ import {
 } from "@/lib/cms/game-slots";
 import { parseLogicRules, type StudioLogicRule } from "@/lib/cms/logic-rules";
 import type { StudioGame, StudioGameTaskLink } from "@/lib/cms/types";
+import {
+  parseFollowUpTrigger,
+  withFollowUpTrigger,
+  type FollowUpKind,
+} from "@/lib/grid/follow-up-trigger";
 
 type Props = {
   game: StudioGame;
@@ -86,6 +92,7 @@ export function GameEditorPanel({
 
   const surface = parseRuntimeProfiles(game.runtime_profiles).default_mode;
   const routeOrder = parseRuntimeProfiles(game.runtime_profiles).route_order;
+  const followUp = parseFollowUpTrigger(game.feature_flags);
   const countdownOn = Boolean(game.duration_minutes && game.duration_minutes > 0);
   const lastCountdownMinutes = useRef(lastPositiveDuration(initialGame.duration_minutes));
   if (game.duration_minutes && game.duration_minutes > 0) {
@@ -349,6 +356,148 @@ export function GameEditorPanel({
               <p className="mt-1.5 text-xs text-muted-foreground">
                 Technik, Störungen, Tipps — im Spielmenü unter FAQ.
               </p>
+            </div>
+            <div className="md:col-span-2">
+              <section className="rounded-3xl bg-secondary/60 p-4 sm:p-5">
+                <p className="text-base font-bold text-foreground">Folge-Trigger</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Optional. Nach Spielende koppelbar mit Micro-Pulse / Slack. Billing bleibt bei
+                  Exitmania oder Tabbrain — GRID speichert nur die Kopplung im Snapshot.
+                </p>
+                <label className="mt-4 flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={followUp.enabled}
+                    onChange={(e) =>
+                      setGame({
+                        ...game,
+                        feature_flags: withFollowUpTrigger(game.feature_flags, {
+                          ...followUp,
+                          enabled: e.target.checked,
+                          kind: e.target.checked
+                            ? followUp.kind === "none"
+                              ? "micro_pulse"
+                              : followUp.kind
+                            : "none",
+                        }),
+                      })
+                    }
+                  />
+                  Folge-Trigger aktiv
+                </label>
+                {followUp.enabled ? (
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <StudioLabel>Art</StudioLabel>
+                      <StudioSelect
+                        value={followUp.kind}
+                        onChange={(e) =>
+                          setGame({
+                            ...game,
+                            feature_flags: withFollowUpTrigger(game.feature_flags, {
+                              ...followUp,
+                              kind: e.target.value as FollowUpKind,
+                            }),
+                          })
+                        }
+                      >
+                        <option value="micro_pulse">Micro-Pulse (REST)</option>
+                        <option value="slack_program">Slack / Teams-Programm</option>
+                      </StudioSelect>
+                    </div>
+                    <div>
+                      <StudioLabel>Kanal</StudioLabel>
+                      <StudioSelect
+                        value={followUp.channel ?? "web"}
+                        onChange={(e) =>
+                          setGame({
+                            ...game,
+                            feature_flags: withFollowUpTrigger(game.feature_flags, {
+                              ...followUp,
+                              channel: e.target.value as "slack" | "msteams" | "web" | "api",
+                            }),
+                          })
+                        }
+                      >
+                        <option value="web">Web</option>
+                        <option value="slack">Slack</option>
+                        <option value="msteams">MS Teams</option>
+                        <option value="api">API</option>
+                      </StudioSelect>
+                    </div>
+                    <div>
+                      <StudioLabel>Rhythmus (Tage)</StudioLabel>
+                      <StudioInput
+                        type="number"
+                        min={1}
+                        placeholder="7"
+                        value={followUp.cadence_days ?? ""}
+                        onChange={(e) =>
+                          setGame({
+                            ...game,
+                            feature_flags: withFollowUpTrigger(game.feature_flags, {
+                              ...followUp,
+                              cadence_days: e.target.value ? Number(e.target.value) : null,
+                            }),
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <StudioLabel>Program-Slug (optional)</StudioLabel>
+                      <StudioInput
+                        placeholder="weekly-pulse"
+                        value={followUp.program_slug ?? ""}
+                        onChange={(e) =>
+                          setGame({
+                            ...game,
+                            feature_flags: withFollowUpTrigger(game.feature_flags, {
+                              ...followUp,
+                              program_slug: e.target.value.trim() || null,
+                            }),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <StudioLabel>CTA-Text</StudioLabel>
+                      <StudioInput
+                        placeholder="Nächsten Pulse starten"
+                        value={followUp.cta_label ?? ""}
+                        onChange={(e) =>
+                          setGame({
+                            ...game,
+                            feature_flags: withFollowUpTrigger(game.feature_flags, {
+                              ...followUp,
+                              cta_label: e.target.value.trim() || null,
+                            }),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <StudioLabel>CTA-Link (Exitmania / Tabbrain)</StudioLabel>
+                      <StudioInput
+                        type="url"
+                        placeholder="https://…"
+                        value={followUp.cta_url ?? ""}
+                        onChange={(e) =>
+                          setGame({
+                            ...game,
+                            feature_flags: withFollowUpTrigger(game.feature_flags, {
+                              ...followUp,
+                              cta_url: e.target.value.trim() || null,
+                            }),
+                          })
+                        }
+                      />
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Kein Checkout in GRID. Der Link zeigt auf den Commerce-Partner.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+              </section>
             </div>
             <div className="md:col-span-2">
               <StudioLabel>Kurztext (optional, Fallback ohne Link)</StudioLabel>

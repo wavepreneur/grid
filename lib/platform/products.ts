@@ -19,14 +19,14 @@ export const GRID_PRODUCTS: GridProductMeta[] = [
   {
     id: "cockpit",
     label: "Cockpit",
-    description: "Live-Spiele überwachen und steuern",
+    description: "Self-Healing für Live-Sessions",
     href: "/cockpit",
     available: true,
   },
   {
     id: "data",
     label: "Data",
-    description: "Intelligence, Auswertungen und Insights",
+    description: "Indizes und Benchmarks nach Spielende",
     href: "/data",
     available: true,
   },

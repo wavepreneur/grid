@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { getEventByInviteCode } from "@/lib/grid/session-auth";
 import { EventCockpit } from "@/components/cockpit/event-cockpit";
-import { CockpitShell } from "@/components/cockpit/cockpit-shell";
+import { StudioPage } from "@/components/cms/studio-page";
+import { BackofficeFrame } from "@/components/platform/backoffice-frame";
 import { normalizeCode } from "@/lib/grid/codes";
 
 type CockpitPageProps = {
@@ -18,11 +19,14 @@ export default async function CockpitPage({ params }: CockpitPageProps) {
   }
 
   return (
-    <CockpitShell
-      title={event.title}
-      description="Live-Übersicht für Event-Leiter: Teams verfolgen, GPS steuern und Team-Leiter zuweisen."
-    >
-      <EventCockpit inviteCode={normalized} />
-    </CockpitShell>
+    <BackofficeFrame>
+      <StudioPage
+        eyebrow="GRID Cockpit"
+        title={event.title}
+        description="Live-Übersicht für Event-Leiter: Teams, Health-Engine und Legacy-GPS. Der Beamer bleibt ohne Sidebar unter /show."
+      >
+        <EventCockpit inviteCode={normalized} />
+      </StudioPage>
+    </BackofficeFrame>
   );
 }

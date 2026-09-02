@@ -37,7 +37,12 @@ export const queryKeys = {
   },
   cockpit: {
     all: ["grid", "cockpit"] as const,
+    overview: () => [...queryKeys.cockpit.all, "overview"] as const,
     snapshot: (inviteCode: string) => [...queryKeys.cockpit.all, inviteCode] as const,
     show: (inviteCode: string) => [...queryKeys.cockpit.all, "show", inviteCode] as const,
+  },
+  data: {
+    all: ["grid", "data"] as const,
+    dashboard: () => [...queryKeys.data.all, "dashboard"] as const,
   },
 } as const;

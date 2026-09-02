@@ -433,6 +433,7 @@ export function GameRoom({
         targetLevel: input.targetLevel,
         walkedMeters: input.walkedMeters,
         forceUnlock: input.forceUnlock,
+        healthRadiusBonusMeters: input.healthRadiusBonusMeters,
       });
       if (!result.success) {
         setError(result.error ?? "Aktion fehlgeschlagen.");
@@ -453,6 +454,7 @@ export function GameRoom({
     handleSolveLevel({
       geolocation: input.geolocation,
       forceUnlock: input.forceUnlock,
+      healthRadiusBonusMeters: input.healthRadiusBonusMeters,
     });
   }
 
@@ -491,6 +493,7 @@ export function GameRoom({
       accuracy: fix.accuracy ?? undefined,
       distance_m: fix.distance_m,
       within_radius: fix.within_radius,
+      health_radius_bonus_m: fix.health_radius_bonus_m,
     });
   }
 
@@ -813,6 +816,25 @@ export function GameRoom({
           {teamName} · {eventContent.levels.length} Aufgaben
         </p>
       </div>
+      {eventContent.followUpTrigger?.enabled ? (
+        <div className="rounded-3xl border border-[var(--cg-primary)]/30 bg-[var(--cg-card)] px-5 py-5 text-center">
+          <p className="text-sm font-semibold text-[var(--cg-fg)]">
+            {eventContent.followUpTrigger.cta_label?.trim() || "Nächster Pulse"}
+          </p>
+          <p className="mt-2 text-sm text-[var(--cg-muted)]">
+            Folge-Trigger liegt im Snapshot. Buchung läuft über Exitmania oder Tabbrain — nicht in
+            GRID.
+          </p>
+          {eventContent.followUpTrigger.cta_url &&
+          /^https?:\/\//i.test(eventContent.followUpTrigger.cta_url) ? (
+            <a href={eventContent.followUpTrigger.cta_url} className="mt-4 block">
+              <BigButton variant="accent">
+                {eventContent.followUpTrigger.cta_label?.trim() || "Weiter"}
+              </BigButton>
+            </a>
+          ) : null}
+        </div>
+      ) : null}
       <div className="cg-animate-pop-in rounded-3xl border-2 border-[var(--cg-success)]/35 bg-[var(--cg-card)] px-5 py-6 text-center shadow-[var(--cg-shadow-lift)]">
         <p className="text-sm font-semibold uppercase tracking-wide text-[var(--cg-muted)]">
           Eure Punkte

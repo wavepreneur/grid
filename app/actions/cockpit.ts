@@ -34,6 +34,8 @@ export type CockpitTeam = {
   navigator_player_id: string | null;
   navigator_name: string | null;
   active_player_count: number;
+  current_phase: string | null;
+  level_started_at: string | null;
   players: CockpitPlayer[];
 };
 
@@ -138,6 +140,9 @@ export async function getEventCockpitSnapshot(
         navigator_player_id: team.navigator_player_id,
         navigator_name: navigator?.display_name ?? null,
         active_player_count: teamPlayers.length,
+        current_phase: gameState.current_phase ?? null,
+        level_started_at:
+          gameState.levels[String(team.current_level ?? 0)]?.started_at ?? null,
         players: teamPlayers.map((player) => ({
           id: player.id,
           display_name: player.display_name,

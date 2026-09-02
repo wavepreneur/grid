@@ -46,7 +46,7 @@ import {
   usesPhasedPlay,
 } from "@/lib/grid/play-slots";
 import type { PlayPhase } from "@/lib/grid/play-surface";
-import { isWithinGeofenceForPlay } from "@/lib/grid/geofence";
+import { isWithinGeofenceForPlay, withHealthRadiusBonus } from "@/lib/grid/geofence";
 import {
   hasReachedDistanceMeters,
   resolveOutdoorUnlockMode,
@@ -1220,6 +1220,8 @@ export async function advanceFromHub(input: {
    * Audited — prevents support dead-ends without silent cheating.
    */
   forceUnlock?: OutdoorForceUnlock;
+  /** Lead-device health radius bonus (capped). Same hub write as a normal arrive. */
+  healthRadiusBonusMeters?: number;
 }): Promise<ActionResult<TeamRealtimeState>> {
   try {
     const { event, team, player } = await assertPlayerSession(input);
@@ -1312,10 +1314,14 @@ export async function advanceFromHub(input: {
         if (!input.geolocation) {
           return { success: false, error: "GPS-Position erforderlich." };
         }
-        if (!isWithinGeofenceForPlay(input.geolocation, levelDefinition.location)) {
+        const healthTarget = withHealthRadiusBonus(
+          levelDefinition.location,
+          input.healthRadiusBonusMeters,
+        );
+        if (!isWithinGeofenceForPlay(input.geolocation, healthTarget)) {
           return {
             success: false,
-            error: `Noch nicht am Wegpunkt (Radius: ${levelDefinition.location.radius_meters} m).`,
+            error: `Noch nicht am Wegpunkt (Radius: ${healthTarget.radius_meters} m).`,
           };
         }
       }
@@ -1422,6 +1428,7 @@ export async function advanceFromHub(input: {
           mode: unlockMode,
           walked_meters:
             unlockMode === "distance" ? outdoorProgress?.walked_meters ?? null : null,
+          health_radius_bonus_m: input.healthRadiusBonusMeters ?? 0,
         },
       });
     }

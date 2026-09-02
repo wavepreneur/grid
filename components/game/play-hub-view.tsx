@@ -12,7 +12,11 @@ import { IconCheck, IconLock } from "@/components/game/city/icons";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
 import { useWalkedDistance } from "@/lib/hooks/use-walked-distance";
 import type { ContentMode } from "@/lib/cms/layer-model";
-import { isWithinGeofenceForPlay, playGeofenceRadiusMeters } from "@/lib/grid/geofence";
+import { isWithinGeofenceForPlay, playGeofenceRadiusMeters, withHealthRadiusBonus } from "@/lib/grid/geofence";
+import {
+  computeHealthRadiusBonus,
+  isNearButOutsideGeofence,
+} from "@/lib/grid/cockpit-health";
 import type { OutdoorForceUnlock } from "@/lib/grid/outdoor-unlock";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 import type { GameLevelStatus } from "@/lib/grid/game-state";
@@ -25,6 +29,7 @@ export type OutdoorArriveInput = {
   targetLevel?: number;
   walkedMeters?: number;
   forceUnlock?: OutdoorForceUnlock;
+  healthRadiusBonusMeters?: number;
 };
 
 type Props = {
@@ -369,9 +374,13 @@ function OutdoorHub({
     storageKey: levelWalkKey,
   });
   const [simBonus, setSimBonus] = useState(0);
+  const [healthBonus, setHealthBonus] = useState(0);
   const arrivedPingRef = useRef(false);
   const lastReportRef = useRef(0);
   const localWalkedRef = useRef(0);
+  const healthNearSinceRef = useRef<number | null>(null);
+  const healthBonusRef = useRef(0);
+  healthBonusRef.current = healthBonus;
 
   const waypoints = useMemo(
     () => buildGpsWaypoints(levels, levelStatuses),
@@ -389,20 +398,66 @@ function OutdoorHub({
     return hit ?? current;
   }, [isGpsMode, routeOrder, sample, levels, levelStatuses, current]);
 
+  useEffect(() => {
+    healthNearSinceRef.current = null;
+    setHealthBonus(0);
+  }, [targetLevel.level]);
+
+  useEffect(() => {
+    if (!isGpsMode || !isWalkTracker) return;
+    const tick = () => {
+      const geo = sampleRef.current;
+      const loc = targetLevel.location;
+      if (!geo || !loc) {
+        healthNearSinceRef.current = null;
+        setHealthBonus(0);
+        return;
+      }
+      const dist = computeTargetDistance(geo, loc);
+      const authoredWithin = isWithinGeofenceForPlay(geo, loc);
+      const playR = playGeofenceRadiusMeters(loc, geo.accuracy);
+      const near = isNearButOutsideGeofence({
+        distanceMeters: dist,
+        playRadiusMeters: playR,
+        authoredWithinRadius: authoredWithin,
+      });
+      if (authoredWithin || !near) {
+        healthNearSinceRef.current = null;
+        setHealthBonus(0);
+        return;
+      }
+      if (healthNearSinceRef.current === null) {
+        healthNearSinceRef.current = Date.now();
+      }
+      setHealthBonus(
+        computeHealthRadiusBonus({
+          authoredWithinRadius: false,
+          nearStuckMs: Date.now() - healthNearSinceRef.current,
+        }),
+      );
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [isGpsMode, isWalkTracker, targetLevel.location, targetLevel.level]);
+
+  const teammateHealthBonus =
+    mirroredGps?.level === targetLevel.level ? (mirroredGps.health_radius_bonus_m ?? 0) : 0;
+  const effectiveHealthBonus = isWalkTracker ? healthBonus : teammateHealthBonus;
+  const healthLocation = targetLevel.location
+    ? withHealthRadiusBonus(targetLevel.location, effectiveHealthBonus)
+    : null;
+
   const distanceToTarget = isWalkTracker
     ? computeTargetDistance(sample, targetLevel.location)
     : mirroredGps?.level === targetLevel.level
       ? mirroredGps.distance_m
       : null;
   const withinRadius = isWalkTracker
-    ? Boolean(
-        sample &&
-          targetLevel.location &&
-          isWithinGeofenceForPlay(sample, targetLevel.location),
-      )
+    ? Boolean(sample && healthLocation && isWithinGeofenceForPlay(sample, healthLocation))
     : Boolean(mirroredGps?.level === targetLevel.level && mirroredGps.within_radius);
-  const playRadius = targetLevel.location
-    ? Math.round(playGeofenceRadiusMeters(targetLevel.location, sample?.accuracy))
+  const playRadius = healthLocation
+    ? Math.round(playGeofenceRadiusMeters(healthLocation, sample?.accuracy))
     : 40;
 
   useEffect(() => {
@@ -446,13 +501,16 @@ function OutdoorHub({
       if (!geo || !loc) return;
       const dist = computeTargetDistance(geo, loc);
       if (dist === null) return;
+      const bonus = healthBonusRef.current;
+      const healthLoc = withHealthRadiusBonus(loc, bonus);
       onBroadcastGpsFix({
         level: targetLevel.level,
         lat: geo.lat,
         lng: geo.lng,
         accuracy: geo.accuracy,
         distance_m: dist,
-        within_radius: isWithinGeofenceForPlay(geo, loc),
+        within_radius: isWithinGeofenceForPlay(geo, healthLoc),
+        health_radius_bonus_m: bonus > 0 ? bonus : undefined,
       });
     };
     send();
@@ -503,6 +561,7 @@ function OutdoorHub({
           : Math.max(mirroredWalkedMeters, serverWalkedMeters)
         : undefined,
       forceUnlock,
+      healthRadiusBonusMeters: healthBonus > 0 ? healthBonus : undefined,
     });
   }
 
@@ -612,6 +671,11 @@ function OutdoorHub({
             <p className="text-center text-sm text-[var(--cg-muted)]">
               Lauft zum Wegpunkt. Bei ca. {playRadius} m piept es und ihr könnt öffnen.
             </p>
+            {effectiveHealthBonus > 0 ? (
+              <p className="rounded-xl bg-[var(--cg-primary)]/15 px-4 py-3 text-center text-sm font-medium text-[var(--cg-fg)]">
+                GPS ungenau — Radius automatisch um {effectiveHealthBonus} m erweitert.
+              </p>
+            ) : null}
             {canUnlockGps ? (
               <div className="space-y-2">
                 <BigButton

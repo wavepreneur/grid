@@ -1,0 +1,23 @@
+---
+description: Never restyle a working live-play path; additive fixes only
+alwaysApply: true
+---
+
+# Don’t break working play
+
+Live play (`/e/{code}`, `app/actions/game.ts`, `components/game/`, `lib/grid/game-state.ts`) is tested on phone + desktop. A path the user already signed off is **done**.
+
+## Do
+
+- Fix the reported bug with the **smallest** change
+- Keep the existing write path (especially the direct `teams.game_state` update after a correct solve)
+- Add fields or copy on screens that already sync to every device
+
+## Do not
+
+- Insert new server round-trips or FSM steps in front of a working solve/OK/sync
+- Switch a working update onto `persistPlayingGameState` (version filter can no-op and return old state as success)
+- Rebuild give-up, quiz reveal, bonus, or lobby start while fixing something else
+- Ask the user to re-test steps they already closed
+
+If a new step is truly required, land it **beside** the working path (same write, extra fields) — never by replacing the write that already reached every device.

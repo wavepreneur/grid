@@ -296,6 +296,8 @@ export type ResolvedEventContent = {
   briefingIframeUrl?: string | null;
   /** Fullscreen iframe URL for FAQ / troubleshooting. */
   faqIframeUrl?: string | null;
+  /** Post-game follow-up from Studio snapshot (no billing in GRID). */
+  followUpTrigger?: import("@/lib/grid/follow-up-trigger").FollowUpTrigger | null;
   /** Optional game logo for lobby / onboarding. */
   logoUrl?: string | null;
   /** Player-facing Alpha/Beta/Gamma names for this game. */
@@ -317,6 +319,8 @@ export type SolveLevelPayload = {
   revealSolution?: boolean;
   /** Alpha lead override when GPS fails — server audits. */
   forceUnlock?: "geofence" | "distance";
+  /** Lead-device health expansion (capped server-side). Does not change the solve write. */
+  healthRadiusBonusMeters?: number;
 };
 
 export const EXITMANIA_TOTAL_LEVELS = 10;

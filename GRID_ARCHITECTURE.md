@@ -1,6 +1,6 @@
 # GRID — Architektur-Mandat vs. Implementierungsstand
 
-Dieses Dokument ist der **Kompass für Entwicklung und Marketing**. Bei jedem Feature prüfen: Entspricht es dem Mandat? Wenn ja — Ziel-Tracker auf der Landingpage (`#ziel-tracker`) und diese Datei aktualisieren.
+Dieses Dokument ist der **Kompass für Entwicklung und Marketing**. Bei jedem Feature prüfen: Entspricht es dem Mandat? Wenn ja — Ziel-Tracker auf [`/status`](https://gridos.vercel.app/status) und diese Datei aktualisieren.
 
 Verwandt: [`GRID_MASTER_PLAN.md`](./GRID_MASTER_PLAN.md) (Roadmap, URLs, Phasen).
 
@@ -13,7 +13,19 @@ GRID ist **keine Content-Plattform** (kein Canva, kein B2B-Kahoot, **kein Loquiz
 - **Variable:** Content als JSON (`global_levels`, `local_waypoints`, `route_override`, Layer-Snapshots)
 - **Fix:** Verhaltens-Engine, asymmetrische Sync-Schicht, ephemeral Team-Tokens — **keine persistenten User-Accounts**
 - **Skalierung:** **Wenige Spiele**, maximal skalierbar über **modulare Content-Layer** (1/2/3), Städte, Indoor/Outdoor, Events, Sprachen
-- **Landing Page = System of Record (Engine):** [`gridos.vercel.app`](https://gridos.vercel.app/) — Architektur-Verfassung, **nicht** Enterprise-Kauf-Funnel (das ist **Tabbrain**)
+- **Landing Page = Pitch (Englisch):** [`gridos.vercel.app`](https://gridos.vercel.app/) — Conversion / Infrastruktur-Zugang. Hero = Engine (Studio / Cockpit / Data). Mittelteil = Ertrags-Säulen (**Exitmania**, **Tabbrain**, **Micro Pulse**). **Nicht** Enterprise-Kauf-Funnel (das ist **Tabbrain**) und **nicht** der IST-Tracker.
+- **System of Record (Engine-IST):** [`/status`](https://gridos.vercel.app/status) — Badges Live / Pilot / Legacy / Roadmap. Footer-Link „STATUS DEV“.
+- **Commerce:** Checkout/Paddle **nicht** in GRID — Exitmania und Tabbrain besitzen Billing. GRID speichert nur Kopplung im Snapshot.
+
+**Drei Produkte auf derselben Engine** (keine eigenen Runtimes):
+
+| Produkt | IST | Ziel |
+|---|---|---|
+| **GRID Studio** | Aufgaben, Spiele, GPS, Publish-Snapshots, Tickets. Optionales Feld `feature_flags.follow_up_trigger` im Snapshot. | Folge-Trigger verpflichtend; Pulse-Provisioning bleibt Exitmania/Tabbrain. **Kein** Checkout in GRID. |
+| **GRID Cockpit** | Live-Übersicht + **manuelle** Operator-Hebel (Legacy/Dev). Lead-Gerät erweitert Radius + Nudge, wenn der Geofence hängt. Session/Device-Handoff heilt sich selbst. | Volle autonome Health-Engine, 0 % Support. Operator-Hebel bleiben für GPS-Tests. |
+| **GRID Data** | `/data` leitet Indizes nach `finished` aus `play_attempt_*` / Hints ab. Org-Schnitt + Feld-Baseline. | Branchenschnitt, Filter nach Abteilung, fertiges Buyer-Dashboard. |
+
+Die Live-Engine (`/e/{code}`, FSM, Rollen, GPS-Lead, Hub → Quiz → Level) bleibt das Fundament und wird für den Produktumbau **nicht** ersetzt.
 
 **Layer-Modell (Pflichtlektüre):** [`docs/GRID_LAYER_MODEL.md`](docs/GRID_LAYER_MODEL.md)
 
@@ -200,7 +212,7 @@ Micro-Pulses dürfen **keine permanenten WebSockets** nutzen. Fortschritt = stat
 | Cockpit Live-Ranking | 🟡 Basis | `getEventCockpitSnapshot`, Poll 3s, **ohne Filter** |
 | Beamer `/show` | ✅ Live | Sortiert alle Teams nach Score |
 | Filter nach Abteilung/Standort | ⬜ Vision | Keine Queries, kein Admin-Dashboard |
-| Post-Event Team-DNA Analyse | ⬜ Vision | — |
+| Post-Event Team-DNA / GRID Data | 🟡 Pilot | `/data` leitet Indizes aus `play_attempt_ok` / `failed` / `hint_purchased` nach `finished` ab — Org-Schnitt + Feld-Baseline, kein Branchenschnitt |
 
 **Nächster Schritt:** Migration `activity_logs` (oder `audit_logs` erweitern) + Cockpit-Filter-UI + denormalisierte Metadaten bei `writeAuditLog`.
 
@@ -211,15 +223,16 @@ Micro-Pulses dürfen **keine permanenten WebSockets** nutzen. Fortschritt = stat
 | Badge | Bedeutung | Wann setzen |
 |---|---|---|
 | **Live** | Produktiv nutzbar, im Code nachweisbar | Feature shipped + manuell getestet |
-| **In Arbeit** | Teilweise / Pilot / Schema ohne UI | Basis existiert, Mandat noch nicht erfüllt |
-| **Vision** | Noch nicht gebaut | Nur Spezifikation oder Marketing-Ziel |
+| **Pilot** | Teilweise / Schema ohne fertiges Produkt-UI | Basis existiert, Mandat noch nicht erfüllt |
+| **Legacy** | Läuft, ist aber nicht die Produkt-Richtung | Bewusst behalten (z. B. Operator-GPS-Hebel), nicht als Ziel verkaufen |
+| **Roadmap** | Noch nicht gebaut | Nur Spezifikation oder Marketing-Ziel |
 
-Quelle der Wahrheit für Marketing: `components/marketing/grid-landing-page.tsx` → `goalTracker`.
+Quelle der Wahrheit für IST-Badges: `lib/marketing/status-record.ts` → gerendert auf `/status`.
 
 Bei jedem Release prüfen:
 
 1. Stimmt der Badge noch?
-2. Stimmt der Copy-Text in Hero / Blaupausen / Mission Control?
+2. Stimmt der Copy-Text in Hero / Studio / Cockpit / Data / Status?
 3. Dieses Dokument aktualisieren (Abschnitt „Ist-Stand“).
 
 ---

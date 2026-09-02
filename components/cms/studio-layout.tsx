@@ -20,9 +20,11 @@ import { OrgSwitcher } from "@/components/cms/org-switcher";
 import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { useStudioUnsaved } from "@/components/cms/studio-unsaved";
+import { getOrgCockpitOverview } from "@/app/actions/cockpit-overview";
 import { listGames, listTemplates } from "@/app/actions/cms/games";
 import { listTasks } from "@/app/actions/cms/tasks";
 import { listTicketPools, getStudioDashboardStats } from "@/app/actions/cms/tickets";
+import { getWorkforceDashboard } from "@/app/actions/data";
 import { queryKeys } from "@/lib/platform/query-keys";
 
 const SIDEBAR_COLLAPSED_KEY = "grid.studio.sidebarCollapsed";
@@ -71,15 +73,15 @@ const NAV: NavItem[] = [
   {
     href: "/cockpit",
     label: "GRID Cockpit",
-    note: "Live-Events",
+    note: "Self-Healing · 0 % Eingriff",
     icon: Activity,
-    group: "Betrieb",
+    group: "Autonomer Betrieb",
     match: (p) => p.startsWith("/cockpit"),
   },
   {
     href: "/data",
     label: "GRID Data",
-    note: "Team Intelligence",
+    note: "Indizes & Benchmarks",
     icon: BarChart3,
     match: (p) => p.startsWith("/data"),
   },
@@ -88,6 +90,7 @@ const NAV: NavItem[] = [
     label: "Entwicklung",
     note: "Debug & Tools",
     icon: Code2,
+    group: "Intern",
     match: (p) => p.startsWith("/admin/dev"),
   },
 ];
@@ -143,6 +146,28 @@ function prefetchForHref(
       queryKey: queryKeys.tickets.list(orgSlug),
       queryFn: async () => {
         const result = await listTicketPools();
+        if (!result.success) throw new Error(result.error);
+        return result.data!;
+      },
+    });
+    return;
+  }
+  if (href === "/cockpit") {
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.cockpit.overview(),
+      queryFn: async () => {
+        const result = await getOrgCockpitOverview();
+        if (!result.success) throw new Error(result.error);
+        return result.data!;
+      },
+    });
+    return;
+  }
+  if (href === "/data") {
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.data.dashboard(),
+      queryFn: async () => {
+        const result = await getWorkforceDashboard();
         if (!result.success) throw new Error(result.error);
         return result.data!;
       },

@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import { GridLandingPage } from "@/components/marketing/grid-landing-page";
 
 export const metadata: Metadata = {
-  title: "GRID | Engine + Studio for asymmetric team missions",
+  title: "GRID | The Zero-Headcount Growth Engine",
   description:
-    "GRID runs live asymmetric team missions on a fixed engine. GRID Studio authors games, GPS routes, and flow — publish a version, start live events.",
+    "Deploy, automate and monetize corporate experiences across 1,900+ cities. Zero operational payroll. Absolute data telemetry. 95%+ net margin by design.",
   openGraph: {
-    title: "GRID — Asymmetric Team Dynamics Engine + Studio",
+    title: "GRID — The Zero-Headcount Growth Engine",
     description:
-      "Author outdoor games in GRID Studio. Publish frozen versions. Run live events with GPS, roles, and cockpit telemetry.",
+      "Turn training, team events, and onboarding into an automated multiplayer engine. Request private infrastructure access.",
   },
 };
 

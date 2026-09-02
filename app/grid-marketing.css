@@ -218,8 +218,120 @@
   transition: all 0.25s ease;
 }
 
+.grid-marketing .grid-hero-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.grid-marketing .grid-product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  max-width: 1040px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.grid-marketing .grid-product-card {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+}
+
+.grid-marketing .grid-product-index {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.grid-marketing .grid-product-name {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(240, 244, 255, 0.4);
+  margin-bottom: 6px;
+}
+
+.grid-marketing .grid-product-header {
+  font-size: 22px;
+  font-weight: 800;
+  color: #f0f4ff;
+  line-height: 1.25;
+  margin-bottom: 12px;
+}
+
+.grid-marketing .grid-product-copy {
+  font-size: 14px;
+  color: rgba(240, 244, 255, 0.52);
+  line-height: 1.65;
+}
+
+.grid-marketing .grid-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 48px;
+  align-items: center;
+}
+
+.grid-marketing .grid-outcome-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.grid-marketing .grid-outcome-list li {
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 229, 255, 0.12);
+  background: rgba(0, 229, 255, 0.04);
+  font-size: 15px;
+  line-height: 1.55;
+  color: rgba(240, 244, 255, 0.72);
+}
+
+.grid-marketing .grid-footer-dev {
+  color: rgba(240, 244, 255, 0.28);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.grid-marketing .grid-footer-dev:hover {
+  color: rgba(0, 229, 255, 0.7);
+}
+
+.grid-marketing .grid-nav-mobile-cta {
+  display: none;
+}
+
 .grid-marketing .grid-card:hover {
-  border-color: rgba(0, 229, 255, 0.25);
+  border-color: rgba(0, 229, 255, 0.32);
+  transform: translateY(-3px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+.grid-marketing .grid-hero-stats {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0;
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 28px 16px;
+  background: rgba(0, 229, 255, 0.03);
+  border: 1px solid rgba(0, 229, 255, 0.12);
+  border-radius: 16px;
 }
 
 .grid-marketing .grid-card-topbar::before {
@@ -248,24 +360,9 @@
   text-transform: uppercase;
 }
 
-.grid-marketing .grid-hero-stats {
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  flex-wrap: nowrap;
-  gap: 0;
-  width: 100%;
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 28px 16px;
-  background: rgba(0, 229, 255, 0.03);
-  border: 1px solid rgba(0, 229, 255, 0.12);
-  border-radius: 16px;
-}
-
 .grid-marketing .grid-hero-stat {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 140px;
+  min-width: 140px;
   text-align: center;
   padding: 0 clamp(12px, 3vw, 28px);
   position: relative;
@@ -324,6 +421,17 @@
   }
   .grid-marketing .show-mobile {
     display: block !important;
+  }
+  .grid-marketing .grid-nav-mobile-cta {
+    display: inline-flex !important;
+  }
+  .grid-marketing .grid-cta.grid-cta-sm {
+    padding: 8px 12px;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+  .grid-marketing .grid-hero-stat:not(:last-child)::after {
+    display: none;
   }
 }
 

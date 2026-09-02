@@ -11,21 +11,19 @@ import {
   operatorClearLevelOverride,
   operatorSetTeamNavigator,
 } from "@/app/actions/cockpit";
-import { CockpitLink, CockpitSection } from "@/components/cockpit/cockpit-shell";
+import { CockpitLink } from "@/components/cockpit/cockpit-shell";
+import { Panel, Stat } from "@/components/cms/ui";
 import { useCockpitSync } from "@/lib/hooks/use-cockpit-sync";
 import { queryKeys } from "@/lib/platform/query-keys";
 import {
   IconArrowRight,
   IconMapPin,
-  IconUsers,
 } from "@/components/cms/studio-icons";
 import {
   GridButton,
   GridError,
-  GridHint,
   GridInput,
   GridLabel,
-  GridStat,
   GridSuccess,
 } from "@/components/grid/grid-shell";
 import { cockpitShowPath, eventLobbyPath, eventPath } from "@/lib/grid/event-routes";
@@ -191,81 +189,123 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
   }
 
   if (!snapshot) {
-    return <p className="text-sm text-slate-500">Cockpit wird geladen…</p>;
+    return <p className="text-sm text-muted-foreground">Cockpit wird geladen…</p>;
   }
 
   const sortedTeams = [...snapshot.teams].sort((a, b) => b.score - a.score);
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <GridStat label="Event" value={snapshot.title} />
-        <GridStat label="Status" value={statusLabel(snapshot.status)} />
-        <GridStat label="Teams" value={String(snapshot.teams.length)} />
-        <GridStat label="Code" value={snapshot.invite_code} />
+    <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat label="Event" value={snapshot.title} />
+        <Stat label="Status" value={statusLabel(snapshot.status)} />
+        <Stat label="Teams" value={String(snapshot.teams.length)} />
+        <Stat label="Code" value={snapshot.invite_code} />
       </div>
 
-      <GridHint tone="info">
-        <p>
+      <Panel title="Einstieg" subtitle="Spieler, Beamer und GRID Data — ohne neuen Write-Path.">
+        <p className="text-sm text-muted-foreground">
           Spieler-Einstieg:{" "}
           <CockpitLink href={eventPath(snapshot.invite_code)}>
             /e/{snapshot.invite_code}
           </CockpitLink>
         </p>
-        <p className="mt-2 inline-flex items-center gap-1">
+        <p className="mt-2 inline-flex items-center gap-1 text-sm text-muted-foreground">
           Live-Ranking für Beamer:{" "}
           <CockpitLink href={cockpitShowPath(snapshot.invite_code)} external>
             /cockpit/{snapshot.invite_code}/show
           </CockpitLink>
           <IconArrowRight size={14} />
         </p>
-      </GridHint>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Nach Spielende:{" "}
+          <CockpitLink href="/data">GRID Data</CockpitLink>
+        </p>
+      </Panel>
 
       {message ? <GridSuccess message={message} /> : null}
       {displayError ? <GridError message={displayError} /> : null}
 
-      <CockpitSection
-        icon={<IconUsers size={18} />}
+      <Panel
+        title="Health-Engine"
+        subtitle="Radius-Fallback und Nudge laufen auf dem GPS-Lead-Gerät — ohne neuen FSM-Schritt. Manuelle Hebel bleiben unten unter Legacy."
+      >
+        <p className="text-sm leading-6 text-muted-foreground">
+          Hängt ein Team länger als 90 s knapp außerhalb des Geofence, erweitert das Lead-Handy den
+          Radius schrittweise (max. 80 m) und zeigt einen In-App-Hinweis. Session-Handoff bleibt
+          der bestehende Self-Heal-Pfad.
+        </p>
+        <ul className="mt-4 flex flex-col gap-2">
+          {sortedTeams.filter((team) => team.status === "playing").length === 0 ? (
+            <li className="text-sm text-muted-foreground">Keine laufenden Teams — Heal greift im Live-Lauf.</li>
+          ) : (
+            sortedTeams
+              .filter((team) => team.status === "playing")
+              .map((team) => {
+                const started = team.level_started_at
+                  ? Date.parse(team.level_started_at)
+                  : Number.NaN;
+                const hanging =
+                  team.current_phase === "hub" &&
+                  Number.isFinite(started) &&
+                  Date.now() - started > 90_000;
+                return (
+                  <li
+                    key={team.id}
+                    className="rounded-2xl bg-secondary px-4 py-3 text-sm"
+                  >
+                    <span className="font-bold">{team.name}</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · Aufgabe {team.current_level || "—"} · {team.current_phase ?? "level"}
+                      {hanging ? " · Lead-Heal sollte Radius erweitern" : " · im Radius-Fenster"}
+                    </span>
+                  </li>
+                );
+              })
+          )}
+        </ul>
+      </Panel>
+
+      <Panel
         title="Live-Ranking"
-        description="Aktuelle Punkte und Team-Status — aktualisiert live via Realtime."
+        subtitle="Aktuelle Punkte und Team-Status — aktualisiert live via Realtime."
       >
         <div className="flex flex-col gap-3">
           {sortedTeams.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+            <p className="rounded-2xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
               Noch keine Teams — Spieler treten über den Event-Link bei.
             </p>
           ) : (
             sortedTeams.map((team, index) => (
               <div
                 key={team.id}
-                className={`rounded-xl border px-4 py-4 ${
-                  index === 0
-                    ? "border-teal-200 bg-teal-50/50"
-                    : "border-slate-200 bg-white"
+                className={`rounded-2xl px-4 py-4 ${
+                  index === 0 ? "bg-primary/10" : "bg-secondary"
                 }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-slate-900">
-                      <span className="mr-2 text-teal-600">#{index + 1}</span>
+                    <p className="font-bold">
+                      <span className="mr-2 text-primary">#{index + 1}</span>
                       {team.name}
-                      <span className="ml-2 text-xs font-normal text-slate-500">
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
                         ({team.join_code})
                       </span>
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Aufgabe {team.current_level || "—"} · {statusLabel(team.status)} ·{" "}
                       {team.active_player_count} Spieler · Leiter: {team.captain_name ?? "—"} · GPS:{" "}
                       {team.navigator_name ?? "—"}
                     </p>
                   </div>
-                  <p className="text-2xl font-semibold tabular-nums text-teal-700">{team.score}</p>
+                  <p className="text-2xl font-bold tabular-nums text-primary">{team.score}</p>
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
                   <Link
                     href={eventLobbyPath(inviteCode, team.join_code, { manage: true })}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700"
+                    className="inline-flex items-center gap-1 text-xs font-bold text-primary"
                   >
                     Team verwalten
                     <IconArrowRight size={12} />
@@ -276,7 +316,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
                       type="button"
                       disabled={isPending || player.is_navigator}
                       onClick={() => handleSetNavigator(team.join_code, player.id)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 disabled:opacity-40"
+                      className="inline-flex items-center gap-1 rounded-full bg-card px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground disabled:opacity-40"
                     >
                       <IconMapPin size={12} />
                       GPS → {player.display_name}
@@ -287,13 +327,20 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
             ))
           )}
         </div>
-      </CockpitSection>
+      </Panel>
 
-      <CockpitSection
-        icon={<IconMapPin size={18} />}
-        title="GPS steuern"
-        description="Pro Aufgabe GPS ein- oder ausschalten. Nach Änderungen müssen Spieler die Spielseite neu laden."
-      >
+      <details className="group rounded-3xl bg-card p-5 shadow-soft">
+        <summary className="cursor-pointer list-none text-sm font-bold">
+          Legacy / Dev — manuelle GPS-Hebel
+          <span className="ml-2 font-normal text-muted-foreground">
+            (Test &amp; Notfall — nicht die Produktvision)
+          </span>
+        </summary>
+        <div className="mt-4 border-t border-border pt-4">
+        <p className="text-sm font-bold">GPS steuern</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Pro Aufgabe GPS ein- oder ausschalten. Nach Änderungen müssen Spieler die Spielseite neu laden.
+        </p>
         <div className="mb-4 grid gap-4 sm:grid-cols-3">
           <div>
             <GridLabel hint="Für Testmodus und GPS-Aktivierung">Radius (Meter)</GridLabel>
@@ -332,13 +379,13 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
           {snapshot.levels.map((level) => (
             <li
               key={level.level}
-              className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-2xl bg-secondary px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
-                <p className="font-medium text-slate-900">
+                <p className="font-bold">
                   Aufgabe {level.level} · {level.title}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   {level.type === "gps" ? "GPS-Aufgabe" : "Ohne GPS"}
                   {level.has_override ? " · Sonder-Einstellung aktiv" : ""}
                 </p>
@@ -350,7 +397,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
                       type="button"
                       disabled={isPending}
                       onClick={() => handleDisableLevel(level.level)}
-                      className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                      className="rounded-full bg-destructive/12 px-3 py-1.5 text-xs font-bold text-destructive"
                     >
                       GPS aus
                     </button>
@@ -358,7 +405,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
                       type="button"
                       disabled={isPending}
                       onClick={() => handleEnableLevel(level.level)}
-                      className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+                      className="rounded-full bg-success/20 px-3 py-1.5 text-xs font-bold text-success-foreground"
                     >
                       GPS an
                     </button>
@@ -366,19 +413,20 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
                       type="button"
                       disabled={isPending}
                       onClick={() => handleResetLevel(level.level)}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                      className="rounded-full bg-card px-3 py-1.5 text-xs font-bold text-muted-foreground"
                     >
                       Zurücksetzen
                     </button>
                   </>
                 ) : (
-                  <span className="text-xs text-slate-400">Keine GPS-Steuerung</span>
+                  <span className="text-xs text-muted-foreground">Keine GPS-Steuerung</span>
                 )}
               </div>
             </li>
           ))}
         </ul>
-      </CockpitSection>
+        </div>
+      </details>
     </div>
   );
 }

@@ -3,7 +3,7 @@ import {
   normalizeAnswer,
   requiresGps,
 } from "@/lib/grid/content-engine";
-import { isWithinGeofenceForPlay } from "@/lib/grid/geofence";
+import { isWithinGeofenceForPlay, withHealthRadiusBonus } from "@/lib/grid/geofence";
 import type {
   ArrivalQuiz,
   LevelDefinition,
@@ -82,10 +82,14 @@ export function validateLevelSolution(
     if (!payload.geolocation) {
       return { ok: false, error: "GPS-Position erforderlich. Bitte Standort freigeben." };
     }
-    if (!isWithinGeofenceForPlay(payload.geolocation, level.location)) {
+    const healthTarget = withHealthRadiusBonus(
+      level.location,
+      payload.healthRadiusBonusMeters,
+    );
+    if (!isWithinGeofenceForPlay(payload.geolocation, healthTarget)) {
       return {
         ok: false,
-        error: `Ihr seid noch nicht am Checkpoint (Radius: ${level.location.radius_meters} m).`,
+        error: `Ihr seid noch nicht am Checkpoint (Radius: ${healthTarget.radius_meters} m).`,
       };
     }
     return { ok: true };

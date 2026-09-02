@@ -58,6 +58,7 @@ export type TeamBroadcastPayload = {
   accuracy?: number;
   distance_m?: number;
   within_radius?: boolean;
+  health_radius_bonus_m?: number;
 };
 
 export type GpsFixPayload = {
@@ -67,6 +68,7 @@ export type GpsFixPayload = {
   accuracy?: number | null;
   distance_m: number;
   within_radius: boolean;
+  health_radius_bonus_m?: number;
 };
 
 type TeamRow = {
@@ -317,6 +319,10 @@ export function useTeamSync({
                 accuracy: payload.accuracy,
                 distance_m: payload.distance_m,
                 within_radius: Boolean(payload.within_radius),
+                health_radius_bonus_m:
+                  typeof payload.health_radius_bonus_m === "number"
+                    ? payload.health_radius_bonus_m
+                    : undefined,
               });
             }
             return;

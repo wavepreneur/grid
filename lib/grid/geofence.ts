@@ -7,6 +7,9 @@ const PLAY_MIN_RADIUS_METERS = 25;
 const PLAY_ACCURACY_PADDING_FACTOR = 0.55;
 const PLAY_ACCURACY_PADDING_CAP_METERS = 45;
 
+/** Cap for lead-device health expansion when the geofence hangs. */
+export const HEALTH_RADIUS_BONUS_CAP_METERS = 80;
+
 export function distanceMeters(
   from: GeolocationSample,
   to: Pick<LevelLocation, "lat" | "lng">,
@@ -46,6 +49,21 @@ export function playGeofenceRadiusMeters(
     PLAY_ACCURACY_PADDING_CAP_METERS,
   );
   return base + padding;
+}
+
+export function clampHealthRadiusBonus(meters: unknown): number {
+  if (typeof meters !== "number" || !Number.isFinite(meters) || meters <= 0) return 0;
+  return Math.min(HEALTH_RADIUS_BONUS_CAP_METERS, Math.round(meters));
+}
+
+/** Authored location plus a health-engine bonus — same write path, wider check. */
+export function withHealthRadiusBonus(
+  target: LevelLocation,
+  bonusMeters: unknown,
+): LevelLocation {
+  const bonus = clampHealthRadiusBonus(bonusMeters);
+  if (bonus <= 0) return target;
+  return { ...target, radius_meters: target.radius_meters + bonus };
 }
 
 /** Mass-outdoor player unlock — min radius + accuracy padding. */

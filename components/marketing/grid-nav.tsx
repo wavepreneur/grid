@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GridLogo } from "@/components/marketing/grid-logo";
 
+const ACCESS_HREF = "/#access";
+
 export function GridNav() {
   const [scrolled, setScrolled] = useState(false);
 
@@ -39,29 +41,29 @@ export function GridNav() {
           justifyContent: "space-between",
         }}
       >
-        <a href="#hero" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
+        <Link href="/#hero" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
           <GridLogo />
           <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: "0.15em", color: "#00e5ff" }}>
             GRID
           </span>
-        </a>
+        </Link>
         <div className="hidden-mobile" style={{ display: "flex", alignItems: "center", gap: 32 }}>
-          <a href="#archetypes" className="grid-nav-link">
-            Archetypes
+          <a href="/#exitmania" className="grid-nav-link">
+            Exitmania
           </a>
-          <a href="#telemetry" className="grid-nav-link">
-            Telemetry
+          <a href="/#tabbrain" className="grid-nav-link">
+            Tabbrain
           </a>
-          <a href="#studio" className="grid-nav-link">
-            Studio
+          <a href="/#pulse" className="grid-nav-link">
+            Micro Pulse
           </a>
-          <a href="#status" className="grid-nav-link">
-            Status
-          </a>
-          <Link href="#briefing" className="grid-cta grid-cta-sm">
-            Deploy Stress-Test
+          <Link href={ACCESS_HREF} className="grid-cta grid-cta-sm">
+            Request Private Engine Access
           </Link>
         </div>
+        <Link href={ACCESS_HREF} className="grid-cta grid-cta-sm grid-nav-mobile-cta">
+          Request Access
+        </Link>
       </div>
     </nav>
   );

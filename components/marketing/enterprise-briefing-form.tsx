@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 
 export function EnterpriseBriefingForm() {
@@ -22,13 +21,11 @@ export function EnterpriseBriefingForm() {
           background: "rgba(0,229,255,0.04)",
         }}
       >
-        <p style={{ fontSize: 18, fontWeight: 700, color: "#f0f4ff" }}>Briefing received.</p>
-        <p style={{ marginTop: 12, fontSize: 14, color: "rgba(240,244,255,0.45)" }}>
-          We will reach out within 24 hours. For immediate pilot access:
+        <p style={{ fontSize: 18, fontWeight: 700, color: "#f0f4ff" }}>Access request received.</p>
+        <p style={{ marginTop: 12, fontSize: 14, color: "rgba(240,244,255,0.45)", lineHeight: 1.6 }}>
+          We review every request. If the fit is there, you hear from us within 24 hours — with
+          keys, not a checkout link.
         </p>
-        <Link href="/admin/dev" className="grid-cta" style={{ marginTop: 24 }}>
-          ◈ Enter Workspace
-        </Link>
       </div>
     );
   }
@@ -99,10 +96,10 @@ export function EnterpriseBriefingForm() {
         <span>I agree to be contacted by the GRID enterprise team.</span>
       </label>
       <button type="submit" className="grid-cta" style={{ justifyContent: "center", width: "fit-content" }}>
-        ◈ Request Enterprise Briefing
+        Unlock 1,900-City Infrastructure
       </button>
       <p style={{ fontSize: 11, color: "rgba(240,244,255,0.35)" }}>
-        Response within 24 hours · Mutual NDA available · No commitment required
+        Access is granted · Response within 24 hours · Mutual NDA available
       </p>
     </form>
   );
