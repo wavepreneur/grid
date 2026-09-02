@@ -11,6 +11,7 @@ import {
   Clock,
   Code2,
   Copy,
+  Download,
   Gamepad2,
   GripVertical,
   Home,
@@ -89,6 +90,9 @@ export function IconRefresh(props: IconProps) {
 }
 export function IconCopy(props: IconProps) {
   return wrap(Copy, props);
+}
+export function IconDownload(props: IconProps) {
+  return wrap(Download, props);
 }
 export function IconSearch(props: IconProps) {
   return wrap(Search, props);

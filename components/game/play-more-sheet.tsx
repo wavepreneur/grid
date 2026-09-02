@@ -4,7 +4,14 @@ import { useEffect, useState, type ReactNode } from "react";
 import { BigButton } from "@/components/game/city/ui";
 import { PlayDocSheet } from "@/components/game/play-doc-sheet";
 import { PersonalResumeLinkCard } from "@/components/player/personal-resume-link-card";
-import { GPS_SETTINGS_TIP } from "@/lib/grid/play-help";
+import type { ContentMode } from "@/lib/cms/layer-model";
+import {
+  GPS_SETTINGS_TIP,
+  INDOOR_STATION_TIP,
+  ONLINE_SYNC_TIP,
+  playHelpMenuHint,
+  playHowToPlayHint,
+} from "@/lib/grid/play-help";
 
 export type PlayMorePanel =
   | "menu"
@@ -12,6 +19,8 @@ export type PlayMorePanel =
   | "faq"
   | "help"
   | "gps"
+  | "station"
+  | "sync"
   | "support"
   | "pause"
   | "team"
@@ -43,6 +52,8 @@ type Props = {
   /** Hub only — Alpha / GPS-lead can unlock the waypoint from this sheet. */
   canUnlockGps?: boolean;
   onForceUnlockGps?: () => void;
+  /** Play surface — help copy must match outdoor / indoor / online. */
+  mode?: ContentMode;
 };
 
 /**
@@ -73,9 +84,16 @@ export function PlayMoreSheet({
   releasePending,
   canUnlockGps = false,
   onForceUnlockGps,
+  mode = "outdoor",
 }: Props) {
-  const showBriefingDoc = open === "briefing" && Boolean(briefingIframeUrl?.trim());
-  const showFaqDoc = open === "faq" && Boolean(faqIframeUrl?.trim());
+  const view: PlayMorePanel =
+    open === "gps" && mode === "indoor"
+      ? "station"
+      : open === "gps" && mode === "online"
+        ? "sync"
+        : open;
+  const showBriefingDoc = view === "briefing" && Boolean(briefingIframeUrl?.trim());
+  const showFaqDoc = view === "faq" && Boolean(faqIframeUrl?.trim());
   const busy = Boolean(transferPending || releasePending);
   const nameRoster = roster.length > 0 ? roster : teammates;
 
@@ -110,7 +128,9 @@ export function PlayMoreSheet({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-[var(--cg-border)] px-5 py-4">
-              <h2 className="text-lg font-bold text-[var(--cg-fg)]">{panelTitle(open)}</h2>
+              <h2 className="text-lg font-bold text-[var(--cg-fg)]">
+                {view ? panelTitle(view) : ""}
+              </h2>
               <button
                 type="button"
                 onClick={onClose}
@@ -121,7 +141,7 @@ export function PlayMoreSheet({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-              {open === "menu" ? (
+              {view === "menu" ? (
                 <div className="grid gap-2">
                   <MenuRow
                     title="Kurzinformationen"
@@ -130,7 +150,7 @@ export function PlayMoreSheet({
                   />
                   <MenuRow
                     title="Steckt ihr fest?"
-                    hint="GPS, Lösung, Verbindung — kurze Auswahl, dann der passende Hebel"
+                    hint={playHelpMenuHint(mode)}
                     onClick={() => onOpen("help")}
                   />
                   <MenuRow
@@ -164,7 +184,7 @@ export function PlayMoreSheet({
                 </div>
               ) : null}
 
-              {open === "briefing" ? (
+              {view === "briefing" ? (
                 <div className="space-y-4">
                   <p className="whitespace-pre-wrap text-base leading-relaxed text-[var(--cg-muted)]">
                     {briefingText?.trim() ||
@@ -176,17 +196,33 @@ export function PlayMoreSheet({
                 </div>
               ) : null}
 
-              {open === "help" ? (
+              {view === "help" ? (
                 <div className="space-y-2">
                   <p className="mb-3 text-sm leading-relaxed text-[var(--cg-muted)]">
                     Sagt kurz, was hakt. Technische Störungen heilt das Spiel selbst; bei Rätsel
                     oder Verständnis gibt es Tipps, Freischalten und FAQ — ohne Support-Ticket.
                   </p>
-                  <MenuRow
-                    title="Standort / GPS"
-                    hint="Wir stehen davor, oder das Gerät liefert keinen Ort"
-                    onClick={() => onOpen("gps")}
-                  />
+                  {mode === "outdoor" ? (
+                    <MenuRow
+                      title="Standort / GPS"
+                      hint="Wir stehen davor, oder das Gerät liefert keinen Ort"
+                      onClick={() => onOpen("gps")}
+                    />
+                  ) : null}
+                  {mode === "indoor" ? (
+                    <MenuRow
+                      title="Station / Code"
+                      hint="Zettel nicht gefunden, oder der Code wird nicht angenommen"
+                      onClick={() => onOpen("station")}
+                    />
+                  ) : null}
+                  {mode === "online" ? (
+                    <MenuRow
+                      title="Geräte sehen nicht dasselbe"
+                      hint="Seite neu laden, warten, Weiterspiel-Link"
+                      onClick={() => onOpen("sync")}
+                    />
+                  ) : null}
                   <MenuRow
                     title="Wir kommen bei der Lösung nicht weiter"
                     hint="Tipp auf einer Kachel, oder unten Lösung anzeigen"
@@ -199,13 +235,13 @@ export function PlayMoreSheet({
                   />
                   <MenuRow
                     title="Wie funktioniert das Spiel?"
-                    hint="FAQ und Kurzinfo"
+                    hint={playHowToPlayHint(mode)}
                     onClick={() => onOpen("faq")}
                   />
                 </div>
               ) : null}
 
-              {open === "gps" ? (
+              {view === "gps" ? (
                 <div className="space-y-3">
                   <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
                     Was trifft zu? Technische GPS-Störungen heilt das Spiel mit, oder ihr schaltet
@@ -261,7 +297,62 @@ export function PlayMoreSheet({
                 </div>
               ) : null}
 
-              {open === "faq" ? (
+              {view === "station" ? (
+                <div className="space-y-3">
+                  <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
+                    {INDOOR_STATION_TIP}
+                  </p>
+                  <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
+                    <p className="font-bold text-[var(--cg-fg)]">Wir finden den Zettel nicht</p>
+                    <p className="mt-1 text-sm text-[var(--cg-muted)]">
+                      Der Code hängt an der Station im Raum — nicht am Handy. Sucht Schilder,
+                      Tische, Wände. Tippt danach die Station in der Liste an und gebt den Code
+                      ein.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
+                    <p className="font-bold text-[var(--cg-fg)]">Code wird nicht angenommen</p>
+                    <p className="mt-1 text-sm text-[var(--cg-muted)]">
+                      Genau den Code vom Zettel dieser Station. Groß- und Kleinschreibung ist egal,
+                      Leerzeichen nicht nötig. Anderer Zettel = andere Station.
+                    </p>
+                  </div>
+                  <BigButton variant="ghost" onClick={() => onOpen("help")}>
+                    Zurück
+                  </BigButton>
+                </div>
+              ) : null}
+
+              {view === "sync" ? (
+                <div className="space-y-3">
+                  <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
+                    {ONLINE_SYNC_TIP}
+                  </p>
+                  <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
+                    <p className="font-bold text-[var(--cg-fg)]">Nicht alle sehen dasselbe</p>
+                    <p className="mt-1 text-sm text-[var(--cg-muted)]">
+                      Kurz warten oder die Seite neu laden. Eine Antwort vom Team gilt für alle
+                      Geräte.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
+                    <p className="font-bold text-[var(--cg-fg)]">Jemand ist raus oder wechselt Gerät</p>
+                    <p className="mt-1 text-sm text-[var(--cg-muted)]">
+                      Weiterspiel-Link und Leitung liegen unter Team — ohne GPS, ohne neuen Code.
+                    </p>
+                    <div className="mt-3">
+                      <BigButton variant="outline" onClick={() => onOpen("team")}>
+                        Zum Team
+                      </BigButton>
+                    </div>
+                  </div>
+                  <BigButton variant="ghost" onClick={() => onOpen("help")}>
+                    Zurück
+                  </BigButton>
+                </div>
+              ) : null}
+
+              {view === "faq" ? (
                 <div className="space-y-4">
                   <p className="text-base leading-relaxed text-[var(--cg-muted)]">
                     Für dieses Spiel ist noch kein FAQ-Link hinterlegt. Bei Problemen nutzt den
@@ -273,11 +364,11 @@ export function PlayMoreSheet({
                 </div>
               ) : null}
 
-              {open === "support" ? (
+              {view === "support" ? (
                 <CrispEmbed websiteId={crispWebsiteId} />
               ) : null}
 
-              {open === "pause" ? (
+              {view === "pause" ? (
                 <div className="space-y-4">
                   <p className="text-base text-[var(--cg-muted)]">
                     Das Spiel ist pausiert. Der Countdown läuft lokal nicht weiter. Schließt die App
@@ -294,7 +385,7 @@ export function PlayMoreSheet({
                 </div>
               ) : null}
 
-              {open === "team" ? (
+              {view === "team" ? (
                 <div className="space-y-4">
                   {nameRoster.length > 0 ? (
                     <div className="space-y-2">
@@ -462,6 +553,10 @@ function panelTitle(panel: Exclude<PlayMorePanel, null>): string {
       return "Steckt ihr fest?";
     case "gps":
       return "Standort / GPS";
+    case "station":
+      return "Station / Code";
+    case "sync":
+      return "Geräte";
     case "faq":
       return "FAQ";
     case "support":

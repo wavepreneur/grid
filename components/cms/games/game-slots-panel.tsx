@@ -53,6 +53,13 @@ import {
 } from "@/lib/cms/gps-defaults";
 import type { StudioGameTaskLink } from "@/lib/cms/types";
 import { MIN_DISTANCE_UNLOCK_METERS } from "@/lib/grid/outdoor-unlock";
+import {
+  parseStationAccessCode,
+  randomStationAccessCode,
+  resolveStationAccessCode,
+  STATION_ACCESS_CODE_MAX,
+  STATION_ACCESS_CODE_MIN,
+} from "@/lib/grid/stations";
 
 function PoolTagFilters({
   tags,
@@ -167,6 +174,7 @@ export function GameSlotsPanel({
   });
   const [delayMeters, setDelayMeters] = useState(100);
   const [delayMinutes, setDelayMinutes] = useState(5);
+  const [stationCode, setStationCode] = useState("");
   const [search, setSearch] = useState("");
   const [poolTag, setPoolTag] = useState("");
   const [openerTag, setOpenerTag] = useState("");
@@ -263,6 +271,12 @@ export function GameSlotsPanel({
         : "team",
     );
     setEndsGame(Boolean(overrides.ends_game));
+    setStationCode(
+      resolveStationAccessCode(
+        overrides.station?.code,
+        `${gameId}:${slot.index}`,
+      ),
+    );
     const existingGps = parseGpsOverride(overrides.location ?? overrides.gps);
     if (unlock.type === "after_task_delay" && unlock.meters && unlock.meters > 0) {
       setOutdoorActivation("after_meters");
@@ -377,6 +391,18 @@ export function GameSlotsPanel({
       }
     }
 
+    let parsedIndoorCode: string | undefined;
+    if (surface === "indoor") {
+      const parsed = parseStationAccessCode(stationCode);
+      if (!parsed) {
+        setError(
+          `Zugangscode: ${STATION_ACCESS_CODE_MIN}–${STATION_ACCESS_CODE_MAX} Zeichen, nur Buchstaben und Zahlen.`,
+        );
+        return;
+      }
+      parsedIndoorCode = parsed;
+    }
+
     setError(null);
     startTransition(async () => {
       if (bonusBindings.some((b) => !b.task_id.trim())) {
@@ -391,6 +417,14 @@ export function GameSlotsPanel({
         visible_to: visibleTo,
         ends_game: endsGame,
         ...(surface === "outdoor" ? { location } : {}),
+        ...(surface === "indoor"
+          ? {
+              station: {
+                name: editSlot.levelLink.task.title,
+                code: parsedIndoorCode,
+              },
+            }
+          : {}),
       });
       if (!result.success) {
         setError(result.error);
@@ -542,6 +576,9 @@ export function GameSlotsPanel({
                   }`
                 : "Ohne Bonus",
               surface === "outdoor" ? outdoorActivationLabel(overrides) : null,
+              surface === "indoor"
+                ? `Code ${resolveStationAccessCode(overrides.station?.code, `${gameId}:${slot.index}`)}`
+                : null,
               routeOrder === "free" ? "Frei" : "Linear",
               visible === "team" ? "Alle" : roleLabelShort(visible),
               overrides.ends_game ? "Abschluss" : null,
@@ -988,13 +1025,39 @@ export function GameSlotsPanel({
                 ) : null}
               </section>
             ) : (
-              <section className="space-y-2 rounded-3xl bg-secondary/60 p-4">
+              <section className="space-y-3 rounded-3xl bg-secondary/60 p-4">
                 <p className="text-base font-bold">Freischaltung</p>
                 <p className="text-sm text-muted-foreground">
                   {routeOrder === "free"
-                    ? "Spielmodus „Freie Reihenfolge“: Alle Aufgaben sind ab Spielstart offen."
-                    : "Spielmodus „Linear“: Aufgaben nacheinander. Die erste ist ab Start verfügbar."}
+                    ? "Spielmodus „Freie Reihenfolge“: Alle Aufgaben sind ab Spielstart offen — jeweils mit Code."
+                    : "Spielmodus „Linear“: Nacheinander. Die nächste Station öffnet erst nach Code."}
                 </p>
+                {surface === "indoor" ? (
+                  <div className="max-w-sm">
+                    <StudioLabel hint="Hängt als Zettel im Raum. Default zufällig, überschreibbar.">
+                      Zugangscode
+                    </StudioLabel>
+                    <div className="flex gap-2">
+                      <StudioInput
+                        value={stationCode}
+                        maxLength={STATION_ACCESS_CODE_MAX}
+                        className="font-mono uppercase tracking-[0.2em]"
+                        onChange={(e) => setStationCode(e.target.value.toUpperCase())}
+                      />
+                      <StudioButton
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setStationCode(randomStationAccessCode())}
+                      >
+                        Neu
+                      </StudioButton>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {STATION_ACCESS_CODE_MIN} Zeichen Standard, bis {STATION_ACCESS_CODE_MAX}{" "}
+                      möglich. Nur Buchstaben und Zahlen.
+                    </p>
+                  </div>
+                ) : null}
               </section>
             )}
 

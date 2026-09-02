@@ -1362,12 +1362,14 @@ export async function advanceFromHub(input: {
     }
 
     if (content.contentMode === "indoor") {
-      if (input.stationCode) {
-        const codeCheck = validateStationCode(levelDefinition, input.stationCode);
-        if (!codeCheck.ok) return { success: false, error: codeCheck.error };
-      } else if (!input.targetLevel) {
-        return { success: false, error: "Stationscode oder Station wählen." };
+      if (!input.stationCode?.trim()) {
+        return {
+          success: false,
+          error: "Stationscode eingeben — der Code hängt an der Station im Raum.",
+        };
       }
+      const codeCheck = validateStationCode(levelDefinition, input.stationCode);
+      if (!codeCheck.ok) return { success: false, error: codeCheck.error };
     }
 
     const slot = buildPlaySlot(levelDefinition, content.contentMode);

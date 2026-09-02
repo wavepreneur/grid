@@ -497,7 +497,7 @@ export function GameRoom({
     });
   }
 
-  function handleOpenStation(levelNumber: number) {
+  function handleOpenStation(levelNumber: number, stationCode?: string) {
     setError(null);
     startSolveTransition(async () => {
       applyTeamResult(
@@ -506,6 +506,7 @@ export function GameRoom({
           joinCode,
           sessionId: session.sessionId,
           targetLevel: levelNumber,
+          stationCode,
         }),
       );
     });

@@ -54,7 +54,7 @@ type Props = {
   mirroredWalkedMeters?: number;
   onArriveOutdoor: (input: OutdoorArriveInput) => void;
   onSolveGpsCheckpoint: (input: OutdoorArriveInput) => void;
-  onOpenStation: (levelNumber: number) => void;
+  onOpenStation: (levelNumber: number, stationCode?: string) => void;
   onSubmitStationCode: (code: string) => void;
   onStartMission: (levelNumber: number) => void;
   /** Lead persists walk to the server (infrequent). */
@@ -91,6 +91,7 @@ export function PlayHubView({
   const meta = hubMeta(mode);
   const current = levels.find((l) => l.level === activeLevel) ?? levels[0];
   const [code, setCode] = useState("");
+  const [codeFor, setCodeFor] = useState<number | null>(null);
 
   // Outdoor GPS pin OR walk/time trigger → dedicated outdoor hub.
   const outdoorTriggered =
@@ -138,6 +139,8 @@ export function PlayHubView({
   if (mode === "indoor") {
     const done = levels.filter((l) => levelStatuses[String(l.level)]?.status === "completed");
     const next = levels.find((l) => levelStatuses[String(l.level)]?.status === "active") ?? current;
+    const free = routeOrder === "free";
+    const allDone = done.length === levels.length && levels.length > 0;
 
     return (
       <section className="flex flex-col gap-4 px-4 pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom)))] pt-2">
@@ -147,8 +150,9 @@ export function PlayHubView({
             {done.length} von {levels.length} Stationen gelöst
           </h1>
           <p className="mt-2 text-sm text-[var(--cg-muted)]">
-            Tippt eine Station an oder gebt den Stationscode ein, der dort aushängt.
-            {routeOrder === "free" ? " Freie Reihenfolge — jede offene Station ist wählbar." : ""}
+            {free
+              ? "Sucht den Zettel im Raum, tippt die Station an und gebt den Code ein."
+              : "Der nächste Punkt ist frei. Sucht den Zettel, tippt die Station an, Code eingeben."}
           </p>
         </header>
 
@@ -174,90 +178,97 @@ export function PlayHubView({
           {levels.map((s) => {
             const status = levelStatuses[String(s.level)]?.status ?? "locked";
             const isDone = status === "completed";
-            const isActive = status === "active";
-            const locked = status === "locked";
+            const locked = !free && status === "locked";
+            const isNext = !isDone && !locked && (free || status === "active");
+            const asking = codeFor === s.level;
             return (
-              <li key={s.level}>
-                <button
-                  type="button"
-                  disabled={disabled || isPending || locked}
-                  onClick={() => onOpenStation(s.level)}
-                  className={`cg-tap-lift grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-3xl border-2 p-4 text-left ${
+              <li key={s.level} className="relative">
+                <div
+                  className={`overflow-hidden rounded-3xl border-2 ${
                     isDone
-                      ? "border-[var(--cg-success)]/40 bg-[var(--cg-success)]/10"
-                      : isActive
+                      ? "border-[var(--cg-success)]/50 bg-[var(--cg-success)]/10"
+                      : asking
                         ? "border-[var(--cg-primary)] bg-[var(--cg-card)] shadow-[var(--cg-shadow-lift)]"
-                        : "border-[var(--cg-border)] bg-[var(--cg-secondary)] opacity-60"
+                        : isNext
+                          ? "border-[var(--cg-primary)]/70 bg-[var(--cg-card)]"
+                          : "border-[var(--cg-border)] bg-[var(--cg-secondary)]"
                   }`}
                 >
-                  <span
-                    className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-xl font-extrabold ${
-                      isDone
-                        ? "bg-[var(--cg-success)] text-[var(--cg-primary-fg)]"
-                        : locked
-                          ? "bg-[var(--cg-card)] text-[var(--cg-muted)]"
-                          : "bg-[var(--cg-primary)] text-[var(--cg-primary-fg)]"
-                    }`}
+                  <button
+                    type="button"
+                    disabled={disabled || isPending || locked || isDone}
+                    onClick={() => {
+                      setCodeFor(s.level);
+                      setCode("");
+                    }}
+                    className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-3 p-4 text-left disabled:cursor-default"
                   >
-                    {isDone ? <IconCheck size={28} /> : locked ? <IconLock size={24} /> : s.level}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-lg font-bold text-[var(--cg-fg)]">
-                      {s.station?.name ?? s.title}
+                    <span
+                      className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-xl font-extrabold ${
+                        isDone
+                          ? "bg-[var(--cg-success)] text-white"
+                          : locked
+                            ? "bg-[var(--cg-card)] text-[var(--cg-muted)]"
+                            : "bg-[var(--cg-primary)] text-[var(--cg-primary-fg)]"
+                      }`}
+                    >
+                      {isDone ? <IconCheck size={28} /> : locked ? <IconLock size={24} /> : s.level}
                     </span>
-                    <span className="block truncate text-sm text-[var(--cg-muted)]">
-                      {s.station?.place ?? "—"}
-                      {s.station?.code ? ` · Code ${s.station.code}` : ""}
+                    <span className="min-w-0">
+                      <span className="block truncate text-lg font-bold text-[var(--cg-fg)]">
+                        {s.station?.name ?? s.title}
+                      </span>
+                      <span className="block truncate text-sm text-[var(--cg-muted)]">
+                        {isDone
+                          ? "Gelöst"
+                          : locked
+                            ? "Noch gesperrt — erst die Station davor"
+                            : s.station?.place?.trim() || "Zettel suchen, dann Code"}
+                      </span>
                     </span>
-                  </span>
-                  <span className="shrink-0 text-sm font-bold text-[var(--cg-muted)]">
-                    {isDone ? "gelöst" : `${s.station?.points ?? "—"} P`}
-                  </span>
-                </button>
+                  </button>
+
+                  {locked ? (
+                    <div className="pointer-events-none absolute inset-0 rounded-3xl bg-[var(--cg-ink)]/35 backdrop-blur-[1px]" />
+                  ) : null}
+
+                  {asking && !isDone && !locked ? (
+                    <div className="space-y-2 border-t border-[var(--cg-border)] px-4 pb-4 pt-3">
+                      <p className="text-sm text-[var(--cg-muted)]">
+                        Code vom Zettel dieser Station — 4 Zeichen, Zahlen und Buchstaben.
+                      </p>
+                      <input
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        placeholder="CODE"
+                        autoComplete="off"
+                        autoCapitalize="characters"
+                        className="w-full rounded-2xl border-2 border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3 text-center text-xl font-bold uppercase tracking-[0.28em] outline-none focus:border-[var(--cg-primary)]"
+                      />
+                      <BigButton
+                        variant="accent"
+                        disabled={disabled || isPending || code.trim().length < 4}
+                        onClick={() => onOpenStation(s.level, code)}
+                      >
+                        Code prüfen
+                      </BigButton>
+                    </div>
+                  ) : null}
+                </div>
               </li>
             );
           })}
         </ul>
 
-        <div className="space-y-3 rounded-t-3xl bg-[var(--cg-card)] px-1 pt-2 shadow-[var(--cg-shadow-lift)]">
-          {next ? (
-            <>
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-1">
-                <div className="min-w-0">
-                  <SectionLabel>Vorschlag</SectionLabel>
-                  <p className="truncate text-lg font-bold text-[var(--cg-fg)]">
-                    {next.station?.name ?? next.title}
-                  </p>
-                </div>
-                <span className="shrink-0 rounded-full bg-[var(--cg-secondary)] px-3 py-1.5 text-sm font-semibold">
-                  {next.station?.place ?? ""}
-                </span>
-              </div>
-              <BigButton variant="accent" disabled={disabled || isPending} onClick={() => onOpenStation(next.level)}>
-                Station starten
-              </BigButton>
-              <div className="space-y-2">
-                <input
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="Stationscode z. B. A1"
-                  className="w-full rounded-2xl border-2 border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-4 text-center text-xl font-bold uppercase tracking-[0.3em] outline-none focus:border-[var(--cg-primary)]"
-                />
-                <BigButton
-                  variant="outline"
-                  disabled={disabled || isPending || !code.trim()}
-                  onClick={() => onSubmitStationCode(code)}
-                >
-                  Stationscode eingeben
-                </BigButton>
-              </div>
-            </>
-          ) : (
-            <p className="rounded-2xl bg-[var(--cg-success)]/20 px-4 py-4 text-center text-base font-bold">
-              Alle Stationen gelöst — auf zur Auswertung!
-            </p>
-          )}
-        </div>
+        {allDone ? (
+          <p className="rounded-2xl bg-[var(--cg-success)]/20 px-4 py-4 text-center text-base font-bold">
+            Alle Stationen gelöst — auf zur Auswertung!
+          </p>
+        ) : next && !free ? (
+          <p className="text-center text-sm text-[var(--cg-muted)]">
+            Als Nächstes: {next.station?.name ?? next.title}
+          </p>
+        ) : null}
       </section>
     );
   }

@@ -15,6 +15,7 @@ import {
 } from "@/lib/cms/game-slots";
 import { parseRuntimeProfiles } from "@/lib/cms/layer-model";
 import { effectiveDistanceUnlockMeters } from "@/lib/grid/outdoor-unlock";
+import { resolveStationAccessCode } from "@/lib/grid/stations";
 /** When → Then rule (stored on studio_games.logic_rules). */
 export type LogicWhenType =
   | "game_start"
@@ -542,12 +543,17 @@ export function compileStudioGameToLevels(input: {
       }
 
       const levelOverrides = parseLinkOverrides(slot.levelLink.overrides);
-      if (levelOverrides.station?.code) {
+      const indoorGame =
+        parseRuntimeProfiles(input.game.runtime_profiles).default_mode === "indoor";
+      if (indoorGame || levelOverrides.station?.code) {
         level.station = {
-          name: levelOverrides.station.name ?? level.title,
-          place: levelOverrides.station.place ?? "",
-          code: levelOverrides.station.code,
-          kind: (levelOverrides.station.kind as StationKind | undefined) ?? "logic",
+          name: levelOverrides.station?.name ?? level.title,
+          place: levelOverrides.station?.place ?? "",
+          code: resolveStationAccessCode(
+            levelOverrides.station?.code,
+            `${input.game.id}:${slot.index}`,
+          ),
+          kind: (levelOverrides.station?.kind as StationKind | undefined) ?? "logic",
         };
       }
 

@@ -19,9 +19,9 @@ import {
   type StudioLayer,
 } from "@/lib/cms/layer-model";
 import type { BonusTrigger, GameLinkOverrides } from "@/lib/cms/game-link-config";
-import { parseLinkLayer } from "@/lib/cms/game-link-config";
+import { parseLinkLayer, parseLinkOverrides } from "@/lib/cms/game-link-config";
 import { parseBonusBindings } from "@/lib/cms/bonus-bindings";
-import { surfaceToPreset, taskToOpenerArrivalQuiz } from "@/lib/cms/game-slots";
+import { buildGameSlots, surfaceToPreset, taskToOpenerArrivalQuiz } from "@/lib/cms/game-slots";
 import { normalizeTaskContent } from "@/lib/cms/task-content";
 import {
   compileGameLogic,
@@ -30,6 +30,11 @@ import {
 } from "@/lib/cms/logic-rules";
 import type { ActionResult } from "@/lib/grid/types";
 import type { ContentMode } from "@/lib/cms/layer-model";
+import {
+  normalizeStationCode,
+  randomStationAccessCode,
+  resolveStationAccessCode,
+} from "@/lib/grid/stations";
 
 function normalizeGameRow(row: StudioGame): StudioGame {
   return {
@@ -325,6 +330,36 @@ export async function addTaskToGame(
 
     if (countError) throw new Error(countError.message);
 
+    const { data: gameRow } = await supabase
+      .from("studio_games")
+      .select("runtime_profiles")
+      .eq("id", gameId)
+      .maybeSingle();
+    const indoorGame =
+      parseRuntimeProfiles(gameRow?.runtime_profiles).default_mode === "indoor";
+
+    let insertOverrides: Record<string, unknown> = {};
+    if (indoorGame && layer !== 3) {
+      const { data: siblingRows } = await supabase
+        .from("studio_game_tasks")
+        .select("overrides")
+        .eq("game_id", gameId);
+      const taken = new Set(
+        (siblingRows ?? []).flatMap((row) => {
+          const code = (row.overrides as { station?: { code?: string } } | null)?.station
+            ?.code;
+          return code ? [normalizeStationCode(code)] : [];
+        }),
+      );
+      let code = randomStationAccessCode();
+      let guard = 0;
+      while (taken.has(code) && guard < 12) {
+        code = randomStationAccessCode();
+        guard += 1;
+      }
+      insertOverrides = { station: { code } };
+    }
+
     const { data: link, error: linkError } = await supabase
       .from("studio_game_tasks")
       .insert({
@@ -332,6 +367,7 @@ export async function addTaskToGame(
         task_id: taskId,
         layer,
         sort_order: count ?? 0,
+        ...(Object.keys(insertOverrides).length > 0 ? { overrides: insertOverrides } : {}),
       })
       .select("id, game_id, task_id, layer, sort_order, overrides")
       .single();
@@ -1215,6 +1251,52 @@ export async function duplicateGames(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Spiele konnten nicht dupliziert werden.",
+    };
+  }
+}
+
+export type GameStationCodeCard = {
+  index: number;
+  title: string;
+  code: string;
+};
+
+export async function listGameStationCodes(
+  gameId: string,
+): Promise<ActionResult<{ gameName: string; cards: GameStationCodeCard[] }>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const { data: game, error: gameError } = await supabase
+      .from("studio_games")
+      .select("id, name, organization_id, runtime_profiles")
+      .eq("id", gameId)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    if (gameError) throw new Error(gameError.message);
+    if (!game) return { success: false, error: "Spiel nicht gefunden." };
+    if (parseRuntimeProfiles(game.runtime_profiles).default_mode !== "indoor") {
+      return { success: false, error: "Codes gibt es nur bei Indoor-Spielen." };
+    }
+
+    const linksResult = await listGameTasks(gameId);
+    if (!linksResult.success || !linksResult.data) {
+      return { success: false, error: linksResult.error ?? "Aufgaben nicht geladen." };
+    }
+    const slots = buildGameSlots(linksResult.data);
+    const cards = slots.map((slot) => {
+      const overrides = parseLinkOverrides(slot.levelLink.overrides);
+      return {
+        index: slot.index,
+        title: slot.levelLink.task.title,
+        code: resolveStationAccessCode(overrides.station?.code, `${gameId}:${slot.index}`),
+      };
+    });
+    return { success: true, data: { gameName: game.name, cards } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Codes konnten nicht geladen werden.",
     };
   }
 }

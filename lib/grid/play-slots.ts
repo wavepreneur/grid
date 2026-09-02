@@ -175,6 +175,7 @@ export function initialPhaseForSurface(
   slot: PlaySlot,
   level?: Pick<LevelDefinition, "location" | "triggers"> | null,
 ): PlayPhase {
+  if (surface === "indoor") return "hub";
   if (surface === "online" && !slot.quiz) return "level";
   if (surface === "outdoor") {
     const needsHub = level

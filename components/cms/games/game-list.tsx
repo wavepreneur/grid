@@ -42,11 +42,13 @@ import {
   IconPlus,
   IconSearch,
   IconTemplate,
+  IconDownload,
   IconTrash,
 } from "@/components/cms/studio-icons";
 import { Chip, Empty, inputCls } from "@/components/cms/ui";
 import { GameStatusSwitch } from "@/components/cms/games/game-status-switch";
 import { GameTestPlayModal } from "@/components/cms/games/game-test-play-modal";
+import { GameStationCodesModal } from "@/components/cms/games/game-station-codes-modal";
 import {
   StudioButton,
   StudioError,
@@ -71,6 +73,10 @@ type GameSort = "updated" | "created" | "status" | "name";
 type CreateMode = "blank" | "template";
 
 const SURFACE_OPTIONS: ContentMode[] = ["outdoor", "indoor", "online"];
+
+function gameDefaultSurface(game: StudioGame): ContentMode {
+  return parseRuntimeProfiles(game.runtime_profiles).default_mode;
+}
 
 const SORT_OPTIONS: Array<StudioSortOption<GameSort>> = [
   {
@@ -169,6 +175,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
   const [duplicateIds, setDuplicateIds] = useState<string[]>([]);
   const [sort, setSort] = useState<GameSort>("updated");
   const [statusTab, setStatusTab] = useState<"alle" | "draft" | "published" | "archived">("alle");
+  const [surfaceTab, setSurfaceTab] = useState<"alle" | ContentMode>("alle");
   const [query, setQuery] = useState("");
 
   const filteredGames = useMemo(() => {
@@ -179,6 +186,9 @@ export function GameList({ initialGames, initialTemplates }: Props) {
       } else if (g.status !== statusTab) {
         return false;
       }
+      if (surfaceTab !== "alle" && gameDefaultSurface(g) !== surfaceTab) {
+        return false;
+      }
       if (!q) return true;
       return (
         g.name.toLowerCase().includes(q) ||
@@ -186,7 +196,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         (g.city_slug ?? "").toLowerCase().includes(q)
       );
     });
-  }, [gamesWithLive, statusTab, query]);
+  }, [gamesWithLive, statusTab, surfaceTab, query]);
 
   const sortedGames = useMemo(() => sortGames(filteredGames, sort), [filteredGames, sort]);
   const sortedTemplates = useMemo(
@@ -602,28 +612,51 @@ export function GameList({ initialGames, initialTemplates }: Props) {
             className={`${inputCls} mt-0 pl-11`}
           />
         </div>
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ["alle", "Aktiv"],
-              ["published", "Veröffentlicht"],
-              ["draft", "Entwurf"],
-              ["archived", "Archiv"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setStatusTab(id)}
-              className={`tap-lift rounded-full px-4 py-2 text-sm font-bold ${
-                statusTab === id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ["alle", "Aktiv"],
+                ["published", "Veröffentlicht"],
+                ["draft", "Entwurf"],
+                ["archived", "Archiv"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setStatusTab(id)}
+                className={`tap-lift rounded-full px-4 py-2 text-sm font-bold ${
+                  statusTab === id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ["alle", "Alle Flächen"],
+                ...SURFACE_OPTIONS.map((mode) => [mode, surfaceLabelDe(mode)] as const),
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setSurfaceTab(id)}
+                className={`tap-lift rounded-full px-4 py-2 text-sm font-bold ${
+                  surfaceTab === id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -795,14 +828,11 @@ function GameRow({
 }) {
   const queryClient = useQueryClient();
   const [testOpen, setTestOpen] = useState(false);
+  const [codesOpen, setCodesOpen] = useState(false);
   const canTest = game.status === "published" || game.status === "draft";
+  const isIndoor = gameDefaultSurface(game) === "indoor";
 
-  const surfaceChip = (() => {
-    const mode = parseRuntimeProfiles(game.runtime_profiles).default_mode;
-    if (mode === "outdoor") return "Outdoor";
-    if (mode === "online") return "Online";
-    return "Indoor";
-  })();
+  const surfaceChip = surfaceLabelDe(gameDefaultSurface(game));
 
   return (
     <article
@@ -882,6 +912,17 @@ function GameRow({
           >
             Testen
           </StudioButton>
+          {isIndoor ? (
+            <StudioButton
+              type="button"
+              size="sm"
+              variant="ghost"
+              icon={<IconDownload size={16} />}
+              onClick={() => setCodesOpen(true)}
+            >
+              Codes
+            </StudioButton>
+          ) : null}
           <StudioButton
             type="button"
             size="sm"
@@ -910,6 +951,14 @@ function GameRow({
           gameId={game.id}
           gameName={game.name}
           publishedVersionNumber={game.published_version_number}
+        />
+      ) : null}
+      {isIndoor ? (
+        <GameStationCodesModal
+          open={codesOpen}
+          onClose={() => setCodesOpen(false)}
+          gameId={game.id}
+          gameName={game.name}
         />
       ) : null}
     </article>

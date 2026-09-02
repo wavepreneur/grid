@@ -84,7 +84,7 @@ type Props = {
   mirroredWalkedMeters?: number;
   mirroredGps?: GpsFixPayload | null;
   onBroadcastGpsFix?: (fix: GpsFixPayload) => void;
-  onOpenStation: (levelNumber: number) => void;
+  onOpenStation: (levelNumber: number, stationCode?: string) => void;
   onSubmitStationCode: (code: string) => void;
   onStartMission: (levelNumber: number) => void;
   onSubmitQuiz: (payload: {
@@ -174,7 +174,7 @@ export function PlayPhaseFlow({
   leadLabel = "Team Lead",
 }: Props) {
   const mode = eventContent.contentMode;
-  const phase = gameState.current_phase ?? "level";
+  const phase = gameState.current_phase ?? (mode === "indoor" ? "hub" : "level");
   const level = eventContent.levels.find((l) => l.level === activeLevel);
   const slot = level ? buildPlaySlot(level, mode, phase) : null;
   const completed = Object.values(gameState.levels).filter((e) => e.status === "completed").length;
@@ -251,6 +251,7 @@ export function PlayPhaseFlow({
         onReclaimSession={onReclaimSession}
         onReleaseMySeat={onReleaseMySeat}
         releasePending={releasePending}
+        mode={mode}
         canUnlockGps={phase === "hub" && canUnlockGps}
         onForceUnlockGps={
           phase === "hub" && canUnlockGps
