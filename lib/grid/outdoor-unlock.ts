@@ -13,8 +13,24 @@ import { distanceMeters, playGeofenceRadiusMeters } from "@/lib/grid/geofence";
 /** Floor for authored radius — phones drift; 15 m is often too tight outdoors. */
 export const MIN_GEOFENCE_RADIUS_METERS = 25;
 
+/**
+ * Floor for walk-to-unlock. GPS jitter regularly covers 5–15 m while standing still;
+ * 10 m therefore opens immediately. Same floor as the geofence radius.
+ */
+export const MIN_DISTANCE_UNLOCK_METERS = 25;
+
 /** Soft slack when comparing walked meters vs after_meters. */
 export const DISTANCE_UNLOCK_TOLERANCE_METERS = 2;
+
+/** Authored walk target, never below the jitter floor. 0 / missing stays 0 (not a distance unlock). */
+export function effectiveDistanceUnlockMeters(
+  authored: number | null | undefined,
+): number {
+  if (typeof authored !== "number" || !Number.isFinite(authored) || authored <= 0) {
+    return 0;
+  }
+  return Math.max(MIN_DISTANCE_UNLOCK_METERS, Math.round(authored));
+}
 
 /**
  * Reject absurd client jumps in one report (anti-teleport soft limit).

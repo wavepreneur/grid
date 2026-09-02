@@ -14,6 +14,7 @@ import {
   taskContentToBonus,
 } from "@/lib/cms/game-slots";
 import { parseRuntimeProfiles } from "@/lib/cms/layer-model";
+import { effectiveDistanceUnlockMeters } from "@/lib/grid/outdoor-unlock";
 /** When → Then rule (stored on studio_games.logic_rules). */
 export type LogicWhenType =
   | "game_start"
@@ -489,7 +490,7 @@ function linkToLevelDefinition(
       level.triggers = {
         ...(level.triggers ?? {}),
         type: "distance",
-        after_meters: rule.then.delay_meters,
+        after_meters: effectiveDistanceUnlockMeters(rule.then.delay_meters),
       };
     }
   }
@@ -565,7 +566,7 @@ export function compileStudioGameToLevels(input: {
         if (unlock.meters && unlock.meters > 0) {
           level.triggers = {
             type: "distance",
-            after_meters: unlock.meters,
+            after_meters: effectiveDistanceUnlockMeters(unlock.meters),
             after_level: sourceLevel > 0 ? sourceLevel : undefined,
           };
         } else if (unlock.minutes && unlock.minutes > 0) {

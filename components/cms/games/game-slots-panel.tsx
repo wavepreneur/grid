@@ -52,6 +52,7 @@ import {
   type GpsPin,
 } from "@/lib/cms/gps-defaults";
 import type { StudioGameTaskLink } from "@/lib/cms/types";
+import { MIN_DISTANCE_UNLOCK_METERS } from "@/lib/grid/outdoor-unlock";
 
 function PoolTagFilters({
   tags,
@@ -265,7 +266,7 @@ export function GameSlotsPanel({
     const existingGps = parseGpsOverride(overrides.location ?? overrides.gps);
     if (unlock.type === "after_task_delay" && unlock.meters && unlock.meters > 0) {
       setOutdoorActivation("after_meters");
-      setDelayMeters(unlock.meters);
+      setDelayMeters(Math.max(MIN_DISTANCE_UNLOCK_METERS, unlock.meters));
     } else if (
       (unlock.type === "after_task_delay" || unlock.type === "elapsed_minutes") &&
       unlock.minutes &&
@@ -348,8 +349,10 @@ export function GameSlotsPanel({
           radius_meters: gpsDraft.radius_meters,
         };
       } else if (outdoorActivation === "after_meters") {
-        if (!(delayMeters > 0)) {
-          setError("Bitte Meter größer als 0 angeben.");
+        if (delayMeters < MIN_DISTANCE_UNLOCK_METERS) {
+          setError(
+            `Mindestens ${MIN_DISTANCE_UNLOCK_METERS} Meter — darunter zählt GPS-Drift oft schon als gelaufen.`,
+          );
           return;
         }
         unlock = {
@@ -943,12 +946,22 @@ export function GameSlotsPanel({
                     </StudioLabel>
                     <StudioInput
                       type="number"
-                      min={1}
+                      min={MIN_DISTANCE_UNLOCK_METERS}
+                      step={5}
                       value={delayMeters}
                       onChange={(e) =>
-                        setDelayMeters(Math.max(1, Number(e.target.value) || 1))
+                        setDelayMeters(
+                          Math.max(
+                            MIN_DISTANCE_UNLOCK_METERS,
+                            Number(e.target.value) || MIN_DISTANCE_UNLOCK_METERS,
+                          ),
+                        )
                       }
                     />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Mindestens {MIN_DISTANCE_UNLOCK_METERS} m. Weniger öffnet durch
+                      GPS-Ungenauigkeit oft sofort, ohne zu laufen.
+                    </p>
                   </div>
                 ) : null}
 

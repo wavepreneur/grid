@@ -49,6 +49,7 @@ import {
 import type { PlayPhase } from "@/lib/grid/play-surface";
 import { isWithinGeofenceForPlay, withHealthRadiusBonus } from "@/lib/grid/geofence";
 import {
+  effectiveDistanceUnlockMeters,
   hasReachedDistanceMeters,
   resolveOutdoorUnlockMode,
   upsertOutdoorBonusMeters,
@@ -1336,7 +1337,9 @@ export async function advanceFromHub(input: {
     }
 
     if (content.contentMode === "outdoor" && unlockMode === "distance") {
-      const required = levelDefinition.triggers?.after_meters ?? 0;
+      const required = effectiveDistanceUnlockMeters(
+        levelDefinition.triggers?.after_meters,
+      );
       if (typeof input.walkedMeters === "number" && input.walkedMeters >= 0) {
         outdoorProgress = upsertOutdoorLevelProgress({
           existing: outdoorProgress,

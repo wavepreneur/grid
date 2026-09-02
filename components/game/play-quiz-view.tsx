@@ -165,17 +165,28 @@ export function PlayQuizView({
                   : show && isPicked && !isRight
                     ? "border-[var(--cg-destructive)] bg-[var(--cg-destructive)]/10"
                     : isPicked
-                      ? "border-[var(--cg-primary)] bg-[var(--cg-card)]"
+                      ? "border-[var(--cg-primary)] bg-[var(--cg-primary)]/18 ring-2 ring-[var(--cg-primary)]/40"
                       : "border-[var(--cg-border)] bg-[var(--cg-card)]"
               }`}
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--cg-secondary)] text-sm font-bold text-[var(--cg-fg)] sm:h-9 sm:w-9">
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold sm:h-9 sm:w-9 ${
+                  show && isRight
+                    ? "bg-[var(--cg-success)] text-white"
+                    : isPicked && !show
+                      ? "bg-[var(--cg-primary)] text-[var(--cg-primary-fg)]"
+                      : "bg-[var(--cg-secondary)] text-[var(--cg-fg)]"
+                }`}
+              >
                 {String.fromCharCode(65 + i)}
               </span>
               <span className="min-w-0 break-words [overflow-wrap:anywhere]">{opt.label}</span>
               {show && isRight ? <IconCheck className="text-[var(--cg-success)]" /> : null}
               {show && isPicked && !isRight ? (
                 <IconX className="text-[var(--cg-destructive)]" />
+              ) : null}
+              {!show && isPicked ? (
+                <IconCheck className="text-[var(--cg-primary)]" />
               ) : null}
             </button>
           );

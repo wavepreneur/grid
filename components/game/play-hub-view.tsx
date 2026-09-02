@@ -17,7 +17,10 @@ import {
   computeHealthRadiusBonus,
   isNearButOutsideGeofence,
 } from "@/lib/grid/cockpit-health";
-import type { OutdoorForceUnlock } from "@/lib/grid/outdoor-unlock";
+import {
+  effectiveDistanceUnlockMeters,
+  type OutdoorForceUnlock,
+} from "@/lib/grid/outdoor-unlock";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 import type { GameLevelStatus } from "@/lib/grid/game-state";
 import type { LevelDefinition, GeolocationSample } from "@/lib/grid/level-types";
@@ -477,7 +480,7 @@ function OutdoorHub({
     (l) => (levelStatuses[String(l.level)]?.status ?? "locked") !== "completed",
   ).length;
 
-  const targetMeters = current.triggers?.after_meters ?? 100;
+  const targetMeters = effectiveDistanceUnlockMeters(current.triggers?.after_meters) || 100;
   const localWalked = walk.displayMeters + simBonus;
   localWalkedRef.current = localWalked;
   const walkedMeters = isWalkTracker
