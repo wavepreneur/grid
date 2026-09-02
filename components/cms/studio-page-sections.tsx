@@ -1,11 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { listGames } from "@/app/actions/cms/games";
-import { listTicketPools } from "@/app/actions/cms/tickets";
+import { listAccessBatches } from "@/app/actions/cms/access";
 import { GameList } from "@/components/cms/games/game-list";
 import { TaskLibrary } from "@/components/cms/tasks/task-library";
-import { TicketPoolsPanel } from "@/components/cms/tickets/ticket-pools-panel";
+import { TicketAccessPanel } from "@/components/cms/tickets/ticket-access-panel";
 import { StudioListSkeleton } from "@/components/cms/studio-list-skeletons";
 import { useStudioGamesList, useStudioTemplates } from "@/lib/hooks/use-studio-games";
 import { useStudioTasksList } from "@/lib/hooks/use-studio-tasks";
@@ -41,25 +40,25 @@ export function StudioTasksListSection() {
 
 export function StudioTicketsSection() {
   const { orgSlug } = useStudioShell();
-  const poolsQuery = useQuery({
+  const batchesQuery = useQuery({
     queryKey: queryKeys.tickets.list(orgSlug),
     queryFn: async () => {
-      const result = await listTicketPools();
+      const result = await listAccessBatches();
       if (!result.success) throw new Error(result.error);
       return result.data!;
     },
   });
   const gamesQuery = useStudioGamesList([]);
 
-  const pools = poolsQuery.data ?? [];
+  const batches = batchesQuery.data ?? [];
   const games = gamesQuery.data ?? [];
   const isInitialLoad =
-    (poolsQuery.isPending && pools.length === 0) ||
+    (batchesQuery.isPending && batches.length === 0) ||
     (gamesQuery.isPending && games.length === 0);
 
   if (isInitialLoad) {
     return <StudioListSkeleton rows={4} />;
   }
 
-  return <TicketPoolsPanel pools={pools} games={games} />;
+  return <TicketAccessPanel batches={batches} games={games} />;
 }

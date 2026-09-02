@@ -5,7 +5,7 @@ export default function AdminTicketsPage() {
   return (
     <StudioPage
       title="Tickets"
-      description="Verwalte Teilnehmer-Zugänge — einzelne Tickets oder Pools mit gemeinsamer Kapazität."
+      description="Codes erzeugen, verteilen und sehen, wer wann reingegangen ist. Spieler tippen den Code auf /go."
     >
       <StudioTicketsSection />
     </StudioPage>

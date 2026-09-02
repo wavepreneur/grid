@@ -23,7 +23,8 @@ import { useStudioUnsaved } from "@/components/cms/studio-unsaved";
 import { getOrgCockpitOverview } from "@/app/actions/cockpit-overview";
 import { listGames, listTemplates } from "@/app/actions/cms/games";
 import { listTasks } from "@/app/actions/cms/tasks";
-import { listTicketPools, getStudioDashboardStats } from "@/app/actions/cms/tickets";
+import { listAccessBatches } from "@/app/actions/cms/access";
+import { getStudioDashboardStats } from "@/app/actions/cms/tickets";
 import { getWorkforceDashboard } from "@/app/actions/data";
 import { queryKeys } from "@/lib/platform/query-keys";
 
@@ -145,7 +146,7 @@ function prefetchForHref(
     void queryClient.prefetchQuery({
       queryKey: queryKeys.tickets.list(orgSlug),
       queryFn: async () => {
-        const result = await listTicketPools();
+        const result = await listAccessBatches();
         if (!result.success) throw new Error(result.error);
         return result.data!;
       },

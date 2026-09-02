@@ -137,14 +137,14 @@ export async function getStudioDashboardStats(): Promise<
         .eq("organization_id", orgId)
         .eq("is_template", true),
       supabase
-        .from("studio_ticket_pools")
-        .select("id, used_activations, status")
+        .from("studio_access_batches")
+        .select("id, used_activations")
         .eq("organization_id", orgId),
     ]);
 
-    const poolRows = pools.data ?? [];
-    const activePools = poolRows.filter((p) => p.status === "active").length;
-    const totalActivations = poolRows.reduce(
+    const batchRows = pools.data ?? [];
+    const activePools = batchRows.length;
+    const totalActivations = batchRows.reduce(
       (sum, p) => sum + Number(p.used_activations ?? 0),
       0,
     );

@@ -59,11 +59,11 @@ export function StudioOverviewSection() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Aufgaben" value={String(stats.tasks)} note="in der Bibliothek" />
         <Stat label="Spiele" value={String(stats.games)} note={`${stats.templates} Vorlagen`} />
-        <Stat label="Aktive Pools" value={String(stats.activePools)} note="Ticket-Pools" />
+        <Stat label="Ticket-Sätze" value={String(stats.activePools)} note="Zugangscodes" />
         <Stat
-          label="Aktivierungen"
+          label="Geräte / Aktivierungen"
           value={String(stats.totalActivations)}
-          note="gesamt"
+          note="Event-Codes"
         />
       </div>
 

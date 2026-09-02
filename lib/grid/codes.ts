@@ -13,6 +13,11 @@ export function generatePulseCode(length = 8): string {
   return generateCode(length);
 }
 
+/** Player-facing access ticket (typed on /go). */
+export function generateAccessCode(length = 6): string {
+  return generateCode(length);
+}
+
 function generateCode(length: number): string {
   const bytes = crypto.getRandomValues(new Uint8Array(length));
   return Array.from(bytes, (byte) => CODE_ALPHABET[byte % CODE_ALPHABET.length]).join(

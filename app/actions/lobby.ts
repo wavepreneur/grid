@@ -30,7 +30,6 @@ import {
 } from "@/lib/grid/resume-token";
 import {
   PLAYER_NOT_FOUND,
-  SESSION_ACTIVE,
   TEAM_FULL,
 } from "@/lib/grid/session-codes";
 import {
@@ -44,6 +43,10 @@ import {
   setTeamNavigator,
   syncTeamLeadershipAfterPlayerLeaves,
 } from "@/lib/grid/team-session";
+import {
+  assertEventPoolHasSeat,
+  touchAccessOnJoin,
+} from "@/lib/grid/access";
 import { teamEntryPath } from "@/lib/grid/team-routes";
 import type {
   ActionResult,
@@ -412,6 +415,11 @@ export async function createTeamAsCaptain(input: {
       return { success: false, error: "Dieses Event ist nicht mehr aktiv." };
     }
 
+    const poolBlocked = await assertEventPoolHasSeat(event.id);
+    if (poolBlocked) {
+      return { success: false, error: poolBlocked };
+    }
+
     // Clamp to event limit — onboarding no longer asks for team size.
     const maxSize = Math.min(
       Math.max(1, input.maxSize),
@@ -481,6 +489,8 @@ export async function createTeamAsCaptain(input: {
     }
 
     await maybeAutoStartTeam(team.id);
+
+    await touchAccessOnJoin({ teamId: team.id, eventId: event.id, isNewPlayer: true });
 
     const refreshedTeam = await getTeamByJoinCode(team.join_code, event.id);
 
@@ -772,6 +782,8 @@ export async function joinTeamAsPlayer(input: {
         payload: { display_name: existingPlayer.display_name },
       });
 
+      await touchAccessOnJoin({ teamId: team.id, eventId: event.id, isNewPlayer: false });
+
       return {
         success: true,
         data: await buildSessionForTeam(
@@ -783,15 +795,6 @@ export async function joinTeamAsPlayer(input: {
     }
 
     if (existingPlayer) {
-      if (!input.takeover) {
-        return {
-          success: false,
-          code: SESSION_ACTIVE,
-          error: `${existingPlayer.display_name} ist bereits in diesem Team aktiv.`,
-          meta: { displayName: existingPlayer.display_name },
-        };
-      }
-
       const sessionId = await rotatePlayerSession(existingPlayer.id);
 
       await writeAuditLog({
@@ -803,6 +806,8 @@ export async function joinTeamAsPlayer(input: {
         payload: { display_name: existingPlayer.display_name },
       });
 
+      await touchAccessOnJoin({ teamId: team.id, eventId: event.id, isNewPlayer: false });
+
       return {
         success: true,
         data: await buildSessionForTeam(
@@ -813,11 +818,15 @@ export async function joinTeamAsPlayer(input: {
       };
     }
 
+    const poolBlocked = await assertEventPoolHasSeat(event.id);
+    if (poolBlocked) {
+      return { success: false, error: poolBlocked };
+    }
+
     const sessionId = randomUUID();
     const activeBeforeJoin = await countActivePlayers(team.id);
-    // 2nd seat = Beta (Profiler); further seats = Gamma (Organizer). Avoids a gamma→beta flash.
-    const initialRole =
-      activeBeforeJoin === 1 ? "beta" : "gamma";
+    const isFirst = activeBeforeJoin === 0;
+    const initialRole = isFirst ? "alpha" : activeBeforeJoin === 1 ? "beta" : "gamma";
 
     const { data: player, error } = await supabase
       .from("players")
@@ -825,7 +834,7 @@ export async function joinTeamAsPlayer(input: {
         team_id: team.id,
         session_id: sessionId,
         display_name: displayName,
-        is_captain: false,
+        is_captain: isFirst,
         role: initialRole,
       })
       .select("id, display_name, is_captain, session_id, role")
@@ -837,7 +846,7 @@ export async function joinTeamAsPlayer(input: {
           success: false,
           code: TEAM_FULL,
           error:
-            "Das Team ist voll. Bist du schon Mitglied? Tippe auf „Gerät wechseln“ und gib deinen Namen ein.",
+            "Das Team ist voll. Bist du schon Mitglied? Wähle deinen Namen in der Liste.",
         };
       }
       return { success: false, error: error?.message ?? "Beitritt fehlgeschlagen." };
@@ -847,22 +856,37 @@ export async function joinTeamAsPlayer(input: {
     // Full rebalance + auto-start continue in the background so the joiner is not blocked.
     const activeCount = activeBeforeJoin + 1;
     const teamPatch: Record<string, unknown> = {};
-    if (initialRole === "beta") {
-      teamPatch.beta_player_id = player.id;
-    }
-    if (team.status === "setup") {
+    if (isFirst) {
+      const lobbyOpenedAt = new Date();
+      teamPatch.captain_player_id = player.id;
+      teamPatch.navigator_player_id = player.id;
       teamPatch.status = "lobby";
-    }
-    if (
-      activeCount >= team.max_size &&
-      (team.status === "lobby" || team.status === "setup")
-    ) {
+      teamPatch.lobby_opened_at = lobbyOpenedAt.toISOString();
       teamPatch.lobby_auto_start_at = computeLobbyAutoStartAt({
         autoStartSeconds:
           event.lobby_auto_start_seconds || DEFAULT_LOBBY_AUTO_START_SECONDS,
         maxSize: team.max_size,
-        activePlayerCount: activeCount,
+        activePlayerCount: 1,
+        from: lobbyOpenedAt,
       }).toISOString();
+    } else {
+      if (initialRole === "beta") {
+        teamPatch.beta_player_id = player.id;
+      }
+      if (team.status === "setup") {
+        teamPatch.status = "lobby";
+      }
+      if (
+        activeCount >= team.max_size &&
+        (team.status === "lobby" || team.status === "setup")
+      ) {
+        teamPatch.lobby_auto_start_at = computeLobbyAutoStartAt({
+          autoStartSeconds:
+            event.lobby_auto_start_seconds || DEFAULT_LOBBY_AUTO_START_SECONDS,
+          maxSize: team.max_size,
+          activePlayerCount: activeCount,
+        }).toISOString();
+      }
     }
 
     if (Object.keys(teamPatch).length > 0) {
@@ -878,6 +902,14 @@ export async function joinTeamAsPlayer(input: {
     const teamForSession = {
       ...team,
       status: (teamPatch.status as typeof team.status | undefined) ?? team.status,
+      captain_player_id:
+        typeof teamPatch.captain_player_id === "string"
+          ? teamPatch.captain_player_id
+          : team.captain_player_id,
+      navigator_player_id:
+        typeof teamPatch.navigator_player_id === "string"
+          ? teamPatch.navigator_player_id
+          : team.navigator_player_id,
       beta_player_id:
         typeof teamPatch.beta_player_id === "string"
           ? teamPatch.beta_player_id
@@ -887,6 +919,8 @@ export async function joinTeamAsPlayer(input: {
           ? teamPatch.lobby_auto_start_at
           : team.lobby_auto_start_at,
     };
+
+    await touchAccessOnJoin({ teamId: team.id, eventId: event.id, isNewPlayer: true });
 
     after(() => {
       void (async () => {
@@ -1162,7 +1196,9 @@ export async function resolveTeamJoinCode(input: {
 export async function listActiveTeamJoinRoster(input: {
   inviteCode: string;
   joinCode: string;
-}): Promise<ActionResult<{ members: Array<{ displayName: string }> }>> {
+}): Promise<
+  ActionResult<{ members: Array<{ displayName: string }>; seatsLeft: number; maxSize: number }>
+> {
   try {
     const event = await getEventByInviteCode(normalizeCode(input.inviteCode));
     if (!event) {
@@ -1175,7 +1211,7 @@ export async function listActiveTeamJoinRoster(input: {
     }
 
     if (team.status === "finished" || team.status === "disbanded") {
-      return { success: true, data: { members: [] } };
+      return { success: true, data: { members: [], seatsLeft: 0, maxSize: team.max_size } };
     }
 
     const supabase = createAdminClient();
@@ -1190,12 +1226,16 @@ export async function listActiveTeamJoinRoster(input: {
       return { success: false, error: error.message };
     }
 
+    const members = (data ?? []).map((row) => ({
+      displayName: row.display_name as string,
+    }));
+
     return {
       success: true,
       data: {
-        members: (data ?? []).map((row) => ({
-          displayName: row.display_name as string,
-        })),
+        members,
+        seatsLeft: Math.max(0, team.max_size - members.length),
+        maxSize: team.max_size,
       },
     };
   } catch (error) {
@@ -1313,6 +1353,8 @@ export async function setupPrebookedTeamAsCaptain(input: {
     }
 
     await maybeAutoStartTeam(team.id);
+
+    await touchAccessOnJoin({ teamId: team.id, eventId: event.id, isNewPlayer: true });
 
     await writeAuditLog({
       organizationId: event.organization_id,

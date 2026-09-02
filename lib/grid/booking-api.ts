@@ -3,6 +3,7 @@ import { buildDefaultContentConfig, getBlueprint, type BlueprintSlug } from "@/l
 import { parseRouteOverride } from "@/lib/grid/content-engine";
 import type { EventRouteOverride } from "@/lib/grid/level-types";
 import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
+import { ensureTeamAccessCodesForEvent } from "@/lib/grid/access";
 
 export type GridBookingRequest = {
   organization_slug?: string;
@@ -22,6 +23,7 @@ export type GridBookingTeam = {
   team_name: string;
   play_url: string;
   lobby_url: string;
+  access_code: string | null;
 };
 
 export type GridBookingResponse = {
@@ -31,6 +33,7 @@ export type GridBookingResponse = {
   content_pack_slug: string | null;
   booking_reference: string | null;
   join_url: string;
+  entry_url: string;
   cockpit_url: string;
   show_url: string;
   teams: GridBookingTeam[];
@@ -179,15 +182,23 @@ export async function buildBookingResponse(input: {
   blueprintSlug: BlueprintSlug;
   idempotent?: boolean;
 }): Promise<GridBookingResponse> {
-  const urls = buildBookingUrls(input.origin, input.event.invite_code, "");
+  const origin = input.origin.replace(/\/$/, "");
+  const codeByTeam = await ensureTeamAccessCodesForEvent({
+    organizationId: input.event.organization_id,
+    eventId: input.event.id,
+    eventTitle: input.event.title,
+    bookingReference: input.event.booking_reference,
+  });
 
   const teams: GridBookingTeam[] = input.teams.map((team) => {
     const teamUrls = buildBookingUrls(input.origin, input.event.invite_code, team.join_code);
+    const accessCode = codeByTeam.get(team.id) ?? null;
     return {
       join_code: team.join_code,
       team_name: team.name,
-      play_url: teamUrls.play_url,
+      play_url: accessCode ? `${origin}/go/${accessCode}` : teamUrls.play_url,
       lobby_url: teamUrls.lobby_url,
+      access_code: accessCode,
     };
   });
 
@@ -197,7 +208,8 @@ export async function buildBookingResponse(input: {
     blueprint_slug: input.blueprintSlug,
     content_pack_slug: readContentPackSlug(input.event.content_config),
     booking_reference: input.event.booking_reference,
-    join_url: urls.join_url,
+    join_url: `${origin}/go`,
+    entry_url: `${origin}/go`,
     cockpit_url: buildBookingUrls(input.origin, input.event.invite_code, "").cockpit_url,
     show_url: buildBookingUrls(input.origin, input.event.invite_code, "").show_url,
     teams,
