@@ -38,6 +38,7 @@ import { resolveBlueprint } from "@/lib/grid/blueprints";
 import { parseContentConfig } from "@/lib/grid/content-engine";
 import { countActivePlayers } from "@/lib/grid/team-session";
 import { assertPlayerSession } from "@/lib/grid/session-auth";
+import { SESSION_SUPERSEDED } from "@/lib/grid/session-codes";
 import type { ActionResult } from "@/lib/grid/types";
 import { findLevelByStationCode } from "@/lib/grid/content-loader";
 import {
@@ -131,9 +132,11 @@ export async function getGameState(input: {
       data: buildRealtimeState(team, player),
     };
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Unbekannter Fehler";
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+      code: /Session ist abgelaufen/i.test(message) ? SESSION_SUPERSEDED : undefined,
+      error: message,
     };
   }
 }

@@ -31,6 +31,7 @@ import {
 } from "@/lib/grid/resume-token";
 import {
   PLAYER_NOT_FOUND,
+  SESSION_SUPERSEDED,
   TEAM_FULL,
 } from "@/lib/grid/session-codes";
 import {
@@ -589,7 +590,11 @@ export async function verifyTeamSession(input: {
 
     const player = await getPlayerBySessionId(input.sessionId);
     if (!player || player.team_id !== team.id) {
-      return { success: false, error: "Session abgelaufen. Bitte erneut mit deinem Namen beitreten." };
+      return {
+        success: false,
+        code: SESSION_SUPERSEDED,
+        error: "Deine Session läuft auf einem anderen Gerät.",
+      };
     }
 
     return {
@@ -981,7 +986,11 @@ export async function getLobbySnapshot(input: {
     if (input.sessionId) {
       const player = await getPlayerBySessionId(input.sessionId);
       if (!player || player.team_id !== team.id) {
-        return { success: false, error: "Session ungültig." };
+        return {
+          success: false,
+          code: SESSION_SUPERSEDED,
+          error: "Deine Session läuft auf einem anderen Gerät.",
+        };
       }
 
       await createAdminClient()

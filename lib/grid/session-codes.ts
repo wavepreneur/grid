@@ -10,3 +10,15 @@ export type SessionErrorCode =
   | typeof SESSION_SUPERSEDED
   | typeof TEAM_FULL
   | typeof PLAYER_NOT_FOUND;
+
+export function isSessionSupersededResult(result: {
+  success: boolean;
+  error?: string;
+  code?: string;
+}): boolean {
+  if (result.success) return false;
+  if (result.code === SESSION_SUPERSEDED) return true;
+  return /Session ungültig|Session ist abgelaufen|Session abgelaufen|anderen Gerät/i.test(
+    result.error ?? "",
+  );
+}

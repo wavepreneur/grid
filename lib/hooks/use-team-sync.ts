@@ -261,6 +261,11 @@ export function useTeamSync({
       }
 
       if (!tokenResult.success) {
+        if (/Session ungültig/i.test(tokenResult.error ?? "")) {
+          onSessionSupersededRef.current?.();
+          connecting = false;
+          return;
+        }
         setError(tokenResult.error);
         setIsConnected(false);
         connecting = false;

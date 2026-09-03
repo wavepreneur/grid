@@ -220,9 +220,17 @@ export async function rotatePlayerSession(playerId: string): Promise<string> {
   const supabase = createAdminClient();
   const sessionId = randomUUID();
 
+  const { data: current, error: readError } = await supabase
+    .from("players")
+    .select("session_id")
+    .eq("id", playerId)
+    .maybeSingle();
+  if (readError) throw new Error(readError.message);
+
   const { error } = await supabase
     .from("players")
     .update({
+      previous_session_id: current?.session_id ?? null,
       session_id: sessionId,
       last_seen_at: new Date().toISOString(),
     })

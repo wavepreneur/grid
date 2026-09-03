@@ -42,6 +42,7 @@ import {
   sessionAfterCaptainTransfer,
 } from "@/lib/grid/live-session";
 import { nextLeadSeq, noteLeadSeq, parseLeadSeq } from "@/lib/grid/lead-seq";
+import { isSessionSupersededResult } from "@/lib/grid/session-codes";
 import {
   clearMissionStarting,
   markMissionStarting,
@@ -195,7 +196,12 @@ export function LobbyRoom({
       sessionId: session.sessionId,
     });
 
-    if (!result.success) return;
+    if (!result.success) {
+      if (isSessionSupersededResult(result)) {
+        setSessionSuperseded(true);
+      }
+      return;
+    }
 
     // Polling often sees "playing" before/without Realtime — never leave the lobby stuck.
     if (
@@ -219,6 +225,13 @@ export function LobbyRoom({
       joinCode,
       sessionId: session.sessionId,
     });
+
+    if (!verified.success) {
+      if (isSessionSupersededResult(verified)) {
+        setSessionSuperseded(true);
+      }
+      return;
+    }
 
     if (verified.success) {
       const held = holdCaptainIdRef.current;

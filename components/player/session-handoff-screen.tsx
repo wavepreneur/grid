@@ -56,14 +56,14 @@ export function SessionHandoffScreen({
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-6 py-10 text-center">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-        Sitzung pausiert
+        Nicht mehr im Spiel
       </p>
       <h2 className="mt-3 text-2xl font-semibold text-slate-900">
-        Spiel läuft auf einem anderen Gerät
+        Jemand anderes nutzt diesen Zugang
       </h2>
       <p className="mt-4 max-w-md text-sm leading-7 text-slate-500">
-        {displayName}, dein Spiel ist auf einem anderen Gerät geöffnet. Du kannst es jederzeit
-        wieder auf dieses Gerät holen.
+        {displayName}, dein Platz läuft jetzt auf einem anderen Gerät. Wenn das versehentlich
+        war, hol dir die Rolle hier zurück — das andere Gerät wird automatisch abgemeldet.
       </p>
 
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}

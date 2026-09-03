@@ -44,6 +44,7 @@ import { findForeignActiveBonuses } from "@/lib/grid/bonus-queue";
 import { useBonusQueueTick } from "@/lib/hooks/use-bonus-queue-tick";
 import { clearWalkedDistanceStorage } from "@/lib/hooks/use-walked-distance";
 import { pickNewerTeamState, type TeamGameState, type TeamRealtimeState } from "@/lib/grid/game-state";
+import { isSessionSupersededResult } from "@/lib/grid/session-codes";
 import type {
   ResolvedEventContent,
   SolveLevelPayload,
@@ -170,7 +171,12 @@ export function GameRoom({
         joinCode,
         sessionId: session.sessionId,
       }).then((result) => {
-        if (!result.success || !result.data) return;
+        if (!result.success || !result.data) {
+          if (isSessionSupersededResult(result)) {
+            setSessionSuperseded(true);
+          }
+          return;
+        }
         setTeamState((current) => {
           const next = pickNewerTeamState(current, result.data!);
           if (next !== current) cacheTeamState(next);
@@ -318,6 +324,10 @@ export function GameRoom({
         tileId,
       });
       if (!result.success) {
+        if (isSessionSupersededResult(result)) {
+          setSessionSuperseded(true);
+          return;
+        }
         setError(result.error);
         return;
       }
@@ -364,6 +374,10 @@ export function GameRoom({
         payload,
       });
       if (!result.success) {
+        if (isSessionSupersededResult(result)) {
+          setSessionSuperseded(true);
+          return;
+        }
         const answerRejected = /Falsche Antwort|Bitte eine Antwort|Bitte alle richtigen|Nicht alle richtigen/i.test(
           result.error,
         );
@@ -409,8 +423,12 @@ export function GameRoom({
     }).then(applyTeamResult);
   }
 
-  function applyTeamResult(result: { success: boolean; data?: TeamRealtimeState; error?: string }) {
+  function applyTeamResult(result: { success: boolean; data?: TeamRealtimeState; error?: string; code?: string }) {
     if (!result.success) {
+      if (isSessionSupersededResult(result)) {
+        setSessionSuperseded(true);
+        return;
+      }
       setError(result.error ?? "Aktion fehlgeschlagen.");
       return;
     }
