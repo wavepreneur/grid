@@ -168,7 +168,7 @@ export async function lookupAccessCode(rawCode: string): Promise<
 
   const { data: team } = await supabase
     .from("teams")
-    .select("id, join_code, name, status")
+    .select("id, join_code, name, status, captain_player_id")
     .eq("id", data.team_id)
     .maybeSingle();
 
@@ -187,7 +187,10 @@ export async function lookupAccessCode(rawCode: string): Promise<
       teamId: team.id,
       eventTitle: event.title,
       teamName: team.name,
-      path: `/e/${event.invite_code}/team/${team.join_code}`,
+      path:
+        team.status === "setup" && !team.captain_player_id
+          ? `/e/${event.invite_code}/captain?team=${team.join_code}`
+          : `/e/${event.invite_code}/team/${team.join_code}`,
     },
   };
 }
