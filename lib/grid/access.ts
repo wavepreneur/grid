@@ -3,6 +3,9 @@ import { generateAccessCode, generateInviteCode, generateJoinCode, normalizeCode
 import { getCityIdBySlug } from "@/lib/grid/organizations";
 import { parseRuntimeProfiles } from "@/lib/cms/layer-model";
 import type { StudioGame } from "@/lib/cms/types";
+import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
+
+export { MAX_PLAYERS_PER_TEAM, splitTeamSeats, formatTeamSeatPreview } from "@/lib/grid/team-seats";
 
 export type AccessKind = "team" | "event_pool";
 export type AccessStatus = "unused" | "redeemed" | "expired" | "revoked";
@@ -395,8 +398,7 @@ export type CreateAccessBatchInput = {
   kind: AccessKind;
   game: StudioGame;
   versionId: string;
-  teamCount: number;
-  playersPerTeam: number;
+  teamSeats: number[];
   maxActivations: number | null;
   validFrom: string | null;
   validUntil: string | null;
@@ -409,6 +411,17 @@ export async function provisionStudioAccessBatch(
   const supabase = createAdminClient();
   const game = input.game;
   const profiles = parseRuntimeProfiles(game.runtime_profiles);
+  const teamSeats = input.kind === "team" ? input.teamSeats : [];
+  if (input.kind === "team") {
+    if (teamSeats.length < 1) {
+      throw new Error("Es braucht mindestens ein Team.");
+    }
+    if (teamSeats.some((seats) => seats < 1 || seats > MAX_PLAYERS_PER_TEAM)) {
+      throw new Error(`Jedes Team braucht 1–${MAX_PLAYERS_PER_TEAM} Plätze.`);
+    }
+  }
+  const playersPerTeam =
+    teamSeats.length > 0 ? Math.max(...teamSeats) : MAX_PLAYERS_PER_TEAM;
 
   let cityId: string | null = null;
   if (game.gps_enabled && game.city_slug) {
@@ -425,7 +438,7 @@ export async function provisionStudioAccessBatch(
       kind: input.kind,
       max_activations: input.kind === "event_pool" ? input.maxActivations : null,
       used_activations: 0,
-      players_per_team: input.playersPerTeam,
+      players_per_team: playersPerTeam,
       valid_from: input.validFrom,
       valid_until: input.validUntil,
       booking_reference: input.bookingReference ?? null,
@@ -438,11 +451,10 @@ export async function provisionStudioAccessBatch(
   }
 
   const inviteCode = generateInviteCode();
-  const teamCount = input.kind === "team" ? input.teamCount : 0;
   const maxTeams =
     input.kind === "event_pool"
       ? Math.max(1, input.maxActivations ?? 500)
-      : Math.max(1, teamCount);
+      : Math.max(1, teamSeats.length);
 
   const contentConfig = {
     blueprint_slug: game.gps_enabled ? "exitmania" : "tabbrain",
@@ -465,11 +477,10 @@ export async function provisionStudioAccessBatch(
       invite_code: inviteCode,
       status: "lobby",
       max_teams: maxTeams,
-      max_players_per_team: input.playersPerTeam,
+      max_players_per_team: playersPerTeam,
       booking_reference: input.bookingReference ?? null,
       content_config: contentConfig,
       studio_game_version_id: input.versionId,
-      access_batch_id: batch.id,
     })
     .select("id, invite_code")
     .single();
@@ -477,6 +488,16 @@ export async function provisionStudioAccessBatch(
   if (eventError || !event) {
     await supabase.from("studio_access_batches").delete().eq("id", batch.id);
     throw new Error(eventError?.message ?? "Event konnte nicht erstellt werden.");
+  }
+
+  const { error: linkError } = await supabase
+    .from("events")
+    .update({ access_batch_id: batch.id })
+    .eq("id", event.id);
+  if (linkError) {
+    await supabase.from("events").delete().eq("id", event.id);
+    await supabase.from("studio_access_batches").delete().eq("id", batch.id);
+    throw new Error(linkError.message);
   }
 
   await supabase
@@ -504,7 +525,7 @@ export async function provisionStudioAccessBatch(
   }
 
   const teams: ProvisionTeam[] = [];
-  for (let i = 0; i < teamCount; i++) {
+  for (let i = 0; i < teamSeats.length; i++) {
     const joinCode = generateJoinCode();
     const { data: team, error: teamError } = await supabase
       .from("teams")
@@ -513,7 +534,7 @@ export async function provisionStudioAccessBatch(
         organization_id: input.organizationId,
         join_code: joinCode,
         name: `Team ${i + 1}`,
-        max_size: input.playersPerTeam,
+        max_size: teamSeats[i],
         status: "setup",
       })
       .select("id, join_code, name")

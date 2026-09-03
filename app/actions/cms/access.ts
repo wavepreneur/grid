@@ -10,6 +10,7 @@ import {
   type AccessKind,
   type AccessStatus,
 } from "@/lib/grid/access";
+import { splitTeamSeats } from "@/lib/grid/team-seats";
 import type { ActionResult } from "@/lib/grid/types";
 
 export type StudioAccessCodeView = {
@@ -24,6 +25,7 @@ export type StudioAccessCodeView = {
   revoked_at: string | null;
   valid_until: string | null;
   player_count: number;
+  seat_count: number;
 };
 
 export type StudioAccessBatchView = {
@@ -37,10 +39,15 @@ export type StudioAccessBatchView = {
   max_activations: number | null;
   used_activations: number;
   players_per_team: number;
+  seat_sizes: number[];
   valid_until: string | null;
   created_at: string;
   codes: StudioAccessCodeView[];
 };
+
+function uniqueIds(values: Array<string | null | undefined>): string[] {
+  return [...new Set(values.filter((id): id is string => Boolean(id)))];
+}
 
 export async function listAccessBatches(): Promise<ActionResult<StudioAccessBatchView[]>> {
   try {
@@ -49,7 +56,7 @@ export async function listAccessBatches(): Promise<ActionResult<StudioAccessBatc
 
     const { data: batches, error } = await supabase
       .from("studio_access_batches")
-      .select("*, studio_games(name), events(invite_code)")
+      .select("*")
       .eq("organization_id", orgId)
       .order("created_at", { ascending: false });
 
@@ -57,24 +64,48 @@ export async function listAccessBatches(): Promise<ActionResult<StudioAccessBatc
     if (!batches || batches.length === 0) return { success: true, data: [] };
 
     const batchIds = batches.map((b) => b.id as string);
-    const { data: codeRows, error: codeError } = await supabase
-      .from("studio_access_codes")
-      .select("*")
-      .in("batch_id", batchIds)
-      .order("created_at", { ascending: true });
+    const gameIds = uniqueIds(batches.map((b) => b.game_id as string | null));
+    const eventIds = uniqueIds(batches.map((b) => b.event_id as string | null));
+
+    const [{ data: codeRows, error: codeError }, { data: games }, { data: events }] =
+      await Promise.all([
+        supabase
+          .from("studio_access_codes")
+          .select("*")
+          .in("batch_id", batchIds)
+          .order("created_at", { ascending: true }),
+        gameIds.length > 0
+          ? supabase.from("studio_games").select("id, name").in("id", gameIds)
+          : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+        eventIds.length > 0
+          ? supabase.from("events").select("id, invite_code").in("id", eventIds)
+          : Promise.resolve({ data: [] as { id: string; invite_code: string }[] }),
+      ]);
 
     if (codeError) throw new Error(codeError.message);
 
-    const teamIds = (codeRows ?? [])
-      .map((c) => c.team_id as string | null)
-      .filter((id): id is string => Boolean(id));
+    const gameNameById = new Map<string, string>();
+    for (const game of games ?? []) {
+      gameNameById.set(game.id as string, game.name as string);
+    }
+    const inviteByEventId = new Map<string, string>();
+    for (const event of events ?? []) {
+      inviteByEventId.set(event.id as string, event.invite_code as string);
+    }
+
+    const teamIds = uniqueIds((codeRows ?? []).map((c) => c.team_id as string | null));
 
     const teamNameById = new Map<string, string>();
+    const seatCountByTeam = new Map<string, number>();
     const playerCountByTeam = new Map<string, number>();
     if (teamIds.length > 0) {
-      const { data: teams } = await supabase.from("teams").select("id, name").in("id", teamIds);
+      const { data: teams } = await supabase
+        .from("teams")
+        .select("id, name, max_size")
+        .in("id", teamIds);
       for (const team of teams ?? []) {
         teamNameById.set(team.id as string, team.name as string);
+        seatCountByTeam.set(team.id as string, Number(team.max_size ?? 0));
       }
       const { data: players } = await supabase
         .from("players")
@@ -106,6 +137,7 @@ export async function listAccessBatches(): Promise<ActionResult<StudioAccessBatc
         revoked_at: (row.revoked_at as string | null) ?? null,
         valid_until: (row.valid_until as string | null) ?? null,
         player_count: row.team_id ? (playerCountByTeam.get(row.team_id as string) ?? 0) : 0,
+        seat_count: row.team_id ? (seatCountByTeam.get(row.team_id as string) ?? 0) : 0,
       };
       const list = codesByBatch.get(row.batch_id as string) ?? [];
       list.push(view);
@@ -113,24 +145,27 @@ export async function listAccessBatches(): Promise<ActionResult<StudioAccessBatc
     }
 
     const data: StudioAccessBatchView[] = batches.map((batch) => {
-      const game = batch.studio_games as { name?: string } | { name?: string }[] | null;
-      const gameName = Array.isArray(game) ? game[0]?.name : game?.name;
-      const event = batch.events as { invite_code?: string } | { invite_code?: string }[] | null;
-      const invite = Array.isArray(event) ? event[0]?.invite_code : event?.invite_code;
+      const codes = codesByBatch.get(batch.id as string) ?? [];
+      const seatSizes = codes
+        .filter((code) => code.kind === "team")
+        .map((code) => code.seat_count)
+        .filter((seats) => seats > 0);
+      const eventId = (batch.event_id as string | null) ?? null;
       return {
         id: batch.id as string,
         name: batch.name as string,
         kind: batch.kind as AccessKind,
         game_id: (batch.game_id as string | null) ?? null,
-        game_name: gameName ?? null,
-        event_id: (batch.event_id as string | null) ?? null,
-        invite_code: invite ?? null,
+        game_name: batch.game_id ? (gameNameById.get(batch.game_id as string) ?? null) : null,
+        event_id: eventId,
+        invite_code: eventId ? (inviteByEventId.get(eventId) ?? null) : null,
         max_activations: batch.max_activations != null ? Number(batch.max_activations) : null,
         used_activations: Number(batch.used_activations ?? 0),
         players_per_team: Number(batch.players_per_team ?? 5),
+        seat_sizes: seatSizes,
         valid_until: (batch.valid_until as string | null) ?? null,
         created_at: batch.created_at as string,
-        codes: codesByBatch.get(batch.id as string) ?? [],
+        codes,
       };
     });
 
@@ -147,8 +182,8 @@ export type CreateAccessBatchForm = {
   game_id: string;
   name: string;
   kind: AccessKind;
+  player_count?: number;
   team_count?: number;
-  players_per_team?: number;
   max_activations?: number | null;
   valid_until?: string | null;
 };
@@ -183,12 +218,15 @@ export async function createAccessBatch(
       return { success: false, error: "Keine veröffentlichte Version gefunden." };
     }
 
-    const teamCount = Math.max(1, Math.min(500, Math.floor(input.team_count ?? 1)));
-    const players = Math.max(1, Math.min(8, Math.floor(input.players_per_team ?? 5)));
-    const maxAct =
-      input.kind === "event_pool"
-        ? Math.max(1, Math.floor(input.max_activations ?? 1))
-        : null;
+    let teamSeats: number[] = [];
+    let maxAct: number | null = null;
+    if (input.kind === "team") {
+      const split = splitTeamSeats(input.player_count ?? 0, input.team_count ?? 0);
+      if (!split.ok) return { success: false, error: split.error };
+      teamSeats = split.seats;
+    } else {
+      maxAct = Math.max(1, Math.floor(input.max_activations ?? input.player_count ?? 1));
+    }
 
     const result = await provisionStudioAccessBatch({
       organizationId: orgId,
@@ -196,8 +234,7 @@ export async function createAccessBatch(
       kind: input.kind,
       game: game as import("@/lib/cms/types").StudioGame,
       versionId: version.id as string,
-      teamCount,
-      playersPerTeam: players,
+      teamSeats,
       maxActivations: maxAct,
       validFrom: null,
       validUntil: input.valid_until?.trim() || null,

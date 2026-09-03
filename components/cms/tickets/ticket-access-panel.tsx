@@ -14,6 +14,7 @@ import { useStudioCache } from "@/lib/platform/studio-cache";
 import {
   StudioButton,
   StudioError,
+  StudioHint,
   StudioInput,
   StudioLabel,
   StudioSectionTitle,
@@ -21,6 +22,7 @@ import {
 } from "@/components/cms/studio-ui";
 import type { StudioGame } from "@/lib/cms/types";
 import type { AccessStatus } from "@/lib/grid/access";
+import { formatTeamSeatPreview, splitTeamSeats } from "@/lib/grid/team-seats";
 
 type Props = {
   batches: StudioAccessBatchView[];
@@ -62,6 +64,7 @@ function csvForBatch(batch: StudioAccessBatchView) {
     "valid_until",
     "revoked_at",
     "player_count",
+    "seat_count",
   ];
   const lines = batch.codes.map((row) =>
     [
@@ -73,6 +76,7 @@ function csvForBatch(batch: StudioAccessBatchView) {
       row.valid_until ?? "",
       row.revoked_at ?? "",
       String(row.player_count),
+      String(row.seat_count),
     ]
       .map((cell) => `"${cell.replaceAll('"', '""')}"`)
       .join(","),
@@ -103,15 +107,24 @@ export function TicketAccessPanel({ batches, games }: Props) {
   const [name, setName] = useState("");
   const [kind, setKind] = useState<"team" | "event_pool">("team");
   const [teamCount, setTeamCount] = useState("3");
-  const [players, setPlayers] = useState("5");
+  const [playerCount, setPlayerCount] = useState("14");
   const [maxActivations, setMaxActivations] = useState("40000");
   const [validUntil, setValidUntil] = useState("");
   const [extraQty, setExtraQty] = useState<Record<string, string>>({});
+
+  const seatSplit = useMemo(
+    () => splitTeamSeats(Number(playerCount) || 0, Number(teamCount) || 0),
+    [playerCount, teamCount],
+  );
 
   function handleCreate(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
     startTransition(async () => {
+      if (kind === "team" && !seatSplit.ok) {
+        setError(seatSplit.error);
+        return;
+      }
       const until = validUntil.trim()
         ? new Date(`${validUntil}T23:59:59`).toISOString()
         : null;
@@ -119,8 +132,8 @@ export function TicketAccessPanel({ batches, games }: Props) {
         game_id: gameId,
         name,
         kind,
-        team_count: Number(teamCount) || 1,
-        players_per_team: Number(players) || 5,
+        player_count: Number(playerCount) || 0,
+        team_count: Number(teamCount) || 0,
         max_activations: kind === "event_pool" ? Number(maxActivations) || 1 : null,
         valid_until: until,
       });
@@ -207,49 +220,46 @@ export function TicketAccessPanel({ batches, games }: Props) {
                 </StudioSelect>
               </div>
               {kind === "team" ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <StudioLabel>Anzahl Teams</StudioLabel>
-                    <StudioInput
-                      type="number"
-                      min={1}
-                      max={500}
-                      value={teamCount}
-                      onChange={(e) => setTeamCount(e.target.value)}
-                    />
+                <div className="space-y-3">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <StudioLabel>Teilnehmer</StudioLabel>
+                      <StudioInput
+                        type="number"
+                        min={1}
+                        max={4000}
+                        value={playerCount}
+                        onChange={(e) => setPlayerCount(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <StudioLabel>Anzahl Teams</StudioLabel>
+                      <StudioInput
+                        type="number"
+                        min={1}
+                        max={500}
+                        value={teamCount}
+                        onChange={(e) => setTeamCount(e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <StudioLabel>Spieler pro Team</StudioLabel>
-                    <StudioInput
-                      type="number"
-                      min={1}
-                      max={8}
-                      value={players}
-                      onChange={(e) => setPlayers(e.target.value)}
-                    />
-                  </div>
+                  {seatSplit.ok ? (
+                    <StudioHint>
+                      {seatSplit.seats.length} Codes · {formatTeamSeatPreview(seatSplit.seats)}
+                    </StudioHint>
+                  ) : (
+                    <StudioHint tone="warn">{seatSplit.error}</StudioHint>
+                  )}
                 </div>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <StudioLabel>Max. Geräte</StudioLabel>
-                    <StudioInput
-                      type="number"
-                      min={1}
-                      value={maxActivations}
-                      onChange={(e) => setMaxActivations(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <StudioLabel>Spieler pro Team</StudioLabel>
-                    <StudioInput
-                      type="number"
-                      min={1}
-                      max={8}
-                      value={players}
-                      onChange={(e) => setPlayers(e.target.value)}
-                    />
-                  </div>
+                <div>
+                  <StudioLabel hint="Geräte, die mit dem einen Code reinkommen">Teilnehmer / Geräte</StudioLabel>
+                  <StudioInput
+                    type="number"
+                    min={1}
+                    value={maxActivations}
+                    onChange={(e) => setMaxActivations(e.target.value)}
+                  />
                 </div>
               )}
               <div>
@@ -265,7 +275,7 @@ export function TicketAccessPanel({ batches, games }: Props) {
           <div className="mt-6 flex flex-wrap gap-3">
             <StudioButton
               type="submit"
-              disabled={pending || published.length === 0}
+              disabled={pending || published.length === 0 || (kind === "team" && !seatSplit.ok)}
               icon={<IconPlus size={16} />}
             >
               {pending ? "Erzeuge…" : "Codes erzeugen"}
@@ -344,8 +354,14 @@ function BatchCard({
           <p className="mt-2 text-sm text-muted-foreground">
             {batch.kind === "event_pool"
               ? `${batch.used_activations} / ${batch.max_activations ?? "∞"} Geräte`
-              : `${used} von ${live} Codes aktiviert`}
-            {` · ${batch.players_per_team} Spieler pro Team`}
+              : [
+                  `${used} von ${live} Codes aktiviert`,
+                  batch.seat_sizes.length > 0
+                    ? `${batch.seat_sizes.reduce((sum, n) => sum + n, 0)} Personen (${batch.seat_sizes.join(", ")})`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
           </p>
         </div>
         <StudioButton
@@ -365,6 +381,7 @@ function BatchCard({
             <tr>
               <th className="px-4 py-2.5">Code</th>
               <th className="px-4 py-2.5">Team</th>
+              <th className="px-4 py-2.5">Plätze</th>
               <th className="px-4 py-2.5">Status</th>
               <th className="px-4 py-2.5">Aktiviert</th>
               <th className="px-4 py-2.5">Zuletzt</th>
@@ -413,7 +430,11 @@ function CodeRow({
       <td className="px-4 py-2.5 font-mono text-base font-bold tracking-wide">{row.code}</td>
       <td className="px-4 py-2.5 text-muted-foreground">
         {row.kind === "event_pool" ? "Gemeinsames Event" : row.team_name ?? "—"}
-        {row.kind === "team" ? ` · ${row.player_count}` : ""}
+      </td>
+      <td className="px-4 py-2.5 text-muted-foreground">
+        {row.kind === "team" && row.seat_count > 0
+          ? `${row.player_count}/${row.seat_count}`
+          : "—"}
       </td>
       <td className="px-4 py-2.5">
         <Chip tone={statusTone(row.status)}>{STATUS_LABEL[row.status]}</Chip>

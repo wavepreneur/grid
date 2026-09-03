@@ -42,6 +42,7 @@ export function TeamEntryGate({
   const [displayName, setDisplayName] = useState(defaultDisplayName);
   const [roster, setRoster] = useState<string[]>([]);
   const [seatsLeft, setSeatsLeft] = useState(0);
+  const [maxSize, setMaxSize] = useState(0);
   const [rosterLoaded, setRosterLoaded] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +71,7 @@ export function TeamEntryGate({
       if (result.success) {
         setRoster(result.data.members.map((m) => m.displayName));
         setSeatsLeft(result.data.seatsLeft);
+        setMaxSize(result.data.maxSize);
       }
       setRosterLoaded(true);
     });
@@ -140,6 +142,11 @@ export function TeamEntryGate({
           <p className="text-sm font-semibold text-teal-900">Dein Team</p>
         )}
         <p className="mt-1 text-base font-bold text-slate-900">{teamName}</p>
+        {rosterLoaded && maxSize > 0 ? (
+          <p className="mt-1 text-sm font-semibold text-teal-800">
+            {roster.length} von {maxSize} Plätzen
+          </p>
+        ) : null}
         <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
           {roster.length > 0
             ? "Wähl deinen Namen — oder trag einen neuen ein, wenn noch Platz ist."

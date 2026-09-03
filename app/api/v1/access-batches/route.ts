@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { authorizeGridApi } from "@/lib/grid/api-auth";
 import { getOrganizationBySlug } from "@/lib/grid/organizations";
 import { getPublicOrigin } from "@/lib/grid/booking-api";
-import { provisionStudioAccessBatch, type AccessKind } from "@/lib/grid/access";
+import { provisionStudioAccessBatch, splitTeamSeats, type AccessKind } from "@/lib/grid/access";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -15,6 +15,8 @@ type Body = {
   name?: string;
   kind?: AccessKind;
   quantity?: number;
+  team_count?: number;
+  player_count?: number;
   players_per_team?: number;
   max_activations?: number | null;
   valid_until?: string | null;
@@ -90,16 +92,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "published version missing" }, { status: 409 });
     }
 
+    const teamCount = Math.max(
+      1,
+      Math.min(500, Math.floor(body.team_count ?? body.quantity ?? 1)),
+    );
+    let teamSeats: number[] = [];
+    let maxActivations: number | null = null;
+    if (kind === "team") {
+      if (body.player_count != null) {
+        const split = splitTeamSeats(body.player_count, teamCount);
+        if (!split.ok) {
+          return NextResponse.json({ error: split.error }, { status: 400 });
+        }
+        teamSeats = split.seats;
+      } else {
+        const per = Math.max(1, Math.min(8, Math.floor(body.players_per_team ?? 5)));
+        teamSeats = Array.from({ length: teamCount }, () => per);
+      }
+    } else {
+      maxActivations = Math.max(1, Math.floor(body.max_activations ?? body.quantity ?? 1));
+    }
+
     const result = await provisionStudioAccessBatch({
       organizationId: organization.id,
       name,
       kind,
       game,
       versionId: version.id,
-      teamCount: Math.max(1, Math.min(500, Math.floor(body.quantity ?? 1))),
-      playersPerTeam: Math.max(1, Math.min(8, Math.floor(body.players_per_team ?? 5))),
-      maxActivations:
-        kind === "event_pool" ? Math.max(1, Math.floor(body.max_activations ?? body.quantity ?? 1)) : null,
+      teamSeats,
+      maxActivations,
       validFrom: null,
       validUntil: body.valid_until ?? null,
       bookingReference: bookingRef,
@@ -131,6 +152,21 @@ async function serializeBatch(batchId: string, origin: string, idempotent = fals
     .eq("batch_id", batchId)
     .order("created_at", { ascending: true });
 
+  const teamIds = [...new Set((codes ?? []).map((row) => row.team_id).filter(Boolean))] as string[];
+  const seatByTeam = new Map<string, { name: string; seats: number }>();
+  if (teamIds.length > 0) {
+    const { data: teams } = await supabase
+      .from("teams")
+      .select("id, name, max_size")
+      .in("id", teamIds);
+    for (const team of teams ?? []) {
+      seatByTeam.set(team.id as string, {
+        name: team.name as string,
+        seats: Number(team.max_size ?? 0),
+      });
+    }
+  }
+
   const base = origin.replace(/\/$/, "");
   return {
     batch_id: batch.id,
@@ -143,13 +179,18 @@ async function serializeBatch(batchId: string, origin: string, idempotent = fals
     used_activations: batch.used_activations,
     valid_until: batch.valid_until,
     idempotent,
-    accesses: (codes ?? []).map((row) => ({
-      code: row.code,
-      status: row.status,
-      redeem_url: `${base}/go/${row.code}`,
-      redeemed_at: row.redeemed_at,
-      valid_until: row.valid_until,
-      revoked_at: row.revoked_at,
-    })),
+    accesses: (codes ?? []).map((row) => {
+      const team = row.team_id ? seatByTeam.get(row.team_id as string) : undefined;
+      return {
+        code: row.code,
+        status: row.status,
+        redeem_url: `${base}/go/${row.code}`,
+        team_name: team?.name ?? null,
+        seats: team?.seats ?? null,
+        redeemed_at: row.redeemed_at,
+        valid_until: row.valid_until,
+        revoked_at: row.revoked_at,
+      };
+    }),
   };
 }

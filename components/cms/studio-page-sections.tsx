@@ -6,6 +6,7 @@ import { GameList } from "@/components/cms/games/game-list";
 import { TaskLibrary } from "@/components/cms/tasks/task-library";
 import { TicketAccessPanel } from "@/components/cms/tickets/ticket-access-panel";
 import { StudioListSkeleton } from "@/components/cms/studio-list-skeletons";
+import { StudioError } from "@/components/cms/studio-ui";
 import { useStudioGamesList, useStudioTemplates } from "@/lib/hooks/use-studio-games";
 import { useStudioTasksList } from "@/lib/hooks/use-studio-tasks";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
@@ -58,6 +59,21 @@ export function StudioTicketsSection() {
 
   if (isInitialLoad) {
     return <StudioListSkeleton rows={4} />;
+  }
+
+  if (batchesQuery.isError) {
+    return (
+      <div className="space-y-4">
+        <StudioError
+          message={
+            batchesQuery.error instanceof Error
+              ? batchesQuery.error.message
+              : "Tickets konnten nicht geladen werden."
+          }
+        />
+        <TicketAccessPanel batches={[]} games={games} />
+      </div>
+    );
   }
 
   return <TicketAccessPanel batches={batches} games={games} />;
