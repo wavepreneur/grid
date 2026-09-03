@@ -4,6 +4,7 @@ import { parseRouteOverride } from "@/lib/grid/content-engine";
 import type { EventRouteOverride } from "@/lib/grid/level-types";
 import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 import { ensureTeamAccessCodesForEvent } from "@/lib/grid/access";
+import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
 
 export type GridBookingRequest = {
   organization_slug?: string;
@@ -346,8 +347,8 @@ export function validateBookingRequest(body: GridBookingRequest): string | null 
     return "team_count must be between 1 and 500";
   }
   const playersPerTeam = body.players_per_team ?? 8;
-  if (playersPerTeam < 1 || playersPerTeam > 8) {
-    return "players_per_team must be between 1 and 8";
+  if (playersPerTeam < 1 || playersPerTeam > MAX_PLAYERS_PER_TEAM) {
+    return `players_per_team must be between 1 and ${MAX_PLAYERS_PER_TEAM}`;
   }
   return null;
 }

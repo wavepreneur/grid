@@ -12,6 +12,7 @@ import {
   IdentityField,
   LobbyPrimaryButton,
 } from "@/components/lobby/lobby-identity";
+import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
 import { eventLobbyPath } from "@/lib/grid/event-routes";
 import { savePlayerSession } from "@/lib/grid/player-session";
 
@@ -34,7 +35,7 @@ export function CaptainSetupForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const isPrebooked = Boolean(joinCode);
-  const teamCap = Math.min(8, Math.max(1, maxPlayersPerTeam));
+  const teamCap = Math.min(MAX_PLAYERS_PER_TEAM, Math.max(1, maxPlayersPerTeam));
 
   function handleSubmit(formData: FormData) {
     setError(null);

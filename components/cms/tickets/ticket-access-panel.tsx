@@ -55,6 +55,7 @@ function formatWhen(iso: string | null) {
 }
 
 function csvForBatch(batch: StudioAccessBatchView) {
+  const allCodes = [...batch.codes, ...batch.archived_codes];
   const header = [
     "code",
     "team",
@@ -66,7 +67,7 @@ function csvForBatch(batch: StudioAccessBatchView) {
     "player_count",
     "seat_count",
   ];
-  const lines = batch.codes.map((row) =>
+  const lines = allCodes.map((row) =>
     [
       row.code,
       row.team_name ?? "",
@@ -390,12 +391,49 @@ function BatchCard({
             </tr>
           </thead>
           <tbody>
-            {batch.codes.map((row) => (
-              <CodeRow key={row.id} row={row} pending={pending} onRevoke={onRevoke} />
-            ))}
+            {batch.codes.length === 0 ? (
+              <tr className="border-t border-border/50">
+                <td colSpan={8} className="px-4 py-4 text-center text-sm text-muted-foreground">
+                  Keine aktiven Codes. Gelöschte Codes liegen im Archiv.
+                </td>
+              </tr>
+            ) : (
+              batch.codes.map((row) => (
+                <CodeRow key={row.id} row={row} pending={pending} onRevoke={onRevoke} />
+              ))
+            )}
           </tbody>
         </table>
       </div>
+
+      {batch.archived_codes.length > 0 ? (
+        <details className="border-t border-border/70 px-4 py-3">
+          <summary className="cursor-pointer text-sm font-semibold text-muted-foreground">
+            Archiv ({batch.archived_codes.length}) · automatische Löschung nach 30 Tagen
+          </summary>
+          <div className="mt-3 overflow-x-auto rounded-2xl border border-border/60">
+            <table className="w-full min-w-[40rem] text-left text-sm">
+              <thead className="bg-secondary/60 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-2.5">Code</th>
+                  <th className="px-4 py-2.5">Team</th>
+                  <th className="px-4 py-2.5">Plätze</th>
+                  <th className="px-4 py-2.5">Status</th>
+                  <th className="px-4 py-2.5">Aktiviert</th>
+                  <th className="px-4 py-2.5">Zuletzt</th>
+                  <th className="px-4 py-2.5">Gelöscht</th>
+                  <th className="px-4 py-2.5">Ablauf</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batch.archived_codes.map((row) => (
+                  <ArchivedCodeRow key={row.id} row={row} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      ) : null}
 
       {batch.kind === "team" ? (
         <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-4 py-3">
@@ -413,6 +451,27 @@ function BatchCard({
         </div>
       ) : null}
     </article>
+  );
+}
+
+function ArchivedCodeRow({ row }: { row: StudioAccessCodeView }) {
+  return (
+    <tr className="border-t border-border/50">
+      <td className="px-4 py-2.5 font-mono text-base font-bold tracking-wide">{row.code}</td>
+      <td className="px-4 py-2.5 text-muted-foreground">
+        {row.kind === "event_pool" ? "Gemeinsames Event" : row.team_name ?? "—"}
+      </td>
+      <td className="px-4 py-2.5 text-muted-foreground">
+        {row.kind === "team" && row.seat_count > 0 ? `${row.player_count}/${row.seat_count}` : "—"}
+      </td>
+      <td className="px-4 py-2.5">
+        <Chip tone={statusTone(row.status)}>{STATUS_LABEL[row.status]}</Chip>
+      </td>
+      <td className="px-4 py-2.5 text-muted-foreground">{formatWhen(row.redeemed_at)}</td>
+      <td className="px-4 py-2.5 text-muted-foreground">{formatWhen(row.last_joined_at)}</td>
+      <td className="px-4 py-2.5 text-muted-foreground">{formatWhen(row.revoked_at)}</td>
+      <td className="px-4 py-2.5 text-muted-foreground">{formatWhen(row.valid_until)}</td>
+    </tr>
   );
 }
 

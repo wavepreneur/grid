@@ -19,6 +19,7 @@ import { canStartTeamGame } from "@/lib/grid/archetype-roles";
 import { buildDefaultContentConfig, getBlueprint, isBlueprintSlug, resolveBlueprint, type BlueprintSlug } from "@/lib/grid/blueprints";
 import { parseContentConfig } from "@/lib/grid/content-engine";
 import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
+import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
 import {
   getCityIdBySlug,
   getDefaultOrganizationId,
@@ -394,8 +395,8 @@ export async function createTeamAsCaptain(input: {
     if (teamName.length < 2) {
       return { success: false, error: "Teamname ist zu kurz." };
     }
-    if (input.maxSize < 1 || input.maxSize > 8) {
-      return { success: false, error: "Teamgröße muss zwischen 1 und 8 liegen." };
+    if (input.maxSize < 1 || input.maxSize > MAX_PLAYERS_PER_TEAM) {
+      return { success: false, error: `Teamgröße muss zwischen 1 und ${MAX_PLAYERS_PER_TEAM} liegen.` };
     }
     if (!department || !region) {
       return { success: false, error: "Abteilung und Region sind Pflichtfelder." };
@@ -1266,8 +1267,8 @@ export async function setupPrebookedTeamAsCaptain(input: {
     if (teamName.length < 2) {
       return { success: false, error: "Teamname ist zu kurz." };
     }
-    if (input.maxSize < 1 || input.maxSize > 8) {
-      return { success: false, error: "Teamgröße muss zwischen 1 und 8 liegen." };
+    if (input.maxSize < 1 || input.maxSize > MAX_PLAYERS_PER_TEAM) {
+      return { success: false, error: `Teamgröße muss zwischen 1 und ${MAX_PLAYERS_PER_TEAM} liegen.` };
     }
     if (!department || !region) {
       return { success: false, error: "Abteilung und Region sind Pflichtfelder." };

@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { authorizeGridApi } from "@/lib/grid/api-auth";
 import { getOrganizationBySlug } from "@/lib/grid/organizations";
 import { getPublicOrigin } from "@/lib/grid/booking-api";
-import { provisionStudioAccessBatch, splitTeamSeats, type AccessKind } from "@/lib/grid/access";
+import { provisionStudioAccessBatch, splitTeamSeats, MAX_PLAYERS_PER_TEAM, type AccessKind } from "@/lib/grid/access";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
         }
         teamSeats = split.seats;
       } else {
-        const per = Math.max(1, Math.min(8, Math.floor(body.players_per_team ?? 5)));
+        const per = Math.max(1, Math.min(MAX_PLAYERS_PER_TEAM, Math.floor(body.players_per_team ?? 5)));
         teamSeats = Array.from({ length: teamCount }, () => per);
       }
     } else {

@@ -367,7 +367,7 @@ export async function ensureTeamAccessCodesForEvent(input: {
           event_id: input.eventId,
           name: input.eventTitle,
           kind: "team",
-          players_per_team: 8,
+          players_per_team: MAX_PLAYERS_PER_TEAM,
           booking_reference: input.bookingReference ?? null,
         })
         .select("id")

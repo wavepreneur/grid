@@ -1,4 +1,4 @@
-export const MAX_PLAYERS_PER_TEAM = 8;
+export const MAX_PLAYERS_PER_TEAM = 10;
 
 export type TeamSeatSplit =
   | { ok: true; seats: number[] }

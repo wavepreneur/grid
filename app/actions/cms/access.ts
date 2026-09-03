@@ -43,16 +43,27 @@ export type StudioAccessBatchView = {
   valid_until: string | null;
   created_at: string;
   codes: StudioAccessCodeView[];
+  archived_codes: StudioAccessCodeView[];
 };
 
 function uniqueIds(values: Array<string | null | undefined>): string[] {
   return [...new Set(values.filter((id): id is string => Boolean(id)))];
 }
 
+const ARCHIVE_RETENTION_DAYS = 30;
+
 export async function listAccessBatches(): Promise<ActionResult<StudioAccessBatchView[]>> {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
+    const cutoff = new Date(Date.now() - ARCHIVE_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+    await supabase
+      .from("studio_access_codes")
+      .delete()
+      .eq("organization_id", orgId)
+      .eq("status", "revoked")
+      .lt("revoked_at", cutoff);
 
     const { data: batches, error } = await supabase
       .from("studio_access_batches")
@@ -145,8 +156,10 @@ export async function listAccessBatches(): Promise<ActionResult<StudioAccessBatc
     }
 
     const data: StudioAccessBatchView[] = batches.map((batch) => {
-      const codes = codesByBatch.get(batch.id as string) ?? [];
-      const seatSizes = codes
+      const allCodes = codesByBatch.get(batch.id as string) ?? [];
+      const codes = allCodes.filter((code) => code.status !== "revoked");
+      const archivedCodes = allCodes.filter((code) => code.status === "revoked");
+      const seatSizes = allCodes
         .filter((code) => code.kind === "team")
         .map((code) => code.seat_count)
         .filter((seats) => seats > 0);
@@ -166,6 +179,7 @@ export async function listAccessBatches(): Promise<ActionResult<StudioAccessBatc
         valid_until: (batch.valid_until as string | null) ?? null,
         created_at: batch.created_at as string,
         codes,
+        archived_codes: archivedCodes,
       };
     });
 
