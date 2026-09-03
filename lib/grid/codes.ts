@@ -18,6 +18,16 @@ export function generateAccessCode(length = 6): string {
   return generateCode(length);
 }
 
+/** Secret organizer token for /portal/{token} — not typed by players. */
+export function generatePortalToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export function buildEventPortalUrl(origin: string, token: string): string {
+  return `${origin.replace(/\/$/, "")}/portal/${token}`;
+}
+
 function generateCode(length: number): string {
   const bytes = crypto.getRandomValues(new Uint8Array(length));
   return Array.from(bytes, (byte) => CODE_ALPHABET[byte % CODE_ALPHABET.length]).join(

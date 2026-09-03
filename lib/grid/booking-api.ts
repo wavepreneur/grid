@@ -4,6 +4,8 @@ import { parseRouteOverride } from "@/lib/grid/content-engine";
 import type { EventRouteOverride } from "@/lib/grid/level-types";
 import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 import { ensureTeamAccessCodesForEvent } from "@/lib/grid/access";
+import { buildEventPortalUrl, generatePortalToken } from "@/lib/grid/codes";
+import { ensureEventPortalToken } from "@/lib/grid/portal";
 import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
 
 export type GridBookingRequest = {
@@ -37,6 +39,7 @@ export type GridBookingResponse = {
   entry_url: string;
   cockpit_url: string;
   show_url: string;
+  event_portal_url: string;
   teams: GridBookingTeam[];
   idempotent?: boolean;
 };
@@ -73,6 +76,7 @@ type EventRow = {
   content_config: unknown;
   route_override: unknown;
   max_players_per_team: number;
+  portal_token: string | null;
 };
 
 type TeamRow = {
@@ -130,7 +134,7 @@ export async function findEventByBookingReference(
   const { data, error } = await supabase
     .from("events")
     .select(
-      "id, invite_code, title, status, organization_id, city_id, booking_reference, content_config, route_override, max_players_per_team",
+      "id, invite_code, title, status, organization_id, city_id, booking_reference, content_config, route_override, max_players_per_team, portal_token",
     )
     .eq("organization_id", organizationId)
     .eq("booking_reference", bookingReference.trim())
@@ -184,6 +188,7 @@ export async function buildBookingResponse(input: {
   idempotent?: boolean;
 }): Promise<GridBookingResponse> {
   const origin = input.origin.replace(/\/$/, "");
+  const portalToken = await ensureEventPortalToken(input.event.id, input.event.portal_token);
   const codeByTeam = await ensureTeamAccessCodesForEvent({
     organizationId: input.event.organization_id,
     eventId: input.event.id,
@@ -213,6 +218,7 @@ export async function buildBookingResponse(input: {
     entry_url: `${origin}/go`,
     cockpit_url: buildBookingUrls(input.origin, input.event.invite_code, "").cockpit_url,
     show_url: buildBookingUrls(input.origin, input.event.invite_code, "").show_url,
+    event_portal_url: buildEventPortalUrl(origin, portalToken),
     teams,
     idempotent: input.idempotent,
   };
@@ -262,9 +268,10 @@ export async function provisionGridBooking(input: {
       scheduled_start_at: input.body.scheduled_start_at ?? null,
       content_config: contentConfig,
       route_override: routeOverride,
+      portal_token: generatePortalToken(),
     })
     .select(
-      "id, invite_code, title, status, organization_id, city_id, booking_reference, content_config, route_override, max_players_per_team",
+      "id, invite_code, title, status, organization_id, city_id, booking_reference, content_config, route_override, max_players_per_team, portal_token",
     )
     .single();
 

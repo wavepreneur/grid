@@ -401,7 +401,7 @@ export async function loadResolvedEventContent(input: {
           ...blueprintFields,
           showLiveScore: contentConfig.show_live_score ?? true,
           missionDurationMinutes:
-            game.duration_minutes ?? contentConfig.mission_duration_minutes ?? 90,
+            contentConfig.mission_duration_minutes ?? game.duration_minutes ?? 90,
           briefingText: game.description?.trim() || null,
           ...parseGameHelpLinks(game.feature_flags),
           followUpTrigger: parseFollowUpTrigger(game.feature_flags),
@@ -441,7 +441,7 @@ export async function loadResolvedEventContent(input: {
           ...blueprintFields,
           showLiveScore: contentConfig.show_live_score ?? true,
           missionDurationMinutes:
-            game.duration_minutes ?? contentConfig.mission_duration_minutes ?? 90,
+            contentConfig.mission_duration_minutes ?? game.duration_minutes ?? 90,
           briefingText: game.description?.trim() || null,
           ...parseGameHelpLinks(game.feature_flags),
           followUpTrigger: parseFollowUpTrigger(game.feature_flags),

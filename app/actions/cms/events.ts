@@ -8,7 +8,7 @@ import {
   STUDIO_TEST_MAX_PLAYERS,
   studioTestBookingReference,
 } from "@/lib/cms/studio-test-session";
-import { generateInviteCode, generateJoinCode } from "@/lib/grid/codes";
+import { generateInviteCode, generateJoinCode, generatePortalToken } from "@/lib/grid/codes";
 import { eventCaptainPath, eventTeamJoinPath, cockpitPath } from "@/lib/grid/event-routes";
 import { getCityIdBySlug } from "@/lib/grid/organizations";
 import type { ActionResult } from "@/lib/grid/types";
@@ -175,6 +175,7 @@ async function createTestEventAndTeam(input: {
       booking_reference: bookingRef,
       content_config: contentConfig,
       studio_game_version_id: input.versionId,
+      portal_token: generatePortalToken(),
     })
     .select("id, invite_code")
     .single();

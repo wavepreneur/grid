@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateAccessCode, generateInviteCode, generateJoinCode, normalizeCode } from "@/lib/grid/codes";
+import { generateAccessCode, generateInviteCode, generateJoinCode, generatePortalToken, normalizeCode } from "@/lib/grid/codes";
 import { getCityIdBySlug } from "@/lib/grid/organizations";
 import { parseRuntimeProfiles } from "@/lib/cms/layer-model";
 import type { StudioGame } from "@/lib/cms/types";
@@ -484,6 +484,7 @@ export async function provisionStudioAccessBatch(
       booking_reference: input.bookingReference ?? null,
       content_config: contentConfig,
       studio_game_version_id: input.versionId,
+      portal_token: generatePortalToken(),
     })
     .select("id, invite_code")
     .single();
