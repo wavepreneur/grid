@@ -2,13 +2,12 @@ import type { Metadata } from "next";
 import { GridLandingPage } from "@/components/marketing/grid-landing-page";
 
 export const metadata: Metadata = {
-  title: "GRID | The Zero-Headcount Growth Engine",
+  title: "The GRID | They're playing in 60 seconds",
   description:
-    "Deploy, automate and monetize corporate experiences across 1,900+ cities. Zero operational payroll. Absolute data telemetry. 95%+ net margin by design.",
+    "The GRID is the live room for team events. No app. No login. No IT. Send a link — ten people or fifty thousand. When it ends, you see how the group actually did.",
   openGraph: {
-    title: "GRID — The Zero-Headcount Growth Engine",
-    description:
-      "Turn training, team events, and onboarding into an automated multiplayer engine. Request private infrastructure access.",
+    title: "The GRID — They're playing in 60 seconds",
+    description: "No app. No login. No IT. The live room for team events.",
   },
 };
 

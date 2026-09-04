@@ -145,7 +145,7 @@ export function EuropeDeploymentMap({ svgMarkup }: EuropeDeploymentMapProps) {
           textTransform: "uppercase",
         }}
       >
-        Live deployment nodes — Europe cluster
+        Live team play — Europe
       </p>
     </div>
   );

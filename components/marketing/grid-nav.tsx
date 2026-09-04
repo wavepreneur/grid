@@ -43,26 +43,32 @@ export function GridNav() {
       >
         <Link href="/#hero" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
           <GridLogo />
-          <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: "0.15em", color: "#00e5ff" }}>
-            GRID
+          <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: "0.22em", color: "#00e5ff" }}>
+            THE GRID
           </span>
         </Link>
-        <div className="hidden-mobile" style={{ display: "flex", alignItems: "center", gap: 32 }}>
-          <a href="/#exitmania" className="grid-nav-link">
-            Exitmania
+        <div className="hidden-mobile" style={{ display: "flex", alignItems: "center", gap: 22 }}>
+          <a href="/#problem" className="grid-nav-link">
+            The problem
           </a>
-          <a href="/#tabbrain" className="grid-nav-link">
-            Tabbrain
+          <a href="/#how" className="grid-nav-link">
+            How it works
           </a>
-          <a href="/#pulse" className="grid-nav-link">
-            Micro Pulse
+          <a href="/#benefits" className="grid-nav-link">
+            Benefits
+          </a>
+          <a href="/#runs" className="grid-nav-link">
+            Where it runs
+          </a>
+          <a href="/#faq" className="grid-nav-link">
+            FAQ
           </a>
           <Link href={ACCESS_HREF} className="grid-cta grid-cta-sm">
-            Request Private Engine Access
+            Talk to The GRID
           </Link>
         </div>
         <Link href={ACCESS_HREF} className="grid-cta grid-cta-sm grid-nav-mobile-cta">
-          Request Access
+          Talk to The GRID
         </Link>
       </div>
     </nav>

@@ -67,11 +67,13 @@ export function EnterpriseBriefingForm() {
             <option value="" disabled>
               Select headcount
             </option>
+            <option>Under 500</option>
             <option>500 – 2,000</option>
             <option>2,000 – 5,000</option>
             <option>5,000 – 20,000</option>
             <option>20,000 – 50,000</option>
             <option>50,000+</option>
+            <option>Partner / product team</option>
           </select>
         </label>
         <label>
@@ -82,21 +84,20 @@ export function EnterpriseBriefingForm() {
           <span className="grid-input-label">Primary Use Case</span>
           <select className="grid-input" name="useCase" defaultValue="">
             <option value="">Select use case (optional)</option>
-            <option>Global Townhall / All-Hands</option>
-            <option>Quarterly Kick-Off</option>
-            <option>Remote Onboarding</option>
-            <option>Leadership Off-Site</option>
-            <option>Continuous Team Engagement</option>
+            <option>City / on-site team event</option>
+            <option>Company-wide program</option>
+            <option>Our own page or Slack</option>
+            <option>We need proof the team did the work</option>
             <option>Other</option>
           </select>
         </label>
       </div>
       <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 12, color: "rgba(240,244,255,0.45)" }}>
         <input type="checkbox" required style={{ marginTop: 3 }} />
-        <span>I agree to be contacted by the GRID enterprise team.</span>
+        <span>I agree to be contacted by The GRID.</span>
       </label>
       <button type="submit" className="grid-cta" style={{ justifyContent: "center", width: "fit-content" }}>
-        Unlock 1,900-City Infrastructure
+        Talk to The GRID
       </button>
       <p style={{ fontSize: 11, color: "rgba(240,244,255,0.35)" }}>
         Access is granted · Response within 24 hours · Mutual NDA available

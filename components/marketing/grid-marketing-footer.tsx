@@ -19,7 +19,7 @@ export function GridMarketingFooter() {
           }}
         >
           <div>
-            <p style={{ fontWeight: 800, letterSpacing: "0.15em", color: "#00e5ff" }}>GRID</p>
+            <p style={{ fontWeight: 800, letterSpacing: "0.22em", color: "#00e5ff" }}>THE GRID</p>
             <p
               style={{
                 marginTop: 12,
@@ -29,16 +29,14 @@ export function GridMarketingFooter() {
                 color: "rgba(240,244,255,0.45)",
               }}
             >
-              The Zero-Headcount Growth Engine.
+              They&apos;re playing in 60 seconds.
               <br />
-              <span style={{ color: "rgba(0,229,255,0.55)" }}>
-                Deploy. Automate. Monetize — across 1,900+ cities.
-              </span>
+              <span style={{ color: "rgba(0,229,255,0.55)" }}>No app. No login. No IT.</span>
             </p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 12 }}>
             <Link href="/#access" className="grid-nav-link" style={{ textTransform: "none" }}>
-              Request Private Engine Access
+              Talk to The GRID
             </Link>
             <Link href="/status" className="grid-footer-dev">
               STATUS DEV
@@ -54,8 +52,7 @@ export function GridMarketingFooter() {
             color: "rgba(240,244,255,0.25)",
           }}
         >
-          GRID is a product of Kinetic Pillar OÜ. Field mechanics validated via Exitmania.com
-          deployments across Europe.
+          The GRID is a product of Kinetic Pillar OÜ.
         </p>
       </div>
     </footer>
