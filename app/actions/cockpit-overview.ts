@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
 import { HEALTH_NEAR_STUCK_MS } from "@/lib/grid/cockpit-health";
+import { normalizeCode } from "@/lib/grid/codes";
 import { parseTeamGameState } from "@/lib/grid/game-state";
 import type { ActionResult } from "@/lib/grid/types";
 
@@ -388,6 +389,171 @@ export async function getOrgCockpitOverview(): Promise<ActionResult<OrgCockpitOv
     return {
       success: false,
       error: error instanceof Error ? error.message : "Cockpit konnte nicht geladen werden.",
+    };
+  }
+}
+
+export type CockpitLookupTeam = {
+  id: string;
+  name: string;
+  joinCode: string;
+  status: string;
+  currentLevel: number;
+  score: number;
+};
+
+export type CockpitLookupHit = {
+  inviteCode: string;
+  eventTitle: string;
+  eventStatus: string;
+  teamCount: number;
+  playingCount: number;
+  finishedCount: number;
+  focusTeamId: string | null;
+  teams: CockpitLookupTeam[];
+};
+
+function sanitizeLookupName(value: string): string {
+  return value.replace(/[%_]/g, "").replace(/\s+/g, " ").trim();
+}
+
+async function loadLookupHit(
+  supabase: ReturnType<typeof createAdminClient>,
+  event: { id: string; title: string; invite_code: string; status: string },
+  focusTeamId: string | null,
+): Promise<CockpitLookupHit> {
+  const { data: teams, error } = await supabase
+    .from("teams")
+    .select("id, name, join_code, status, current_level, game_state")
+    .eq("event_id", event.id)
+    .neq("status", "disbanded")
+    .order("join_code", { ascending: true });
+
+  if (error) throw new Error(error.message);
+
+  const list: CockpitLookupTeam[] = (teams ?? []).map((team) => {
+    const gameState = parseTeamGameState(team.game_state);
+    return {
+      id: team.id as string,
+      name: (team.name as string) || "Team",
+      joinCode: team.join_code as string,
+      status: team.status as string,
+      currentLevel: (team.current_level as number) ?? 0,
+      score: gameState.score ?? 0,
+    };
+  });
+
+  return {
+    inviteCode: event.invite_code,
+    eventTitle: event.title,
+    eventStatus: event.status,
+    teamCount: list.length,
+    playingCount: list.filter((team) => team.status === "playing").length,
+    finishedCount: list.filter((team) => team.status === "finished").length,
+    focusTeamId,
+    teams: list,
+  };
+}
+
+export async function lookupCockpitQuery(
+  raw: string,
+): Promise<ActionResult<CockpitLookupHit | null>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const query = raw.trim();
+    if (query.length < 2) {
+      return { success: true, data: null };
+    }
+
+    const supabase = createAdminClient();
+    const code = normalizeCode(query);
+
+    const { data: byInvite } = await supabase
+      .from("events")
+      .select("id, title, invite_code, status")
+      .eq("organization_id", orgId)
+      .eq("invite_code", code)
+      .maybeSingle();
+
+    if (byInvite) {
+      return {
+        success: true,
+        data: await loadLookupHit(supabase, byInvite, null),
+      };
+    }
+
+    const { data: access } = await supabase
+      .from("studio_access_codes")
+      .select("event_id, team_id")
+      .eq("organization_id", orgId)
+      .eq("code", code)
+      .maybeSingle();
+
+    let eventId = (access?.event_id as string | null) ?? null;
+    let focusTeamId = (access?.team_id as string | null) ?? null;
+
+    if (!eventId && focusTeamId) {
+      const { data: accessTeam } = await supabase
+        .from("teams")
+        .select("event_id")
+        .eq("id", focusTeamId)
+        .maybeSingle();
+      eventId = (accessTeam?.event_id as string | null) ?? null;
+    }
+
+    if (!eventId) {
+      const { data: byJoin } = await supabase
+        .from("teams")
+        .select("id, event_id")
+        .eq("organization_id", orgId)
+        .eq("join_code", code)
+        .maybeSingle();
+      if (byJoin) {
+        eventId = byJoin.event_id as string;
+        focusTeamId = byJoin.id as string;
+      }
+    }
+
+    if (!eventId) {
+      const name = sanitizeLookupName(query);
+      if (name.length >= 2) {
+        const { data: byName } = await supabase
+          .from("teams")
+          .select("id, event_id")
+          .eq("organization_id", orgId)
+          .ilike("name", `${name}%`)
+          .order("updated_at", { ascending: false })
+          .limit(1);
+        const match = byName?.[0];
+        if (match) {
+          eventId = match.event_id as string;
+          focusTeamId = match.id as string;
+        }
+      }
+    }
+
+    if (!eventId) {
+      return { success: true, data: null };
+    }
+
+    const { data: event, error } = await supabase
+      .from("events")
+      .select("id, title, invite_code, status")
+      .eq("id", eventId)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!event) return { success: true, data: null };
+
+    return {
+      success: true,
+      data: await loadLookupHit(supabase, event, focusTeamId),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Suche fehlgeschlagen.",
     };
   }
 }

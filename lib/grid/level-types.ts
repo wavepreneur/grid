@@ -1,5 +1,6 @@
 import type { CompiledGameLogic } from "@/lib/cms/logic-rules";
 import type { ContentMode } from "@/lib/cms/layer-model";
+import type { EventModules } from "@/lib/grid/event-modules";
 import type { PlayPhase, PlaySurface } from "@/lib/grid/play-surface";
 
 export type LevelType = "gps" | "digital" | "quiz" | "station";
@@ -253,6 +254,8 @@ export type EventContentConfig = {
   allowed_fallbacks?: ContentMode[];
   /** Copied from studio game at booking/publish time when available. */
   runtime_profiles?: unknown;
+  /** Partner upgrades for this booking. Absent = routes + quiz on, Data off. */
+  modules?: EventModules;
 };
 
 export type BlueprintCapabilities = {

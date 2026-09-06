@@ -45,7 +45,7 @@ Exitmania games.* (Katalog)                ← Marketing, PDF-URLs, grid_pack_sl
 
 | Loquiz heute (Exitmania) | GRID-Ersatz |
 |--------------------------|-------------|
-| `create-loquiz-ticket` | `create-grid-session` → `POST /api/v1/bookings` |
+| `create-loquiz-ticket` | Admin-Pilot: GRID `POST /api/v1/bookings` (`exitmania:pilot:…`); Live-Checkout bleibt Loquiz |
 | `team_credentials` (user/pass) | `grid_invite_code`, `grid_join_code`, `grid_play_url` |
 | `loquiz://` QR | `/e/{invite}/team/{join}` |
 | Webhook `/api/webhooks/loquiz` | `GET /api/v1/events/{inviteCode}/status` + später Outbound-Webhook |
@@ -70,11 +70,24 @@ Content-Type: application/json
   "city_slug": "berlin",
   "content_pack_slug": "berlin-classic",
   "booking_reference": "exitmania:booking:{uuid}",
-  "route_override": { "levels": { "2": { "location": { ... } } } }
+  "route_override": { "levels": { "2": { "location": { ... } } } },
+  "modules": {
+    "custom_routes": true,
+    "custom_quiz": true,
+    "team_intelligence": false
+  }
 }
 ```
 
 **Idempotent:** Gleiche `booking_reference` + Org → bestehendes Event zurück.
+
+Antwort enthält dieselben Handles wie das Spiel — keine zweite ID-Welt:
+
+- `invite_code` → `/e/{invite}`, `/cockpit/{invite}`
+- `results_url` → `/portal/{token}/results` (alle Teams, nur Bucher-Token)
+- `event_portal_url` → `/portal/{token}` (geheimes Event-Cockpit für den Bucher)
+- `teams[].play_url` / `access_code` → Team-Einstieg
+- `modules` → Event-Cockpit schaltet Routen / Quiz / Data frei. Default ohne Flag: Routen + Quiz an, Data aus.
 
 ### Nachschlagen
 
@@ -92,14 +105,20 @@ x-grid-api-key: ...
 
 ## Exitmania-Implementierung
 
+Live-Checkout bleibt auf Loquiz. GRID wird **nicht** aus Paddle/Stripe/`create-loquiz-ticket` aufgerufen.
+
+Isolierter Admin-Pilot in Exitmania:
+
+- `/admin/grid-pilot` → neue Tabellen `grid_pilot_bookings` / `grid_pilot_teams`
+- `POST /api/v1/bookings` mit `booking_reference=exitmania:pilot:{uuid}`
+- Spieler-Seite `/grid-ticket/{token}` (nicht `/ticket/{token}`)
+
 | Datei | Zweck |
 |-------|--------|
-| `next-app/lib/gridBookingClient.ts` | HTTP-Client zur GRID Booking-API |
-| `supabase/functions/create-grid-session/` | Nach Paddle: GRID-Session statt Loquiz-Ticket |
-| Migration `grid_*` auf `team_credentials` | Play-URLs speichern |
-| Feature-Flag pro Spiel | `games.grid_enabled` / `grid_content_pack_slug` |
+| Exitmania `next-app/lib/gridPilot/client.ts` | Nur Admin-Pilot → GRID Booking-API |
+| Exitmania `grid_pilot_*` | Testbuchungen, getrennt von `bookings` / `team_credentials` |
 
-Pilot: **ein Spiel, eine Stadt**, Loquiz parallel für Rest.
+Pilot: Admin erzeugt Tickets. Loquiz parallel für alle echten Käufe.
 
 ## Tabbrain (greenfield)
 

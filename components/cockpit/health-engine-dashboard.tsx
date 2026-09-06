@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -16,7 +16,9 @@ import {
 } from "lucide-react";
 import {
   getOrgCockpitOverview,
+  lookupCockpitQuery,
   type CockpitHealthFlag,
+  type CockpitLookupHit,
   type CockpitOverviewSession,
 } from "@/app/actions/cockpit-overview";
 import { StudioPage } from "@/components/cms/studio-page";
@@ -106,6 +108,49 @@ export function HealthEngineDashboard() {
   });
 
   const [open, setOpen] = useState<CockpitOverviewSession | null>(null);
+  const [query, setQuery] = useState("");
+  const [lookup, setLookup] = useState<CockpitLookupHit | null>(null);
+  const [lookupPending, setLookupPending] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+
+  const needle = query.trim().toLowerCase();
+  const sessions = (data?.sessions ?? []).filter((session) => {
+    if (!needle) return true;
+    return (
+      session.teamName.toLowerCase().includes(needle) ||
+      session.joinCode.toLowerCase().includes(needle) ||
+      session.inviteCode.toLowerCase().includes(needle) ||
+      session.eventTitle.toLowerCase().includes(needle)
+    );
+  });
+  const healing = (data?.healing ?? []).filter((row) => {
+    if (!needle) return true;
+    return (
+      row.teamName.toLowerCase().includes(needle) ||
+      row.eventTitle.toLowerCase().includes(needle)
+    );
+  });
+  const telemetry = (data?.telemetry ?? []).filter((row) => {
+    if (!needle) return true;
+    return row.teamName.toLowerCase().includes(needle) || row.playerName.toLowerCase().includes(needle);
+  });
+
+  async function onLookup(event: FormEvent) {
+    event.preventDefault();
+    setLookupError(null);
+    setLookupPending(true);
+    const result = await lookupCockpitQuery(query);
+    setLookupPending(false);
+    if (!result.success) {
+      setLookup(null);
+      setLookupError(result.error);
+      return;
+    }
+    setLookup(result.data);
+    if (!result.data) {
+      setLookupError("Kein Event oder Team zu diesem Code / Namen.");
+    }
+  }
 
   return (
     <StudioPage
@@ -121,6 +166,67 @@ export function HealthEngineDashboard() {
         </p>
       ) : (
         <div className="space-y-6">
+          <Panel
+            title="Nachschlagen"
+            subtitle="Invite, Zugangscode, Join-Code oder Teamname — filtert die Listen und öffnet das Event. Kein Fern-Support."
+          >
+            <form onSubmit={onLookup} className="flex flex-col gap-3 sm:flex-row">
+              <input
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setLookupError(null);
+                }}
+                placeholder="2QLEJ5SQ oder Teamname"
+                className="h-11 flex-1 rounded-2xl border border-border bg-card px-4 text-sm outline-none focus:border-primary"
+              />
+              <button
+                type="submit"
+                disabled={lookupPending || query.trim().length < 2}
+                className="h-11 rounded-2xl bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-50"
+              >
+                {lookupPending ? "Sucht…" : "Finden"}
+              </button>
+            </form>
+            {lookupError ? <p className="mt-3 text-sm text-destructive">{lookupError}</p> : null}
+            {lookup ? (
+              <div className="mt-4 rounded-2xl bg-secondary px-4 py-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-bold">{lookup.eventTitle}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {lookup.inviteCode} · {lookup.eventStatus} · {lookup.teamCount} Teams
+                      {lookup.teamCount > 1 ? " · gemeinsames Event" : ""} · {lookup.playingCount}{" "}
+                      live · {lookup.finishedCount} fertig
+                    </p>
+                  </div>
+                  <Link
+                    href={cockpitPath(lookup.inviteCode)}
+                    className="text-sm font-bold text-primary"
+                  >
+                    Event öffnen
+                  </Link>
+                </div>
+                <ul className="mt-3 space-y-1.5">
+                  {lookup.teams.map((team) => (
+                    <li
+                      key={team.id}
+                      className={`rounded-xl px-3 py-2 text-sm ${
+                        team.id === lookup.focusTeamId ? "bg-primary/10 font-semibold" : "bg-card"
+                      }`}
+                    >
+                      {team.name}
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        {team.joinCode} · {team.status} · Aufgabe {team.currentLevel || "—"} ·{" "}
+                        {team.score} Pkt.
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </Panel>
+
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Stat
               label="Self-Healing-Quote"
@@ -212,14 +318,15 @@ export function HealthEngineDashboard() {
               title="Sessions"
               subtitle="Telemetrie-Status. Antippen öffnet das Event-Cockpit."
             >
-              {data.sessions.length === 0 ? (
+              {sessions.length === 0 ? (
                 <Empty>
-                  Keine Lobby- oder Live-Teams. Sobald ein Event läuft, erscheint es hier — der
-                  Event-Code bleibt der Einstieg für Beamer und Legacy-GPS.
+                  {needle
+                    ? "Kein Live-Team passt zur Suche. Oben „Finden“ prüft auch abgeschlossene Events."
+                    : "Keine Lobby- oder Live-Teams. Sobald ein Event läuft, erscheint es hier — der Event-Code bleibt der Einstieg für Beamer und Legacy-GPS."}
                 </Empty>
               ) : (
                 <div className="grid gap-3 lg:grid-cols-2">
-                  {data.sessions.map((session) => {
+                  {sessions.map((session) => {
                     const flag = FLAG_INFO[session.flag];
                     return (
                       <button
@@ -266,11 +373,11 @@ export function HealthEngineDashboard() {
 
             <div className="space-y-4">
               <Panel title="Auto-Eingriffe" subtitle="Was das System in den letzten 24 h selbst geregelt hat.">
-                {data.healing.length === 0 ? (
+                {healing.length === 0 ? (
                   <Empty>Keine Auto-Eingriffe im Log — die Sessions laufen ohne Störung oder der Heal greift still.</Empty>
                 ) : (
                   <ul className="space-y-2">
-                    {data.healing.map((row) => (
+                    {healing.map((row) => (
                       <li key={row.id} className="rounded-2xl bg-secondary px-4 py-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="mr-auto text-sm font-bold">{row.teamName}</span>
@@ -293,11 +400,11 @@ export function HealthEngineDashboard() {
               </Panel>
 
               <Panel title="Telemetrie-Strom" subtitle="Rohsignal — fließt direkt in GRID Data.">
-                {data.telemetry.length === 0 ? (
+                {telemetry.length === 0 ? (
                   <Empty>Noch keine Solve-Events in den letzten 24 Stunden.</Empty>
                 ) : (
                   <ul className="space-y-2">
-                    {data.telemetry.map((row) => (
+                    {telemetry.map((row) => (
                       <li
                         key={row.id}
                         className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-secondary px-4 py-3"

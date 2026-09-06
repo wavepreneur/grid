@@ -4,7 +4,8 @@ import { parseRouteOverride } from "@/lib/grid/content-engine";
 import type { EventRouteOverride } from "@/lib/grid/level-types";
 import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 import { ensureTeamAccessCodesForEvent } from "@/lib/grid/access";
-import { buildEventPortalUrl, generatePortalToken } from "@/lib/grid/codes";
+import { buildEventPortalResultsUrl, buildEventPortalUrl, generatePortalToken } from "@/lib/grid/codes";
+import { mergeBookingModules, modulesFromContentConfig, type EventModules } from "@/lib/grid/event-modules";
 import { ensureEventPortalToken } from "@/lib/grid/portal";
 import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
 
@@ -19,6 +20,7 @@ export type GridBookingRequest = {
   booking_reference?: string;
   scheduled_start_at?: string;
   route_override?: EventRouteOverride;
+  modules?: Partial<EventModules>;
 };
 
 export type GridBookingTeam = {
@@ -39,7 +41,9 @@ export type GridBookingResponse = {
   entry_url: string;
   cockpit_url: string;
   show_url: string;
+  results_url: string;
   event_portal_url: string;
+  modules: EventModules;
   teams: GridBookingTeam[];
   idempotent?: boolean;
 };
@@ -218,7 +222,9 @@ export async function buildBookingResponse(input: {
     entry_url: `${origin}/go`,
     cockpit_url: buildBookingUrls(input.origin, input.event.invite_code, "").cockpit_url,
     show_url: buildBookingUrls(input.origin, input.event.invite_code, "").show_url,
+    results_url: buildEventPortalResultsUrl(origin, portalToken),
     event_portal_url: buildEventPortalUrl(origin, portalToken),
+    modules: modulesFromContentConfig(input.event.content_config),
     teams,
     idempotent: input.idempotent,
   };
@@ -251,6 +257,7 @@ export async function provisionGridBooking(input: {
     ...(input.body.content_pack_slug?.trim()
       ? { content_pack_slug: input.body.content_pack_slug.trim() }
       : {}),
+    modules: mergeBookingModules(input.body.modules),
   };
 
   const supabase = createAdminClient();

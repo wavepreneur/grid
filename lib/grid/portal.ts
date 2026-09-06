@@ -5,6 +5,7 @@ import { bumpEventContentRevision } from "@/lib/grid/content-revision";
 import { loadResolvedEventContent } from "@/lib/grid/content-loader";
 import { ensureTeamAccessCodesForEvent } from "@/lib/grid/access";
 import { generatePortalToken } from "@/lib/grid/codes";
+import { modulesFromContentConfig, type EventModules } from "@/lib/grid/event-modules";
 import type { ArrivalQuiz, EventContentConfig, EventRouteOverride } from "@/lib/grid/level-types";
 import type { GridEventStatus } from "@/lib/grid/types";
 
@@ -48,7 +49,11 @@ export type PortalSnapshot = {
   waypoints: PortalWaypoint[];
   quizzes: PortalQuiz[];
   accesses: PortalAccess[];
+  invite_code: string;
   locked: boolean;
+  modules: EventModules;
+  show_quizzes: boolean;
+  show_intelligence: boolean;
 };
 
 export type PortalSaveInput = {
@@ -65,6 +70,7 @@ export type PortalSaveInput = {
 type PortalEventRow = {
   id: string;
   title: string;
+  invite_code: string;
   status: GridEventStatus;
   organization_id: string;
   city_id: string | null;
@@ -155,7 +161,7 @@ export async function loadPortalEventByToken(token: string): Promise<PortalEvent
   const { data, error } = await supabase
     .from("events")
     .select(
-      "id, title, status, organization_id, city_id, content_config, route_override, studio_game_version_id, max_teams, max_players_per_team, portal_token",
+      "id, title, invite_code, status, organization_id, city_id, content_config, route_override, studio_game_version_id, max_teams, max_players_per_team, portal_token",
     )
     .eq("portal_token", trimmed)
     .maybeSingle();
@@ -246,6 +252,7 @@ export async function loadPortalSnapshot(token: string): Promise<PortalSnapshot 
     (event.max_teams ?? 0) * event.max_players_per_team;
 
   const locked = event.status === "completed" || event.status === "archived";
+  const modules = modulesFromContentConfig(event.content_config);
 
   return {
     token: event.portal_token,
@@ -255,11 +262,15 @@ export async function loadPortalSnapshot(token: string): Promise<PortalSnapshot 
     player_seats: playerSeats,
     duration_minutes: content.missionDurationMinutes,
     content_mode: content.contentMode,
-    show_waypoints: waypoints.length > 0 && content.capabilities.gps,
+    show_waypoints: modules.custom_routes && waypoints.length > 0 && content.capabilities.gps,
     waypoints,
     quizzes,
     accesses,
+    invite_code: event.invite_code,
     locked,
+    modules,
+    show_quizzes: modules.custom_quiz && quizzes.length > 0,
+    show_intelligence: modules.team_intelligence,
   };
 }
 
@@ -284,17 +295,23 @@ export async function savePortalOverrides(
   token: string,
   input: PortalSaveInput,
 ): Promise<PortalSnapshot> {
-  const validationError = validatePortalSave(input);
-  if (validationError) {
-    throw new Error(validationError);
-  }
-
   const event = await loadPortalEventByToken(token);
   if (!event) {
     throw new Error("Event-Portal nicht gefunden.");
   }
   if (event.status === "completed" || event.status === "archived") {
     throw new Error("Dieses Event ist abgeschlossen und kann nicht mehr geändert werden.");
+  }
+
+  const modules = modulesFromContentConfig(event.content_config);
+  const gatedInput: PortalSaveInput = {
+    duration_minutes: input.duration_minutes,
+    waypoints: modules.custom_routes ? input.waypoints : [],
+    quizzes: modules.custom_quiz ? input.quizzes : [],
+  };
+  const validationError = validatePortalSave(gatedInput);
+  if (validationError) {
+    throw new Error(validationError);
   }
 
   const content = await loadResolvedEventContent({
@@ -315,12 +332,12 @@ export async function savePortalOverrides(
       .map((level) => level.level),
   );
 
-  for (const waypoint of input.waypoints) {
+  for (const waypoint of gatedInput.waypoints) {
     if (!allowedWaypointLevels.has(waypoint.level)) {
       throw new Error(`Aufgabe ${waypoint.level} hat keine überschreibbaren Koordinaten.`);
     }
   }
-  for (const quiz of input.quizzes) {
+  for (const quiz of gatedInput.quizzes) {
     if (!allowedQuizLevels.has(quiz.level)) {
       throw new Error(`Aufgabe ${quiz.level} hat kein überschreibbares Einstiegsquiz.`);
     }
@@ -329,7 +346,8 @@ export async function savePortalOverrides(
   const currentConfig = parseContentConfig(event.content_config);
   const nextConfig: EventContentConfig = {
     ...currentConfig,
-    mission_duration_minutes: input.duration_minutes,
+    mission_duration_minutes: gatedInput.duration_minutes,
+    modules,
   };
 
   const currentOverride = parseRouteOverride(event.route_override);
@@ -337,7 +355,7 @@ export async function savePortalOverrides(
     ...(currentOverride.levels ?? {}),
   };
 
-  for (const waypoint of input.waypoints) {
+  for (const waypoint of gatedInput.waypoints) {
     const level = content.levels.find((item) => item.level === waypoint.level);
     const key = String(waypoint.level);
     const previous = nextLevels[key] ?? {};
@@ -351,7 +369,7 @@ export async function savePortalOverrides(
     };
   }
 
-  for (const quiz of input.quizzes) {
+  for (const quiz of gatedInput.quizzes) {
     const level = content.levels.find((item) => item.level === quiz.level);
     const key = String(quiz.level);
     const previous = nextLevels[key] ?? {};

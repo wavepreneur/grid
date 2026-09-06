@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadResolvedEventContent } from "@/lib/grid/content-loader";
+import { completedLevelNumbers } from "@/lib/grid/event-results";
 import { parseTeamGameState } from "@/lib/grid/game-state";
 import { setTeamNavigator } from "@/lib/grid/team-session";
 import { writeAuditLog } from "@/lib/grid/audit-log";
@@ -36,6 +37,7 @@ export type CockpitTeam = {
   active_player_count: number;
   current_phase: string | null;
   level_started_at: string | null;
+  done_levels: number[];
   players: CockpitPlayer[];
 };
 
@@ -121,6 +123,8 @@ export async function getEventCockpitSnapshot(
       playersByTeam.set(player.team_id, list);
     }
 
+    const levelNumbers = content.levels.map((level) => level.level);
+
     const cockpitTeams: CockpitTeam[] = teamRows.map((team) => {
       const teamPlayers = playersByTeam.get(team.id) ?? [];
       const gameState = parseTeamGameState(team.game_state);
@@ -143,6 +147,7 @@ export async function getEventCockpitSnapshot(
         current_phase: gameState.current_phase ?? null,
         level_started_at:
           gameState.levels[String(team.current_level ?? 0)]?.started_at ?? null,
+        done_levels: completedLevelNumbers(team.game_state, levelNumbers),
         players: teamPlayers.map((player) => ({
           id: player.id,
           display_name: player.display_name,

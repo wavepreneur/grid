@@ -868,16 +868,34 @@ export function GameRoom({
         <p className="cg-animate-score-pop mt-2 text-5xl font-extrabold tabular-nums text-[var(--cg-fg)]">
           {teamState.gameState.score ?? 0}
         </p>
+        <ol className="mt-4 flex flex-wrap justify-center gap-1.5">
+          {eventContent.levels.map((level) => {
+            const done = teamState.gameState.levels[String(level.level)]?.status === "completed";
+            return (
+              <li
+                key={level.level}
+                title={level.title}
+                className={`flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold ${
+                  done
+                    ? "bg-[var(--cg-success)] text-white"
+                    : "bg-[var(--cg-muted)]/15 text-[var(--cg-muted)]"
+                }`}
+              >
+                {level.level}
+              </li>
+            );
+          })}
+        </ol>
+        <p className="mt-3 text-xs text-[var(--cg-muted)]">
+          {countCompletedLevels(teamState.gameState)} / {eventContent.levels.length} Aufgaben · nur
+          euer Team
+        </p>
       </div>
       {eventContent.showLiveScore ? (
         <Link href={cockpitShowPath(inviteCode)} className="block">
-          <BigButton variant="accent">Ranking ansehen</BigButton>
+          <BigButton>Beamer-Ranking</BigButton>
         </Link>
-      ) : (
-        <p className="text-center text-sm text-[var(--cg-muted)]">
-          Live-Ranking ist für dieses Event ausgeschaltet.
-        </p>
-      )}
+      ) : null}
     </div>
   ) : currentLevelDefinition ? (
     phased && usesMissionShell(eventContent) ? (

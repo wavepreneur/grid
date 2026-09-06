@@ -9,11 +9,36 @@ import {
   GridLabel,
   GridSuccess,
 } from "@/components/grid/grid-shell";
+import { EventIntelligencePanel } from "@/components/event/event-intelligence-panel";
+import { EventProgressPanel } from "@/components/event/event-progress-panel";
+import { eventPortalResultsPath } from "@/lib/grid/event-routes";
 import {
   PORTAL_DURATION_OPTIONS,
+  type PortalAccess,
   type PortalSaveInput,
   type PortalSnapshot,
 } from "@/lib/grid/portal";
+
+function absoluteUrl(pathOrUrl: string): string {
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  if (typeof window === "undefined") return pathOrUrl;
+  return `${window.location.origin}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
+}
+
+function downloadAccessCsv(title: string, accesses: PortalAccess[]) {
+  const rows = [
+    ["Team", "Zugangscode", "Spiel-Link"],
+    ...accesses.map((access) => [access.team_name, access.access_code, absoluteUrl(access.play_url)]),
+  ];
+  const csv = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = `${title.replaceAll(/\s+/g, "-").toLowerCase()}-zugaenge.csv`;
+  link.click();
+  URL.revokeObjectURL(href);
+}
 
 type Props = {
   initial: PortalSnapshot;
@@ -58,10 +83,10 @@ export function EventPortalForm({ initial }: Props) {
     );
   }
 
-  async function copyAccess(code: string) {
+  async function copyText(value: string) {
     try {
-      await navigator.clipboard.writeText(code);
-      setCopiedCode(code);
+      await navigator.clipboard.writeText(value);
+      setCopiedCode(value);
     } catch {
       setCopiedCode(null);
     }
@@ -111,6 +136,131 @@ export function EventPortalForm({ initial }: Props) {
         <Stat label="Spieler" value={initial.player_seats} />
         <Stat label="Minuten" value={duration} />
       </section>
+
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-slate-900">So startest du</h2>
+        <ol className="space-y-2 text-sm leading-6 text-slate-600">
+          <li>
+            <span className="font-semibold text-slate-900">1.</span> Link oder Code an die
+            Teamleads — unten kopieren oder als CSV.
+          </li>
+          <li>
+            <span className="font-semibold text-slate-900">2.</span> Jedes Team öffnet den Link auf
+            dem Handy. Keine App.
+          </li>
+          <li>
+            <span className="font-semibold text-slate-900">3.</span> Wenn alle in der Lobby sind,
+            startet das Spiel von selbst.
+          </li>
+        </ol>
+      </section>
+
+      {initial.accesses.length > 0 ? (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Teams einladen</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                Link oder Code an den Teamlead. Mail-Einladungen kommen später über Exitmania
+                (Resend) — hier kopieren oder die Liste herunterladen.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => downloadAccessCsv(initial.title, initial.accesses)}
+              className="text-sm font-medium text-teal-700 hover:underline"
+            >
+              Zugänge als CSV
+            </button>
+          </div>
+          <ul className="space-y-2">
+            {initial.accesses.map((access) => {
+              const playUrl = absoluteUrl(access.play_url);
+              const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(playUrl)}`;
+              return (
+                <li
+                  key={access.access_code}
+                  className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={qrSrc}
+                    alt=""
+                    width={64}
+                    height={64}
+                    className="hidden rounded-lg border border-slate-100 bg-white sm:block"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-900">{access.team_name}</p>
+                    <p className="font-mono text-base tracking-wide text-teal-700">
+                      {access.access_code}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void copyText(playUrl)}
+                      className="text-sm font-medium text-teal-700 hover:underline"
+                    >
+                      {copiedCode === playUrl ? "Link kopiert" : "Link"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void copyText(access.access_code)}
+                      className="text-sm font-medium text-teal-700 hover:underline"
+                    >
+                      {copiedCode === access.access_code ? "Kopiert" : "Code"}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-slate-900">Fortschritt</h2>
+        <p className="text-sm leading-6 text-slate-500">
+          Grün = Aufgabe gelöst. Aktualisiert sich von selbst.
+        </p>
+        <EventProgressPanel portalToken={initial.token} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-slate-900">Ergebnisse</h2>
+        <p className="text-sm leading-6 text-slate-500">
+          Alle Teams dieses Events — nur mit diesem Cockpit-Link, nicht über den Invite.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <a
+            href={eventPortalResultsPath(initial.token)}
+            className="inline-flex rounded-xl bg-teal-800 px-4 py-2.5 text-sm font-semibold text-white"
+          >
+            Ergebnisse ansehen
+          </a>
+          <button
+            type="button"
+            onClick={() => void copyText(absoluteUrl(eventPortalResultsPath(initial.token)))}
+            className="text-sm font-medium text-teal-700 hover:underline"
+          >
+            {copiedCode === absoluteUrl(eventPortalResultsPath(initial.token))
+              ? "Link kopiert"
+              : "Ergebnis-Link kopieren"}
+          </button>
+        </div>
+      </section>
+
+      {initial.show_intelligence ? (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-slate-900">Data</h2>
+          <p className="text-sm leading-6 text-slate-500">
+            Rohwerte aus dem Event. Die visuelle Zusammenfassung baut später Exitmania — hier nur
+            die Zahlen.
+          </p>
+          <EventIntelligencePanel portalToken={initial.token} />
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-slate-900">Spieldauer</h2>
@@ -177,7 +327,7 @@ export function EventPortalForm({ initial }: Props) {
         </section>
       ) : null}
 
-      {quizzes.length > 0 ? (
+      {initial.show_quizzes ? (
         <section className="space-y-4">
           <div>
             <h2 className="text-base font-semibold text-slate-900">Unternehmensquiz</h2>
@@ -256,37 +406,6 @@ export function EventPortalForm({ initial }: Props) {
               ))}
             </fieldset>
           ))}
-        </section>
-      ) : null}
-
-      {initial.accesses.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="text-base font-semibold text-slate-900">Zugänge</h2>
-          <p className="text-sm leading-6 text-slate-500">
-            Diese Codes gehen an die Teams. Ein Code, ein Platz.
-          </p>
-          <ul className="space-y-2">
-            {initial.accesses.map((access) => (
-              <li
-                key={access.access_code}
-                className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-900">{access.team_name}</p>
-                  <p className="font-mono text-base tracking-wide text-teal-700">
-                    {access.access_code}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void copyAccess(access.access_code)}
-                  className="shrink-0 text-sm font-medium text-teal-700 hover:underline"
-                >
-                  {copiedCode === access.access_code ? "Kopiert" : "Kopieren"}
-                </button>
-              </li>
-            ))}
-          </ul>
         </section>
       ) : null}
 

@@ -108,7 +108,7 @@ Players (Browser-Geräte / Rollen)
 | `gameId` | `studio_games` + **published** `studio_game_versions` / `content_pack_slug` |
 | `scope` | **`event`** (`invite_code`, optional `scope_key` / `booking_reference`) |
 | Ticket user/pass | **Access Code** oder direkter **Team-Join-Link** |
-| `results.loquiz.com/game:scope` | `…/results/{invite}` oder `…/results/{gameSlug}:{scopeKey}` |
+| `results.loquiz.com/game:scope` | Team: eigener Stand im Spiel. Alle Teams: `/portal/{token}/results` |
 | QR App-Scan | QR auf **Play-URL** (Browser) |
 | Unused/Used | Access: `unused` → `redeemed` (Event+Team gebunden) |
 | validFrom/Until | Access `valid_from` / `valid_until` (optional) |
@@ -224,16 +224,16 @@ GET /api/v1/events/{inviteCode}/results    # Highscore-Payload für Exitmania-Po
 # optional outbound webhook später
 ```
 
-Results-URL für Organizer (öffentlich):
+Results-URL für den Bucher (Portal-Token, nicht Invite):
 
-`{GRID_ORIGIN}/results/{inviteCode}`  
-äquivalent Loquiz: `results…/{game}:{scope}` → bei uns `invite` **ist** der Scope-Handle.
+`{GRID_ORIGIN}/portal/{token}/results`  
+Team sieht nur den eigenen Stand im Spiel. `/results/{invite}` ist geschlossen.
 
 ### 4.6 Exitmania-Call-Sites (Migration)
 
 | Heute | Morgen |
 |-------|--------|
-| `create-loquiz-ticket` | `create-grid-session` → erweiterte `POST /bookings` |
+| `create-loquiz-ticket` | Admin-Pilot: GRID `POST /bookings`; Live-Checkout bleibt Loquiz |
 | `create-teamevent-loquiz-tickets` | `POST /access-batches` oder `/bookings` + Expand |
 | Admin Bulk wie Loquiz-UI | GRID Studio Tickets **oder** Exitmania Admin → GRID API |
 | `results.loquiz.com/…` | GRID Results / Exitmania Proxy auf GRID Status |

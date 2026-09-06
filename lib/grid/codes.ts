@@ -28,6 +28,10 @@ export function buildEventPortalUrl(origin: string, token: string): string {
   return `${origin.replace(/\/$/, "")}/portal/${token}`;
 }
 
+export function buildEventPortalResultsUrl(origin: string, token: string): string {
+  return `${buildEventPortalUrl(origin, token)}/results`;
+}
+
 function generateCode(length: number): string {
   const bytes = crypto.getRandomValues(new Uint8Array(length));
   return Array.from(bytes, (byte) => CODE_ALPHABET[byte % CODE_ALPHABET.length]).join(

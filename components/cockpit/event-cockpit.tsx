@@ -217,10 +217,6 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
           </CockpitLink>
           <IconArrowRight size={14} />
         </p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Nach Spielende:{" "}
-          <CockpitLink href="/data">GRID Data</CockpitLink>
-        </p>
       </Panel>
 
       {message ? <GridSuccess message={message} /> : null}
@@ -301,6 +297,22 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
                   </div>
                   <p className="text-2xl font-bold tabular-nums text-primary">{team.score}</p>
                 </div>
+                <ol className="mt-3 flex flex-wrap gap-1.5">
+                  {snapshot.levels.map((level) => {
+                    const done = team.done_levels.includes(level.level);
+                    return (
+                      <li
+                        key={level.level}
+                        title={level.title}
+                        className={`flex h-7 min-w-7 items-center justify-center rounded-md px-1.5 text-[11px] font-bold ${
+                          done ? "bg-emerald-600 text-white" : "bg-card text-muted-foreground"
+                        }`}
+                      >
+                        {level.level}
+                      </li>
+                    );
+                  })}
+                </ol>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
                   <Link

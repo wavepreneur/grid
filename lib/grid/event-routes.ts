@@ -41,6 +41,11 @@ export function cockpitShowPath(inviteCode: string): string {
   return `/cockpit/${code(inviteCode)}/show`;
 }
 
+/** Booker-only all-teams results — gated by portal token, never by invite. */
+export function eventPortalResultsPath(portalToken: string): string {
+  return `/portal/${portalToken}/results`;
+}
+
 export function teamEntryPath(
   inviteCode: string,
   joinCode: string,
