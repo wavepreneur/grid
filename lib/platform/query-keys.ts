@@ -27,8 +27,8 @@ export const queryKeys = {
     detail: (taskId: string) => [...queryKeys.tasks.all, "detail", taskId] as const,
     usageMeta: (taskIds: string[]) =>
       [...queryKeys.tasks.all, "usage-meta", [...taskIds].sort().join(",")] as const,
-    librarySearch: (query: string, quizOnly = false, tag = "") =>
-      [...queryKeys.tasks.all, "library", query, quizOnly, tag] as const,
+    librarySearch: (query: string, quizOnly = false, tags = "") =>
+      [...queryKeys.tasks.all, "library", query, quizOnly, tags] as const,
     libraryTags: (orgSlug: string) => [...queryKeys.tasks.all, "library-tags", orgSlug] as const,
   },
   tickets: {

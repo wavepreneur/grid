@@ -61,36 +61,56 @@ import {
   STATION_ACCESS_CODE_MIN,
 } from "@/lib/grid/stations";
 
+function tagsMatchingSets(sets: string[][], selected: string[]) {
+  if (selected.length === 0) return sets;
+  return sets.filter((tags) => selected.every((tag) => tags.includes(tag)));
+}
+
+function remainingPoolTags(sets: string[][], selected: string[]) {
+  const next = new Set<string>();
+  for (const tags of tagsMatchingSets(sets, selected)) {
+    for (const tag of tags) {
+      if (!selected.includes(tag)) next.add(tag);
+    }
+  }
+  return [...next].sort((a, b) => a.localeCompare(b, "de", { sensitivity: "base" }));
+}
+
 function PoolTagFilters({
   tags,
+  sets,
   selected,
-  onSelect,
+  onChange,
 }: {
   tags: string[];
-  selected: string;
-  onSelect: (tag: string) => void;
+  sets: string[][];
+  selected: string[];
+  onChange: (tags: string[]) => void;
 }) {
-  if (tags.length === 0) return null;
+  const visible = selected.length === 0 ? tags : [...selected, ...remainingPoolTags(sets, selected)];
+  if (visible.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-1.5">
       <button
         type="button"
-        onClick={() => onSelect("")}
+        onClick={() => onChange([])}
         className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
-          !selected
+          selected.length === 0
             ? "bg-primary text-primary-foreground"
             : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
         }`}
       >
         Alle
       </button>
-      {tags.map((tag) => {
-        const active = selected === tag;
+      {visible.map((tag) => {
+        const active = selected.includes(tag);
         return (
           <button
             key={tag}
             type="button"
-            onClick={() => onSelect(active ? "" : tag)}
+            onClick={() =>
+              onChange(active ? selected.filter((entry) => entry !== tag) : [...selected, tag])
+            }
             className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
               active
                 ? "bg-foreground text-background"
@@ -176,16 +196,18 @@ export function GameSlotsPanel({
   const [delayMinutes, setDelayMinutes] = useState(5);
   const [stationCode, setStationCode] = useState("");
   const [search, setSearch] = useState("");
-  const [poolTag, setPoolTag] = useState("");
-  const [openerTag, setOpenerTag] = useState("");
+  const [poolTags, setPoolTags] = useState<string[]>([]);
+  const [openerTags, setOpenerTags] = useState<string[]>([]);
   const [pickedTaskId, setPickedTaskId] = useState("");
   const debounced = useDebouncedValue(search, 200);
   const debouncedOpener = useDebouncedValue(openerSearch, 200);
-  const { data: libraryTags = [] } = useTaskLibraryTags();
-  const { data: library = [] } = useTaskLibrarySearch(debounced, { tag: poolTag });
+  const { data: libraryTagIndex } = useTaskLibraryTags();
+  const libraryTags = libraryTagIndex?.tags ?? [];
+  const libraryTagSets = libraryTagIndex?.sets ?? [];
+  const { data: library = [] } = useTaskLibrarySearch(debounced, { tags: poolTags });
   const { data: quizLibrary = [] } = useTaskLibrarySearch(debouncedOpener, {
     quizOnly: true,
-    tag: openerTag,
+    tags: openerTags,
   });
 
   useEffect(() => {
@@ -676,9 +698,10 @@ export function GameSlotsPanel({
 
         <PoolTagFilters
           tags={libraryTags}
-          selected={poolTag}
-          onSelect={(tag) => {
-            setPoolTag(tag);
+          sets={libraryTagSets}
+          selected={poolTags}
+          onChange={(next) => {
+            setPoolTags(next);
             setPickedTaskId("");
           }}
         />
@@ -714,7 +737,7 @@ export function GameSlotsPanel({
               );
             })}
           </div>
-        ) : search.trim() || poolTag ? (
+        ) : search.trim() || poolTags.length > 0 ? (
           <p className="text-xs text-muted-foreground">
             Keine Treffer — anderes Schlagwort wählen oder Aufgabe zuerst im Pool anlegen.
           </p>
@@ -796,8 +819,9 @@ export function GameSlotsPanel({
                       />
                       <PoolTagFilters
                         tags={libraryTags}
-                        selected={openerTag}
-                        onSelect={setOpenerTag}
+                        sets={libraryTagSets}
+                        selected={openerTags}
+                        onChange={setOpenerTags}
                       />
                       <div className="max-h-44 space-y-1 overflow-y-auto rounded-2xl border border-border bg-card p-2">
                         {quizLibrary.length === 0 ? (

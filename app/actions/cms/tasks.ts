@@ -137,8 +137,13 @@ export type TaskLibraryItem = {
   answer_type?: string;
 };
 
-/** Distinct tags from the active task pool (for Studio pickers). */
-export async function listTaskLibraryTags(): Promise<ActionResult<string[]>> {
+export type TaskLibraryTagIndex = {
+  tags: string[];
+  sets: string[][];
+};
+
+/** Distinct tags plus per-task sets (for AND-filters in Studio pickers). */
+export async function listTaskLibraryTags(): Promise<ActionResult<TaskLibraryTagIndex>> {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
@@ -151,17 +156,25 @@ export async function listTaskLibraryTags(): Promise<ActionResult<string[]>> {
 
     if (error) throw new Error(error.message);
 
-    const tags = new Set<string>();
+    const unique = new Set<string>();
+    const sets: string[][] = [];
     for (const row of data ?? []) {
-      for (const tag of (row.tags as string[] | null) ?? []) {
-        const trimmed = tag.trim();
-        if (trimmed) tags.add(trimmed);
-      }
+      const taskTags = [
+        ...new Set(
+          ((row.tags as string[] | null) ?? []).map((tag) => tag.trim()).filter(Boolean),
+        ),
+      ];
+      if (taskTags.length === 0) continue;
+      sets.push(taskTags);
+      for (const tag of taskTags) unique.add(tag);
     }
 
     return {
       success: true,
-      data: [...tags].sort((a, b) => a.localeCompare(b, "de", { sensitivity: "base" })),
+      data: {
+        tags: [...unique].sort((a, b) => a.localeCompare(b, "de", { sensitivity: "base" })),
+        sets,
+      },
     };
   } catch (error) {
     return {
@@ -175,6 +188,7 @@ export async function listTaskLibraryTags(): Promise<ActionResult<string[]>> {
 export async function searchTaskLibrary(input: {
   query?: string;
   tag?: string | null;
+  tags?: string[] | null;
   limit?: number;
   /** Only choice / multi_choice tasks (Einstiegsfrage). */
   quizOnly?: boolean;
@@ -185,7 +199,13 @@ export async function searchTaskLibrary(input: {
     const limit = Math.min(50, Math.max(1, input.limit ?? 30));
     // Over-fetch when filtering to quiz types client-side.
     const fetchLimit = input.quizOnly ? Math.min(100, limit * 4) : limit;
-    const tag = input.tag?.trim() || null;
+    const tags = [
+      ...new Set(
+        [...(input.tags ?? []), input.tag ?? ""]
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+      ),
+    ];
 
     let query = supabase
       .from("studio_tasks")
@@ -195,7 +215,7 @@ export async function searchTaskLibrary(input: {
       .order("updated_at", { ascending: false })
       .limit(fetchLimit);
 
-    if (tag) {
+    for (const tag of tags) {
       query = query.contains("tags", [tag]);
     }
 

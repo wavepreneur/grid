@@ -7,6 +7,7 @@ import { upsertTask, type TaskUpsertInput } from "@/app/actions/cms/tasks";
 import { TaskDeleteButton } from "@/components/cms/tasks/task-delete-button";
 import { TaskDuplicateButton } from "@/components/cms/tasks/task-duplicate-button";
 import { TaskEditorPreview } from "@/components/cms/tasks/task-editor-preview";
+import { TaskTagsField } from "@/components/cms/tasks/task-tags-field";
 import { TaskScoringEditor, TaskTilesEditor } from "@/components/cms/tasks/task-tiles-editor";
 import { ImageUploadField } from "@/components/cms/shared/image-upload-field";
 import { StudioPanel } from "@/components/cms/admin-shell";
@@ -49,7 +50,9 @@ export function TaskEditor({ task, returnTo }: Props) {
 
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
-  const [tags, setTags] = useState((task?.tags ?? []).join(", "));
+  const [tags, setTags] = useState<string[]>(() =>
+    (task?.tags ?? []).map((tag) => tag.trim()).filter(Boolean),
+  );
   const [content, setContent] = useState<StudioTaskContent>(() =>
     normalizeTaskContent(task?.content ?? DEFAULT_TASK_CONTENT),
   );
@@ -105,10 +108,7 @@ export function TaskEditor({ task, returnTo }: Props) {
       id: task?.id,
       title,
       description,
-      tags: tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
+      tags,
       content: normalizeTaskContent(content),
     };
 
@@ -119,11 +119,12 @@ export function TaskEditor({ task, returnTo }: Props) {
         return;
       }
       cache.setTask(result.data!);
+      cache.invalidateTasks();
       acknowledgeSaved(
         JSON.stringify({
           title: result.data!.title,
           description: result.data!.description ?? "",
-          tags: (result.data!.tags ?? []).join(", "),
+          tags: result.data!.tags ?? [],
           content: normalizeTaskContent(result.data!.content),
         }),
       );
@@ -177,12 +178,10 @@ export function TaskEditor({ task, returnTo }: Props) {
               onChange={(url) => patchContent({ hero_image_url: url || undefined })}
             />
             <div>
-              <StudioLabel hint="Kommagetrennt — zum Filtern in der Bibliothek">Tags</StudioLabel>
-              <StudioInput
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder="berlin, mauer, outdoor, quiz…"
-              />
+              <StudioLabel hint="Vorhandene Tags auswählen oder neue anlegen — zum Filtern in der Bibliothek">
+                Tags
+              </StudioLabel>
+              <TaskTagsField value={tags} onChange={setTags} />
             </div>
           </div>
         </StudioPanel>

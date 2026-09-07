@@ -8,16 +8,23 @@ import { queryKeys } from "@/lib/platform/query-keys";
 
 export function useTaskLibrarySearch(
   debouncedQuery: string,
-  options?: { quizOnly?: boolean; tag?: string | null },
+  options?: { quizOnly?: boolean; tag?: string | null; tags?: string[] },
 ) {
   const quizOnly = Boolean(options?.quizOnly);
-  const tag = options?.tag?.trim() || "";
+  const tags = [
+    ...new Set(
+      [...(options?.tags ?? []), options?.tag ?? ""]
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    ),
+  ].sort((a, b) => a.localeCompare(b, "de", { sensitivity: "base" }));
+  const tagsKey = tags.join("\u0001");
   return useQuery({
-    queryKey: queryKeys.tasks.librarySearch(debouncedQuery, quizOnly, tag),
+    queryKey: queryKeys.tasks.librarySearch(debouncedQuery, quizOnly, tagsKey),
     queryFn: async () => {
       const result = await searchTaskLibrary({
         query: debouncedQuery,
-        tag: tag || null,
+        tags,
         limit: 40,
         quizOnly,
       });
