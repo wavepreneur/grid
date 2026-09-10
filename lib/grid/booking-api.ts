@@ -9,6 +9,10 @@ import { mergeBookingModules, modulesFromContentConfig, type EventModules } from
 import { ensureEventPortalToken } from "@/lib/grid/portal";
 import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
 import { sanitizeGrowthPackInput, type GrowthPack } from "@/lib/grid/growth-pack";
+import {
+  resolvePublishedStudioGame,
+  studioGameContentConfigFields,
+} from "@/lib/grid/studio-booking";
 
 export type GridBookingRequest = {
   organization_slug?: string;
@@ -255,12 +259,14 @@ export async function provisionGridBooking(input: {
   }
 
   const growth = sanitizeGrowthPackInput(input.body.growth);
+  const packSlug = input.body.content_pack_slug?.trim() || "";
+  const studio = packSlug
+    ? await resolvePublishedStudioGame(input.organizationId, packSlug)
+    : null;
   const contentConfig = {
     ...buildDefaultContentConfig(blueprintSlug),
     ...(blueprint.capabilities.gps ? { city_slug: citySlug } : {}),
-    ...(input.body.content_pack_slug?.trim()
-      ? { content_pack_slug: input.body.content_pack_slug.trim() }
-      : {}),
+    ...(studio ? studioGameContentConfigFields(studio.game) : {}),
     modules: mergeBookingModules(input.body.modules),
     ...(growth ? { growth } : {}),
   };
@@ -280,6 +286,7 @@ export async function provisionGridBooking(input: {
       scheduled_start_at: input.body.scheduled_start_at ?? null,
       content_config: contentConfig,
       route_override: routeOverride,
+      studio_game_version_id: studio?.versionId ?? null,
       portal_token: generatePortalToken(),
     })
     .select(

@@ -83,6 +83,8 @@ Content-Type: application/json
 }
 ```
 
+`content_pack_slug` ist der **Studio-Spiel-Slug** (oder die Spiel-UUID). GRID bindet die veröffentlichte Version. `city_slug` wählt Layer 1 (GPS/Stationen) — dieselbe Mission, viele Städte.
+
 **Idempotent:** Gleiche `booking_reference` + Org → bestehendes Event zurück.
 
 Antwort enthält dieselben Handles wie das Spiel — keine zweite ID-Welt:

@@ -68,6 +68,35 @@ function toEditorState(game: StudioGame): GameEditorState {
 const SURFACES: ContentMode[] = ["outdoor", "indoor", "online"];
 const DEFAULT_COUNTDOWN_MINUTES = 90;
 
+function CopySlugChip({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void copy()}
+      className="inline-flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2 text-left"
+      title="Kopieren"
+    >
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <code className="font-mono text-sm font-semibold text-foreground">{value}</code>
+      <span className="text-xs text-primary">{copied ? "Kopiert" : "Kopieren"}</span>
+    </button>
+  );
+}
+
 function lastPositiveDuration(minutes: number | null | undefined): number {
   return minutes && minutes > 0 ? minutes : DEFAULT_COUNTDOWN_MINUTES;
 }
@@ -291,6 +320,20 @@ export function GameEditorPanel({
             <StudioBadge>{surfaceLabelDe(surface)}</StudioBadge>
             <p className="text-xs text-muted-foreground">
               Veröffentlichen und Live-Events steuerst du in der Spiele-Liste.
+            </p>
+          </div>
+
+          <div className="mb-6 rounded-3xl border border-border bg-secondary/50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Für Exitmania / Booking
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <CopySlugChip label="Spiel-Slug" value={game.slug} />
+              {game.city_slug ? <CopySlugChip label="Stadt-Slug" value={game.city_slug} /> : null}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Spiel-Slug startet genau dieses Spiel. Stadt-Slug kannst du pro Buchung tauschen —
+              eine Mission, viele Städte.
             </p>
           </div>
 

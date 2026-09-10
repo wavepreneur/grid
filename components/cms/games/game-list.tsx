@@ -898,7 +898,11 @@ function GameRow({
 
         <h2 className="mt-3 text-xl font-bold">{game.name}</h2>
         <p className="text-sm text-muted-foreground">
-          Version {game.published_version_number} · {game.slug}
+          Version {game.published_version_number}
+          {game.city_slug ? ` · Stadt ${game.city_slug}` : ""}
+        </p>
+        <p className="mt-1 font-mono text-xs font-semibold text-foreground">
+          Spiel-Slug: {game.slug}
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">
