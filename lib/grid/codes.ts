@@ -4,6 +4,11 @@ export function generateInviteCode(length = 8): string {
   return generateCode(length);
 }
 
+/** Stable partner key for studio_games.slug — never derived from the title. */
+export function generateGameSlug(length = 10): string {
+  return generateCode(length);
+}
+
 export function generateJoinCode(length = 6): string {
   return generateCode(length);
 }

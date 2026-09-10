@@ -328,12 +328,12 @@ export function GameEditorPanel({
               Für Exitmania / Booking
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <CopySlugChip label="Spiel-Slug" value={game.slug} />
+              <CopySlugChip label="Spiel-Code" value={game.slug} />
               {game.city_slug ? <CopySlugChip label="Stadt-Slug" value={game.city_slug} /> : null}
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              Spiel-Slug startet genau dieses Spiel. Stadt-Slug kannst du pro Buchung tauschen —
-              eine Mission, viele Städte.
+              Der Spiel-Code ändert sich nicht, wenn du den Titel umbenennst. Stadt-Slug kannst du
+              pro Buchung tauschen — eine Mission, viele Städte.
             </p>
           </div>
 

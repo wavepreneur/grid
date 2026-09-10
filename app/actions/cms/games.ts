@@ -5,12 +5,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
 import {
   DEFAULT_TASK_CONTENT,
-  slugifyStudio,
   type StudioGame,
   type StudioGameTaskLink,
   type StudioTask,
   type UpdateGameInput,
 } from "@/lib/cms/types";
+import { generateGameSlug } from "@/lib/grid/codes";
 import {
   DEFAULT_RUNTIME_PROFILES,
   buildLayerSnapshotMeta,
@@ -102,11 +102,9 @@ export type CreateGameInput = {
 async function ensureUniqueGameSlug(
   supabase: ReturnType<typeof createAdminClient>,
   organizationId: string,
-  name: string,
 ): Promise<string> {
-  const base = slugifyStudio(name) || "spiel";
-  let candidate = base;
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const candidate = generateGameSlug();
     const { data } = await supabase
       .from("studio_games")
       .select("id")
@@ -114,16 +112,15 @@ async function ensureUniqueGameSlug(
       .eq("slug", candidate)
       .maybeSingle();
     if (!data) return candidate;
-    candidate = `${base}-${attempt + 2}`.slice(0, 64);
   }
-  return `${base}-${Date.now()}`.slice(0, 64);
+  throw new Error("Spiel-Code konnte nicht erzeugt werden.");
 }
 
 export async function createGame(input: CreateGameInput): Promise<ActionResult<StudioGame>> {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
-    const slug = await ensureUniqueGameSlug(supabase, orgId, input.name);
+    const slug = await ensureUniqueGameSlug(supabase, orgId);
 
     const surface: ContentMode =
       input.surface === "indoor" || input.surface === "online" || input.surface === "outdoor"
@@ -258,7 +255,6 @@ export async function updateGame(input: UpdateGameInput): Promise<ActionResult<S
 
     if (input.name !== undefined) {
       payload.name = input.name.trim();
-      payload.slug = slugifyStudio(input.name);
     }
     if (input.description !== undefined) payload.description = input.description.trim();
     if (input.language !== undefined) payload.language = input.language;
@@ -1154,7 +1150,7 @@ async function copyGameWithLinks(
   source: StudioGame,
   name: string,
 ): Promise<StudioGame> {
-  const slug = await ensureUniqueGameSlug(supabase, orgId, name);
+  const slug = await ensureUniqueGameSlug(supabase, orgId);
 
   const { data, error } = await supabase
     .from("studio_games")

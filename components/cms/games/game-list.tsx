@@ -902,7 +902,7 @@ function GameRow({
           {game.city_slug ? ` · Stadt ${game.city_slug}` : ""}
         </p>
         <p className="mt-1 font-mono text-xs font-semibold text-foreground">
-          Spiel-Slug: {game.slug}
+          Spiel-Code: {game.slug}
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">

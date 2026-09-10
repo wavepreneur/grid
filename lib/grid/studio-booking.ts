@@ -93,7 +93,7 @@ export async function resolvePublishedStudioGame(
     )
     .eq("organization_id", organizationId);
 
-  query = isUuid(key) ? query.eq("id", key) : query.eq("slug", key);
+  query = isUuid(key) ? query.eq("id", key) : query.ilike("slug", key);
 
   const { data, error } = await query.maybeSingle();
   if (error) throw new Error(error.message);
