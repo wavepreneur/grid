@@ -6,7 +6,7 @@ export function generateInviteCode(length = 8): string {
 
 /** Stable partner key for studio_games.slug — never derived from the title. */
 export function generateGameSlug(length = 10): string {
-  return generateCode(length);
+  return generateCode(length).toLowerCase();
 }
 
 export function generateJoinCode(length = 6): string {
