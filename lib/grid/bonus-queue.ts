@@ -104,55 +104,57 @@ export function mergeBonusQueue(
   return [...keep.filter((i) => !ids.has(i.bonus_id)), ...incoming];
 }
 
+function normalizeQueueRole(
+  role: string | null | undefined,
+): "alpha" | "beta" | "gamma" | null {
+  if (role === "captain" || role === "navigator" || role === "alpha") return "alpha";
+  if (role === "beta") return "beta";
+  if (role === "solver" || role === "gamma") return "gamma";
+  return null;
+}
+
+/** Who may see this queue item on their device. */
+export function bonusQueueItemMatchesPlayer(
+  item: Pick<BonusQueueItem, "for_team" | "for_role" | "for_player_id">,
+  role: string | null | undefined,
+  playerId?: string | null,
+  options?: { claimUnassigned?: boolean },
+): boolean {
+  if (item.for_player_id) {
+    return Boolean(playerId) && item.for_player_id === playerId;
+  }
+  if (item.for_team) return true;
+  const normalized = normalizeQueueRole(role);
+  if (normalized !== null && normalized === item.for_role) return true;
+  return Boolean(options?.claimUnassigned);
+}
+
 export function findPresentableBonusForRole(
   gameState: TeamGameState,
   role: string | null | undefined,
-  options?: { claimUnassigned?: boolean },
+  options?: { claimUnassigned?: boolean; playerId?: string | null },
 ): BonusQueueItem | null {
   const queue = gameState.bonus_queue ?? [];
-  const normalized =
-    role === "captain" || role === "navigator"
-      ? "alpha"
-      : role === "solver"
-        ? "gamma"
-        : role;
-
   const matches = (item: BonusQueueItem) =>
-    item.for_team ||
-    item.for_role === normalized ||
-    Boolean(options?.claimUnassigned);
+    bonusQueueItemMatchesPlayer(item, role, options?.playerId, options);
 
-  const active = queue.find(
-    (item) => item.status === "active" && matches(item),
-  );
+  const active = queue.find((item) => item.status === "active" && matches(item));
   if (active) return active;
 
-  return (
-    queue.find(
-      (item) => item.status === "ready" && matches(item),
-    ) ?? null
-  );
+  return queue.find((item) => item.status === "ready" && matches(item)) ?? null;
 }
 
 /** Role-only bonuses currently being solved by someone else. */
 export function findForeignActiveBonuses(
   gameState: TeamGameState,
   role: string | null | undefined,
-  options?: { claimUnassigned?: boolean },
+  options?: { claimUnassigned?: boolean; playerId?: string | null },
 ): BonusQueueItem[] {
-  if (options?.claimUnassigned) return [];
+  if (options?.claimUnassigned && !options.playerId) return [];
   const queue = gameState.bonus_queue ?? [];
-  const normalized =
-    role === "captain" || role === "navigator"
-      ? "alpha"
-      : role === "solver"
-        ? "gamma"
-        : role;
-
   return queue.filter(
     (item) =>
       item.status === "active" &&
-      !item.for_team &&
-      item.for_role !== normalized,
+      !bonusQueueItemMatchesPlayer(item, role, options?.playerId, options),
   );
 }

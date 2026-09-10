@@ -98,6 +98,7 @@ type Props = {
   onBeginBonus: (bonusId: string) => void;
   onContinueBonus: (bonusId: string) => void;
   onSkipBonus: () => void;
+  onHandOffBonus?: (bonusId: string, toPlayerId: string) => void;
   onRevealLevel?: () => void;
   canPaceTeam?: boolean;
   leadLabel?: string;
@@ -169,6 +170,7 @@ export function PlayPhaseFlow({
   onBeginBonus,
   onContinueBonus,
   onSkipBonus,
+  onHandOffBonus,
   onRevealLevel,
   canPaceTeam = false,
   leadLabel = "Team Lead",
@@ -284,13 +286,17 @@ export function PlayPhaseFlow({
   // Active / ready bonus from queue (supports parallel role packs).
   // Solo Alpha claims role-only bonuses so 1-device tests still see Layer 3.
   const claimUnassigned = Boolean(soloAlpha) || (isAlpha && teammates.length === 0);
-  const queueBonus = findPresentableBonusForRole(gameState, myRole, { claimUnassigned });
+  const queueBonus = findPresentableBonusForRole(gameState, myRole, {
+    claimUnassigned,
+    playerId: myPlayerId,
+  });
   const overlayBonus = gameState.active_bonus;
   const presentBonusMeta = queueBonus
     ? {
         from_level: queueBonus.from_level,
         bonus_id: queueBonus.bonus_id,
         for_team: queueBonus.for_team,
+        for_player_id: queueBonus.for_player_id ?? null,
         snapshot: queueBonus.task_snapshot ?? null,
       }
     : overlayBonus
@@ -298,6 +304,7 @@ export function PlayPhaseFlow({
           from_level: overlayBonus.from_level,
           bonus_id: overlayBonus.bonus_id,
           for_team: overlayBonus.for_team,
+          for_player_id: overlayBonus.for_player_id ?? null,
           snapshot:
             (gameState.bonus_queue ?? []).find((i) => i.bonus_id === overlayBonus.bonus_id)
               ?.task_snapshot ?? null,
@@ -313,9 +320,16 @@ export function PlayPhaseFlow({
     );
     if (
       bonus &&
-      (presentBonusMeta.for_team || canPresentBonus(bonus, myRole, { claimUnassigned }))
+      (presentBonusMeta.for_team ||
+        presentBonusMeta.for_player_id === myPlayerId ||
+        (!presentBonusMeta.for_player_id &&
+          canPresentBonus(bonus, myRole, { claimUnassigned })))
     ) {
       const bonusId = presentBonusMeta.bonus_id ?? `legacy-${presentBonusMeta.from_level}`;
+      const canHandOff =
+        Boolean(onHandOffBonus) &&
+        !presentBonusMeta.for_team &&
+        teammates.length > 0;
       return (
         <>
           {sheets}
@@ -335,10 +349,14 @@ export function PlayPhaseFlow({
             teamSession={gameState.bonus_sessions?.[bonusId] ?? null}
             canPaceTeam={presentBonusMeta.for_team ? canPaceTeam : true}
             leadLabel={leadLabel}
+            teammates={teammates}
             onBegin={() => onBeginBonus(bonusId)}
             onSubmit={onSubmitBonus}
             onContinue={() => onContinueBonus(bonusId)}
             onSkipWaiting={onSkipBonus}
+            onHandOff={
+              canHandOff ? (toPlayerId) => onHandOffBonus?.(bonusId, toPlayerId) : undefined
+            }
           />
         </>
       );
@@ -409,12 +427,17 @@ export function PlayPhaseFlow({
       (item) =>
         (item.status === "active" || item.status === "ready") && !item.for_team,
     );
-    const pendingRoleHint = pendingRoleItem
-      ? bonusAudienceHeadline(
-          { for_role: pendingRoleItem.for_role, for_team: false },
-          roleLabels,
-        )
+    const handedTo = pendingRoleItem?.for_player_id
+      ? roster?.find((p) => p.id === pendingRoleItem.for_player_id)?.name
       : null;
+    const pendingRoleHint = handedTo
+      ? handedTo
+      : pendingRoleItem
+        ? bonusAudienceHeadline(
+            { for_role: pendingRoleItem.for_role, for_team: false },
+            roleLabels,
+          )
+        : null;
 
     return (
       <>

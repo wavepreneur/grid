@@ -16,6 +16,7 @@ import {
   submitArrivalQuiz,
   advanceQuizToLevel,
   submitBonusAnswer,
+  handOffBonus,
   syncOutdoorWalkProgress,
 } from "@/app/actions/game";
 import { usesMissionShell } from "@/lib/grid/blueprints";
@@ -647,6 +648,21 @@ export function GameRoom({
     });
   }
 
+  function handleHandOffBonus(bonusId: string, toPlayerId: string) {
+    setError(null);
+    startSolveTransition(async () => {
+      applyTeamResult(
+        await handOffBonus({
+          inviteCode,
+          joinCode,
+          sessionId: session.sessionId,
+          bonusId,
+          toPlayerId,
+        }),
+      );
+    });
+  }
+
   function handleDismissBonusNotice(noticeId: string) {
     // Optimistic clear so phase remounts cannot resurrect the toast.
     setTeamState((current) => {
@@ -690,10 +706,12 @@ export function GameRoom({
   const foreignBonusToasts = useMemo(() => {
     return findForeignActiveBonuses(teamState.gameState, session.archetypeRole, {
       claimUnassigned: soloAlpha,
+      playerId: session.playerId,
     }).map((item) => ({
       bonusId: item.bonus_id,
       solverName:
         teamState.gameState.bonus_sessions?.[item.bonus_id]?.solver_name ||
+        lobbyPlayers.find((p) => p.id === item.for_player_id)?.display_name ||
         lobbyPlayers.find((p) => {
           const role =
             p.archetype_role ??
@@ -996,6 +1014,7 @@ export function GameRoom({
         onBeginBonus={handleBeginBonus}
         onContinueBonus={handleContinueBonus}
         onSkipBonus={handleSkipBonus}
+        onHandOffBonus={handleHandOffBonus}
         onRevealLevel={handleRevealLevel}
         canPaceTeam={isAlpha}
         leadLabel={leadLabel}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
-import { IconCheck, IconGift, IconUser, IconX } from "@/components/game/city/icons";
+import { IconCheck, IconGift, IconUser, IconUsers, IconX } from "@/components/game/city/icons";
 import { CodeBoxesInput } from "@/components/game/code-boxes-input";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
 import type { BonusTask } from "@/lib/grid/level-types";
@@ -19,6 +19,12 @@ import { hubMeta } from "@/lib/grid/play-slots";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 import { CityTeamBar } from "@/components/game/city/team-bar";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
+
+type TeammateOption = {
+  id: string;
+  name: string;
+  roleLabel: string;
+};
 
 type Props = {
   bonus: BonusTask;
@@ -36,10 +42,12 @@ type Props = {
   teamSession?: BonusSessionState | null;
   canPaceTeam?: boolean;
   leadLabel?: string;
+  teammates?: TeammateOption[];
   onBegin: () => void;
   onSubmit: (selectedOptionId: string) => void;
   onContinue: () => void;
   onSkipWaiting: () => void;
+  onHandOff?: (toPlayerId: string) => void;
 };
 
 export function PlayBonusView({
@@ -61,6 +69,8 @@ export function PlayBonusView({
   onSubmit,
   onContinue,
   onSkipWaiting,
+  teammates = [],
+  onHandOff,
 }: Props) {
   const answerMode = bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
   const boxCount = bonus.number_fields ?? Math.min(4, Math.max(1, (bonus.answer ?? "").length || 4));
@@ -73,6 +83,7 @@ export function PlayBonusView({
   );
   const [submitting, setSubmitting] = useState(false);
   const [continuing, setContinuing] = useState(false);
+  const [pickOpen, setPickOpen] = useState(false);
   const sfxPlayedRef = useRef<string | null>(null);
 
   const reveal = teamSession?.reveal ?? null;
@@ -80,6 +91,7 @@ export function PlayBonusView({
   const show = Boolean(reveal);
   const correct = reveal?.correct ?? false;
   const locked = show || disabled || isPending || submitting;
+  const busyHandOff = locked;
   const selectedId = reveal?.selected_option_id ?? picked ?? "";
   const attemptLabel =
     reveal?.attempt_label ??
@@ -317,9 +329,54 @@ export function PlayBonusView({
 
       <div className="mt-auto space-y-3 pt-6">
         {!show ? (
-          <BigButton disabled={locked || !canCheck} onClick={checkAnswer}>
-            Antwort prüfen
-          </BigButton>
+          <>
+            <BigButton disabled={locked || !canCheck} onClick={checkAnswer}>
+              Antwort prüfen
+            </BigButton>
+            {onHandOff && teammates.length > 0 ? (
+              <div className="space-y-2 pt-1">
+                {pickOpen ? (
+                  <div className="space-y-2 rounded-2xl bg-[var(--cg-secondary)] px-3 py-3">
+                    <p className="px-1 text-center text-sm font-semibold text-[var(--cg-fg)]">
+                      Wer übernimmt?
+                    </p>
+                    {teammates.map((mate) => (
+                      <button
+                        key={mate.id}
+                        type="button"
+                        disabled={busyHandOff}
+                        onClick={() => onHandOff(mate.id)}
+                        className="cg-tap-lift flex w-full items-center justify-between rounded-xl bg-[var(--cg-card)] px-4 py-3 text-left disabled:opacity-50"
+                      >
+                        <span className="font-semibold text-[var(--cg-fg)]">{mate.name}</span>
+                        <span className="text-xs font-bold uppercase tracking-wide text-[var(--cg-muted)]">
+                          {mate.roleLabel}
+                        </span>
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      disabled={busyHandOff}
+                      onClick={() => setPickOpen(false)}
+                      className="w-full pt-1 text-center text-sm font-semibold text-[var(--cg-muted)]"
+                    >
+                      Zurück
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={locked}
+                    onClick={() => setPickOpen(true)}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl px-3 py-3 text-center text-sm font-semibold text-[var(--cg-muted)] disabled:opacity-40"
+                  >
+                    <IconUsers size={16} />
+                    Geht bei mir nicht — wer übernimmt?
+                  </button>
+                )}
+              </div>
+            ) : null}
+          </>
         ) : (
           <div
             className={`space-y-3 ${correct ? "cg-animate-rise-in" : "cg-animate-pop-in"}`}

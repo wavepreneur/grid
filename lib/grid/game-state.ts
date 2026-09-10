@@ -53,6 +53,16 @@ export type ActiveBonusState = {
   started_at: string;
   /** Compiled bonus id when from bonuses[]. */
   bonus_id?: string;
+  /** When set, only this player may see/solve (handoff from the assigned role). */
+  for_player_id?: string;
+};
+
+export type BonusHandoffRecord = {
+  from_player_id: string;
+  from_player_name: string;
+  to_player_id: string;
+  to_player_name: string;
+  at: string;
 };
 
 /** Armed / ready Layer-3 surprises. @see docs/BONUS_LAYER3_MODEL.md */
@@ -73,6 +83,10 @@ export type BonusQueueItem = {
    * (Studio test edits / unpublished publish snapshots).
    */
   task_snapshot?: import("@/lib/grid/level-types").BonusTask;
+  /** Overrides for_role — bonus belongs to this player after a handoff. */
+  for_player_id?: string;
+  /** Who passed the bonus to whom — Data / audit trail. */
+  handoffs?: BonusHandoffRecord[];
 };
 
 /** Shared bonus answer — first submit wins; every device shows the same result. */
@@ -357,7 +371,26 @@ function parseActiveBonus(value: unknown): ActiveBonusState | null | undefined {
     for_team: Boolean(c.for_team),
     started_at: String(c.started_at),
     bonus_id: typeof c.bonus_id === "string" ? c.bonus_id : undefined,
+    for_player_id: typeof c.for_player_id === "string" ? c.for_player_id : undefined,
   };
+}
+
+function parseBonusHandoffs(value: unknown): BonusHandoffRecord[] | undefined {
+  if (!Array.isArray(value) || value.length === 0) return undefined;
+  const items: BonusHandoffRecord[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const c = raw as Partial<BonusHandoffRecord>;
+    if (!c.from_player_id || !c.to_player_id || !c.at) continue;
+    items.push({
+      from_player_id: String(c.from_player_id),
+      from_player_name: String(c.from_player_name ?? ""),
+      to_player_id: String(c.to_player_id),
+      to_player_name: String(c.to_player_name ?? ""),
+      at: String(c.at),
+    });
+  }
+  return items.length > 0 ? items : undefined;
 }
 
 function parseBonusQueue(value: unknown): BonusQueueItem[] | undefined {
@@ -393,6 +426,8 @@ function parseBonusQueue(value: unknown): BonusQueueItem[] | undefined {
           : undefined,
       fanfare_shown: Boolean(c.fanfare_shown),
       task_snapshot: parseBonusTask(c.task_snapshot) ?? undefined,
+      for_player_id: typeof c.for_player_id === "string" ? c.for_player_id : undefined,
+      handoffs: parseBonusHandoffs(c.handoffs),
     });
   }
   return items;

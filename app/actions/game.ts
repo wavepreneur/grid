@@ -65,6 +65,7 @@ import {
   resolveBonusForPlay,
 } from "@/lib/grid/bonus";
 import {
+  bonusQueueItemMatchesPlayer,
   markBonusActive,
   markBonusDone,
   mergeBonusQueue,
@@ -1908,19 +1909,18 @@ async function completeActiveBonus(input: {
   const fromQueue = (gameState.bonus_queue ?? []).find(
     (item) =>
       item.status === "active" &&
-      (item.for_team ||
-        item.for_role === normalizedRole ||
-        claimUnassigned),
+      bonusQueueItemMatchesPlayer(item, normalizedRole, player.id, { claimUnassigned }),
   );
-  const active = fromQueue
-    ? {
-        from_level: fromQueue.from_level,
-        for_role: fromQueue.for_role,
-        for_team: fromQueue.for_team,
-        started_at: fromQueue.armed_at,
-        bonus_id: fromQueue.bonus_id,
-      }
-    : gameState.active_bonus;
+    const active = fromQueue
+      ? {
+          from_level: fromQueue.from_level,
+          for_role: fromQueue.for_role,
+          for_team: fromQueue.for_team,
+          started_at: fromQueue.armed_at,
+          bonus_id: fromQueue.bonus_id,
+          for_player_id: fromQueue.for_player_id,
+        }
+      : gameState.active_bonus;
 
   if (!active) {
     return { success: false, error: "Kein aktiver Bonus." };
@@ -1969,7 +1969,11 @@ async function completeActiveBonus(input: {
   }
 
   const playerRoleCheck = (player.role ?? "gamma") as PlayerRole;
-  if (!canPresentBonus(bonus, playerRoleCheck, { claimUnassigned })) {
+  const assignedToPlayer = Boolean(fromQueue?.for_player_id);
+  if (assignedToPlayer && fromQueue?.for_player_id !== player.id) {
+    return { success: false, error: "Diese Bonusaufgabe ist für jemand anderen." };
+  }
+  if (!assignedToPlayer && !canPresentBonus(bonus, playerRoleCheck, { claimUnassigned })) {
     return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
   }
 
@@ -2487,10 +2491,10 @@ export async function beginBonusPresentation(input: {
     const normalizedRole = normalizePlayRole(player.role);
     const fromQueue = (gameState.bonus_queue ?? []).find((item) => {
       if (item.status !== "active") return false;
-      if (input.bonusId) return item.bonus_id === input.bonusId;
-      return (
-        item.for_team || item.for_role === normalizedRole || claimUnassigned
-      );
+      if (input.bonusId && item.bonus_id !== input.bonusId) return false;
+      return bonusQueueItemMatchesPlayer(item, normalizedRole, player.id, {
+        claimUnassigned,
+      });
     });
     const active = fromQueue
       ? {
@@ -2499,6 +2503,7 @@ export async function beginBonusPresentation(input: {
           for_team: fromQueue.for_team,
           started_at: fromQueue.armed_at,
           bonus_id: fromQueue.bonus_id,
+          for_player_id: fromQueue.for_player_id,
         }
       : gameState.active_bonus;
 
@@ -2526,7 +2531,11 @@ export async function beginBonusPresentation(input: {
       bonusId,
       fromQueue?.task_snapshot,
     );
-    if (bonus && !canPresentBonus(bonus, player.role as PlayerRole, { claimUnassigned })) {
+    if (
+      bonus &&
+      fromQueue?.for_player_id !== player.id &&
+      !canPresentBonus(bonus, player.role as PlayerRole, { claimUnassigned })
+    ) {
       return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
     }
 
@@ -2550,6 +2559,146 @@ export async function beginBonusPresentation(input: {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Bonus-Start fehlgeschlagen.",
+    };
+  }
+}
+
+/** Assigned player hands a role-bonus to a teammate so they can solve it. */
+export async function handOffBonus(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  bonusId: string;
+  toPlayerId: string;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    const { event, team, player } = await assertPlayerSession(input);
+    if (team.status !== "playing") {
+      return { success: false, error: "Das Spiel läuft noch nicht." };
+    }
+    if (!input.toPlayerId || input.toPlayerId === player.id) {
+      return { success: false, error: "Bitte jemand anderen auswählen." };
+    }
+
+    const gameState = parseTeamGameState(team.game_state);
+    const claimUnassigned = (await countActivePlayers(team.id)) <= 1;
+    const item = (gameState.bonus_queue ?? []).find((entry) => entry.bonus_id === input.bonusId);
+    if (!item || (item.status !== "active" && item.status !== "ready")) {
+      return { success: false, error: "Kein aktiver Bonus." };
+    }
+    if (item.for_team) {
+      return { success: false, error: "Diese Aufgabe sehen schon alle." };
+    }
+    if (gameState.bonus_sessions?.[item.bonus_id]?.reveal) {
+      return { success: false, error: "Die Aufgabe ist schon beantwortet." };
+    }
+    if (
+      !bonusQueueItemMatchesPlayer(item, player.role, player.id, { claimUnassigned })
+    ) {
+      return { success: false, error: "Nur wer die Aufgabe hat, kann sie weitergeben." };
+    }
+
+    const supabase = createAdminClient();
+    const { data: target, error: targetError } = await supabase
+      .from("players")
+      .select("id, display_name, role, left_at, team_id")
+      .eq("id", input.toPlayerId)
+      .eq("team_id", team.id)
+      .is("left_at", null)
+      .maybeSingle();
+
+    if (targetError) throw new Error(targetError.message);
+    if (!target) {
+      return { success: false, error: "Mitspieler nicht gefunden." };
+    }
+
+    const nowIso = new Date().toISOString();
+    const targetRole = normalizePlayRole(target.role as string | null);
+    const handoff = {
+      from_player_id: player.id,
+      from_player_name: player.display_name,
+      to_player_id: target.id as string,
+      to_player_name: (target.display_name as string) || "Mitspieler",
+      at: nowIso,
+    };
+    const bonusTitle = item.task_snapshot?.title?.trim() || null;
+
+    const nextQueue = (gameState.bonus_queue ?? []).map((entry) =>
+      entry.bonus_id === item.bonus_id
+        ? {
+            ...entry,
+            for_player_id: handoff.to_player_id,
+            for_role: targetRole,
+            status: "active" as const,
+            handoffs: [...(entry.handoffs ?? []), handoff],
+          }
+        : entry,
+    );
+
+    const nextGameState: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      bonus_queue: nextQueue,
+      active_bonus: {
+        from_level: item.from_level,
+        for_role: targetRole,
+        for_team: false,
+        started_at: gameState.active_bonus?.started_at ?? nowIso,
+        bonus_id: item.bonus_id,
+        for_player_id: handoff.to_player_id,
+      },
+      bonus_sessions: patchBonusSession(gameState.bonus_sessions, item.bonus_id, {
+        intro_done: true,
+        solver_name: handoff.to_player_name,
+        solver_player_id: handoff.to_player_id,
+      }),
+    };
+
+    const persisted = await persistPlayingGameState({
+      teamId: team.id,
+      player,
+      gameState: nextGameState,
+      expectedVersion: gameState.version,
+    });
+    if (!persisted.success) return persisted;
+
+    await insertSyncEvent({
+      teamId: team.id,
+      eventType: "bonus_handed_off",
+      level: item.from_level,
+      actorPlayerId: player.id,
+      payload: {
+        bonus_id: item.bonus_id,
+        bonus_title: bonusTitle,
+        ...handoff,
+      },
+    });
+
+    await writeAuditLog({
+      organizationId: event.organization_id,
+      eventId: event.id,
+      teamId: team.id,
+      playerId: player.id,
+      action: "bonus_handed_off",
+      payload: {
+        bonus_id: item.bonus_id,
+        bonus_title: bonusTitle,
+        level: item.from_level,
+        from_player_id: handoff.from_player_id,
+        from_player_name: handoff.from_player_name,
+        from_player_role: player.role ?? null,
+        to_player_id: handoff.to_player_id,
+        to_player_name: handoff.to_player_name,
+        to_player_role: (target.role as string | null) ?? null,
+        at: nowIso,
+      },
+    });
+
+    return persisted;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Weitergeben fehlgeschlagen.",
     };
   }
 }

@@ -9,6 +9,15 @@ import { loadPortalEventByToken } from "@/lib/grid/portal";
 import { modulesFromContentConfig } from "@/lib/grid/event-modules";
 
 const ATTEMPT_ACTIONS = ["play_attempt_ok", "play_attempt_failed", "hint_purchased"] as const;
+const DATA_ACTIONS = [...ATTEMPT_ACTIONS, "bonus_handed_off"] as const;
+
+export type EventIntelligenceHandoff = {
+  at: string;
+  fromName: string;
+  toName: string;
+  bonusTitle: string | null;
+  level: number;
+};
 
 export type EventIntelligenceTeam = {
   id: string;
@@ -16,6 +25,7 @@ export type EventIntelligenceTeam = {
   status: string;
   score: number;
   scores: TeamIndexScores;
+  handoffs: EventIntelligenceHandoff[];
 };
 
 export type EventIntelligenceSnapshot = {
@@ -49,7 +59,7 @@ export async function loadEventIntelligenceByPortalToken(
       .from("audit_logs")
       .select("action, team_id, player_id, created_at, payload")
       .in("team_id", teamIds)
-      .in("action", [...ATTEMPT_ACTIONS])
+      .in("action", [...DATA_ACTIONS])
       .order("created_at", { ascending: true });
 
     if (logsError) throw new Error(logsError.message);
@@ -76,12 +86,32 @@ export async function loadEventIntelligenceByPortalToken(
     title: event.title,
     teams: teamRows.map((team) => {
       const gameState = parseTeamGameState(team.game_state);
+      const logs = logsByTeam.get(team.id) ?? [];
       return {
         id: team.id,
         name: team.name,
         status: team.status,
         score: gameState.score ?? 0,
-        scores: computeTeamIndices(logsByTeam.get(team.id) ?? []),
+        scores: computeTeamIndices(logs),
+        handoffs: logs
+          .filter((row) => row.action === "bonus_handed_off")
+          .map((row) => ({
+            at: row.created_at,
+            fromName:
+              typeof row.payload.from_player_name === "string"
+                ? row.payload.from_player_name
+                : "Spieler",
+            toName:
+              typeof row.payload.to_player_name === "string"
+                ? row.payload.to_player_name
+                : "Spieler",
+            bonusTitle:
+              typeof row.payload.bonus_title === "string" ? row.payload.bonus_title : null,
+            level:
+              typeof row.payload.level === "number" && Number.isFinite(row.payload.level)
+                ? row.payload.level
+                : 0,
+          })),
       };
     }),
   };

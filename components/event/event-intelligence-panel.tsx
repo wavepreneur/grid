@@ -57,6 +57,16 @@ export function EventIntelligencePanel({ portalToken }: Props) {
             {scoreLabel(team.scores.teamAgility)} · {team.scores.attemptsFailed} falsch ·{" "}
             {team.scores.hints} Tipps
           </p>
+          {team.handoffs.length > 0 ? (
+            <ul className="mt-2 space-y-1">
+              {team.handoffs.map((handoff, index) => (
+                <li key={`${handoff.at}-${index}`} className="text-xs leading-5 text-slate-600">
+                  {handoff.fromName} → {handoff.toName}
+                  {handoff.bonusTitle ? ` · ${handoff.bonusTitle}` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </li>
       ))}
     </ul>
