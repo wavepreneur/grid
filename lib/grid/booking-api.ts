@@ -246,26 +246,30 @@ export async function provisionGridBooking(input: {
 }): Promise<{ event: EventRow; teams: TeamRow[] }> {
   const blueprintSlug = resolveBookingBlueprint(input.orgSlug, input.body.blueprint_slug);
   const blueprint = getBlueprint(blueprintSlug);
-  const citySlug = input.body.city_slug ?? blueprint.defaultContent.city_slug ?? DEFAULT_CITY_SLUG;
   const routeOverride = parseRouteOverride(input.body.route_override ?? {});
-
-  let cityId: string | null = null;
-  if (blueprint.capabilities.gps) {
-    const { getCityIdBySlug } = await import("@/lib/grid/organizations");
-    cityId = await getCityIdBySlug(input.organizationId, citySlug);
-    if (!cityId) {
-      throw new Error(`City "${citySlug}" not found`);
-    }
-  }
-
-  const growth = sanitizeGrowthPackInput(input.body.growth);
   const packSlug = input.body.content_pack_slug?.trim() || "";
   const studio = packSlug
     ? await resolvePublishedStudioGame(input.organizationId, packSlug)
     : null;
+
+  const requestedCity =
+    input.body.city_slug?.trim() ||
+    studio?.game.city_slug?.trim() ||
+    (!studio ? (blueprint.defaultContent.city_slug ?? DEFAULT_CITY_SLUG) : "");
+
+  let cityId: string | null = null;
+  if (requestedCity) {
+    const { getCityIdBySlug } = await import("@/lib/grid/organizations");
+    cityId = await getCityIdBySlug(input.organizationId, requestedCity);
+    if (!cityId && !studio) {
+      throw new Error(`City "${requestedCity}" not found`);
+    }
+  }
+
+  const growth = sanitizeGrowthPackInput(input.body.growth);
   const contentConfig = {
     ...buildDefaultContentConfig(blueprintSlug),
-    ...(blueprint.capabilities.gps ? { city_slug: citySlug } : {}),
+    ...(requestedCity ? { city_slug: requestedCity } : {}),
     ...(studio ? studioGameContentConfigFields(studio.game) : {}),
     modules: mergeBookingModules(input.body.modules),
     ...(growth ? { growth } : {}),
