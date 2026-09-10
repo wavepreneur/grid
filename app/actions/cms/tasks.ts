@@ -296,18 +296,21 @@ export type TaskUpsertInput = {
   organization_scoped?: boolean;
 };
 
+function friendlyTaskConstraintError(message: string): string {
+  if (/studio_tasks_org_slug_key|duplicate key/i.test(message)) {
+    return "Eine andere Aufgabe verwendet denselben internen Namen. Bitte erneut speichern.";
+  }
+  return message;
+}
+
 export async function upsertTask(input: TaskUpsertInput): Promise<ActionResult<StudioTask>> {
   try {
     const organizationId = input.organization_scoped !== false
       ? await getStudioOrganizationId()
       : null;
 
-    const slug = slugifyStudio(input.slug || input.title);
-    if (!slug) return { success: false, error: "Slug ist ungültig." };
-
     const payload = {
       organization_id: organizationId,
-      slug,
       title: input.title.trim(),
       description: (input.description ?? "").trim(),
       language: input.language ?? "de",
@@ -331,7 +334,7 @@ export async function upsertTask(input: TaskUpsertInput): Promise<ActionResult<S
         .select("*")
         .single();
 
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(friendlyTaskConstraintError(error.message));
 
       // Refresh frozen arrival_quiz snapshots that use this task as Einstiegsfrage.
       await refreshOpenerQuizSnapshots(supabase, {
@@ -349,13 +352,18 @@ export async function upsertTask(input: TaskUpsertInput): Promise<ActionResult<S
       };
     }
 
+    const slug =
+      (input.slug && slugifyStudio(input.slug)) ||
+      (await ensureUniqueTaskSlug(supabase, organizationId, input.title));
+    if (!slug) return { success: false, error: "Slug ist ungültig." };
+
     const { data, error } = await supabase
       .from("studio_tasks")
-      .insert(payload)
+      .insert({ ...payload, slug })
       .select("*")
       .single();
 
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(friendlyTaskConstraintError(error.message));
     revalidatePath("/admin/tasks");
     return {
       success: true,
