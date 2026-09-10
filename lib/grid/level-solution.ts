@@ -16,6 +16,8 @@ export function formatLevelSolution(level: LevelDefinition): string {
   }
 
   if (level.input_mode === "confirm") return "OK";
+  if (level.input_mode === "photo" || level.input_mode === "augmented_photo") return "Foto";
+  if (level.input_mode === "video") return "Video";
 
   const answer = level.answer?.trim();
   if (answer) return answer;

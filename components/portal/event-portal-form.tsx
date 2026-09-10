@@ -11,7 +11,7 @@ import {
 } from "@/components/grid/grid-shell";
 import { EventIntelligencePanel } from "@/components/event/event-intelligence-panel";
 import { EventProgressPanel } from "@/components/event/event-progress-panel";
-import { eventPortalResultsPath } from "@/lib/grid/event-routes";
+import { eventPortalGalleryPath, eventPortalResultsPath } from "@/lib/grid/event-routes";
 import {
   PORTAL_DURATION_OPTIONS,
   type PortalAccess,
@@ -247,6 +247,30 @@ export function EventPortalForm({ initial }: Props) {
             {copiedCode === absoluteUrl(eventPortalResultsPath(initial.token))
               ? "Link kopiert"
               : "Ergebnis-Link kopieren"}
+          </button>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-slate-900">Galerie</h2>
+        <p className="text-sm leading-6 text-slate-500">
+          Fotos und Videos der Teams — nur mit diesem Link, nicht über den Invite.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <a
+            href={eventPortalGalleryPath(initial.token)}
+            className="inline-flex rounded-xl bg-teal-800 px-4 py-2.5 text-sm font-semibold text-white"
+          >
+            Galerie ansehen
+          </a>
+          <button
+            type="button"
+            onClick={() => void copyText(absoluteUrl(eventPortalGalleryPath(initial.token)))}
+            className="text-sm font-medium text-teal-700 hover:underline"
+          >
+            {copiedCode === absoluteUrl(eventPortalGalleryPath(initial.token))
+              ? "Link kopiert"
+              : "Galerie-Link kopieren"}
           </button>
         </div>
       </section>

@@ -63,6 +63,8 @@ type Props = {
   onBroadcastWalkProgress?: (level: number, walkedMeters: number) => void;
   mirroredGps?: GpsFixPayload | null;
   onBroadcastGpsFix?: (fix: GpsFixPayload) => void;
+  /** Studio playtest — GPS waypoints can be opened without being on site. */
+  isStudioTest?: boolean;
 };
 
 export function PlayHubView({
@@ -87,6 +89,7 @@ export function PlayHubView({
   onBroadcastWalkProgress,
   mirroredGps = null,
   onBroadcastGpsFix,
+  isStudioTest = false,
 }: Props) {
   const meta = hubMeta(mode);
   const current = levels.find((l) => l.level === activeLevel) ?? levels[0];
@@ -141,6 +144,7 @@ export function PlayHubView({
             ? (input) => onSolveGpsCheckpoint(input)
             : (input) => onArriveOutdoor(input)
         }
+        isStudioTest={isStudioTest}
       />
     );
   }
@@ -402,6 +406,7 @@ function OutdoorHub({
   onReportWalkProgress,
   onBroadcastWalkProgress,
   onBroadcastGpsFix,
+  isStudioTest = false,
 }: {
   levels: LevelDefinition[];
   levelStatuses: Record<string, { status: GameLevelStatus }>;
@@ -419,6 +424,7 @@ function OutdoorHub({
   onReportWalkProgress?: (level: number, walkedMeters: number) => void;
   onBroadcastWalkProgress?: (level: number, walkedMeters: number) => void;
   onBroadcastGpsFix?: (fix: GpsFixPayload) => void;
+  isStudioTest?: boolean;
 }) {
   const isWalkMode =
     current.triggers?.type === "distance" &&
@@ -664,7 +670,7 @@ function OutdoorHub({
           onOpen={() => openWithSample(walk.sample, current.level)}
           onForceOpen={() => openWithSample(walk.sample, current.level, "distance")}
           onSimulateWalk={
-            isWalkTracker ? () => setSimBonus((m) => m + 25) : undefined
+            isWalkTracker || isStudioTest ? () => setSimBonus((m) => m + 25) : undefined
           }
         />
         <p className="px-5 pb-6 text-center text-sm text-[var(--cg-muted)]">
@@ -756,18 +762,47 @@ function OutdoorHub({
               </p>
             ) : null}
             <GpsTroubleBlock
-              canUnlock={canUnlockGps}
+              canUnlock={canUnlockGps || isStudioTest}
               disabled={disabled || isPending}
               gpsError={isWalkTracker ? gpsError : null}
               onUnlock={() =>
                 openWithSample(
-                  sample,
+                  sample ?? targetLevel.location
+                    ? {
+                        lat: (sample ?? targetLevel.location)!.lat,
+                        lng: (sample ?? targetLevel.location)!.lng,
+                        accuracy: sample?.accuracy ?? 5,
+                      }
+                    : sample,
                   routeOrder === "free" ? targetLevel.level : undefined,
                   "geofence",
                 )
               }
             />
-            {process.env.NODE_ENV === "development" && targetLevel.location ? (
+            {isStudioTest && targetLevel.location ? (
+              <div className="space-y-2 rounded-2xl border border-[var(--cg-primary)]/30 bg-[var(--cg-primary)]/10 px-4 py-3">
+                <p className="text-center text-sm font-semibold text-[var(--cg-fg)]">
+                  Studio-Test — du musst nicht in der Stadt sein
+                </p>
+                <BigButton
+                  variant="accent"
+                  disabled={disabled || isPending}
+                  onClick={() =>
+                    openWithSample(
+                      {
+                        lat: targetLevel.location!.lat,
+                        lng: targetLevel.location!.lng,
+                        accuracy: 5,
+                      },
+                      routeOrder === "free" ? targetLevel.level : undefined,
+                      "geofence",
+                    )
+                  }
+                >
+                  Aufgabe hier auslösen
+                </BigButton>
+              </div>
+            ) : process.env.NODE_ENV === "development" && targetLevel.location ? (
               <BigButton
                 variant="outline"
                 disabled={disabled || isPending}

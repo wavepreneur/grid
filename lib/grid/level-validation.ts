@@ -56,7 +56,11 @@ export function validateLevelSolution(
   }
 
   if (payload.revealSolution) {
-    if (!level.scoring?.allow_reveal_solution) {
+    const mediaSkip =
+      level.input_mode === "photo" ||
+      level.input_mode === "video" ||
+      level.input_mode === "augmented_photo";
+    if (!level.scoring?.allow_reveal_solution && !mediaSkip) {
       return { ok: false, error: "Lösung anzeigen ist für diese Aufgabe nicht erlaubt." };
     }
     return { ok: true };
@@ -101,6 +105,13 @@ export function validateLevelSolution(
 
   if (level.type === "digital" || (level.type === "station" && level.answer)) {
     if (level.input_mode === "confirm") {
+      return { ok: true };
+    }
+    if (
+      level.input_mode === "photo" ||
+      level.input_mode === "video" ||
+      level.input_mode === "augmented_photo"
+    ) {
       return { ok: true };
     }
     if (!payload.answer?.trim()) {

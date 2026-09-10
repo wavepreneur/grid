@@ -276,7 +276,12 @@ export function taskContentToBonus(
     };
   }
 
-  if (content.answer_type === "confirm") {
+  if (
+    content.answer_type === "confirm" ||
+    content.answer_type === "photo" ||
+    content.answer_type === "video" ||
+    content.answer_type === "augmented_photo"
+  ) {
     return {
       for_role: role,
       for_team,

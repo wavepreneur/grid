@@ -198,7 +198,7 @@ export function GameSlotsPanel({
   const [search, setSearch] = useState("");
   const [poolTags, setPoolTags] = useState<string[]>([]);
   const [openerTags, setOpenerTags] = useState<string[]>([]);
-  const [pickedTaskId, setPickedTaskId] = useState("");
+  const [pickedTaskIds, setPickedTaskIds] = useState<string[]>([]);
   const debounced = useDebouncedValue(search, 200);
   const debouncedOpener = useDebouncedValue(openerSearch, 200);
   const { data: libraryTagIndex } = useTaskLibraryTags();
@@ -326,26 +326,43 @@ export function GameSlotsPanel({
   }
 
   function handleAddStop() {
-    const pick =
-      library.find((t) => t.id === pickedTaskId) ??
-      library.find((t) => t.title.toLowerCase().includes(search.trim().toLowerCase())) ??
-      null;
-    if (!pick) {
-      setError("Aufgabe in der Liste auswählen oder suchen.");
+    const picks = library.filter((task) => pickedTaskIds.includes(task.id));
+    if (picks.length === 0) {
+      setError("Aufgaben in der Liste antippen — nochmal antippen nimmt sie wieder raus.");
       return;
     }
     setError(null);
     startTransition(async () => {
-      const result = await addTaskToGame(gameId, pick.id, 2);
-      if (!result.success) {
-        setError(result.error);
+      const added: string[] = [];
+      const skipped: string[] = [];
+      let nextLinks = links;
+      for (const pick of picks) {
+        const result = await addTaskToGame(gameId, pick.id, 2);
+        if (!result.success) {
+          if (result.error.includes("bereits")) {
+            skipped.push(pick.title);
+            continue;
+          }
+          setError(result.error);
+          commit(nextLinks);
+          return;
+        }
+        added.push(pick.title);
+        nextLinks = [...nextLinks, result.data!];
+      }
+      commit(nextLinks);
+      setPickedTaskIds([]);
+      setSearch("");
+      if (added.length === 0) {
+        setMessage(skipped.length > 0 ? "Diese Aufgaben sind schon im Spiel." : null);
         return;
       }
-      const next = [...links, result.data!];
-      commit(next);
-      setPickedTaskId("");
-      setSearch("");
-      setMessage(`„${pick.title}“ hinzugefügt.`);
+      const extra = skipped.length > 0 ? ` · ${skipped.length} schon enthalten` : "";
+      setMessage(
+        added.length === 1
+          ? `„${added[0]}“ hinzugefügt.${extra}`
+          : `${added.length} Aufgaben hinzugefügt.${extra}`,
+      );
     });
   }
 
@@ -679,7 +696,6 @@ export function GameSlotsPanel({
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
-                setPickedTaskId("");
               }}
               placeholder="Suchen…"
             />
@@ -687,11 +703,13 @@ export function GameSlotsPanel({
           <div className="flex items-end">
             <StudioButton
               type="button"
-              disabled={pending || (!pickedTaskId && library.length === 0)}
+              disabled={pending || pickedTaskIds.length === 0}
               onClick={handleAddStop}
               icon={<IconPlus size={16} />}
             >
-              Hinzufügen
+              {pickedTaskIds.length > 1
+                ? `${pickedTaskIds.length} hinzufügen`
+                : "Hinzufügen"}
             </StudioButton>
           </div>
         </div>
@@ -702,22 +720,28 @@ export function GameSlotsPanel({
           selected={poolTags}
           onChange={(next) => {
             setPoolTags(next);
-            setPickedTaskId("");
+            setPickedTaskIds([]);
           }}
         />
 
         {library.length > 0 ? (
           <div className="max-h-56 space-y-1 overflow-y-auto rounded-2xl border border-border p-2">
             {library.slice(0, 24).map((task) => {
-              const selected = pickedTaskId === task.id;
+              const selected = pickedTaskIds.includes(task.id);
               return (
                 <button
                   key={task.id}
                   type="button"
-                  onClick={() => setPickedTaskId(task.id)}
+                  onClick={() =>
+                    setPickedTaskIds((current) =>
+                      current.includes(task.id)
+                        ? current.filter((id) => id !== task.id)
+                        : [...current, task.id],
+                    )
+                  }
                   className={`flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-sm ${
                     selected
-                      ? "bg-primary/15 font-semibold text-foreground"
+                      ? "bg-primary/15 font-semibold text-foreground ring-2 ring-primary/40"
                       : "hover:bg-secondary"
                   }`}
                 >

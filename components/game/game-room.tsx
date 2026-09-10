@@ -1029,6 +1029,11 @@ export function GameRoom({
         onReveal={handleRevealLevel}
         mirroredGps={mirroredGps?.level === activeLevel ? mirroredGps : null}
         onBroadcastGpsFix={handleBroadcastGpsFix}
+        captureContext={{
+          inviteCode,
+          joinCode,
+          sessionId: session.sessionId,
+        }}
       />
     ) : (
       <LevelPanel

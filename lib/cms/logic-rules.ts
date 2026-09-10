@@ -368,6 +368,16 @@ function linkToLevelDefinition(
   if (content.answer_type === "confirm") {
     level.input_mode = "confirm";
     level.answer = "ok";
+  } else if (
+    content.answer_type === "photo" ||
+    content.answer_type === "video" ||
+    content.answer_type === "augmented_photo"
+  ) {
+    level.input_mode = content.answer_type;
+    level.answer = "ok";
+    if (content.overlay_image_url?.trim()) {
+      level.overlay_image_url = content.overlay_image_url.trim();
+    }
   } else if (content.answer_type === "text" && content.code_boxes) {
     level.input_mode = "boxes";
     const boxed = charsToCodeBoxAnswer(content.answer ?? "");
@@ -418,12 +428,16 @@ function linkToLevelDefinition(
   }
 
   if (content.scoring) {
+    const mediaTask =
+      content.answer_type === "photo" ||
+      content.answer_type === "video" ||
+      content.answer_type === "augmented_photo";
     level.scoring = {
       points: content.scoring.points,
       countdown_seconds: content.scoring.countdown_seconds ?? null,
       decay_enabled: content.scoring.decay_enabled,
       decay_floor: content.scoring.decay_floor ?? 0,
-      allow_reveal_solution: Boolean(content.scoring.allow_reveal_solution),
+      allow_reveal_solution: Boolean(content.scoring.allow_reveal_solution) || mediaTask,
     };
   }
 

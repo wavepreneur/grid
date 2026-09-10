@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Lightbulb } from "lucide-react";
 import type { StudioTaskContent, TaskContentTile, TaskTileMediaType } from "@/lib/cms/types";
-import { defaultTaskScoring } from "@/lib/cms/task-content";
+import { defaultTaskScoring, isMediaAnswerType } from "@/lib/cms/task-content";
 import { ContentMediaSheet } from "@/components/game/city/content-media-sheet";
 import {
   LevelHero,
@@ -106,7 +106,9 @@ export function TaskEditorPreview({ title, description, content }: Props) {
               <div className="space-y-3">
                 <p className="flex items-center justify-center gap-2 rounded-2xl bg-[var(--cg-secondary)] py-4 text-base font-semibold text-[var(--cg-fg)]">
                   Lösung:{" "}
-                  {content.answer_type === "confirm"
+                  {isMediaAnswerType(content.answer_type)
+                    ? "Übersprungen"
+                    : content.answer_type === "confirm"
                     ? "OK"
                     : content.answer_type === "choice" || content.answer_type === "multi_choice"
                       ? (content.options ?? [])
@@ -139,7 +141,28 @@ export function TaskEditorPreview({ title, description, content }: Props) {
                   <div className="w-full rounded-2xl border-2 border-[var(--cg-input)] bg-[var(--cg-secondary)]/40 px-4 py-5 text-center text-xl font-bold tracking-widest text-[var(--cg-muted)]">
                     Antwort eintragen…
                   </div>
-                ) : content.answer_type === "confirm" ? null : content.options?.length ? (
+                ) : content.answer_type === "confirm" ? null : isMediaAnswerType(
+                    content.answer_type,
+                  ) ? (
+                  <div className="space-y-2">
+                    <div className="relative mx-auto aspect-[3/4] w-full max-w-xs overflow-hidden rounded-2xl bg-[var(--cg-secondary)]">
+                      {content.answer_type === "augmented_photo" && content.overlay_image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={content.overlay_image_url}
+                          alt=""
+                          className="h-full w-full object-contain"
+                        />
+                      ) : (
+                        <p className="flex h-full items-center justify-center px-4 text-center text-sm font-semibold text-[var(--cg-muted)]">
+                          {content.answer_type === "video"
+                            ? "Kamera · max. 30 Sekunden"
+                            : "Kamera · Foto"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : content.options?.length ? (
                   <div className="space-y-2">
                     {content.options.map((opt) => (
                       <div
@@ -162,10 +185,20 @@ export function TaskEditorPreview({ title, description, content }: Props) {
                 ) : null}
 
                 <BigButton variant="primary" disabled>
-                  {content.answer_type === "confirm" ? "OK" : "Antwort prüfen"}
+                  {content.answer_type === "confirm"
+                    ? "OK"
+                    : content.answer_type === "photo" || content.answer_type === "augmented_photo"
+                      ? "Foto machen"
+                      : content.answer_type === "video"
+                        ? "Video aufnehmen"
+                        : "Antwort prüfen"}
                 </BigButton>
 
-                {scoring.allow_reveal_solution ? (
+                {isMediaAnswerType(content.answer_type) ? (
+                  <p className="text-center text-sm font-semibold text-[var(--cg-muted)]">
+                    Überspringen · 0 Punkte
+                  </p>
+                ) : scoring.allow_reveal_solution ? (
                   <RevealSolutionControl onConfirmReveal={() => setPreviewSolutionRevealed(true)} />
                 ) : null}
               </>

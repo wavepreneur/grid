@@ -36,6 +36,11 @@ type ExitmaniaLevelViewProps = {
   onReveal?: () => void;
   mirroredGps?: GpsFixPayload | null;
   onBroadcastGpsFix?: (fix: GpsFixPayload) => void;
+  captureContext?: {
+    inviteCode: string;
+    joinCode: string;
+    sessionId: string;
+  };
 };
 
 export function ExitmaniaLevelView({
@@ -62,6 +67,7 @@ export function ExitmaniaLevelView({
   onReveal,
   mirroredGps: _mirroredGps = null,
   onBroadcastGpsFix: _onBroadcastGpsFix,
+  captureContext,
 }: ExitmaniaLevelViewProps) {
   void _allLevels;
   void _levelStatuses;
@@ -125,6 +131,7 @@ export function ExitmaniaLevelView({
           canPaceTeam={canPaceTeam}
           leadLabel={leadLabel}
           onReveal={onReveal}
+          captureContext={captureContext}
         />
       </div>
 

@@ -211,7 +211,8 @@ export async function solveCurrentLevel(input: {
       gpsEnabled: blueprint.capabilities.gps,
     });
     const forceUnlock = input.payload?.forceUnlock;
-    if (forceUnlock && !archetype.canUnlockGps) {
+    const isStudioTest = Boolean(parseContentConfig(event.content_config).is_studio_test);
+    if (forceUnlock && !archetype.canUnlockGps && !isStudioTest) {
       return {
         success: false,
         error: "Nur Alpha / GPS-Leiter kann den Standort manuell freigeben.",
@@ -1303,7 +1304,8 @@ export async function advanceFromHub(input: {
     let outdoorProgress = gameState.outdoor_progress ?? null;
 
     if (input.forceUnlock) {
-      if (!archetype.canUnlockGps) {
+      const isStudioTest = Boolean(parseContentConfig(event.content_config).is_studio_test);
+      if (!archetype.canUnlockGps && !isStudioTest) {
         return {
           success: false,
           error: "Nur Alpha / GPS-Leiter kann den Standort manuell freigeben.",

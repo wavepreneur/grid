@@ -136,9 +136,15 @@ function assembleLevelDefinition(
     content.input_mode === "text" ||
     content.input_mode === "number" ||
     content.input_mode === "boxes" ||
-    content.input_mode === "confirm"
+    content.input_mode === "confirm" ||
+    content.input_mode === "photo" ||
+    content.input_mode === "video" ||
+    content.input_mode === "augmented_photo"
   ) {
     level.input_mode = content.input_mode;
+  }
+  if (typeof content.overlay_image_url === "string" && content.overlay_image_url.trim()) {
+    level.overlay_image_url = content.overlay_image_url.trim();
   }
   if (
     content.number_fields === 1 ||
@@ -356,6 +362,7 @@ function withSurfaceFields(
     allowedFallbacks,
     routeOrder,
     roleLabels: profiles.role_labels,
+    isStudioTest: Boolean(contentConfig.is_studio_test),
     levels: applyContentModeToLevels(levels, contentMode),
   };
 }

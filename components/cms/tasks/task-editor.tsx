@@ -29,6 +29,7 @@ import {
   codeBoxChars,
   createTaskOptionId,
   defaultTaskScoring,
+  isMediaAnswerType,
   normalizeTaskContent,
 } from "@/lib/cms/task-content";
 import {
@@ -238,13 +239,22 @@ export function TaskEditor({ task, returnTo }: Props) {
                         ? charsToCodeBoxAnswer(content.answer ?? "").number_fields
                         : undefined,
                     });
-                  } else if (answer_type === "confirm") {
+                  } else if (
+                    answer_type === "confirm" ||
+                    answer_type === "photo" ||
+                    answer_type === "video" ||
+                    answer_type === "augmented_photo"
+                  ) {
                     patchContent({
                       answer_type,
                       options: undefined,
                       number_fields: undefined,
                       code_boxes: undefined,
                       answer: undefined,
+                      overlay_image_url:
+                        answer_type === "augmented_photo"
+                          ? content.overlay_image_url
+                          : undefined,
                     });
                   } else {
                     patchContent({
@@ -263,6 +273,9 @@ export function TaskEditor({ task, returnTo }: Props) {
                 <option value="choice">Multiple Choice (eine richtig)</option>
                 <option value="multi_choice">Mehrfachauswahl (mehrere richtig)</option>
                 <option value="confirm">Keine Eingabe (nur OK)</option>
+                <option value="photo">Foto erstellen</option>
+                <option value="video">Video erstellen</option>
+                <option value="augmented_photo">Augmented Photo</option>
               </StudioSelect>
             </div>
 
@@ -347,6 +360,30 @@ export function TaskEditor({ task, returnTo }: Props) {
                 Spieler tippen nur auf „OK“ — keine Antwort eingeben. Ideal, wenn die Kacheln
                 schon alles zeigen.
               </p>
+            ) : content.answer_type === "photo" ? (
+              <p className="rounded-2xl bg-secondary px-4 py-3 text-sm text-muted-foreground">
+                Spieler öffnen die Kamera, machen ein Foto (beliebig oft neu) und senden es.
+                Senden gibt die Punkte, Überspringen 0. Das Bild landet in der Event-Galerie.
+              </p>
+            ) : content.answer_type === "video" ? (
+              <p className="rounded-2xl bg-secondary px-4 py-3 text-sm text-muted-foreground">
+                Spieler nehmen ein Video von höchstens 30 Sekunden auf. Senden gibt die Punkte,
+                Überspringen 0. Das Video landet in der Event-Galerie.
+              </p>
+            ) : content.answer_type === "augmented_photo" ? (
+              <div className="space-y-4">
+                <p className="rounded-2xl bg-secondary px-4 py-3 text-sm text-muted-foreground">
+                  PNG-Rahmen mit transparenter Mitte — liegt über der Live-Kamera und wird ins
+                  Foto eingebrannt. Kein 3D-AR, dafür zuverlässig auf iPhone und Android.
+                </p>
+                <ImageUploadField
+                  label="Rahmen / Schablone"
+                  value={content.overlay_image_url ?? ""}
+                  onChange={(url) => patchContent({ overlay_image_url: url || undefined })}
+                  hint="PNG mit transparenten Flächen"
+                  detail="Am besten 3:4 oder 4:3. Der Rahmen bleibt sichtbar, die Mitte ist das Live-Bild."
+                />
+              </div>
             ) : (
               <div className="space-y-3">
                 <StudioLabel>
@@ -401,7 +438,9 @@ export function TaskEditor({ task, returnTo }: Props) {
             description={
               content.answer_type === "choice" || content.answer_type === "multi_choice"
                 ? "Als Mission: Erfolgs-Hinweis. Als Einstiegsfrage im Spiel: Side-Fact nach der Antwort (Stadttour)."
-                : "Nur bei korrekter Lösung — nicht bei Skip oder abgelaufenem Countdown."
+                : isMediaAnswerType(content.answer_type)
+                  ? "Nur nach Senden — nicht bei Überspringen."
+                  : "Nur bei korrekter Lösung — nicht bei Skip oder abgelaufenem Countdown."
             }
           />
           <div className="space-y-4">

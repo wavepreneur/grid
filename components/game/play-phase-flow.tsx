@@ -451,6 +451,7 @@ export function PlayPhaseFlow({
           onOpenStation={onOpenStation}
           onSubmitStationCode={onSubmitStationCode}
           onStartMission={onStartMission}
+          isStudioTest={Boolean(eventContent.isStudioTest)}
         />
       </>
     );
@@ -533,6 +534,11 @@ export function PlayPhaseFlow({
         onReveal={onRevealLevel}
         mirroredGps={mirroredGps}
         onBroadcastGpsFix={onBroadcastGpsFix}
+        captureContext={
+          inviteCode && joinCode && sessionId
+            ? { inviteCode, joinCode, sessionId }
+            : undefined
+        }
       />
     </>
   );

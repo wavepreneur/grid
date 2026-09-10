@@ -46,6 +46,10 @@ export function eventPortalResultsPath(portalToken: string): string {
   return `/portal/${portalToken}/results`;
 }
 
+export function eventPortalGalleryPath(portalToken: string): string {
+  return `/portal/${portalToken}/gallery`;
+}
+
 export function teamEntryPath(
   inviteCode: string,
   joinCode: string,

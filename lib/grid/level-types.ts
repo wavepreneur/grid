@@ -173,7 +173,9 @@ export type LevelDefinition = {
   correct_option_id?: string;
   correct_option_ids?: string[];
   /** How the player enters the solution for digital levels. */
-  input_mode?: "text" | "number" | "boxes" | "confirm";
+  input_mode?: "text" | "number" | "boxes" | "confirm" | "photo" | "video" | "augmented_photo";
+  /** PNG overlay for augmented_photo. */
+  overlay_image_url?: string;
   /** Boxes for input_mode "boxes" / legacy "number" (1–4). */
   number_fields?: 1 | 2 | 3 | 4;
   role_required?: PlayerRole | null;
@@ -305,6 +307,8 @@ export type ResolvedEventContent = {
   logoUrl?: string | null;
   /** Player-facing Alpha/Beta/Gamma names for this game. */
   roleLabels?: import("@/lib/grid/role-labels").RoleDisplayLabels;
+  /** Studio „Testen“ session — GPS may be triggered remotely. */
+  isStudioTest?: boolean;
 };
 
 export type GeolocationSample = {
@@ -318,13 +322,21 @@ export type SolveLevelPayload = {
   selectedOptionId?: string;
   selectedOptionIds?: string[];
   geolocation?: GeolocationSample;
-  /** Skip after revealing solution — awards 0 points when scoring allows it. */
+  /** Skip after revealing solution — awards 0 points (also for photo/video). */
   revealSolution?: boolean;
   /** Alpha lead override when GPS fails — server audits. */
   forceUnlock?: "geofence" | "distance";
   /** Lead-device health expansion (capped server-side). Does not change the solve write. */
   healthRadiusBonusMeters?: number;
 };
+
+export type MediaInputMode = "photo" | "video" | "augmented_photo";
+
+export function isMediaInputMode(
+  mode: LevelDefinition["input_mode"] | string | null | undefined,
+): mode is MediaInputMode {
+  return mode === "photo" || mode === "video" || mode === "augmented_photo";
+}
 
 export const EXITMANIA_TOTAL_LEVELS = 10;
 export const DEFAULT_TEMPLATE_SLUG = "default-exitmania";

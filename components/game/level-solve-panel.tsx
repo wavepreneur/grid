@@ -23,9 +23,10 @@ import { LevelScoringBar } from "@/components/game/level-scoring-bar";
 import { CodeBoxesInput } from "@/components/game/code-boxes-input";
 import { hasLiveLevelScoring } from "@/lib/grid/level-scoring";
 import { formatLevelSolution } from "@/lib/grid/level-solution";
-import type { LevelDefinition, SolveLevelPayload } from "@/lib/grid/level-types";
+import { isMediaInputMode, type LevelDefinition, type SolveLevelPayload } from "@/lib/grid/level-types";
 import type { LevelRevealState } from "@/lib/grid/game-state";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
+import { MediaCapturePanel } from "@/components/game/media-capture-panel";
 
 type LevelSolvePanelProps = {
   level: LevelDefinition;
@@ -47,6 +48,11 @@ type LevelSolvePanelProps = {
   canPaceTeam?: boolean;
   leadLabel?: string;
   onReveal?: () => void;
+  captureContext?: {
+    inviteCode: string;
+    joinCode: string;
+    sessionId: string;
+  };
 };
 
 export function LevelSolvePanel({
@@ -66,6 +72,7 @@ export function LevelSolvePanel({
   canPaceTeam = false,
   leadLabel = "Team Lead",
   onReveal,
+  captureContext,
 }: LevelSolvePanelProps) {
   const [answer, setAnswer] = useState("");
   const [numberParts, setNumberParts] = useState<string[]>(() =>
@@ -100,6 +107,7 @@ export function LevelSolvePanel({
     sample && level.location ? isWithinGeofenceForPlay(sample, level.location) : false;
 
   const inputMode = level.input_mode ?? "text";
+  const isMedia = isMediaInputMode(inputMode);
   const isCodeBoxes = inputMode === "boxes" || inputMode === "number";
   const numberFieldCount = level.number_fields ?? 1;
   const solutionText = formatLevelSolution(level);
@@ -231,7 +239,7 @@ export function LevelSolvePanel({
         }
       >
         <Check className="h-5 w-5 text-[var(--cg-success)]" />
-        Lösung: {solutionText}
+        {isMedia ? "Übersprungen" : `Lösung: ${solutionText}`}
       </p>
       <p
         className={
@@ -263,7 +271,7 @@ export function LevelSolvePanel({
   ) : null;
 
   const revealButton =
-    allowReveal && !solutionShown ? (
+    allowReveal && !solutionShown && !isMedia ? (
       <RevealSolutionControl
         disabled={disabled || isPending}
         onConfirmReveal={revealAndSkip}
@@ -276,7 +284,7 @@ export function LevelSolvePanel({
     level.type === "gps"
       ? isNavigator && withinRadius
       : level.type === "digital"
-        ? inputMode === "confirm"
+        ? inputMode === "confirm" || isMedia
           ? true
           : isCodeBoxes
             ? numberParts.every((p) => p.trim().length > 0)
@@ -290,7 +298,7 @@ export function LevelSolvePanel({
   // Stale "correct" after remount/phase with empty form — hide so it does not look like praise for blank input.
   const formLooksEmpty =
     level.type === "digital"
-      ? inputMode === "confirm"
+      ? inputMode === "confirm" || isMedia
         ? false
         : isCodeBoxes
           ? numberParts.every((p) => !p.trim())
@@ -410,6 +418,21 @@ export function LevelSolvePanel({
           revealBlock
         ) : (
           <div key={feedback?.id ?? "idle"} className={`space-y-4 ${formMotionClass}`}>
+            {level.type === "digital" && isMediaInputMode(inputMode) ? (
+              <MediaCapturePanel
+                kind={inputMode}
+                overlayImageUrl={level.overlay_image_url}
+                levelNumber={level.level}
+                disabled={disabled}
+                isPending={isPending}
+                captureContext={captureContext}
+                cityStyle
+                canPaceTeam={canPaceTeam}
+                leadLabel={leadLabel}
+                onSubmit={onSubmit}
+              />
+            ) : null}
+
             {level.type === "digital" && inputMode === "text" && !isCodeBoxes ? (
               <input
                 ref={textInputRef}
@@ -484,7 +507,7 @@ export function LevelSolvePanel({
                   ? "Kein Tippen nötig — der Wegpunkt wird automatisch bestätigt."
                   : "Zum Zielpunkt laufen — die Aufgabe startet automatisch in der Nähe."}
               </p>
-            ) : (
+            ) : isMedia ? null : (
               <BigButton
                 disabled={disabled || isPending || !canSubmit}
                 onClick={handleSubmit}
@@ -545,6 +568,21 @@ export function LevelSolvePanel({
         revealBlock
       ) : (
         <>
+          {level.type === "digital" && isMediaInputMode(inputMode) ? (
+            <MediaCapturePanel
+              kind={inputMode}
+              overlayImageUrl={level.overlay_image_url}
+              levelNumber={level.level}
+              disabled={disabled}
+              isPending={isPending}
+              captureContext={captureContext}
+              cityStyle={false}
+              canPaceTeam={canPaceTeam}
+              leadLabel={leadLabel}
+              onSubmit={onSubmit}
+            />
+          ) : null}
+
           {level.type === "digital" && inputMode === "text" && !isCodeBoxes ? (
             <div>
               <GridLabel>Deine Antwort</GridLabel>
@@ -614,7 +652,7 @@ export function LevelSolvePanel({
                 ? "Kein Tippen nötig — der Wegpunkt wird automatisch bestätigt."
                 : "Zum Zielpunkt laufen — die Aufgabe startet automatisch in der Nähe."}
             </p>
-          ) : (
+          ) : isMedia ? null : (
             <GridButton
               type="button"
               className="mt-4"

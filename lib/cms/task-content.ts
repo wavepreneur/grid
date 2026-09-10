@@ -154,10 +154,24 @@ function attachLegacyHintsToTiles(
 function migrateAnswerType(raw: unknown): TaskAnswerType {
   // Legacy "number" → freitext + code_boxes (handled in normalize).
   if (raw === "number") return "text";
-  if (raw === "choice" || raw === "multi_choice" || raw === "text" || raw === "confirm") {
+  if (
+    raw === "choice" ||
+    raw === "multi_choice" ||
+    raw === "text" ||
+    raw === "confirm" ||
+    raw === "photo" ||
+    raw === "video" ||
+    raw === "augmented_photo"
+  ) {
     return raw;
   }
   return "text";
+}
+
+export function isMediaAnswerType(
+  value: string | null | undefined,
+): value is "photo" | "video" | "augmented_photo" {
+  return value === "photo" || value === "video" || value === "augmented_photo";
 }
 
 function migrateNumberFields(raw: unknown): TaskNumberFieldCount | undefined {
@@ -311,6 +325,10 @@ export function normalizeTaskContent(raw: unknown): StudioTaskContent {
     success_info:
       typeof source.success_info === "string" && source.success_info.trim()
         ? source.success_info.trim()
+        : undefined,
+    overlay_image_url:
+      typeof source.overlay_image_url === "string" && source.overlay_image_url.trim()
+        ? source.overlay_image_url.trim()
         : undefined,
   };
 }

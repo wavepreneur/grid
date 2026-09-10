@@ -20,7 +20,15 @@ export type StudioTicketPoolStatus = "draft" | "active" | "paused" | "closed";
 
 export type TaskTileMediaType = "image" | "audio" | "video" | "iframe";
 
-export type TaskAnswerType = "text" | "choice" | "multi_choice" | "confirm" | "number";
+export type TaskAnswerType =
+  | "text"
+  | "choice"
+  | "multi_choice"
+  | "confirm"
+  | "number"
+  | "photo"
+  | "video"
+  | "augmented_photo";
 
 export type TaskNumberFieldCount = 1 | 2 | 3 | 4;
 
@@ -71,6 +79,8 @@ export type StudioTaskContent = {
   success_title?: string;
   /** Team note after solve — empty = no success window. */
   success_info?: string;
+  /** PNG frame for augmented_photo — drawn over the live camera. */
+  overlay_image_url?: string;
 };
 
 export type StudioTask = {
