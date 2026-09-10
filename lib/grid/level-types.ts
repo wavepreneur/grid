@@ -258,6 +258,11 @@ export type EventContentConfig = {
   runtime_profiles?: unknown;
   /** Partner upgrades for this booking. Absent = routes + quiz on, Data off. */
   modules?: EventModules;
+  /**
+   * Commerce growth pack (Exitmania/Tabbrain). Secrets stay on this JSON;
+   * play only receives `ResolvedEventContent.growthOffer`.
+   */
+  growth?: import("@/lib/grid/growth-pack").GrowthPack;
 };
 
 export type BlueprintCapabilities = {
@@ -303,6 +308,8 @@ export type ResolvedEventContent = {
   faqIframeUrl?: string | null;
   /** Post-game follow-up from Studio snapshot (no billing in GRID). */
   followUpTrigger?: import("@/lib/grid/follow-up-trigger").FollowUpTrigger | null;
+  /** Public recap card at Game Over — copy from booking growth pack, no secrets. */
+  growthOffer?: import("@/lib/grid/growth-pack").GrowthOffer | null;
   /** Optional game logo for lobby / onboarding. */
   logoUrl?: string | null;
   /** Player-facing Alpha/Beta/Gamma names for this game. */

@@ -8,6 +8,7 @@ import { buildEventPortalResultsUrl, buildEventPortalUrl, generatePortalToken } 
 import { mergeBookingModules, modulesFromContentConfig, type EventModules } from "@/lib/grid/event-modules";
 import { ensureEventPortalToken } from "@/lib/grid/portal";
 import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
+import { sanitizeGrowthPackInput, type GrowthPack } from "@/lib/grid/growth-pack";
 
 export type GridBookingRequest = {
   organization_slug?: string;
@@ -21,6 +22,8 @@ export type GridBookingRequest = {
   scheduled_start_at?: string;
   route_override?: EventRouteOverride;
   modules?: Partial<EventModules>;
+  /** Commerce recap/share pack. GRID stores it; Exitmania owns mail. */
+  growth?: GrowthPack | Record<string, unknown>;
 };
 
 export type GridBookingTeam = {
@@ -251,6 +254,7 @@ export async function provisionGridBooking(input: {
     }
   }
 
+  const growth = sanitizeGrowthPackInput(input.body.growth);
   const contentConfig = {
     ...buildDefaultContentConfig(blueprintSlug),
     ...(blueprint.capabilities.gps ? { city_slug: citySlug } : {}),
@@ -258,6 +262,7 @@ export async function provisionGridBooking(input: {
       ? { content_pack_slug: input.body.content_pack_slug.trim() }
       : {}),
     modules: mergeBookingModules(input.body.modules),
+    ...(growth ? { growth } : {}),
   };
 
   const supabase = createAdminClient();

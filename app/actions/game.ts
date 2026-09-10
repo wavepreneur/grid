@@ -72,6 +72,7 @@ import {
   pickBonusToActivate,
   promoteArmedBonuses,
 } from "@/lib/grid/bonus-queue";
+import { queueGrowthTeamFinished } from "@/lib/grid/growth-dispatch";
 
 function buildRealtimeState(
   team: {
@@ -610,6 +611,10 @@ export async function solveCurrentLevel(input: {
         force_unlock: forceUnlock ?? null,
       },
     });
+
+    if (isFinished) {
+      queueGrowthTeamFinished(team.id);
+    }
 
     if (forceUnlock) {
       await writeAuditLog({
@@ -1193,6 +1198,9 @@ async function persistPlayingGameState(input: {
     return { success: false, error: error.message };
   }
   if (data) {
+    if (input.patch?.status === "finished" && data.status === "finished") {
+      queueGrowthTeamFinished(input.teamId);
+    }
     return { success: true, data: buildRealtimeState(data, input.player) };
   }
 
@@ -2148,6 +2156,10 @@ async function completeActiveBonus(input: {
 
   if (error || !updatedTeam) {
     return { success: false, error: error?.message ?? "Bonus-Update fehlgeschlagen." };
+  }
+
+  if (finished || allDoneLevels) {
+    queueGrowthTeamFinished(team.id);
   }
 
   return { success: true, data: buildRealtimeState(updatedTeam, player) };

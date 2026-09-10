@@ -30,6 +30,7 @@ import { LevelPanel } from "@/components/game/level-panel";
 import { PlayPhaseFlow } from "@/components/game/play-phase-flow";
 import type { OutdoorArriveInput } from "@/components/game/play-hub-view";
 import type { PlayMorePanel } from "@/components/game/play-more-sheet";
+import { GrowthRecapCard } from "@/components/game/growth-recap-card";
 import { SyncModal } from "@/components/game/sync-modal";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 import { IdentityBar } from "@/components/player/identity-bar";
@@ -860,6 +861,15 @@ export function GameRoom({
           {teamName} · {eventContent.levels.length} Aufgaben
         </p>
       </div>
+      {eventContent.growthOffer?.enabled ? (
+        <GrowthRecapCard
+          inviteCode={inviteCode}
+          joinCode={joinCode}
+          sessionId={session.sessionId}
+          playerId={session.playerId}
+          offer={eventContent.growthOffer}
+        />
+      ) : null}
       {eventContent.followUpTrigger?.enabled ? (
         <div className="rounded-3xl border border-[var(--cg-primary)]/30 bg-[var(--cg-card)] px-5 py-5 text-center">
           <p className="text-sm font-semibold text-[var(--cg-fg)]">

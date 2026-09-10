@@ -37,6 +37,7 @@ import { buildDefaultStation, normalizeStationCode } from "@/lib/grid/stations";
 import { parseBonusTask } from "@/lib/grid/bonus";
 import { parseGameHelpLinks } from "@/lib/grid/game-help-links";
 import { parseFollowUpTrigger } from "@/lib/grid/follow-up-trigger";
+import { parseGrowthOffer } from "@/lib/grid/growth-pack";
 
 type GlobalLevelRow = {
   level_number: number;
@@ -363,6 +364,7 @@ function withSurfaceFields(
     routeOrder,
     roleLabels: profiles.role_labels,
     isStudioTest: Boolean(contentConfig.is_studio_test),
+    growthOffer: parseGrowthOffer(contentConfig),
     levels: applyContentModeToLevels(levels, contentMode),
   };
 }

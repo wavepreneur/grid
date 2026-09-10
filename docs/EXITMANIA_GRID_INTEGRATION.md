@@ -75,6 +75,10 @@ Content-Type: application/json
     "custom_routes": true,
     "custom_quiz": true,
     "team_intelligence": false
+  },
+  "growth": {
+    "enabled": true,
+    "surface": "exitmania_b2c"
   }
 }
 ```
@@ -105,18 +109,19 @@ x-grid-api-key: ...
 
 ## Exitmania-Implementierung
 
-Live-Checkout bleibt auf Loquiz. GRID wird **nicht** aus Paddle/Stripe/`create-loquiz-ticket` aufgerufen.
+Live-Checkout bleibt auf Loquiz, **solange** `grid_city_runtime` leer ist. Admin-Pilot ist der sichtbare Endnutzer-Pfad:
 
-Isolierter Admin-Pilot in Exitmania:
+- `/admin/grid-pilot` → `grid_pilot_*` → GRID `POST /api/v1/bookings` mit `growth` Pack
+- Spieler: `/grid-ticket/{token}` plus GRID Game-Over Recap (Mail in Exitmania)
+- Optional Stadt-Switch (z. B. München): Paddle erzeugt Loquiz **und** `grid_checkout_sessions`; `/ticket/{token}` zeigt GRID. Notfall `force_loquiz`.
 
-- `/admin/grid-pilot` → neue Tabellen `grid_pilot_bookings` / `grid_pilot_teams`
-- `POST /api/v1/bookings` mit `booking_reference=exitmania:pilot:{uuid}`
-- Spieler-Seite `/grid-ticket/{token}` (nicht `/ticket/{token}`)
+`booking_reference`: Pilot `exitmania:pilot:{uuid}`, Live `exitmania:booking:{uuid}`.
 
 | Datei | Zweck |
 |-------|--------|
-| Exitmania `next-app/lib/gridPilot/client.ts` | Nur Admin-Pilot → GRID Booking-API |
+| Exitmania `next-app/lib/gridPilot/client.ts` | GRID Booking-API |
 | Exitmania `grid_pilot_*` | Testbuchungen, getrennt von `bookings` / `team_credentials` |
+| `events.content_config.growth` | Recap-Copy + Capture/Webhook-URLs (Secrets nicht im Play-Client) |
 
 Pilot: Admin erzeugt Tickets. Loquiz parallel für alle echten Käufe.
 
