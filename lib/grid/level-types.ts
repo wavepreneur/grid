@@ -61,6 +61,8 @@ export type BonusTask = {
   /** Longer briefing from the Studio task (description / success copy). */
   description?: string;
   hero_image_url?: string;
+  /** Media tiles (minigame iframe, image, …) — same as Layer-2 missions. */
+  tiles?: LevelContentTile[];
   question: string;
   /** Multiple-choice options (empty when answer_mode is text/boxes/confirm). */
   options: QuizOption[];

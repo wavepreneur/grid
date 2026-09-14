@@ -22,6 +22,7 @@ import {
   type OutdoorForceUnlock,
 } from "@/lib/grid/outdoor-unlock";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { FormattedTaskText } from "@/components/game/formatted-task-text";
 import type { GameLevelStatus } from "@/lib/grid/game-state";
 import type { LevelDefinition, GeolocationSample } from "@/lib/grid/level-types";
 import type { GpsFixPayload } from "@/lib/hooks/use-team-sync";
@@ -366,9 +367,12 @@ export function PlayHubView({
             Mission {next.level} von {levels.length}
           </SectionLabel>
           <h2 className="mt-1 text-2xl font-bold text-[var(--cg-fg)] sm:text-3xl">{next.title}</h2>
-          <p className="mt-2 text-base text-[var(--cg-muted)] sm:text-lg">
-            {next.teaser ?? next.description}
-          </p>
+          {next.teaser ?? next.description ? (
+            <FormattedTaskText
+              text={next.teaser ?? next.description}
+              className="mt-2 text-base text-[var(--cg-muted)] sm:text-lg"
+            />
+          ) : null}
           {next.role_split ? (
             <p className="mt-4 rounded-2xl bg-[var(--cg-secondary)] px-4 py-3 text-base font-semibold text-[var(--cg-fg)]">
               {next.role_split}

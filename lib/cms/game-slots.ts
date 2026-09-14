@@ -12,8 +12,8 @@ import { parseBonusBindings, type BonusBinding } from "@/lib/cms/bonus-bindings"
 import type { ContentMode } from "@/lib/cms/layer-model";
 import { LAYER_GAME_PRESETS, type LayerGamePreset } from "@/lib/cms/layer-model";
 import type { StudioGameTaskLink, StudioTask, StudioTaskContent } from "@/lib/cms/types";
-import type { ArrivalQuiz, BonusTask, QuizOption } from "@/lib/grid/level-types";
-import { normalizeTaskContent } from "@/lib/cms/task-content";
+import type { ArrivalQuiz, BonusTask, LevelContentTile, QuizOption } from "@/lib/grid/level-types";
+import { normalizeTaskContent, studioTilesToLevelTiles } from "@/lib/cms/task-content";
 
 export type StudioArrivalQuiz = {
   title?: string;
@@ -247,6 +247,7 @@ export function taskContentToBonus(
     .filter((part, index, all) => all.indexOf(part) === index)
     .join("\n\n");
   const hero_image_url = content.hero_image_url?.trim() || undefined;
+  const tiles: LevelContentTile[] | undefined = studioTilesToLevelTiles(content.tiles);
   const intro =
     forRole === "team"
       ? "Diese Bonusaufgabe sehen alle im Team."
@@ -268,6 +269,7 @@ export function taskContentToBonus(
       intro,
       description: description || undefined,
       hero_image_url,
+      tiles,
       question,
       options: content.options.map((o) => ({ id: o.id, label: o.label })),
       correct_option_id: correctId,
@@ -289,6 +291,7 @@ export function taskContentToBonus(
       intro,
       description: description || undefined,
       hero_image_url,
+      tiles,
       question,
       options: [{ id: "done", label: "Erledigt" }],
       correct_option_id: "done",
@@ -316,6 +319,7 @@ export function taskContentToBonus(
     intro,
     description: description || undefined,
     hero_image_url,
+    tiles,
     question,
     options: [],
     correct_option_id: "__text__",

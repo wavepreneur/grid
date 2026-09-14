@@ -5,8 +5,11 @@ import { Check, X } from "lucide-react";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
 import { IconCheck, IconGift, IconUser, IconUsers, IconX } from "@/components/game/city/icons";
 import { CodeBoxesInput } from "@/components/game/code-boxes-input";
+import { ContentTileGrid } from "@/components/game/content-tile-grid";
+import { FormattedTaskText } from "@/components/game/formatted-task-text";
+import { MediaModal } from "@/components/game/media-modal";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
-import type { BonusTask } from "@/lib/grid/level-types";
+import type { BonusTask, LevelContentTile } from "@/lib/grid/level-types";
 import type { BonusSessionState } from "@/lib/grid/game-state";
 import { formatBonusSolution } from "@/lib/grid/bonus";
 import {
@@ -84,6 +87,7 @@ export function PlayBonusView({
   const [submitting, setSubmitting] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const [pickOpen, setPickOpen] = useState(false);
+  const [activeTile, setActiveTile] = useState<LevelContentTile | null>(null);
   const sfxPlayedRef = useRef<string | null>(null);
 
   const reveal = teamSession?.reveal ?? null;
@@ -109,6 +113,7 @@ export function PlayBonusView({
   const hub = hubMeta(mode);
   const audience = bonusAudienceIconCount(bonus);
   const audienceLabel = bonusAudienceHeadline(bonus, roleLabels);
+  const tiles = bonus.tiles ?? [];
 
   const canCheck =
     answerMode === "choice" || answerMode === "confirm"
@@ -254,9 +259,22 @@ export function PlayBonusView({
         ) : null}
 
         {bonus.description?.trim() ? (
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--cg-muted)]">
-            {bonus.description.trim()}
-          </p>
+          <FormattedTaskText
+            text={bonus.description}
+            className="text-left text-sm leading-relaxed text-[var(--cg-muted)]"
+          />
+        ) : null}
+
+        {tiles.length > 0 ? (
+          <ContentTileGrid
+            tiles={tiles}
+            purchasedHints={{}}
+            score={0}
+            onOpen={setActiveTile}
+            onPurchaseHint={() => {}}
+            cityStyle
+            soloAlpha
+          />
         ) : null}
 
         <p className="rounded-2xl bg-[var(--cg-card)] p-5 text-lg font-semibold shadow-[var(--cg-shadow-soft)] text-[var(--cg-fg)]">
@@ -442,6 +460,8 @@ export function PlayBonusView({
           </div>
         )}
       </div>
+
+      <MediaModal tile={activeTile} onClose={() => setActiveTile(null)} />
     </section>
   );
 }

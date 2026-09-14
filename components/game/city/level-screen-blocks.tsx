@@ -8,6 +8,7 @@ import {
   Play,
   Volume2,
 } from "lucide-react";
+import { FormattedTaskText } from "@/components/game/formatted-task-text";
 import { SectionLabel } from "@/components/game/city/ui";
 
 export function LevelHero({
@@ -37,9 +38,10 @@ export function LevelHero({
             {title.trim()}
           </h1>
           {description?.trim() ? (
-            <p className="break-words text-sm leading-relaxed text-[var(--cg-muted)] [overflow-wrap:anywhere] whitespace-pre-wrap">
-              {description.trim()}
-            </p>
+            <FormattedTaskText
+              text={description}
+              className="break-words text-sm leading-relaxed text-[var(--cg-muted)] [overflow-wrap:anywhere]"
+            />
           ) : null}
         </div>
       ) : null}

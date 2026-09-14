@@ -4,6 +4,7 @@
  */
 
 import type { ArrivalQuiz, BonusTask, LevelDefinition, PlayerRole } from "@/lib/grid/level-types";
+import { parseLevelTiles } from "@/lib/grid/level-content";
 import { normalizeAnswer } from "@/lib/grid/content-engine";
 
 export function parseBonusTask(raw: unknown): BonusTask | undefined {
@@ -41,6 +42,7 @@ export function parseBonusTask(raw: unknown): BonusTask | undefined {
       typeof b.hero_image_url === "string" && b.hero_image_url.trim()
         ? b.hero_image_url.trim()
         : undefined,
+    tiles: parseLevelTiles(b.tiles),
     question: b.question,
     options: Array.isArray(b.options) ? (b.options as BonusTask["options"]) : [],
     correct_option_id:

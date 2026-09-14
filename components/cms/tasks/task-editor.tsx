@@ -164,12 +164,14 @@ export function TaskEditor({ task, returnTo }: Props) {
               <StudioInput value={title} onChange={(e) => setTitle(e.target.value)} required />
             </div>
             <div>
-              <StudioLabel>Beschreibung</StudioLabel>
+              <StudioLabel hint="Zeilenumbrüche und Absätze bleiben. **fett**, Listen mit - oder 1.">
+                Beschreibung
+              </StudioLabel>
               <StudioTextarea
                 className="min-h-28"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Story / Kontext — was der Spieler vor dem Rätsel liest"
+                placeholder={"Story / Kontext\n\n- Erster Punkt\n- Zweiter Punkt"}
               />
             </div>
             <ImageUploadField

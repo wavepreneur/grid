@@ -6,6 +6,7 @@ import { IconCheck, IconKey, IconX } from "@/components/game/city/icons";
 import type { ArrivalQuiz } from "@/lib/grid/level-types";
 import type { QuizRevealState } from "@/lib/grid/game-state";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { FormattedTaskText } from "@/components/game/formatted-task-text";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
 
 type Props = {
@@ -138,7 +139,10 @@ export function PlayQuizView({
       <div className="mt-4 text-center sm:mt-5">
         <h2 className="text-lg font-bold text-[var(--cg-fg)] sm:text-xl">{displayTitle}</h2>
         {quiz.description?.trim() ? (
-          <p className="mt-2 text-sm text-[var(--cg-muted)] sm:text-base">{quiz.description.trim()}</p>
+          <FormattedTaskText
+            text={quiz.description}
+            className="mt-2 text-sm text-[var(--cg-muted)] sm:text-base"
+          />
         ) : null}
       </div>
 

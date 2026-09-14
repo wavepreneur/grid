@@ -7,6 +7,7 @@ import {
   type TaskScoring,
   type TaskTileMediaType,
 } from "@/lib/cms/types";
+import type { LevelContentTile } from "@/lib/grid/level-types";
 
 export function createTaskTileId(): string {
   return `tile_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
@@ -335,4 +336,31 @@ export function normalizeTaskContent(raw: unknown): StudioTaskContent {
 
 export function correctOptionIds(content: StudioTaskContent): string[] {
   return (content.options ?? []).filter((o) => o.correct).map((o) => o.id);
+}
+
+/** Studio media tiles → play tiles (Layer 2 levels and Layer 3 bonuses). */
+export function studioTilesToLevelTiles(
+  tiles: TaskContentTile[] | undefined,
+): LevelContentTile[] | undefined {
+  if (!tiles?.length) return undefined;
+  const mapped: LevelContentTile[] = [];
+  for (const tile of tiles) {
+    const url = tile.media_url?.trim();
+    if (!url) continue;
+    const next: LevelContentTile = {
+      id: tile.id,
+      type: tile.media_type,
+      url,
+      label: tile.label?.trim() || undefined,
+      cover_image_url: tile.cover_image_url?.trim() || undefined,
+    };
+    if (tile.hint_text?.trim()) {
+      next.hint = {
+        text: tile.hint_text.trim(),
+        point_cost: tile.hint_point_cost ?? 50,
+      };
+    }
+    mapped.push(next);
+  }
+  return mapped.length > 0 ? mapped : undefined;
 }

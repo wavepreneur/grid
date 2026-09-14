@@ -7,7 +7,7 @@ import {
   parseLinkOverrides,
   roleAssignmentToPlayerRole,
 } from "@/lib/cms/game-link-config";
-import { charsToCodeBoxAnswer, correctOptionIds, normalizeTaskContent } from "@/lib/cms/task-content";
+import { charsToCodeBoxAnswer, correctOptionIds, normalizeTaskContent, studioTilesToLevelTiles } from "@/lib/cms/task-content";
 import {
   arrivalQuizToRuntime,
   buildGameSlots,
@@ -406,25 +406,9 @@ function linkToLevelDefinition(
     }
   }
 
-  if (content.tiles?.length) {
-    level.tiles = content.tiles
-      .filter((t) => t.media_url.trim())
-      .map((t) => {
-        const tile: NonNullable<LevelDefinition["tiles"]>[number] = {
-          id: t.id,
-          type: t.media_type,
-          url: t.media_url.trim(),
-          label: t.label?.trim() || undefined,
-          cover_image_url: t.cover_image_url?.trim() || undefined,
-        };
-        if (t.hint_text?.trim()) {
-          tile.hint = {
-            text: t.hint_text.trim(),
-            point_cost: t.hint_point_cost ?? 50,
-          };
-        }
-        return tile;
-      });
+  const mappedTiles = studioTilesToLevelTiles(content.tiles);
+  if (mappedTiles) {
+    level.tiles = mappedTiles;
   }
 
   if (content.scoring) {
