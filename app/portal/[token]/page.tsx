@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getPortalSnapshot } from "@/app/actions/portal";
 import { EventPortalForm } from "@/components/portal/event-portal-form";
+import { GridPoweredBy } from "@/components/grid/grid-powered-by";
 import { GridError, GridShell } from "@/components/grid/grid-shell";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +50,7 @@ export default async function EventPortalPage({ params }: Props) {
         <div className="rounded-[1.75rem] bg-white p-5 shadow-[0_20px_50px_-24px_rgba(15,23,42,0.45)] sm:p-7">
           <EventPortalForm initial={result.data} />
         </div>
+        <GridPoweredBy className="mt-8" />
       </main>
     </div>
   );
