@@ -8,6 +8,7 @@ import {
   eventPath,
   eventTeamJoinPath,
 } from "@/lib/grid/event-routes";
+import { buildGoReturnSnippet } from "@/lib/grid/codes";
 import { buildManageTeamUrl } from "@/lib/grid/play-url";
 import { archetypeRoleLabel } from "@/lib/grid/archetype-roles";
 import { clearPlayerSession } from "@/lib/grid/player-session";
@@ -76,7 +77,9 @@ export function IdentityBar({
   function handleCopyPlayLink() {
     startTransition(async () => {
       try {
-        await navigator.clipboard.writeText(joinCode.toUpperCase());
+        await navigator.clipboard.writeText(
+          buildGoReturnSnippet(window.location.origin, joinCode),
+        );
         setCopyState("copied");
         window.setTimeout(() => setCopyState("idle"), 2500);
       } catch {
@@ -103,10 +106,10 @@ export function IdentityBar({
               className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
             >
               {copyState === "copied"
-                ? "✓ Code kopiert"
+                ? "✓ Kopiert"
                 : copyState === "error"
                   ? "Fehler"
-                  : "Code kopieren"}
+                  : "Kopieren"}
             </button>
           ) : null}
           {showManageTeam ? (

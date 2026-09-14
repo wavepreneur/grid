@@ -58,6 +58,12 @@ export function buildEventInviteUrl(origin: string, inviteCode: string): string 
   return `${base}/e/${normalizeCode(inviteCode)}`;
 }
 
+/** Clipboard text so a saved note has both the /go page and the team code. */
+export function buildGoReturnSnippet(origin: string, joinCode: string): string {
+  const url = `${origin.replace(/\/$/, "")}/go`;
+  return `url: ${url}\ncode: ${normalizeCode(joinCode)}`;
+}
+
 export function normalizeCode(value: string): string {
   return value.trim().toUpperCase();
 }

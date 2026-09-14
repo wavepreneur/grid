@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { buildGoReturnSnippet } from "@/lib/grid/codes";
 
 type Props = {
   inviteCode: string;
@@ -23,7 +24,9 @@ export function PersonalResumeLinkCard({
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(code);
+      await navigator.clipboard.writeText(
+        buildGoReturnSnippet(window.location.origin, code),
+      );
       setCopyState("copied");
       window.setTimeout(() => setCopyState("idle"), 2500);
     } catch {
@@ -33,10 +36,10 @@ export function PersonalResumeLinkCard({
 
   const label =
     copyState === "copied"
-      ? "Code kopiert"
+      ? "Kopiert — speichern!"
       : copyState === "error"
         ? "Kopieren fehlgeschlagen"
-        : "Code kopieren";
+        : "Kopieren";
 
   if (compact) {
     return (
@@ -50,7 +53,7 @@ export function PersonalResumeLinkCard({
         </span>
         <span className="mt-0.5 block text-sm text-[var(--cg-muted)]">
           {copyState === "idle"
-            ? "Später: /go, dieser Code, dann dein Name"
+            ? "Kopiert /go und den Code — dann deinen Namen"
             : label}
         </span>
       </button>
@@ -61,9 +64,9 @@ export function PersonalResumeLinkCard({
     <div className="rounded-2xl border border-dashed border-teal-200 bg-teal-50/60 px-4 py-4">
       <p className="text-sm font-bold text-teal-950">Wieder rein</p>
       <p className="mt-1 text-xs leading-relaxed text-teal-900/80">
-        Merke dir diesen Code. Später auf <span className="font-semibold">/go</span>{" "}
-        eintippen, dann deinen Namen — du landest im selben Spiel, egal ob allein
-        oder zu zehnt.
+        Kopieren speichert die Seite und den Code. Später öffnest du{" "}
+        <span className="font-semibold">/go</span>, tippst den Code, dann deinen
+        Namen — allein oder zu zehnt im selben Spiel.
       </p>
       <p className="mt-3 text-center font-mono text-2xl font-bold tracking-[0.22em] text-teal-950">
         {code}
