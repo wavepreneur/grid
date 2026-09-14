@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   computeLevelScoringSnapshot,
+  earliestIsoTimestamp,
   type LevelScoringSnapshot,
 } from "@/lib/grid/level-scoring";
 import type { LevelScoring } from "@/lib/grid/level-types";
@@ -12,25 +13,23 @@ export function useLevelScoringTimer(
   startedAt: string | null | undefined,
   fallbackStartedAt?: string | null,
 ): LevelScoringSnapshot | null {
-  const effectiveStart = startedAt ?? fallbackStartedAt ?? null;
+  const countdownSeconds = scoring?.countdown_seconds ?? 0;
 
-  const [snapshot, setSnapshot] = useState<LevelScoringSnapshot | null>(() =>
-    computeLevelScoringSnapshot(scoring, effectiveStart),
-  );
+  const pinnedStartRef = useRef<string | null>(null);
+  const incoming = startedAt ?? fallbackStartedAt ?? null;
+  if (incoming) {
+    pinnedStartRef.current = earliestIsoTimestamp(pinnedStartRef.current, incoming);
+  }
+  const effectiveStart = pinnedStartRef.current ?? incoming;
+
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
-    setSnapshot(computeLevelScoringSnapshot(scoring, effectiveStart));
-
-    if (!scoring?.countdown_seconds || scoring.countdown_seconds <= 0) {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      setSnapshot(computeLevelScoringSnapshot(scoring, effectiveStart));
-    }, 1000);
-
+    if (countdownSeconds <= 0) return undefined;
+    setNowMs(Date.now());
+    const interval = window.setInterval(() => setNowMs(Date.now()), 250);
     return () => window.clearInterval(interval);
-  }, [scoring, effectiveStart]);
+  }, [countdownSeconds]);
 
-  return snapshot;
+  return computeLevelScoringSnapshot(scoring, effectiveStart, nowMs);
 }

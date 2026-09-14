@@ -5,6 +5,8 @@ export type LevelScoringSnapshot = {
   currentPoints: number;
   floorPoints: number;
   elapsedSeconds: number;
+  /** 0–1 progress through the countdown window (sub-second). */
+  elapsedRatio: number;
   remainingSeconds: number | null;
   isExpired: boolean;
   hasCountdown: boolean;
@@ -37,29 +39,33 @@ export function computeLevelScoringSnapshot(
   const hasCountdown = Boolean(countdownTotal && countdownTotal > 0);
   const hasDecay = Boolean(scoring.decay_enabled && hasCountdown);
 
-  const startMs = startedAt ? Date.parse(startedAt) : nowMs;
-  const elapsedSeconds = Number.isNaN(startMs)
-    ? 0
-    : Math.max(0, Math.floor((nowMs - startMs) / 1000));
+  const startMs = startedAt ? Date.parse(startedAt) : Number.NaN;
+  const elapsedMs = Number.isNaN(startMs) ? 0 : Math.max(0, nowMs - startMs);
+  const elapsedSeconds = Math.floor(elapsedMs / 1000);
+  const elapsedRatio =
+    hasCountdown && countdownTotal
+      ? Math.min(1, elapsedMs / (countdownTotal * 1000))
+      : 0;
 
   let remainingSeconds: number | null = null;
   let isExpired = false;
 
   if (hasCountdown && countdownTotal) {
-    remainingSeconds = Math.max(0, countdownTotal - elapsedSeconds);
-    isExpired = remainingSeconds <= 0;
+    const remainingMs = countdownTotal * 1000 - elapsedMs;
+    remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+    isExpired = remainingMs <= 0;
   }
 
   let currentPoints = maxPoints;
 
   if (hasDecay && countdownTotal) {
-    const progress = Math.min(1, elapsedSeconds / countdownTotal);
-    currentPoints = Math.round(maxPoints + (floorPoints - maxPoints) * progress);
+    currentPoints = Math.round(maxPoints + (floorPoints - maxPoints) * elapsedRatio);
     if (maxPoints >= floorPoints) {
       currentPoints = Math.max(floorPoints, Math.min(maxPoints, currentPoints));
     } else {
       currentPoints = Math.min(floorPoints, Math.max(maxPoints, currentPoints));
     }
+    if (isExpired) currentPoints = floorPoints;
   } else if (isExpired && hasCountdown && !hasDecay) {
     currentPoints = maxPoints;
   }
@@ -69,6 +75,7 @@ export function computeLevelScoringSnapshot(
     currentPoints,
     floorPoints,
     elapsedSeconds,
+    elapsedRatio,
     remainingSeconds,
     isExpired,
     hasCountdown,
@@ -84,6 +91,20 @@ export function computeLevelReward(
 ): number {
   const snapshot = computeLevelScoringSnapshot(scoring, startedAt, nowMs);
   return snapshot?.currentPoints ?? 0;
+}
+
+export function earliestIsoTimestamp(
+  ...values: Array<string | null | undefined>
+): string | null {
+  const times = values.filter((value): value is string => {
+    if (!value) return false;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed);
+  });
+  if (times.length === 0) return null;
+  return times.reduce((left, right) =>
+    Date.parse(left) <= Date.parse(right) ? left : right,
+  );
 }
 
 export function hasLiveLevelScoring(scoring: LevelScoring | undefined): boolean {

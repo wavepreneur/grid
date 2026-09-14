@@ -13,6 +13,8 @@ import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
 import type { BonusTask, LevelContentTile } from "@/lib/grid/level-types";
 import type { BonusSessionState } from "@/lib/grid/game-state";
 import { formatBonusSolution } from "@/lib/grid/bonus";
+import { earliestIsoTimestamp } from "@/lib/grid/level-scoring";
+import { useLevelScoringTimer } from "@/lib/hooks/use-level-scoring-timer";
 import {
   bonusAudienceHeadline,
   bonusAudienceIconCount,
@@ -23,6 +25,28 @@ import { hubMeta } from "@/lib/grid/play-slots";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 import { CityTeamBar } from "@/components/game/city/team-bar";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
+
+function bonusClockStorageKey(bonusId: string, clockScope: string): string {
+  return `grid:bonus-clock:${clockScope}:${bonusId}`;
+}
+
+function readStoredBonusClock(bonusId: string, clockScope: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return sessionStorage.getItem(bonusClockStorageKey(bonusId, clockScope));
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredBonusClock(bonusId: string, clockScope: string, iso: string) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(bonusClockStorageKey(bonusId, clockScope), iso);
+  } catch {
+    /* private mode */
+  }
+}
 
 type TeammateOption = {
   id: string;
@@ -47,8 +71,9 @@ type Props = {
   canPaceTeam?: boolean;
   leadLabel?: string;
   teammates?: TeammateOption[];
+  clockScope?: string | null;
   onBegin: () => void;
-  onSubmit: (selectedOptionId: string) => void;
+  onSubmit: (selectedOptionId: string, extras?: { timedOut?: boolean; clockStartedAt?: string | null }) => void;
   onContinue: () => void;
   onSkipWaiting: () => void;
   onHandOff?: (toPlayerId: string) => void;
@@ -74,6 +99,7 @@ export function PlayBonusView({
   onContinue,
   onSkipWaiting,
   teammates = [],
+  clockScope = null,
   onHandOff,
 }: Props) {
   const answerMode = bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
@@ -89,10 +115,34 @@ export function PlayBonusView({
   const [continuing, setContinuing] = useState(false);
   const [pickOpen, setPickOpen] = useState(false);
   const [activeTile, setActiveTile] = useState<LevelContentTile | null>(null);
-  const [localStartedAt, setLocalStartedAt] = useState<string | null>(null);
+  const clockKey = clockScope?.trim() || "play";
+  const [localStartedAt, setLocalStartedAt] = useState<string | null>(() =>
+    readStoredBonusClock(bonusId, clockKey),
+  );
+  const [localTimeout, setLocalTimeout] = useState(false);
+  const [localTimeoutAt, setLocalTimeoutAt] = useState<string | null>(null);
   const sfxPlayedRef = useRef<string | null>(null);
 
-  const reveal = teamSession?.reveal ?? null;
+  const scoringStartedAt = earliestIsoTimestamp(
+    teamSession?.started_at,
+    localStartedAt,
+    readStoredBonusClock(bonusId, clockKey),
+  );
+  const reveal =
+    teamSession?.reveal ??
+    (localTimeout
+      ? {
+          bonus_id: bonusId,
+          answered_by: myName,
+          answered_by_player_id: "",
+          correct: false,
+          reward: 0,
+          selected_option_id: "",
+          attempt_label: "Zeit abgelaufen",
+          revealed_at: localTimeoutAt ?? scoringStartedAt ?? "",
+          timed_out: true,
+        }
+      : null);
   const introDone = Boolean(teamSession?.intro_done || localIntro || reveal);
   const show = Boolean(reveal);
   const correct = reveal?.correct ?? false;
@@ -116,7 +166,11 @@ export function PlayBonusView({
   const audience = bonusAudienceIconCount(bonus);
   const audienceLabel = bonusAudienceHeadline(bonus, roleLabels);
   const tiles = bonus.tiles ?? [];
-  const scoringStartedAt = teamSession?.started_at ?? localStartedAt;
+  const scoringSnapshot = useLevelScoringTimer(
+    introDone ? bonus.scoring : undefined,
+    introDone ? scoringStartedAt : null,
+  );
+  const timedOutRef = useRef(false);
 
   const canCheck =
     answerMode === "choice" || answerMode === "confirm"
@@ -127,7 +181,7 @@ export function PlayBonusView({
 
   useEffect(() => {
     if (reveal) return;
-    if (!isPending) {
+    if (!isPending && !timedOutRef.current) {
       setSubmitting(false);
       setContinuing(false);
     }
@@ -135,15 +189,57 @@ export function PlayBonusView({
 
   useEffect(() => {
     if (!reveal) return;
-    if (sfxPlayedRef.current !== reveal.revealed_at) {
-      sfxPlayedRef.current = reveal.revealed_at;
-      playPlaySfx(reveal.correct ? "correct" : "wrong");
-    }
+    if (sfxPlayedRef.current) return;
+    sfxPlayedRef.current = reveal.revealed_at;
+    playPlaySfx(reveal.correct ? "correct" : "wrong");
   }, [reveal]);
+
+  useEffect(() => {
+    if (!introDone) return;
+    const pinned =
+      earliestIsoTimestamp(
+        teamSession?.started_at,
+        localStartedAt,
+        readStoredBonusClock(bonusId, clockKey),
+      ) ?? new Date().toISOString();
+    writeStoredBonusClock(bonusId, clockKey, pinned);
+    setLocalStartedAt((prev) => earliestIsoTimestamp(prev, pinned) ?? pinned);
+    // localStartedAt is read once to seed; writing it must not re-run this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bonusId, introDone, teamSession?.started_at]);
+
+  useEffect(() => {
+    if (
+      !scoringSnapshot?.isExpired ||
+      !scoringSnapshot.hasCountdown ||
+      show ||
+      submitting ||
+      timedOutRef.current ||
+      !introDone
+    ) {
+      return;
+    }
+    timedOutRef.current = true;
+    const expiredAt = new Date().toISOString();
+    setLocalTimeoutAt((prev) => prev ?? expiredAt);
+    setLocalTimeout(true);
+    setSubmitting(true);
+    onSubmit("", { timedOut: true, clockStartedAt: scoringStartedAt });
+  }, [
+    introDone,
+    onSubmit,
+    scoringSnapshot?.hasCountdown,
+    scoringSnapshot?.isExpired,
+    scoringStartedAt,
+    show,
+    submitting,
+  ]);
 
   function beginIntro() {
     if (introDone) return;
-    setLocalStartedAt((prev) => prev ?? new Date().toISOString());
+    const started = new Date().toISOString();
+    setLocalStartedAt(started);
+    writeStoredBonusClock(bonusId, clockKey, started);
     setLocalIntro(true);
     onBegin();
   }
@@ -154,7 +250,7 @@ export function PlayBonusView({
       answerMode === "choice" || answerMode === "confirm" ? picked : typed || picked;
     if (!payload) return;
     setSubmitting(true);
-    onSubmit(payload);
+    onSubmit(payload, { clockStartedAt: scoringStartedAt });
   }
 
   function handleContinue() {
@@ -242,6 +338,7 @@ export function PlayBonusView({
           <LevelScoringBar
             scoring={bonus.scoring}
             startedAt={scoringStartedAt}
+            snapshot={scoringSnapshot}
             compact
           />
         </div>
@@ -445,17 +542,27 @@ export function PlayBonusView({
                   </span>
                   <div className="min-w-0 pt-0.5">
                     <p className="text-sm font-bold text-[var(--cg-destructive)]">
-                      {answerer} konnte die Aufgabe nicht beantworten
+                      {reveal?.timed_out
+                        ? "Zeit abgelaufen — die Bonusaufgabe gilt als nicht gelöst"
+                        : `${answerer} konnte die Aufgabe nicht beantworten`}
                     </p>
-                    {attemptLabel ? (
+                    {reveal?.timed_out ? (
                       <p className="mt-1 text-sm leading-snug text-[var(--cg-fg)]">
-                        Eingabe von {answerer}:{" "}
-                        <span className="font-bold tracking-wide">{attemptLabel}</span>
+                        0 Extra-Punkte — {leadLabel} geht weiter, wenn ihr soweit seid.
                       </p>
-                    ) : null}
-                    <p className="mt-0.5 text-sm leading-snug text-[var(--cg-muted)]">
-                      Keine Extra-Punkte — {leadLabel} geht weiter, wenn ihr soweit seid.
-                    </p>
+                    ) : (
+                      <>
+                        {attemptLabel ? (
+                          <p className="mt-1 text-sm leading-snug text-[var(--cg-fg)]">
+                            Eingabe von {answerer}:{" "}
+                            <span className="font-bold tracking-wide">{attemptLabel}</span>
+                          </p>
+                        ) : null}
+                        <p className="mt-0.5 text-sm leading-snug text-[var(--cg-muted)]">
+                          Keine Extra-Punkte — {leadLabel} geht weiter, wenn ihr soweit seid.
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
 

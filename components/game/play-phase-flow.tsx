@@ -94,7 +94,10 @@ type Props = {
   onAdvanceQuizToLevel: () => void;
   onSolveLevel: (payload: SolveLevelPayload) => void;
   onPurchaseHint: (tileId: string) => void;
-  onSubmitBonus: (selectedOptionId: string) => void;
+  onSubmitBonus: (
+    selectedOptionId: string,
+    extras?: { timedOut?: boolean; clockStartedAt?: string | null },
+  ) => void;
   onBeginBonus: (bonusId: string) => void;
   onContinueBonus: (bonusId: string) => void;
   onSkipBonus: () => void;
@@ -352,6 +355,7 @@ export function PlayPhaseFlow({
             canPaceTeam={presentBonusMeta.for_team ? canPaceTeam : true}
             leadLabel={leadLabel}
             teammates={teammates}
+            clockScope={teamStartedAt}
             onBegin={() => onBeginBonus(bonusId)}
             onSubmit={onSubmitBonus}
             onContinue={() => onContinueBonus(bonusId)}
@@ -398,6 +402,7 @@ export function PlayPhaseFlow({
             teamSession={gameState.bonus_sessions?.[bonusId] ?? null}
             canPaceTeam={canPaceTeam}
             leadLabel={leadLabel}
+            clockScope={teamStartedAt}
             onBegin={() => onBeginBonus(bonusId)}
             onSubmit={onSubmitBonus}
             onContinue={() => onContinueBonus(bonusId)}

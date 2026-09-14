@@ -24,7 +24,7 @@ import {
   elapsedMinutesSince,
   resolveProgressionAfterSolve,
 } from "@/lib/grid/logic-engine";
-import { computeLevelReward } from "@/lib/grid/level-scoring";
+import { computeLevelReward, earliestIsoTimestamp } from "@/lib/grid/level-scoring";
 import {
   getLevelDefinition,
   validateArrivalQuiz,
@@ -1935,6 +1935,8 @@ async function completeActiveBonus(input: {
   gameState: TeamGameState;
   selectedOptionId?: string;
   skip?: boolean;
+  timedOut?: boolean;
+  clockStartedAt?: string | null;
 }): Promise<ActionResult<TeamRealtimeState>> {
   const { event, team, player, gameState } = input;
   const playerRole = (player.role ?? "gamma") as PlayerRole;
@@ -2021,12 +2023,19 @@ async function completeActiveBonus(input: {
 
   let correct = false;
   let reward = 0;
-  if (!input.skip) {
+  const bonusId = bonusSessionId(active);
+  const scoringStartedAt = earliestIsoTimestamp(
+    gameState.bonus_sessions?.[bonusId]?.started_at,
+    input.clockStartedAt,
+  );
+  if (input.timedOut) {
+    correct = false;
+    reward = 0;
+  } else if (!input.skip) {
     if (!input.selectedOptionId) {
       return { success: false, error: "Bitte eine Antwort auswählen." };
     }
     correct = isBonusAnswerCorrect(bonus, input.selectedOptionId);
-    const scoringStartedAt = gameState.bonus_sessions?.[bonusSessionId(active)]?.started_at ?? null;
     reward = correct
       ? bonus.scoring
         ? computeLevelReward(bonus.scoring, scoringStartedAt)
@@ -2034,7 +2043,6 @@ async function completeActiveBonus(input: {
       : 0;
   }
 
-  const bonusId = bonusSessionId(active);
   const existingReveal = gameState.bonus_sessions?.[bonusId]?.reveal ?? null;
   if (!input.skip) {
     if (existingReveal) {
@@ -2057,7 +2065,7 @@ async function completeActiveBonus(input: {
       phase: "bonus",
       correct,
       selectedOptionId: input.selectedOptionId ?? null,
-      error: correct ? null : "falsche_antwort",
+      error: correct ? null : input.timedOut ? "zeit_abgelaufen" : "falsche_antwort",
       durationMs: durations.durationMs,
       elapsedMissionMs: durations.elapsedMissionMs,
       contentMode: content.contentMode,
@@ -2071,6 +2079,8 @@ async function completeActiveBonus(input: {
       score: gameState.score + reward,
       bonus_sessions: patchBonusSession(gameState.bonus_sessions, bonusId, {
         intro_done: true,
+        started_at:
+          gameState.bonus_sessions?.[bonusId]?.started_at ?? scoringStartedAt ?? nowIso,
         solver_name: player.display_name,
         solver_player_id: player.id,
         reveal: {
@@ -2080,8 +2090,11 @@ async function completeActiveBonus(input: {
           correct,
           reward,
           selected_option_id: input.selectedOptionId ?? "",
-          attempt_label: formatBonusAttemptLabel(bonus, input.selectedOptionId ?? ""),
+          attempt_label: input.timedOut
+            ? "Zeit abgelaufen"
+            : formatBonusAttemptLabel(bonus, input.selectedOptionId ?? ""),
           revealed_at: nowIso,
+          timed_out: Boolean(input.timedOut),
         },
       }),
     };
@@ -2503,6 +2516,8 @@ export async function submitBonusAnswer(input: {
   joinCode: string;
   sessionId: string;
   selectedOptionId: string;
+  timedOut?: boolean;
+  clockStartedAt?: string | null;
 }): Promise<ActionResult<TeamRealtimeState>> {
   try {
     const { event, team, player } = await assertPlayerSession(input);
@@ -2526,6 +2541,8 @@ export async function submitBonusAnswer(input: {
       gameState,
       selectedOptionId: input.selectedOptionId,
       skip: false,
+      timedOut: input.timedOut,
+      clockStartedAt: input.clockStartedAt ?? null,
     });
   } catch (error) {
     return {

@@ -99,6 +99,7 @@ export type BonusRevealState = {
   selected_option_id: string;
   attempt_label: string | null;
   revealed_at: string;
+  timed_out?: boolean;
 };
 
 /** Per-bonus live session (intro + reveal) while the item is still active. */
@@ -460,6 +461,7 @@ function parseBonusReveal(value: unknown): BonusRevealState | null {
         ? c.attempt_label
         : null,
     revealed_at: String(c.revealed_at),
+    timed_out: Boolean(c.timed_out),
   };
 }
 

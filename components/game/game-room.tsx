@@ -614,7 +614,10 @@ export function GameRoom({
     });
   }
 
-  function handleSubmitBonus(selectedOptionId: string) {
+  function handleSubmitBonus(
+    selectedOptionId: string,
+    extras?: { timedOut?: boolean; clockStartedAt?: string | null },
+  ) {
     setError(null);
     startSolveTransition(async () => {
       applyTeamResult(
@@ -623,6 +626,8 @@ export function GameRoom({
           joinCode,
           sessionId: session.sessionId,
           selectedOptionId,
+          timedOut: extras?.timedOut,
+          clockStartedAt: extras?.clockStartedAt ?? null,
         }),
       );
     });
