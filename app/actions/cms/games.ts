@@ -35,6 +35,8 @@ import {
   randomStationAccessCode,
   resolveStationAccessCode,
 } from "@/lib/grid/stations";
+import { PUSHABLE_EVENT_STATUSES, withLastLivePushAt } from "@/lib/cms/live-push";
+import { pingTeamsContentUpdated } from "@/lib/grid/content-ping";
 
 function normalizeGameRow(row: StudioGame): StudioGame {
   return {
@@ -981,6 +983,135 @@ export async function publishGame(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Game konnte nicht veröffentlicht werden.",
+    };
+  }
+}
+
+export async function pushLiveStudioGame(gameId: string): Promise<
+  ActionResult<{
+    versionNumber: number;
+    eventCount: number;
+    pushedAt: string;
+    featureFlags: Record<string, unknown>;
+  }>
+> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const published = await publishGame(gameId, "Live-Teams aktualisieren");
+    if (!published.success || !published.data) {
+      return { success: false, error: published.error };
+    }
+
+    const supabase = createAdminClient();
+    const { data: versions, error: versionsError } = await supabase
+      .from("studio_game_versions")
+      .select("id")
+      .eq("game_id", gameId);
+    if (versionsError) throw new Error(versionsError.message);
+
+    const versionIds = (versions ?? []).map((row) => row.id as string);
+    const eventMap = new Map<
+      string,
+      { id: string; content_config: unknown; content_revision: number | null }
+    >();
+
+    if (versionIds.length > 0) {
+      const { data: byVersion, error: byVersionError } = await supabase
+        .from("events")
+        .select("id, content_config, content_revision")
+        .eq("organization_id", orgId)
+        .in("studio_game_version_id", versionIds)
+        .in("status", [...PUSHABLE_EVENT_STATUSES]);
+      if (byVersionError) throw new Error(byVersionError.message);
+      for (const row of byVersion ?? []) {
+        eventMap.set(row.id as string, {
+          id: row.id as string,
+          content_config: row.content_config,
+          content_revision: (row.content_revision as number | null) ?? 0,
+        });
+      }
+    }
+
+    const { data: byCmsId, error: byCmsError } = await supabase
+      .from("events")
+      .select("id, content_config, content_revision")
+      .eq("organization_id", orgId)
+      .eq("content_config->>cms_game_id", gameId)
+      .in("status", [...PUSHABLE_EVENT_STATUSES]);
+    if (byCmsError) throw new Error(byCmsError.message);
+    for (const row of byCmsId ?? []) {
+      eventMap.set(row.id as string, {
+        id: row.id as string,
+        content_config: row.content_config,
+        content_revision: (row.content_revision as number | null) ?? 0,
+      });
+    }
+
+    const events = [...eventMap.values()];
+    for (const event of events) {
+      const prev =
+        event.content_config && typeof event.content_config === "object"
+          ? (event.content_config as Record<string, unknown>)
+          : {};
+      const { error: updateError } = await supabase
+        .from("events")
+        .update({
+          studio_game_version_id: published.data.versionId,
+          content_config: {
+            ...prev,
+            cms_game_id: gameId,
+            cms_version_number: published.data.versionNumber,
+          },
+          content_revision: (event.content_revision ?? 0) + 1,
+        })
+        .eq("id", event.id);
+      if (updateError) throw new Error(updateError.message);
+    }
+
+    await pingTeamsContentUpdated(
+      events.map((event) => event.id),
+      Math.max(...events.map((event) => (event.content_revision ?? 0) + 1), 1),
+    );
+
+    const { data: gameRow, error: gameReadError } = await supabase
+      .from("studio_games")
+      .select("feature_flags")
+      .eq("id", gameId)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    if (gameReadError) throw new Error(gameReadError.message);
+
+    const pushedAt = new Date().toISOString();
+    const featureFlags = withLastLivePushAt(
+      (gameRow?.feature_flags as Record<string, unknown> | null) ?? {},
+      pushedAt,
+    );
+    const { error: flagError } = await supabase
+      .from("studio_games")
+      .update({
+        feature_flags: featureFlags,
+        updated_at: pushedAt,
+      })
+      .eq("id", gameId)
+      .eq("organization_id", orgId);
+    if (flagError) throw new Error(flagError.message);
+
+    revalidatePath("/admin/games");
+    revalidatePath(`/admin/games/${gameId}`);
+    return {
+      success: true,
+      data: {
+        versionNumber: published.data.versionNumber,
+        eventCount: events.length,
+        pushedAt,
+        featureFlags,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Live-Teams konnten nicht aktualisiert werden.",
     };
   }
 }

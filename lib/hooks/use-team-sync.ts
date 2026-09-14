@@ -30,6 +30,8 @@ type UseTeamSyncOptions = {
   onWalkMeters?: (level: number, walkedMeters: number) => void;
   /** Live GPS pin from the team-lead device — teammates mirror, no server poll. */
   onGpsFix?: (fix: GpsFixPayload) => void;
+  /** Operator swapped published content — fetch once, no interval. */
+  onContentUpdated?: () => void;
   /**
    * lobby: status + start/lead only (do not parse game_state).
    * play: live solves. Default play so a missing flag cannot mute in-game sync.
@@ -45,7 +47,8 @@ export type TeamBroadcastPayload = {
     | "start_aborted"
     | "captain_transferred"
     | "walk_meters"
-    | "gps_fix";
+    | "gps_fix"
+    | "content_updated";
   new_captain_id?: string;
   previous_captain_id?: string;
   started_at?: string;
@@ -161,6 +164,7 @@ export function useTeamSync({
   onStartOverlay,
   onWalkMeters,
   onGpsFix,
+  onContentUpdated,
 }: UseTeamSyncOptions) {
   const [isConnected, setIsConnected] = useState(false);
   /** Soft status for wake/reconnect — not a hard failure. */
@@ -179,6 +183,7 @@ export function useTeamSync({
   const onStartOverlayRef = useRef(onStartOverlay);
   const onWalkMetersRef = useRef(onWalkMeters);
   const onGpsFixRef = useRef(onGpsFix);
+  const onContentUpdatedRef = useRef(onContentUpdated);
 
   onTeamStatusChangeRef.current = onTeamStatusChange;
   onGameStateChangeRef.current = onGameStateChange;
@@ -189,6 +194,7 @@ export function useTeamSync({
   onStartOverlayRef.current = onStartOverlay;
   onWalkMetersRef.current = onWalkMeters;
   onGpsFixRef.current = onGpsFix;
+  onContentUpdatedRef.current = onContentUpdated;
 
   useEffect(() => {
     if (!enabled) return;
@@ -330,6 +336,10 @@ export function useTeamSync({
                     : undefined,
               });
             }
+            return;
+          }
+          if (payload.type === "content_updated") {
+            onContentUpdatedRef.current?.();
             return;
           }
           if (payload.type === "game_starting") {

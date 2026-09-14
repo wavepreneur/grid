@@ -49,6 +49,7 @@ import { Chip, Empty, inputCls } from "@/components/cms/ui";
 import { GameStatusSwitch } from "@/components/cms/games/game-status-switch";
 import { GameTestPlayModal } from "@/components/cms/games/game-test-play-modal";
 import { GameStationCodesModal } from "@/components/cms/games/game-station-codes-modal";
+import { GameLivePushButton } from "@/components/cms/games/game-live-push-button";
 import {
   StudioButton,
   StudioError,
@@ -960,6 +961,12 @@ function GameRow({
             Löschen
           </StudioButton>
         </div>
+
+        {game.status !== "archived" ? (
+          <div className="mt-4 border-t border-border/70 pt-3">
+            <GameLivePushButton gameId={game.id} featureFlags={game.feature_flags} />
+          </div>
+        ) : null}
       </div>
 
       {canTest ? (

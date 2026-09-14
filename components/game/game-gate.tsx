@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getEventContent, getEventContentRevision } from "@/app/actions/content";
+import { getEventContent } from "@/app/actions/content";
 import { getGameState, prepareTeamGame } from "@/app/actions/game";
 import { GameRoom } from "@/components/game/game-room";
 import { GameGateSkeleton } from "@/components/game/game-gate-skeleton";
@@ -12,6 +12,7 @@ import {
   loadCachedEventContent,
 } from "@/lib/grid/offline-content";
 import { eventTeamJoinPath } from "@/lib/grid/event-routes";
+import { useQuietContentRefresh } from "@/lib/hooks/use-quiet-content-refresh";
 import {
   abandonTeamSession,
   resolveTeamSession,
@@ -88,6 +89,18 @@ export function GameGate({
   useEffect(() => {
     contentRevisionRef.current = contentRevision;
   }, [contentRevision]);
+
+  const applyQuietContent = useCallback((content: ResolvedEventContent, revision: number) => {
+    setEventContent(content);
+    setContentRevision(revision);
+  }, []);
+
+  const pullIfNewer = useQuietContentRefresh({
+    inviteCode,
+    enabled: ready,
+    revisionRef: contentRevisionRef,
+    onUpdated: applyQuietContent,
+  });
 
   useEffect(() => {
     if (ready) return;
@@ -197,27 +210,6 @@ export function GameGate({
     };
   }, [inviteCode, joinCode, router]);
 
-  useEffect(() => {
-    if (!ready) return;
-
-    const interval = window.setInterval(async () => {
-      const revisionResult = await getEventContentRevision(inviteCode);
-      if (!revisionResult.success) return;
-      if (revisionResult.data.contentRevision <= contentRevisionRef.current) return;
-
-      const contentResult = await getEventContent(inviteCode);
-      if (!contentResult.success) return;
-
-      const { contentRevision: nextRevision, eventId: _id, ...resolvedContent } =
-        contentResult.data;
-      cacheEventContent(inviteCode, resolvedContent);
-      setEventContent(resolvedContent);
-      setContentRevision(nextRevision);
-    }, 12_000);
-
-    return () => window.clearInterval(interval);
-  }, [inviteCode, ready]);
-
   if (error) {
     return <GridError message={error} />;
   }
@@ -241,6 +233,7 @@ export function GameGate({
       eventContent={eventContent}
       teamName={teamName}
       eventTitle={eventTitle}
+      onQuietContentUpdate={pullIfNewer}
     />
   );
 }

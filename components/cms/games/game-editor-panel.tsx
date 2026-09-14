@@ -14,6 +14,7 @@ import { GameLogicPanel } from "@/components/cms/games/game-logic-panel";
 import { GameSlotsPanel } from "@/components/cms/games/game-slots-panel";
 import { GameDeleteButton } from "@/components/cms/games/game-delete-button";
 import { GameDuplicateButton } from "@/components/cms/games/game-duplicate-button";
+import { GameLivePushButton } from "@/components/cms/games/game-live-push-button";
 import { ImageUploadField } from "@/components/cms/shared/image-upload-field";
 import { useStudioCache } from "@/lib/platform/studio-cache";
 import { useStudioDirtySnapshot } from "@/components/cms/studio-unsaved";
@@ -322,6 +323,11 @@ export function GameEditorPanel({
               Veröffentlichen und Live-Events steuerst du in der Spiele-Liste.
             </p>
           </div>
+          {game.status !== "archived" && !game.is_template ? (
+            <div className="mb-6">
+              <GameLivePushButton gameId={game.id} featureFlags={game.feature_flags} />
+            </div>
+          ) : null}
 
           <div className="mb-6 rounded-3xl border border-border bg-secondary/50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

@@ -44,7 +44,7 @@ export function GameStatusSwitch({
       ]
         .filter(Boolean)
         .join(" ")
-    : `Veröffentlichen speichert den Entwurf als Version ${publishedVersionNumber + 1}. Laufende Events bleiben auf älteren Versionen, bis du neue startest.`;
+    : `Veröffentlichen speichert den Entwurf als Version ${publishedVersionNumber + 1}. Gebuchte und laufende Teams bleiben auf der alten Version, bis du „Live-Teams aktualisieren“ klickst.`;
 
   function applyDraft() {
     if (!isPublished || pending) return;

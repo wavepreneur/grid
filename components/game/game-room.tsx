@@ -67,6 +67,7 @@ type GameRoomProps = {
   eventContent: ResolvedEventContent;
   teamName: string;
   eventTitle?: string;
+  onQuietContentUpdate?: () => void;
 };
 
 function countCompletedLevels(gameState: TeamGameState): number {
@@ -81,6 +82,7 @@ export function GameRoom({
   eventContent,
   teamName,
   eventTitle = "Mission",
+  onQuietContentUpdate,
 }: GameRoomProps) {
   const router = useRouter();
   const [session, setSession] = useState(initialSession);
@@ -232,6 +234,7 @@ export function GameRoom({
     onGpsFix: (fix) => {
       setMirroredGps(fix);
     },
+    onContentUpdated: onQuietContentUpdate,
   });
 
   useEffect(() => {

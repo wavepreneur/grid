@@ -50,7 +50,7 @@ export const gridStudioTracker = [
   },
   {
     claim: "Push-to-Live: update running event from new publish (manual confirm)",
-    status: "vision" as Maturity,
+    status: "beta" as Maturity,
   },
   {
     claim: "Runtime logic engine: Rogain hide, points gates, end_game rules",
