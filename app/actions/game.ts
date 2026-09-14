@@ -2175,12 +2175,15 @@ export async function activateReadyBonuses(input: {
   sessionId: string;
   /** Meters walked since arm, keyed by bonus_id (for delay_meters). */
   walkedMetersByBonusId?: Record<string, number>;
+  /** Studio-Test only: promote armed bonuses so desk checks don't require a walk. */
+  studioForceReady?: boolean;
 }): Promise<ActionResult<TeamRealtimeState>> {
   try {
-    const { team, player } = await assertPlayerSession(input);
+    const { team, player, event } = await assertPlayerSession(input);
     if (team.status !== "playing") {
       return { success: false, error: "Das Spiel läuft noch nicht." };
     }
+    const isStudioTest = Boolean(parseContentConfig(event.content_config).is_studio_test);
 
     const gameState = parseTeamGameState(team.game_state);
     const now = new Date();
@@ -2214,6 +2217,14 @@ export async function activateReadyBonuses(input: {
       nowIso,
       mergedMetersByBonusId,
     );
+
+    if (input.studioForceReady && isStudioTest) {
+      queue = queue.map((item) =>
+        item.status === "armed"
+          ? { ...item, status: "ready" as const, ready_at: item.ready_at ?? nowIso }
+          : item,
+      );
+    }
 
     // Also promote by ready_at even if status still armed
     queue = queue.map((item) => {

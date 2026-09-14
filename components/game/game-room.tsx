@@ -43,6 +43,7 @@ import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
 import { cacheTeamState, readLocalPaused, writeLocalPaused, pauseStorageKey } from "@/lib/grid/offline-state";
 import { displayRoleLabel, bonusAudienceHeadline, DEFAULT_ROLE_LABELS } from "@/lib/grid/role-labels";
 import { findForeignActiveBonuses } from "@/lib/grid/bonus-queue";
+import { StudioDeskTestBar } from "@/components/game/studio-desk-test-bar";
 import { useBonusQueueTick } from "@/lib/hooks/use-bonus-queue-tick";
 import { clearWalkedDistanceStorage } from "@/lib/hooks/use-walked-distance";
 import { pickNewerTeamState, type TeamGameState, type TeamRealtimeState } from "@/lib/grid/game-state";
@@ -260,7 +261,7 @@ export function GameRoom({
   const modal = teamState.gameState.modal;
   const walkStorageKey = `grid:walk:${inviteCode}:${joinCode}`;
 
-  useBonusQueueTick({
+  const { deskMeterBonus } = useBonusQueueTick({
     inviteCode,
     joinCode,
     sessionId: session.sessionId,
@@ -269,6 +270,7 @@ export function GameRoom({
     enabled: !sessionSuperseded && !isFinished,
     // One tracker device (Alpha/GPS lead) — avoids split meter counters across phones.
     trackMeters: session.isAlpha,
+    isStudioTest: Boolean(eventContent.isStudioTest),
     onState: (state) => {
       setTeamState((current) => {
         const next = pickNewerTeamState(current, state);
@@ -277,6 +279,15 @@ export function GameRoom({
       });
     },
   });
+
+  const deskTestBar = deskMeterBonus ? (
+    <StudioDeskTestBar
+      requiredMeters={deskMeterBonus.requiredMeters}
+      walkedMeters={deskMeterBonus.walkedMeters}
+      onAddMeters={deskMeterBonus.addDeskMeters}
+      onShowNow={deskMeterBonus.showBonusNow}
+    />
+  ) : null;
 
   const completedLevels = useMemo(
     () => countCompletedLevels(teamState.gameState),
@@ -1092,6 +1103,7 @@ export function GameRoom({
     return (
       <>
         <CityPlayShell mode={eventContent.contentMode}>
+          {deskTestBar}
           {playBody}
           {realtimeHint ? (
             <p className="px-4 pb-2 text-center text-xs text-[var(--cg-muted)]">
@@ -1151,6 +1163,7 @@ export function GameRoom({
             isConnected={isConnected}
           />
         ) : null}
+        {deskTestBar}
         {playBody}
         {realtimeHint ? (
           <p className="text-center text-xs text-slate-500">{realtimeHint}</p>

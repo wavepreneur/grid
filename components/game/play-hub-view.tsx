@@ -670,7 +670,9 @@ function OutdoorHub({
           onOpen={() => openWithSample(walk.sample, current.level)}
           onForceOpen={() => openWithSample(walk.sample, current.level, "distance")}
           onSimulateWalk={
-            isWalkTracker || isStudioTest ? () => setSimBonus((m) => m + 25) : undefined
+            isStudioTest || process.env.NODE_ENV === "development"
+              ? () => setSimBonus((m) => m + 25)
+              : undefined
           }
         />
         <p className="px-5 pb-6 text-center text-sm text-[var(--cg-muted)]">

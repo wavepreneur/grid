@@ -140,6 +140,11 @@ export function GameTestPlayModal({
         Link an Mitspieler schicken — sie sehen die Einladung, tragen nur ihren Namen ein und landen
         im Wartebereich. Nach größeren Inhaltsänderungen besser „Neu generieren“.
       </p>
+      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+        Bonus nach Metern bleibt im Spiel auf dem echten Wert (z. B. 80 m). Denselben Testlink
+        kannst du am Tisch prüfen (+25 m / Bonus jetzt zeigen) und danach draußen laufen — beides
+        zählt. Echte Buchungen sehen diese Testleiste nicht.
+      </p>
 
       {playUrl ? (
         <div className="mt-4 rounded-2xl border border-border bg-secondary/50 px-4 py-3">

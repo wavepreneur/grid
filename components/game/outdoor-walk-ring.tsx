@@ -162,9 +162,9 @@ export function OutdoorWalkRing({
         </div>
       ) : (
         <div className="mt-6 w-full max-w-sm space-y-3">
-          {onSimulateWalk && process.env.NODE_ENV === "development" ? (
+          {onSimulateWalk ? (
             <BigButton variant="outline" disabled={disabled || isPending} onClick={onSimulateWalk}>
-              +25 m simulieren (Dev)
+              +25 m am Tisch
             </BigButton>
           ) : null}
           {showForceOpen && onForceOpen ? (

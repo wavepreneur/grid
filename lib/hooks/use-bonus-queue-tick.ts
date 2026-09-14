@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { activateReadyBonuses } from "@/app/actions/game";
 import { useWalkedDistance } from "@/lib/hooks/use-walked-distance";
 import type { TeamGameState, TeamRealtimeState } from "@/lib/grid/game-state";
@@ -14,11 +14,21 @@ type Options = {
   enabled?: boolean;
   /** Only the GPS lead device accumulates bonus meters (one team truth). */
   trackMeters?: boolean;
+  /** Studio test: desk buttons may add meters or force-show the bonus. */
+  isStudioTest?: boolean;
   onState: (state: TeamRealtimeState) => void;
+};
+
+export type DeskMeterBonus = {
+  requiredMeters: number;
+  walkedMeters: number;
+  addDeskMeters: () => void;
+  showBonusNow: () => void;
 };
 
 /**
  * Ticks the Layer-3 bonus queue: time delays + meter walks → activateReadyBonuses.
+ * No extra radio for desk tests — only the same click/walk path.
  */
 export function useBonusQueueTick({
   inviteCode,
@@ -28,8 +38,9 @@ export function useBonusQueueTick({
   walkStorageKey,
   enabled = true,
   trackMeters = true,
+  isStudioTest = false,
   onState,
-}: Options) {
+}: Options): { deskMeterBonus: DeskMeterBonus | null } {
   const queue = gameState.bonus_queue ?? [];
   const meterItems = queue.filter(
     (item) =>
@@ -38,7 +49,8 @@ export function useBonusQueueTick({
       item.meters_required > 0,
   );
   const needsMeterWalk = meterItems.length > 0;
-  // One shared walk counter for all meter-armed bonuses (same journey after solve).
+  const requiredMeters = Math.max(0, ...meterItems.map((item) => item.meters_required ?? 0));
+  const [deskMeters, setDeskMeters] = useState(0);
   const meterBonusKey =
     needsMeterWalk && trackMeters && walkStorageKey
       ? `${walkStorageKey}:bonus-meters`
@@ -51,6 +63,16 @@ export function useBonusQueueTick({
   const onStateRef = useRef(onState);
   onStateRef.current = onState;
   const inflightRef = useRef(false);
+
+  useEffect(() => {
+    if (!needsMeterWalk) setDeskMeters(0);
+  }, [needsMeterWalk]);
+
+  const walkedMeters = Math.max(
+    walk.meters,
+    gameState.outdoor_progress?.bonus_walked_meters ?? 0,
+    deskMeters,
+  );
 
   useEffect(() => {
     if (!enabled) return;
@@ -74,10 +96,8 @@ export function useBonusQueueTick({
       try {
         const walkedMetersByBonusId: Record<string, number> = {};
         if (needsMeterWalk && trackMeters) {
-          const serverBonus = gameState.outdoor_progress?.bonus_walked_meters ?? 0;
-          const meters = Math.max(walk.meters, serverBonus);
           for (const item of meterItems) {
-            walkedMetersByBonusId[item.bonus_id] = meters;
+            walkedMetersByBonusId[item.bonus_id] = walkedMeters;
           }
         }
 
@@ -115,10 +135,35 @@ export function useBonusQueueTick({
     joinCode,
     sessionId,
     needsMeterWalk,
-    walk.meters,
-    gameState.outdoor_progress?.bonus_walked_meters,
+    walkedMeters,
     // Re-run when queue shape changes
     queue.map((i) => `${i.bonus_id}:${i.status}:${i.ready_at}`).join("|"),
     meterItems.length,
   ]);
+
+  const showBonusNow = useCallback(() => {
+    void activateReadyBonuses({
+      inviteCode,
+      joinCode,
+      sessionId,
+      walkedMetersByBonusId: Object.fromEntries(
+        meterItems.map((item) => [item.bonus_id, item.meters_required ?? requiredMeters]),
+      ),
+      studioForceReady: true,
+    }).then((result) => {
+      if (result.success) onStateRef.current(result.data);
+    });
+  }, [inviteCode, joinCode, meterItems, requiredMeters, sessionId]);
+
+  const deskMeterBonus =
+    isStudioTest && trackMeters && needsMeterWalk
+      ? {
+          requiredMeters,
+          walkedMeters,
+          addDeskMeters: () => setDeskMeters((current) => current + 25),
+          showBonusNow,
+        }
+      : null;
+
+  return { deskMeterBonus };
 }
