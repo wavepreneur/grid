@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { uploadStudioImage } from "@/app/actions/cms/media";
 import { IconUpload } from "@/components/cms/studio-icons";
+import { prepareStudioImageUpload } from "@/lib/cms/studio-image-upload";
 import {
   StudioButton,
   StudioError,
@@ -17,9 +18,20 @@ type Props = {
   onClear?: () => void;
   hint?: string;
   detail?: string;
+  accept?: string;
+  requireTransparency?: boolean;
 };
 
-export function ImageUploadField({ label, value, onChange, onClear, hint, detail }: Props) {
+export function ImageUploadField({
+  label,
+  value,
+  onChange,
+  onClear,
+  hint,
+  detail,
+  accept = "image/jpeg,image/png,image/webp,image/gif",
+  requireTransparency = false,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -27,15 +39,24 @@ export function ImageUploadField({ label, value, onChange, onClear, hint, detail
   function handleFile(file: File | null) {
     if (!file) return;
     setError(null);
-    const formData = new FormData();
-    formData.append("file", file);
     startTransition(async () => {
-      const result = await uploadStudioImage(formData);
-      if (!result.success) {
-        setError(result.error);
-        return;
+      try {
+        const prepared = await prepareStudioImageUpload(file, { requireTransparency });
+        const formData = new FormData();
+        formData.append("file", prepared);
+        const result = await uploadStudioImage(formData);
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
+        onChange(result.data!.url);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Upload fehlgeschlagen. PNG unter 4 MB versuchen.",
+        );
       }
-      onChange(result.data!.url);
     });
   }
 
@@ -90,7 +111,7 @@ export function ImageUploadField({ label, value, onChange, onClear, hint, detail
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept={accept}
         className="hidden"
         onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
       />

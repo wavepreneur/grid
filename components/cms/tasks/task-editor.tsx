@@ -380,8 +380,10 @@ export function TaskEditor({ task, returnTo }: Props) {
                   label="Rahmen / Schablone"
                   value={content.overlay_image_url ?? ""}
                   onChange={(url) => patchContent({ overlay_image_url: url || undefined })}
-                  hint="PNG mit transparenten Flächen"
-                  detail="Am besten 3:4 oder 4:3. Der Rahmen bleibt sichtbar, die Mitte ist das Live-Bild."
+                  hint="PNG mit transparenten Flächen, max. 4 MB"
+                  detail="Am besten 3:4 oder 4:3. Die Mitte muss transparent sein — JPEG wird abgelehnt, weil die Kamera sonst schwarz überdeckt wird."
+                  accept="image/png"
+                  requireTransparency
                 />
               </div>
             ) : (
