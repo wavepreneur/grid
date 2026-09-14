@@ -252,14 +252,15 @@ export function LobbyRoom({
   const handleTeamStatusChange = useCallback(
     (status: string) => {
       if (status === "playing" || status === "finished") {
-        goToPlay();
+        if (!studioTest) goToPlay();
+        else void refreshLobby();
         return;
       }
 
       void refreshLobby();
       void syncSessionFromServer();
     },
-    [goToPlay, refreshLobby, syncSessionFromServer],
+    [goToPlay, refreshLobby, studioTest, syncSessionFromServer],
   );
 
   const handlePlayersChange = useCallback(
@@ -301,6 +302,9 @@ export function LobbyRoom({
     onPlayersChange: handlePlayersChange,
     onSyncEvent: (event) => {
       if (event.event_type === "game_started" || event.event_type === "game_finished") {
+        if (studioTest && event.event_type === "game_started") {
+          return;
+        }
         const count = Number(event.payload.player_count);
         markMissionStarting(
           inviteCode,

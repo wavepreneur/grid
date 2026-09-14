@@ -3,6 +3,7 @@ import { getEventContent } from "@/app/actions/content";
 import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GridLink, GridShell } from "@/components/grid/grid-shell";
 import { TeamEntryGate } from "@/components/lobby/team-entry-gate";
+import { isStudioTestEvent } from "@/lib/cms/studio-test-session";
 import { eventPath } from "@/lib/grid/event-routes";
 
 type EventTeamPageProps = {
@@ -40,11 +41,8 @@ export default async function EventTeamPage({ params, searchParams }: EventTeamP
     );
   }
 
-  const contentConfig = eventResult.data.content_config as
-    | Record<string, unknown>
-    | null
-    | undefined;
-  const studioTest = Boolean(contentConfig?.is_studio_test);
+  const studioTest =
+    isStudioTestEvent(eventResult.data) || Boolean(content?.isStudioTest);
 
   const midGame = teamResult.data.teamStatus === "playing";
   const captainName = teamResult.data.captainDisplayName;

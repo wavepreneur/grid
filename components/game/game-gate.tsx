@@ -175,15 +175,19 @@ export function GameGate({
       });
       if (cancelled) return;
 
+      if (!peek.success) {
+        setError(peek.error);
+        return;
+      }
+
       const studioNeedsBriefing =
         Boolean(freshContent.isStudioTest) &&
-        (!peek.success ||
-          peek.data.status === "lobby" ||
+        (peek.data.status === "lobby" ||
           peek.data.status === "setup" ||
           (peek.data.status === "playing" && !peek.data.gameState.briefing_confirmed));
 
       if (studioNeedsBriefing) {
-        if (peek.success && peek.data.status === "playing") {
+        if (peek.data.status === "playing") {
           await rewindUnplayedStudioTestToLobby({
             inviteCode,
             joinCode,

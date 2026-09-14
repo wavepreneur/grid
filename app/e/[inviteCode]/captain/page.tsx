@@ -3,6 +3,7 @@ import { getEventContent } from "@/app/actions/content";
 import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GridShell } from "@/components/grid/grid-shell";
 import { CaptainSetupForm } from "@/components/lobby/captain-setup-form";
+import { isStudioTestEvent } from "@/lib/cms/studio-test-session";
 import { eventLobbyPath, eventPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
 import Link from "next/link";
 
@@ -20,11 +21,7 @@ export default async function EventCaptainPage({ params, searchParams }: EventCa
   const eventResult = await getEventInvite(normalizedInvite);
   if (!eventResult.success) notFound();
 
-  const contentConfig = eventResult.data.content_config as
-    | Record<string, unknown>
-    | null
-    | undefined;
-  const studioTest = Boolean(contentConfig?.is_studio_test);
+  const studioTest = isStudioTestEvent(eventResult.data);
 
   // Prebooked / Studio-Test link with join code: once the lead finished setup,
   // teammates must land on the join form (name only) — not captain setup again.

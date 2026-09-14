@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { prepareTeamGame } from "@/app/actions/game";
 import { getLobbySnapshot, rewindUnplayedStudioTestToLobby } from "@/app/actions/lobby";
 import { LobbyRoom } from "@/components/lobby/lobby-room";
-import { GridError } from "@/components/grid/grid-shell";
-import { eventPlayPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
+import { GridError, GridLink } from "@/components/grid/grid-shell";
+import {
+  eventPlayPath,
+  eventTeamJoinPath,
+} from "@/lib/grid/event-routes";
 import type { ResolvedEventContent } from "@/lib/grid/level-types";
 import { cacheEventContent } from "@/lib/grid/offline-content";
 import type { RoleDisplayLabels } from "@/lib/grid/role-labels";
@@ -27,6 +30,24 @@ type LobbyGateProps = {
   eventContent?: ResolvedEventContent | null;
 };
 
+const SNAPSHOT_TIMEOUT_MS = 12000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 export function LobbyGate({
   inviteCode,
   joinCode,
@@ -38,49 +59,73 @@ export function LobbyGate({
   eventContent = null,
 }: LobbyGateProps) {
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const [snapshot, setSnapshot] = useState<LobbySnapshot | null>(null);
   const [session, setSession] = useState<PlayerSession | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isStudio = studioTest || Boolean(eventContent?.isStudioTest);
 
   useEffect(() => {
     if (eventContent) cacheEventContent(inviteCode, eventContent);
   }, [eventContent, inviteCode]);
 
   useEffect(() => {
-    resolveTeamSession(inviteCode, joinCode).then(async (resolved) => {
-      if (!resolved) {
-        abandonTeamSession();
-        router.replace(eventTeamJoinPath(inviteCode, joinCode));
-        return;
-      }
+    let cancelled = false;
 
-      setSession(resolved.session);
+    async function boot() {
+      try {
+        const resolved = await withTimeout(
+          resolveTeamSession(inviteCode, joinCode),
+          SNAPSHOT_TIMEOUT_MS,
+          "Wartebereich antwortet nicht.",
+        );
+        if (cancelled) return;
 
-      const isPlaying =
-        resolved.session.teamStatus === "playing" ||
-        resolved.session.teamStatus === "finished";
+        if (!resolved) {
+          if (isStudio) {
+            setError("Session nicht gefunden. Bitte Namen erneut eingeben.");
+            return;
+          }
+          abandonTeamSession();
+          routerRef.current.replace(eventTeamJoinPath(inviteCode, joinCode));
+          return;
+        }
 
-      if (isPlaying && !manageMode) {
-        let stayInLobby = false;
-        if (studioTest && resolved.session.teamStatus === "playing") {
-          const rewind = await rewindUnplayedStudioTestToLobby({
+        setSession(resolved.session);
+
+        const teamStatus = resolved.session.teamStatus;
+        const isPlaying = teamStatus === "playing" || teamStatus === "finished";
+
+        if (isPlaying && !manageMode) {
+          if (isStudio && teamStatus === "playing") {
+            const rewind = await rewindUnplayedStudioTestToLobby({
+              inviteCode,
+              joinCode,
+              sessionId: resolved.session.sessionId,
+            });
+            const stayedInLobby = Boolean(rewind.success && rewind.data?.rewound);
+            if (!stayedInLobby && rewind.success) {
+              routerRef.current.replace(eventPlayPath(inviteCode, joinCode));
+              return;
+            }
+          } else if (!isStudio || teamStatus === "finished") {
+            routerRef.current.replace(eventPlayPath(inviteCode, joinCode));
+            return;
+          }
+        }
+
+        const result = await withTimeout(
+          getLobbySnapshot({
             inviteCode,
             joinCode,
             sessionId: resolved.session.sessionId,
-          });
-          stayInLobby = Boolean(rewind.success && rewind.data.rewound);
-        }
-        if (!stayInLobby) {
-          router.replace(eventPlayPath(inviteCode, joinCode));
-          return;
-        }
-      }
+          }),
+          SNAPSHOT_TIMEOUT_MS,
+          "Wartebereich antwortet nicht.",
+        );
+        if (cancelled) return;
 
-      getLobbySnapshot({
-        inviteCode,
-        joinCode,
-        sessionId: resolved.session.sessionId,
-      }).then((result) => {
         if (!result.success) {
           setError(result.error);
           return;
@@ -88,12 +133,11 @@ export function LobbyGate({
 
         if (
           !manageMode &&
+          !isStudio &&
           (result.data.team_status === "playing" || result.data.team_status === "finished")
         ) {
-          if (!studioTest) {
-            router.replace(eventPlayPath(inviteCode, joinCode));
-            return;
-          }
+          routerRef.current.replace(eventPlayPath(inviteCode, joinCode));
+          return;
         }
 
         setSnapshot(result.data);
@@ -102,12 +146,32 @@ export function LobbyGate({
           joinCode,
           sessionId: resolved.session.sessionId,
         });
-      });
-    });
-  }, [inviteCode, joinCode, manageMode, router, studioTest]);
+      } catch (bootError) {
+        if (cancelled) return;
+        setError(
+          bootError instanceof Error
+            ? bootError.message
+            : "Wartebereich konnte nicht geladen werden.",
+        );
+      }
+    }
+
+    void boot();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [inviteCode, isStudio, joinCode, manageMode]);
 
   if (error) {
-    return <GridError message={error} />;
+    return (
+      <div className="flex flex-col gap-3">
+        <GridError message={error} />
+        <GridLink href={eventTeamJoinPath(inviteCode, joinCode)}>
+          Zurück zur Namenseingabe
+        </GridLink>
+      </div>
+    );
   }
 
   if (!session || !snapshot) {
@@ -126,7 +190,7 @@ export function LobbyGate({
       eventTitle={eventTitle}
       briefingIframeUrl={briefingIframeUrl}
       roleLabels={roleLabels}
-      studioTest={studioTest}
+      studioTest={isStudio}
     />
   );
 }

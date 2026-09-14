@@ -3,6 +3,7 @@ import { getEventContent } from "@/app/actions/content";
 import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GridShell } from "@/components/grid/grid-shell";
 import { LobbyGate } from "@/components/lobby/lobby-gate";
+import { isStudioTestEvent } from "@/lib/cms/studio-test-session";
 
 type EventLobbyPageProps = {
   params: Promise<{ inviteCode: string; joinCode: string }>;
@@ -28,11 +29,8 @@ export default async function EventLobbyPage({ params, searchParams }: EventLobb
   const contentResult = await getEventContent(normalizedInvite);
   const content = contentResult.success ? contentResult.data : null;
 
-  const contentConfig = eventResult.data.content_config as
-    | Record<string, unknown>
-    | null
-    | undefined;
-  const studioTest = Boolean(contentConfig?.is_studio_test);
+  const studioTest =
+    isStudioTestEvent(eventResult.data) || Boolean(content?.isStudioTest);
 
   return (
     <GridShell

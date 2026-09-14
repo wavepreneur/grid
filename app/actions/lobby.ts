@@ -341,6 +341,9 @@ export async function rewindUnplayedStudioTestToLobby(input: {
     if (!team || !player || player.team_id !== team.id) {
       return { success: false, error: "Session ungültig." };
     }
+    if (team.status === "lobby" || team.status === "setup") {
+      return { success: true, data: { rewound: true } };
+    }
     if (team.status !== "playing") {
       return { success: true, data: { rewound: false } };
     }
@@ -1104,28 +1107,40 @@ export async function getLobbySnapshot(input: {
       });
     }
 
-    if (team.status === "lobby") {
-      await maybeAutoStartTeam(team.id);
-    }
-
     const supabase = createAdminClient();
-    const { data, error } = await supabase
-      .from("team_lobby_snapshot")
-      .select("*")
-      .eq("join_code", joinCode)
-      .single();
+    const loadSnapshot = async () => {
+      const { data, error } = await supabase
+        .from("team_lobby_snapshot")
+        .select("*")
+        .eq("join_code", joinCode)
+        .eq("event_id", event.id)
+        .maybeSingle();
+      if (error || !data) {
+        return {
+          success: false as const,
+          error: error?.message ?? "Lobby nicht gefunden.",
+        };
+      }
+      return {
+        success: true as const,
+        data: {
+          ...data,
+          players: Array.isArray(data.players) ? data.players : [],
+        },
+      };
+    };
 
-    if (error || !data) {
-      return { success: false, error: error?.message ?? "Lobby nicht gefunden." };
+    const first = await loadSnapshot();
+    if (!first.success) return first;
+
+    // Studio tests stay in briefing until Start — never compile/auto-start here.
+    if (team.status === "lobby" && !isStudioTestEvent(event)) {
+      await maybeAutoStartTeam(team.id);
+      const next = await loadSnapshot();
+      if (next.success) return next;
     }
 
-    return {
-      success: true,
-      data: {
-        ...data,
-        players: Array.isArray(data.players) ? data.players : [],
-      },
-    };
+    return first;
   } catch (error) {
     return {
       success: false,
