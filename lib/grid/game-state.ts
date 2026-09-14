@@ -304,7 +304,8 @@ export function parseTeamGameState(value: unknown): TeamGameState {
       (candidate as { bonus_session?: unknown }).bonus_session,
     ),
     bonus_notice: parseBonusNotice(candidate.bonus_notice),
-    content_ready: candidate.content_ready === false ? false : true,
+    content_ready:
+      candidate.content_ready === false || !candidate.levels ? false : true,
     outdoor_progress:
       candidate.outdoor_progress === null
         ? null

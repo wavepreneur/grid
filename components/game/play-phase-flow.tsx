@@ -24,7 +24,7 @@ import type {
   ResolvedEventContent,
   SolveLevelPayload,
 } from "@/lib/grid/level-types";
-import { buildPlaySlot, missionFromLevel } from "@/lib/grid/play-slots";
+import { buildPlaySlot, missionFromLevel, usesPhasedPlay } from "@/lib/grid/play-slots";
 import type { GpsFixPayload } from "@/lib/hooks/use-team-sync";
 import {
   bonusAudienceHeadline,
@@ -176,7 +176,9 @@ export function PlayPhaseFlow({
   leadLabel = "Team Lead",
 }: Props) {
   const mode = eventContent.contentMode;
-  const phase = gameState.current_phase ?? (mode === "indoor" ? "hub" : "level");
+  const phase =
+    gameState.current_phase ??
+    (mode === "indoor" || usesPhasedPlay(eventContent) ? "hub" : "level");
   const level = eventContent.levels.find((l) => l.level === activeLevel);
   const slot = level ? buildPlaySlot(level, mode, phase) : null;
   const completed = Object.values(gameState.levels).filter((e) => e.status === "completed").length;

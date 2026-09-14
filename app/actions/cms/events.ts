@@ -71,7 +71,8 @@ async function countTeamPlayers(teamId: string) {
   const { count, error } = await supabase
     .from("players")
     .select("id", { count: "exact", head: true })
-    .eq("team_id", teamId);
+    .eq("team_id", teamId)
+    .is("left_at", null);
   if (error) throw new Error(error.message);
   return count ?? 0;
 }
@@ -271,6 +272,9 @@ export async function getOrCreateStudioTestSession(
               navigator_player_id: null,
               lobby_opened_at: null,
               lobby_auto_start_at: null,
+              started_at: null,
+              current_level: 1,
+              game_state: {},
             })
             .eq("id", team.id);
           teamStatus = "setup";

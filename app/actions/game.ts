@@ -979,10 +979,14 @@ export async function initializeTeamGameState(
   const supabase = createAdminClient();
   const { data: current } = await supabase
     .from("teams")
-    .select("game_state")
+    .select("game_state, status")
     .eq("id", teamId)
     .maybeSingle();
+  const inLobby = current?.status === "lobby" || current?.status === "setup";
+  // Playing teams keep their write path. Lobby/setup always re-stamp L1
+  // (hub / quiz) so a reused Studio-Test does not open in the level view.
   if (
+    !inLobby &&
     current?.game_state &&
     parseTeamGameState(current.game_state).content_ready !== false
   ) {
@@ -1021,7 +1025,7 @@ export async function initializeTeamGameState(
     ...initialState,
     levels: stampedState,
     content_ready: true,
-    ...(startPhase ? { current_phase: startPhase } : {}),
+    current_phase: startPhase ?? "hub",
   };
 
   await supabase
@@ -1099,7 +1103,12 @@ export async function prepareTeamGame(input: {
       return { success: false, error: "Team ist nicht in der Lobby." };
     }
 
-    if (team.game_state && parseTeamGameState(team.game_state).content_ready !== false) {
+    const inLobby = team.status === "lobby" || team.status === "setup";
+    if (
+      !inLobby &&
+      team.game_state &&
+      parseTeamGameState(team.game_state).content_ready !== false
+    ) {
       return { success: true, data: { ready: true } };
     }
 

@@ -102,7 +102,6 @@ export function LobbyRoom({
   const [error, setError] = useState<string | null>(null);
   const [briefingOpen, setBriefingOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
-  const [inviteOpen, setInviteOpen] = useState(false);
   const [countdown, setCountdown] = useState(
     formatCountdown(initialSnapshot.lobby_auto_start_at),
   );
@@ -545,12 +544,12 @@ export function LobbyRoom({
     teamAllowsMore &&
     playerCount < snapshot.max_size &&
     (isLobby || (manageMode && isPlaying));
-  // Live: no solo “optional invite” — seats are paid/booked; joining uses the booking flow.
-  // Studio test: keep optional invite so you can pull devices into the lobby.
-  const showSoloInvite = canInviteTeammates && aloneNow && studioTest;
   const showTeamInvite = canInviteTeammates && !aloneNow;
   const showAutoStartCountdown =
-    isLobby && Boolean(snapshot.lobby_auto_start_at) && countdown !== "—";
+    isLobby &&
+    !studioTest &&
+    Boolean(snapshot.lobby_auto_start_at) &&
+    countdown !== "—";
   const autoStartMsLeft = snapshot.lobby_auto_start_at
     ? new Date(snapshot.lobby_auto_start_at).getTime() - Date.now()
     : null;
@@ -710,24 +709,6 @@ export function LobbyRoom({
                   );
                 })}
               </ul>
-            </div>
-          ) : null}
-
-          {showSoloInvite ? (
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => setInviteOpen((v) => !v)}
-                className="w-full text-center text-sm font-medium text-slate-500 underline-offset-2 hover:underline"
-              >
-                {inviteOpen ? "Einladen ausblenden" : "Optional: Mitspieler einladen (Test)"}
-              </button>
-              {inviteOpen && teammateUrl ? (
-                <div className="space-y-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5">
-                  <QrInviteImage url={teammateUrl} />
-                  <CopyInviteLink url={teammateUrl} label="Einladungslink kopieren" />
-                </div>
-              ) : null}
             </div>
           ) : null}
 

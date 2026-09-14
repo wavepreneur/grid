@@ -294,7 +294,7 @@ export function GameRoom({
     [teamState.gameState],
   );
 
-  const playPhase = teamState.gameState.current_phase ?? "level";
+  const playPhase = teamState.gameState.current_phase ?? "hub";
 
   useEffect(() => {
     setSolveFeedback(null);

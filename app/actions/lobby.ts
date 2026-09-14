@@ -18,6 +18,7 @@ import { writeAuditLog } from "@/lib/grid/audit-log";
 import { canStartTeamGame } from "@/lib/grid/archetype-roles";
 import { buildDefaultContentConfig, getBlueprint, isBlueprintSlug, resolveBlueprint, type BlueprintSlug } from "@/lib/grid/blueprints";
 import { parseContentConfig } from "@/lib/grid/content-engine";
+import { initializeTeamGameState } from "@/app/actions/game";
 import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
 import {
@@ -201,7 +202,7 @@ async function getEventByInviteCode(
   const { data, error } = await supabase
     .from("events")
     .select(
-      "id, title, organization_id, organization_name, city_id, invite_code, status, max_teams, max_players_per_team, lobby_auto_start_seconds, content_config, route_override, booking_reference",
+      "id, title, organization_id, organization_name, city_id, invite_code, status, max_teams, max_players_per_team, lobby_auto_start_seconds, content_config, route_override, booking_reference, studio_game_version_id",
     )
     .eq("invite_code", normalizeCode(inviteCode))
     .maybeSingle();
@@ -251,6 +252,16 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
   if (!team || team.status !== "lobby") return;
   if (!team.captain_player_id) return;
 
+  const { data: event } = await supabase
+    .from("events")
+    .select("id, organization_id, city_id, content_config, route_override, invite_code, studio_game_version_id")
+    .eq("id", team.event_id)
+    .single();
+
+  if (!event) return;
+  // Studio-Test: briefing + manual start. Never skip the waiting room.
+  if (parseContentConfig(event.content_config).is_studio_test) return;
+
   const activePlayerCount = await countActivePlayers(teamId);
   const rosterFull = activePlayerCount >= team.max_size;
   const timerExpired =
@@ -259,16 +270,19 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
 
   if (!rosterFull && !timerExpired) return;
 
-  const { data: event } = await supabase
-    .from("events")
-    .select("id, organization_id, city_id, content_config, route_override, invite_code, studio_game_version_id")
-    .eq("id", team.event_id)
-    .single();
-
-  if (!event) return;
-
   const startGate = await assertCanStartGame(event as GridEvent, teamId);
   if (!startGate.success) return;
+
+  await initializeTeamGameState(
+    team.id,
+    team.captain_player_id,
+    event.id,
+    event.organization_id,
+    event.city_id,
+    event.content_config,
+    event.route_override,
+    event.studio_game_version_id,
+  );
 
   const startedAt = new Date().toISOString();
   const { data: updated } = await supabase
@@ -1087,6 +1101,17 @@ export async function startGameManually(input: {
     if (!startGate.success) {
       return startGate;
     }
+
+    await initializeTeamGameState(
+      team.id,
+      player.id,
+      event.id,
+      event.organization_id,
+      event.city_id,
+      event.content_config,
+      event.route_override,
+      event.studio_game_version_id,
+    );
 
     const startedAt = new Date().toISOString();
     const supabase = createAdminClient();
