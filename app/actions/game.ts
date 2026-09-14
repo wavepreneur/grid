@@ -984,10 +984,11 @@ export async function initializeTeamGameState(
     .maybeSingle();
   const inLobby = current?.status === "lobby" || current?.status === "setup";
   const parsed = current?.game_state ? parseTeamGameState(current.game_state) : null;
-  const levelsReady =
-    Boolean(parsed?.levels) &&
-    Object.keys(parsed?.levels ?? {}).length > 0 &&
-    parsed.content_ready !== false;
+  const levelsReady = Boolean(
+    parsed &&
+      Object.keys(parsed.levels).length > 0 &&
+      parsed.content_ready !== false,
+  );
   const alreadyPlayed = parsed
     ? Object.values(parsed.levels).some((entry) => entry.status === "completed")
     : false;
