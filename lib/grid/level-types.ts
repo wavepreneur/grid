@@ -69,6 +69,8 @@ export type BonusTask = {
   correct_option_id: string;
   correct_option_ids?: string[];
   reward: number;
+  /** Same countdown / decay as Layer-2 missions when set in Studio. */
+  scoring?: LevelScoring;
   /**
    * How the player answers. Default/omitted = choice (options).
    * text/boxes use `answer`; confirm is a single acknowledgement.

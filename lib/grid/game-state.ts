@@ -107,6 +107,8 @@ export type BonusSessionState = {
   intro_done: boolean;
   solver_name?: string | null;
   solver_player_id?: string | null;
+  /** When the bonus task became visible — countdown starts here. */
+  started_at?: string | null;
   reveal?: BonusRevealState | null;
 };
 
@@ -482,6 +484,10 @@ function parseOneBonusSession(
     solver_player_id:
       typeof c.solver_player_id === "string" && c.solver_player_id
         ? c.solver_player_id
+        : null,
+    started_at:
+      typeof c.started_at === "string" && c.started_at
+        ? c.started_at
         : null,
     reveal: parseBonusReveal(c.reveal),
   };

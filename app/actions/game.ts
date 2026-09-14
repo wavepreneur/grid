@@ -452,6 +452,7 @@ export async function solveCurrentLevel(input: {
               correct_option_id: def.correct_option_id,
               correct_option_ids: def.correct_option_ids,
               reward: def.reward,
+              scoring: def.scoring,
               answer_mode: def.answer_mode,
               answer: def.answer,
               number_fields: def.number_fields,
@@ -2025,7 +2026,12 @@ async function completeActiveBonus(input: {
       return { success: false, error: "Bitte eine Antwort auswählen." };
     }
     correct = isBonusAnswerCorrect(bonus, input.selectedOptionId);
-    reward = correct ? bonus.reward : 0;
+    const scoringStartedAt = gameState.bonus_sessions?.[bonusSessionId(active)]?.started_at ?? null;
+    reward = correct
+      ? bonus.scoring
+        ? computeLevelReward(bonus.scoring, scoringStartedAt)
+        : bonus.reward
+      : 0;
   }
 
   const bonusId = bonusSessionId(active);
@@ -2600,6 +2606,7 @@ export async function beginBonusPresentation(input: {
       version: gameState.version + 1,
       bonus_sessions: patchBonusSession(gameState.bonus_sessions, bonusId, {
         intro_done: true,
+        started_at: existing?.started_at ?? new Date().toISOString(),
         solver_name: player.display_name,
         solver_player_id: player.id,
       }),

@@ -7,7 +7,7 @@ import {
   type TaskScoring,
   type TaskTileMediaType,
 } from "@/lib/cms/types";
-import type { LevelContentTile } from "@/lib/grid/level-types";
+import type { LevelContentTile, LevelScoring } from "@/lib/grid/level-types";
 
 export function createTaskTileId(): string {
   return `tile_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
@@ -363,4 +363,17 @@ export function studioTilesToLevelTiles(
     mapped.push(next);
   }
   return mapped.length > 0 ? mapped : undefined;
+}
+
+export function studioScoringToLevelScoring(
+  scoring: TaskScoring | undefined,
+): LevelScoring | undefined {
+  if (!scoring) return undefined;
+  return {
+    points: scoring.points,
+    countdown_seconds: scoring.countdown_seconds ?? null,
+    decay_enabled: scoring.decay_enabled,
+    decay_floor: scoring.decay_floor ?? 0,
+    allow_reveal_solution: Boolean(scoring.allow_reveal_solution),
+  };
 }

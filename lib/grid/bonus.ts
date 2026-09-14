@@ -5,6 +5,7 @@
 
 import type { ArrivalQuiz, BonusTask, LevelDefinition, PlayerRole } from "@/lib/grid/level-types";
 import { parseLevelTiles } from "@/lib/grid/level-content";
+import { parseLevelScoring } from "@/lib/grid/level-scoring";
 import { normalizeAnswer } from "@/lib/grid/content-engine";
 
 export function parseBonusTask(raw: unknown): BonusTask | undefined {
@@ -55,6 +56,7 @@ export function parseBonusTask(raw: unknown): BonusTask | undefined {
       ? (b.correct_option_ids as string[])
       : undefined,
     reward: typeof b.reward === "number" ? b.reward : 150,
+    scoring: parseLevelScoring(b.scoring),
     answer_mode: mode === "choice" ? undefined : mode,
     answer: typeof b.answer === "string" ? b.answer : undefined,
     number_fields:

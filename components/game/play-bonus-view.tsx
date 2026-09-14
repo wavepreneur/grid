@@ -7,6 +7,7 @@ import { IconCheck, IconGift, IconUser, IconUsers, IconX } from "@/components/ga
 import { CodeBoxesInput } from "@/components/game/code-boxes-input";
 import { ContentTileGrid } from "@/components/game/content-tile-grid";
 import { FormattedTaskText } from "@/components/game/formatted-task-text";
+import { LevelScoringBar } from "@/components/game/level-scoring-bar";
 import { MediaModal } from "@/components/game/media-modal";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
 import type { BonusTask, LevelContentTile } from "@/lib/grid/level-types";
@@ -88,6 +89,7 @@ export function PlayBonusView({
   const [continuing, setContinuing] = useState(false);
   const [pickOpen, setPickOpen] = useState(false);
   const [activeTile, setActiveTile] = useState<LevelContentTile | null>(null);
+  const [localStartedAt, setLocalStartedAt] = useState<string | null>(null);
   const sfxPlayedRef = useRef<string | null>(null);
 
   const reveal = teamSession?.reveal ?? null;
@@ -114,6 +116,7 @@ export function PlayBonusView({
   const audience = bonusAudienceIconCount(bonus);
   const audienceLabel = bonusAudienceHeadline(bonus, roleLabels);
   const tiles = bonus.tiles ?? [];
+  const scoringStartedAt = teamSession?.started_at ?? localStartedAt;
 
   const canCheck =
     answerMode === "choice" || answerMode === "confirm"
@@ -140,6 +143,7 @@ export function PlayBonusView({
 
   function beginIntro() {
     if (introDone) return;
+    setLocalStartedAt((prev) => prev ?? new Date().toISOString());
     setLocalIntro(true);
     onBegin();
   }
@@ -225,9 +229,23 @@ export function PlayBonusView({
         <span className="cg-animate-pop-in flex h-20 w-20 items-center justify-center rounded-3xl bg-[var(--cg-accent)] text-[var(--cg-accent-fg)] shadow-[var(--cg-shadow-lift)]">
           <IconGift size={40} />
         </span>
-        <SectionLabel>Bonusaufgabe · +{bonus.reward} Punkte</SectionLabel>
+        <SectionLabel>
+          {bonus.scoring?.countdown_seconds
+            ? "Bonusaufgabe"
+            : `Bonusaufgabe · +${bonus.reward} Punkte`}
+        </SectionLabel>
         <h1 className="mt-1 text-2xl font-bold text-[var(--cg-fg)]">{bonus.title}</h1>
       </div>
+
+      {bonus.scoring && introDone && !show ? (
+        <div className="mt-4">
+          <LevelScoringBar
+            scoring={bonus.scoring}
+            startedAt={scoringStartedAt}
+            compact
+          />
+        </div>
+      ) : null}
 
       <div className="mt-6 flex flex-col items-center gap-2">
         <span className="flex items-center gap-1.5 rounded-full bg-[var(--cg-primary)] px-3 py-2 text-sm font-bold text-[var(--cg-primary-fg)]">

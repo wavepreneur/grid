@@ -13,7 +13,7 @@ import type { ContentMode } from "@/lib/cms/layer-model";
 import { LAYER_GAME_PRESETS, type LayerGamePreset } from "@/lib/cms/layer-model";
 import type { StudioGameTaskLink, StudioTask, StudioTaskContent } from "@/lib/cms/types";
 import type { ArrivalQuiz, BonusTask, LevelContentTile, QuizOption } from "@/lib/grid/level-types";
-import { normalizeTaskContent, studioTilesToLevelTiles } from "@/lib/cms/task-content";
+import { normalizeTaskContent, studioScoringToLevelScoring, studioTilesToLevelTiles } from "@/lib/cms/task-content";
 
 export type StudioArrivalQuiz = {
   title?: string;
@@ -248,6 +248,7 @@ export function taskContentToBonus(
     .join("\n\n");
   const hero_image_url = content.hero_image_url?.trim() || undefined;
   const tiles: LevelContentTile[] | undefined = studioTilesToLevelTiles(content.tiles);
+  const scoring = studioScoringToLevelScoring(content.scoring);
   const intro =
     forRole === "team"
       ? "Diese Bonusaufgabe sehen alle im Team."
@@ -275,6 +276,7 @@ export function taskContentToBonus(
       correct_option_id: correctId,
       correct_option_ids: correctIds.length > 1 ? correctIds : undefined,
       reward,
+      scoring,
     };
   }
 
@@ -296,6 +298,7 @@ export function taskContentToBonus(
       options: [{ id: "done", label: "Erledigt" }],
       correct_option_id: "done",
       reward,
+      scoring,
       answer_mode: "confirm",
     };
   }
@@ -324,6 +327,7 @@ export function taskContentToBonus(
     options: [],
     correct_option_id: "__text__",
     reward,
+    scoring,
     answer_mode: boxed ? "boxes" : "text",
     answer,
     number_fields: fields,

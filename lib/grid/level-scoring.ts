@@ -91,3 +91,24 @@ export function hasLiveLevelScoring(scoring: LevelScoring | undefined): boolean 
   if (scoring.countdown_seconds && scoring.countdown_seconds > 0) return true;
   return false;
 }
+
+export function parseLevelScoring(value: unknown): LevelScoring | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const scoring = value as Partial<LevelScoring>;
+  if (typeof scoring.points !== "number" || !Number.isFinite(scoring.points)) {
+    return undefined;
+  }
+  return {
+    points: Math.round(scoring.points),
+    countdown_seconds:
+      typeof scoring.countdown_seconds === "number" && scoring.countdown_seconds > 0
+        ? Math.round(scoring.countdown_seconds)
+        : scoring.countdown_seconds === null
+          ? null
+          : undefined,
+    decay_enabled: Boolean(scoring.decay_enabled),
+    decay_floor:
+      typeof scoring.decay_floor === "number" ? Math.round(scoring.decay_floor) : undefined,
+    allow_reveal_solution: Boolean(scoring.allow_reveal_solution),
+  };
+}
