@@ -19,9 +19,9 @@ export default async function PlayGoCodePage({ params }: Props) {
   return (
     <GridShell
       variant="welcome"
-      eyebrow="GRID"
-      title="Zugangscode"
-      description="Code vom Team oder aus der Mail eintippen."
+      eyebrow="Spiel starten"
+      title="Team-Code"
+      description="Den Code aus der Mail oder vom Ticket hier eintippen."
     >
       <div className="space-y-4">
         <GridError message={result.error} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { savePortalSnapshot } from "@/app/actions/portal";
 import {
   GridButton,
@@ -61,6 +61,16 @@ export function EventPortalForm({ initial }: Props) {
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const [goHost, setGoHost] = useState("gridos.vercel.app/go");
+  const [goUrl, setGoUrl] = useState("https://gridos.vercel.app/go");
+  const showPrepare = initial.show_waypoints || initial.show_quizzes;
+
+  useEffect(() => {
+    const origin = window.location.origin;
+    setGoUrl(`${origin}/go`);
+    setGoHost(`${origin.replace(/^https?:\/\//, "")}/go`);
+  }, []);
 
   const durationChoices = useMemo(() => {
     const values = new Set<number>(PORTAL_DURATION_OPTIONS);
@@ -130,41 +140,248 @@ export function EventPortalForm({ initial }: Props) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-8">
+    <form onSubmit={onSubmit} className="space-y-6">
       <section className="grid grid-cols-3 gap-3">
         <Stat label="Teams" value={initial.team_count} />
         <Stat label="Spieler" value={initial.player_seats} />
         <Stat label="Minuten" value={duration} />
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold text-slate-900">So startest du</h2>
-        <ol className="space-y-2 text-sm leading-6 text-slate-600">
-          <li>
-            <span className="font-semibold text-slate-900">1.</span> Link oder Code an die
-            Teamleads — unten kopieren oder als CSV.
-          </li>
-          <li>
-            <span className="font-semibold text-slate-900">2.</span> Jedes Team öffnet den Link auf
-            dem Handy. Keine App.
-          </li>
-          <li>
-            <span className="font-semibold text-slate-900">3.</span> Wenn alle in der Lobby sind,
-            startet das Spiel von selbst.
-          </li>
-        </ol>
-      </section>
-
-      {initial.accesses.length > 0 ? (
-        <section className="space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">Teams einladen</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                Link oder Code an den Teamlead. Mail-Einladungen kommen später über Exitmania
-                (Resend) — hier kopieren oder die Liste herunterladen.
+      {showPrepare ? (
+        <JourneyStep
+          number={1}
+          title="Event vorbereiten"
+          hint="Route und Firmenfragen — so sieht der Kunde die gebuchten Module."
+        >
+          <div className="rounded-2xl border border-dashed border-teal-700/30 bg-[linear-gradient(180deg,#ecfdf5_0%,#f8fafc_55%)] p-4">
+            <div className="relative overflow-hidden rounded-xl bg-teal-900/90 px-4 py-8 text-center text-white">
+              <MapSketch />
+              <p className="relative text-sm font-semibold">Karte kommt als Nächstes</p>
+              <p className="relative mt-1 text-xs leading-5 text-teal-100">
+                In der Testphase: Felder unten durchgehen. Speichern auf der Karte folgt im nächsten
+                Schritt.
               </p>
             </div>
+          </div>
+
+          <div>
+            <GridLabel hint="Gilt sofort für alle Teams dieses Events.">Spieldauer</GridLabel>
+            <select
+              value={duration}
+              disabled={initial.locked}
+              onChange={(event) => setDuration(event.target.value)}
+              className="grid-input w-full rounded-xl px-4 py-3.5 text-base outline-none"
+            >
+              {durationChoices.map((minutes) => (
+                <option key={minutes} value={minutes}>
+                  {minutes} Min.
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {initial.show_waypoints ? (
+            waypoints.length > 0 ? (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Startpunkte überschreiben</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    Nur die Koordinaten. Radius und Aufgaben bleiben unverändert.
+                  </p>
+                </div>
+                {waypoints.map((waypoint) => (
+                  <fieldset
+                    key={waypoint.level}
+                    className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4"
+                  >
+                    <legend className="px-1 text-sm font-semibold text-slate-800">
+                      Aufgabe {waypoint.level} · {waypoint.title}
+                    </legend>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <GridLabel>Latitude</GridLabel>
+                        <GridInput
+                          inputMode="decimal"
+                          disabled={initial.locked}
+                          value={Number.isFinite(waypoint.lat) ? String(waypoint.lat) : ""}
+                          onChange={(event) =>
+                            updateWaypoint(waypoint.level, event.target.value, String(waypoint.lng))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <GridLabel>Longitude</GridLabel>
+                        <GridInput
+                          inputMode="decimal"
+                          disabled={initial.locked}
+                          value={Number.isFinite(waypoint.lng) ? String(waypoint.lng) : ""}
+                          onChange={(event) =>
+                            updateWaypoint(waypoint.level, String(waypoint.lat), event.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Du kannst auch 52.37387, 9.73816 ins erste Feld einfügen.
+                    </p>
+                  </fieldset>
+                ))}
+              </div>
+            ) : (
+              <EmptyModule
+                title="Eigene Routen"
+                body="Hier erscheinen die GPS-Punkte zum Verschieben. Die Karten-Ansicht folgt — das Modul ist für dieses Event schon frei."
+              />
+            )
+          ) : null}
+
+          {initial.show_quizzes ? (
+            quizzes.length > 0 ? (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Unternehmensquiz</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    Ersetzt nur die Einstiegsfragen. Hauptaufgaben und Bonus bleiben unberührt.
+                  </p>
+                </div>
+                {quizzes.map((quiz, quizIndex) => (
+                  <fieldset
+                    key={quiz.level}
+                    className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4"
+                  >
+                    <legend className="px-1 text-sm font-semibold text-slate-800">
+                      Aufgabe {quiz.level} · {quiz.title}
+                    </legend>
+                    <div>
+                      <GridLabel>Frage</GridLabel>
+                      <textarea
+                        disabled={initial.locked}
+                        rows={3}
+                        value={quiz.question}
+                        onChange={(event) =>
+                          setQuizzes((current) =>
+                            current.map((item, index) =>
+                              index === quizIndex ? { ...item, question: event.target.value } : item,
+                            ),
+                          )
+                        }
+                        className="grid-input w-full rounded-xl px-4 py-3 text-base outline-none"
+                        placeholder="Eure Frage an das Team"
+                      />
+                    </div>
+                    {quiz.answers.map((answer, answerIndex) => (
+                      <label key={answerIndex} className="flex items-start gap-3">
+                        <input
+                          type="radio"
+                          name={`quiz-${quiz.level}-correct`}
+                          className="mt-4"
+                          disabled={initial.locked}
+                          checked={quiz.correct_index === answerIndex}
+                          onChange={() =>
+                            setQuizzes((current) =>
+                              current.map((item, index) =>
+                                index === quizIndex
+                                  ? { ...item, correct_index: answerIndex as 0 | 1 | 2 | 3 }
+                                  : item,
+                              ),
+                            )
+                          }
+                        />
+                        <div className="min-w-0 flex-1">
+                          <GridLabel>
+                            Antwort {String.fromCharCode(65 + answerIndex)}
+                            {quiz.correct_index === answerIndex ? " (richtig)" : ""}
+                          </GridLabel>
+                          <GridInput
+                            disabled={initial.locked}
+                            value={answer}
+                            onChange={(event) =>
+                              setQuizzes((current) =>
+                                current.map((item, index) =>
+                                  index === quizIndex
+                                    ? {
+                                        ...item,
+                                        answers: item.answers.map((value, inner) =>
+                                          inner === answerIndex ? event.target.value : value,
+                                        ) as PortalSnapshot["quizzes"][number]["answers"],
+                                      }
+                                    : item,
+                                ),
+                              )
+                            }
+                          />
+                        </div>
+                      </label>
+                    ))}
+                  </fieldset>
+                ))}
+              </div>
+            ) : (
+              <EmptyModule
+                title="Eigene Quizfragen"
+                body="Hier erscheinen die Firmenfragen zum Überschreiben. Das Modul ist frei — sobald das Spiel Quiz-Slots hat, siehst du sie an dieser Stelle."
+              />
+            )
+          ) : null}
+
+          {error ? <GridError message={error} /> : null}
+          {saved ? (
+            <GridSuccess message="Änderungen sind live. Die Teams können sofort starten." />
+          ) : null}
+
+          {initial.locked ? (
+            <p className="text-sm text-slate-500">Dieses Event ist abgeschlossen.</p>
+          ) : (
+            <GridButton type="submit" disabled={pending}>
+              {pending ? "Speichert…" : "Änderungen speichern"}
+            </GridButton>
+          )}
+        </JourneyStep>
+      ) : (
+        <section className="space-y-3 rounded-2xl border border-slate-200 p-4">
+          <GridLabel hint="Gilt sofort für alle Teams dieses Events.">Spieldauer</GridLabel>
+          <select
+            value={duration}
+            disabled={initial.locked}
+            onChange={(event) => setDuration(event.target.value)}
+            className="grid-input w-full rounded-xl px-4 py-3.5 text-base outline-none"
+          >
+            {durationChoices.map((minutes) => (
+              <option key={minutes} value={minutes}>
+                {minutes} Min.
+              </option>
+            ))}
+          </select>
+          {error ? <GridError message={error} /> : null}
+          {saved ? (
+            <GridSuccess message="Änderungen sind live. Die Teams können sofort starten." />
+          ) : null}
+          {initial.locked ? null : (
+            <GridButton type="submit" disabled={pending}>
+              {pending ? "Speichert…" : "Dauer speichern"}
+            </GridButton>
+          )}
+        </section>
+      )}
+
+      {initial.accesses.length > 0 ? (
+        <JourneyStep
+          number={showPrepare ? 2 : 1}
+          title="Teams einladen"
+          hint={`Spieler öffnen ${goHost} und tippen den Code — keine App.`}
+        >
+          <div className="rounded-2xl bg-teal-800 px-4 py-5 text-center text-white">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-100">
+              Code eingeben auf
+            </p>
+            <a href={goUrl} className="mt-2 inline-block font-mono text-lg font-bold tracking-wide">
+              {goHost}
+            </a>
+            <p className="mt-2 text-sm text-teal-100">
+              Alternativ den Link oder QR an den Teamlead schicken.
+            </p>
+          </div>
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={() => downloadAccessCsv(initial.title, initial.accesses)}
@@ -192,7 +409,7 @@ export function EventPortalForm({ initial }: Props) {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-slate-900">{access.team_name}</p>
-                    <p className="font-mono text-base tracking-wide text-teal-700">
+                    <p className="font-mono text-xl tracking-[0.18em] text-teal-700">
                       {access.access_code}
                     </p>
                   </div>
@@ -216,22 +433,22 @@ export function EventPortalForm({ initial }: Props) {
               );
             })}
           </ul>
-        </section>
+        </JourneyStep>
       ) : null}
 
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold text-slate-900">Fortschritt</h2>
-        <p className="text-sm leading-6 text-slate-500">
-          Grün = Aufgabe gelöst. Aktualisiert sich von selbst.
-        </p>
+      <JourneyStep
+        number={(showPrepare ? 2 : 1) + (initial.accesses.length > 0 ? 1 : 0)}
+        title="Live sehen"
+        hint="Grün = Aufgabe gelöst. Aktualisiert sich von selbst."
+      >
         <EventProgressPanel portalToken={initial.token} />
-      </section>
+      </JourneyStep>
 
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold text-slate-900">Ergebnisse</h2>
-        <p className="text-sm leading-6 text-slate-500">
-          Alle Teams dieses Events — nur mit diesem Cockpit-Link, nicht über den Invite.
-        </p>
+      <JourneyStep
+        number={(showPrepare ? 3 : 2) + (initial.accesses.length > 0 ? 1 : 0)}
+        title="Ergebnisse"
+        hint="Alle Teams dieses Events — nur mit diesem Cockpit-Link."
+      >
         <div className="flex flex-wrap gap-3">
           <a
             href={eventPortalResultsPath(initial.token)}
@@ -249,13 +466,13 @@ export function EventPortalForm({ initial }: Props) {
               : "Ergebnis-Link kopieren"}
           </button>
         </div>
-      </section>
+      </JourneyStep>
 
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold text-slate-900">Galerie</h2>
-        <p className="text-sm leading-6 text-slate-500">
-          Fotos und Videos der Teams — nur mit diesem Link, nicht über den Invite.
-        </p>
+      <JourneyStep
+        number={(showPrepare ? 4 : 3) + (initial.accesses.length > 0 ? 1 : 0)}
+        title="Galerie"
+        hint="Fotos und Videos der Teams — nur mit diesem Link."
+      >
         <div className="flex flex-wrap gap-3">
           <a
             href={eventPortalGalleryPath(initial.token)}
@@ -273,177 +490,75 @@ export function EventPortalForm({ initial }: Props) {
               : "Galerie-Link kopieren"}
           </button>
         </div>
-      </section>
+      </JourneyStep>
 
       {initial.show_intelligence ? (
-        <section className="space-y-3">
-          <h2 className="text-base font-semibold text-slate-900">Data</h2>
-          <p className="text-sm leading-6 text-slate-500">
-            Rohwerte aus dem Event. Die visuelle Zusammenfassung baut später Exitmania — hier nur
-            die Zahlen.
-          </p>
-          <EventIntelligencePanel portalToken={initial.token} />
-        </section>
-      ) : null}
-
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold text-slate-900">Spieldauer</h2>
-        <GridLabel hint="Gilt sofort für alle Teams dieses Events.">Dauer</GridLabel>
-        <select
-          value={duration}
-          disabled={initial.locked}
-          onChange={(event) => setDuration(event.target.value)}
-          className="grid-input w-full rounded-xl px-4 py-3.5 text-base outline-none"
+        <JourneyStep
+          number={(showPrepare ? 5 : 4) + (initial.accesses.length > 0 ? 1 : 0)}
+          title="Team Intelligence"
+          hint="Rohwerte aus dem Event. Die visuelle Zusammenfassung baut später Exitmania."
         >
-          {durationChoices.map((minutes) => (
-            <option key={minutes} value={minutes}>
-              {minutes} Min.
-            </option>
-          ))}
-        </select>
-      </section>
-
-      {initial.show_waypoints ? (
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">Koordinaten</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-500">
-              Nur die Zahlen überschreiben. Radius und Aufgaben bleiben unverändert.
-            </p>
-          </div>
-          {waypoints.map((waypoint) => (
-            <fieldset
-              key={waypoint.level}
-              className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4"
-            >
-              <legend className="px-1 text-sm font-semibold text-slate-800">
-                Aufgabe {waypoint.level} · {waypoint.title}
-              </legend>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <GridLabel>Latitude</GridLabel>
-                  <GridInput
-                    inputMode="decimal"
-                    disabled={initial.locked}
-                    value={Number.isFinite(waypoint.lat) ? String(waypoint.lat) : ""}
-                    onChange={(event) =>
-                      updateWaypoint(waypoint.level, event.target.value, String(waypoint.lng))
-                    }
-                  />
-                </div>
-                <div>
-                  <GridLabel>Longitude</GridLabel>
-                  <GridInput
-                    inputMode="decimal"
-                    disabled={initial.locked}
-                    value={Number.isFinite(waypoint.lng) ? String(waypoint.lng) : ""}
-                    onChange={(event) =>
-                      updateWaypoint(waypoint.level, String(waypoint.lat), event.target.value)
-                    }
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-slate-400">
-                Du kannst auch 52.37387, 9.73816 ins erste Feld einfügen.
-              </p>
-            </fieldset>
-          ))}
-        </section>
+          <EventIntelligencePanel portalToken={initial.token} />
+        </JourneyStep>
       ) : null}
-
-      {initial.show_quizzes ? (
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">Unternehmensquiz</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-500">
-              Ersetzt nur die Einstiegsfragen. Hauptaufgaben und Bonus bleiben unberührt.
-            </p>
-          </div>
-          {quizzes.map((quiz, quizIndex) => (
-            <fieldset
-              key={quiz.level}
-              className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4"
-            >
-              <legend className="px-1 text-sm font-semibold text-slate-800">
-                Aufgabe {quiz.level} · {quiz.title}
-              </legend>
-              <div>
-                <GridLabel>Frage</GridLabel>
-                <textarea
-                  disabled={initial.locked}
-                  rows={3}
-                  value={quiz.question}
-                  onChange={(event) =>
-                    setQuizzes((current) =>
-                      current.map((item, index) =>
-                        index === quizIndex ? { ...item, question: event.target.value } : item,
-                      ),
-                    )
-                  }
-                  className="grid-input w-full rounded-xl px-4 py-3 text-base outline-none"
-                  placeholder="Eure Frage an das Team"
-                />
-              </div>
-              {quiz.answers.map((answer, answerIndex) => (
-                <label key={answerIndex} className="flex items-start gap-3">
-                  <input
-                    type="radio"
-                    name={`quiz-${quiz.level}-correct`}
-                    className="mt-4"
-                    disabled={initial.locked}
-                    checked={quiz.correct_index === answerIndex}
-                    onChange={() =>
-                      setQuizzes((current) =>
-                        current.map((item, index) =>
-                          index === quizIndex
-                            ? { ...item, correct_index: answerIndex as 0 | 1 | 2 | 3 }
-                            : item,
-                        ),
-                      )
-                    }
-                  />
-                  <div className="min-w-0 flex-1">
-                    <GridLabel>
-                      Antwort {String.fromCharCode(65 + answerIndex)}
-                      {quiz.correct_index === answerIndex ? " (richtig)" : ""}
-                    </GridLabel>
-                    <GridInput
-                      disabled={initial.locked}
-                      value={answer}
-                      onChange={(event) =>
-                        setQuizzes((current) =>
-                          current.map((item, index) =>
-                            index === quizIndex
-                              ? {
-                                  ...item,
-                                  answers: item.answers.map((value, inner) =>
-                                    inner === answerIndex ? event.target.value : value,
-                                  ) as PortalSnapshot["quizzes"][number]["answers"],
-                                }
-                              : item,
-                          ),
-                        )
-                      }
-                    />
-                  </div>
-                </label>
-              ))}
-            </fieldset>
-          ))}
-        </section>
-      ) : null}
-
-      {error ? <GridError message={error} /> : null}
-      {saved ? <GridSuccess message="Änderungen sind live. Die Teams können sofort starten." /> : null}
-
-      {initial.locked ? (
-        <p className="text-sm text-slate-500">Dieses Event ist abgeschlossen.</p>
-      ) : (
-        <GridButton type="submit" disabled={pending}>
-          {pending ? "Speichert…" : "Änderungen speichern"}
-        </GridButton>
-      )}
     </form>
+  );
+}
+
+function JourneyStep({
+  number,
+  title,
+  hint,
+  children,
+}: {
+  number: number;
+  title: string;
+  hint: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
+      <div className="flex items-start gap-3 border-b border-slate-100 bg-slate-50/80 px-4 py-4 sm:px-5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-800 text-sm font-bold text-white">
+          {number}
+        </span>
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+          <p className="mt-0.5 text-sm leading-6 text-slate-500">{hint}</p>
+        </div>
+      </div>
+      <div className="space-y-4 px-4 py-5 sm:px-5">{children}</div>
+    </section>
+  );
+}
+
+function EmptyModule({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5">
+      <p className="text-sm font-semibold text-slate-800">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-slate-500">{body}</p>
+    </div>
+  );
+}
+
+function MapSketch() {
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full opacity-40"
+      viewBox="0 0 320 120"
+      aria-hidden
+    >
+      <path
+        d="M12 88 C 48 40, 90 30, 140 58 S 230 110, 308 42"
+        fill="none"
+        stroke="white"
+        strokeWidth="2"
+        strokeDasharray="6 8"
+      />
+      <circle cx="58" cy="52" r="7" fill="#5eead4" />
+      <circle cx="168" cy="70" r="7" fill="#5eead4" />
+      <circle cx="268" cy="48" r="7" fill="#5eead4" />
+    </svg>
   );
 }
 

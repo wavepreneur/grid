@@ -33,11 +33,12 @@ export function PlayCodeEntry({ initialCode = "" }: { initialCode?: string }) {
       <GridInput
         value={code}
         onChange={(event) => setCode(normalizeCode(event.target.value))}
-        placeholder="CODE"
+        placeholder="ABC123"
         autoComplete="off"
         autoCapitalize="characters"
         maxLength={10}
         aria-label="Zugangscode"
+        className="text-center font-mono text-2xl font-bold tracking-[0.22em] uppercase"
       />
       {error ? <GridError message={error} /> : null}
       <GridButton

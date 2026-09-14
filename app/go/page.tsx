@@ -7,9 +7,9 @@ export default function PlayGoPage() {
   return (
     <GridShell
       variant="welcome"
-      eyebrow="GRID"
-      title="Zugangscode"
-      description="Code vom Team oder aus der Mail eintippen — dann seid ihr im Spiel."
+      eyebrow="Spiel starten"
+      title="Team-Code"
+      description="Den Code aus der Mail oder vom Ticket hier eintippen. Keine App — dann seid ihr im Spiel."
     >
       <PlayCodeEntry />
     </GridShell>

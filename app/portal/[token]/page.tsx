@@ -40,8 +40,8 @@ export default async function EventPortalPage({ params }: Props) {
           </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight">{result.data.title}</h1>
           <p className="mt-3 max-w-xl text-sm leading-6 text-white/85">
-            Teams einladen, Fortschritt sehen, Ergebnisse teilen. Dauer und Startpunkte ändern — ohne
-            neues Spiel.
+            Fünf Schritte: Event vorbereiten, Teams einladen, live zusehen, Ergebnisse und Galerie.
+            Route und Quiz überschreiben — ohne neues Spiel.
           </p>
         </div>
       </header>

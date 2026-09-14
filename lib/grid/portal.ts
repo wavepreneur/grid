@@ -262,14 +262,14 @@ export async function loadPortalSnapshot(token: string): Promise<PortalSnapshot 
     player_seats: playerSeats,
     duration_minutes: content.missionDurationMinutes,
     content_mode: content.contentMode,
-    show_waypoints: modules.custom_routes && waypoints.length > 0 && content.capabilities.gps,
+    show_waypoints: modules.custom_routes,
     waypoints,
     quizzes,
     accesses,
     invite_code: event.invite_code,
     locked,
     modules,
-    show_quizzes: modules.custom_quiz && quizzes.length > 0,
+    show_quizzes: modules.custom_quiz,
     show_intelligence: modules.team_intelligence,
   };
 }
