@@ -30,6 +30,7 @@ type TeamEntryGateProps = {
   captainDisplayName?: string | null;
   defaultDisplayName?: string;
   studioTest?: boolean;
+  skipStoredSession?: boolean;
 };
 
 export function TeamEntryGate({
@@ -40,6 +41,7 @@ export function TeamEntryGate({
   captainDisplayName = null,
   defaultDisplayName = "",
   studioTest = false,
+  skipStoredSession = false,
 }: TeamEntryGateProps) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(defaultDisplayName);
@@ -54,6 +56,12 @@ export function TeamEntryGate({
   const isMidGame = teamStatus === "playing" || teamStatus === "finished";
 
   useEffect(() => {
+    if (skipStoredSession) {
+      abandonTeamSession();
+      setCheckingSession(false);
+      return;
+    }
+
     resolveTeamSession(inviteCode, joinCode).then((resolved) => {
       if (resolved) {
         if (studioTest && resolved.session.teamStatus !== "finished") {
@@ -67,7 +75,7 @@ export function TeamEntryGate({
       abandonTeamSession();
       setCheckingSession(false);
     });
-  }, [inviteCode, joinCode, router, studioTest]);
+  }, [inviteCode, joinCode, router, skipStoredSession, studioTest]);
 
   useEffect(() => {
     if (checkingSession) return;

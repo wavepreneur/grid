@@ -19,7 +19,7 @@ import { canStartTeamGame } from "@/lib/grid/archetype-roles";
 import { buildDefaultContentConfig, getBlueprint, isBlueprintSlug, resolveBlueprint, type BlueprintSlug } from "@/lib/grid/blueprints";
 import { parseContentConfig } from "@/lib/grid/content-engine";
 import { initializeTeamGameState } from "@/app/actions/game";
-import { needsBriefingBeforePlay } from "@/lib/cms/studio-test-session";
+import { isStudioTestEvent, needsBriefingBeforePlay, STUDIO_TEST_MAX_PLAYERS } from "@/lib/cms/studio-test-session";
 import { parseTeamGameState } from "@/lib/grid/game-state";
 import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
@@ -86,6 +86,33 @@ type ActivePlayerRow = {
 
 function lobbyTeamStatus(status: GridTeamStatus): GridTeamStatus {
   return status === "setup" ? "lobby" : status;
+}
+
+async function ensureStudioTestTeamSeats(input: {
+  event: GridEvent;
+  teamId: string;
+  teamMaxSize: number;
+}): Promise<number> {
+  if (!isStudioTestEvent(input.event)) return Math.max(1, input.teamMaxSize);
+  if (
+    input.teamMaxSize >= STUDIO_TEST_MAX_PLAYERS &&
+    input.event.max_players_per_team >= STUDIO_TEST_MAX_PLAYERS
+  ) {
+    return input.teamMaxSize;
+  }
+
+  const supabase = createAdminClient();
+  await Promise.all([
+    supabase
+      .from("teams")
+      .update({ max_size: STUDIO_TEST_MAX_PLAYERS })
+      .eq("id", input.teamId),
+    supabase
+      .from("events")
+      .update({ max_players_per_team: STUDIO_TEST_MAX_PLAYERS })
+      .eq("id", input.event.id),
+  ]);
+  return STUDIO_TEST_MAX_PLAYERS;
 }
 
 /**
@@ -857,6 +884,12 @@ export async function joinTeamAsPlayer(input: {
       return { success: false, error: "Dieses Team ist nicht mehr aktiv." };
     }
 
+    await ensureStudioTestTeamSeats({
+      event,
+      teamId: team.id,
+      teamMaxSize: team.max_size,
+    });
+
     const supabase = createAdminClient();
     const existingPlayer = await findActivePlayerByDisplayName(team.id, displayName);
 
@@ -1079,6 +1112,12 @@ export async function getLobbySnapshot(input: {
     if (!team) {
       return { success: false, error: "Team nicht gefunden." };
     }
+
+    await ensureStudioTestTeamSeats({
+      event,
+      teamId: team.id,
+      teamMaxSize: team.max_size,
+    });
 
     if (input.sessionId) {
       const player = await getPlayerBySessionId(input.sessionId);
@@ -1355,6 +1394,12 @@ export async function listActiveTeamJoinRoster(input: {
       return { success: true, data: { members: [], seatsLeft: 0, maxSize: team.max_size } };
     }
 
+    const maxSize = await ensureStudioTestTeamSeats({
+      event,
+      teamId: team.id,
+      teamMaxSize: team.max_size,
+    });
+
     const supabase = createAdminClient();
     const { data, error } = await supabase
       .from("players")
@@ -1375,8 +1420,8 @@ export async function listActiveTeamJoinRoster(input: {
       success: true,
       data: {
         members,
-        seatsLeft: Math.max(0, team.max_size - members.length),
-        maxSize: team.max_size,
+        seatsLeft: Math.max(0, maxSize - members.length),
+        maxSize,
       },
     };
   } catch (error) {

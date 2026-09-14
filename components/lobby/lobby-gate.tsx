@@ -27,7 +27,10 @@ type LobbyGateProps = {
   eventTitle?: string;
   briefingIframeUrl?: string | null;
   roleLabels?: RoleDisplayLabels | null;
+  /** Briefing + Start first (Studio test or GRID pilot). */
   studioTest?: boolean;
+  /** Studio „Testen“ — invite up to 3, even when currently alone. */
+  studioPlaytest?: boolean;
   eventContent?: ResolvedEventContent | null;
 };
 
@@ -57,6 +60,7 @@ export function LobbyGate({
   briefingIframeUrl = null,
   roleLabels = null,
   studioTest = false,
+  studioPlaytest = false,
   eventContent = null,
 }: LobbyGateProps) {
   const router = useRouter();
@@ -84,12 +88,8 @@ export function LobbyGate({
         if (cancelled) return;
 
         if (!resolved) {
-          if (isStudio) {
-            setError("Session nicht gefunden. Bitte Namen erneut eingeben.");
-            return;
-          }
           abandonTeamSession();
-          routerRef.current.replace(eventTeamJoinPath(inviteCode, joinCode));
+          routerRef.current.replace(`${eventTeamJoinPath(inviteCode, joinCode)}?rejoin=1`);
           return;
         }
 
@@ -194,6 +194,7 @@ export function LobbyGate({
       briefingIframeUrl={briefingIframeUrl}
       roleLabels={roleLabels}
       studioTest={isStudio}
+      studioPlaytest={studioPlaytest || Boolean(eventContent?.isStudioTest)}
     />
   );
 }

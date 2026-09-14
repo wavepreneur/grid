@@ -21,6 +21,7 @@ type IdentityBarProps = {
   showManageTeam?: boolean;
   showEventHome?: boolean;
   showCopyPlayLink?: boolean;
+  showReleaseSeat?: boolean;
 };
 
 function roleLabel(session: PlayerSession): string {
@@ -37,6 +38,7 @@ export function IdentityBar({
   showManageTeam = true,
   showEventHome = true,
   showCopyPlayLink = false,
+  showReleaseSeat = true,
 }: IdentityBarProps) {
   const router = useRouter();
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
@@ -51,7 +53,7 @@ export function IdentityBar({
       });
       clearPlayerSession();
       abandonTeamSession();
-      window.location.href = eventTeamJoinPath(inviteCode, joinCode);
+      window.location.href = `${eventTeamJoinPath(inviteCode, joinCode)}?rejoin=1`;
     });
   }
 
@@ -119,14 +121,16 @@ export function IdentityBar({
               Team verwalten
             </button>
           ) : null}
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={handleReleaseSeat}
-            className="rounded-lg px-2.5 py-1 text-xs font-medium text-teal-600 hover:bg-teal-50 disabled:opacity-50"
-          >
-            {isPending ? "…" : "Platz freigeben"}
-          </button>
+          {showReleaseSeat ? (
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={handleReleaseSeat}
+              className="rounded-lg px-2.5 py-1 text-xs font-medium text-teal-600 hover:bg-teal-50 disabled:opacity-50"
+            >
+              {isPending ? "…" : "Platz freigeben"}
+            </button>
+          ) : null}
           {showEventHome ? (
             <button
               type="button"

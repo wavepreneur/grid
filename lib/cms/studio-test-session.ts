@@ -51,3 +51,13 @@ export function studioNeedsBriefing(input: {
 }
 
 export const STUDIO_TEST_MAX_PLAYERS = 3;
+
+/** Studio playtests always have 3 seats. GRID pilots / live bookings keep their booked size. */
+export function effectiveTeamSeatCap(
+  event: Parameters<typeof isStudioTestEvent>[0],
+  teamMaxSize: number,
+): number {
+  const size = Math.max(1, teamMaxSize);
+  if (isStudioTestEvent(event)) return Math.max(STUDIO_TEST_MAX_PLAYERS, size);
+  return size;
+}

@@ -54,6 +54,7 @@ import type {
 } from "@/lib/grid/level-types";
 import { applyCaptainTransferToPlayers, applyRosterToSession, rosterWithHeldCaptain, sessionAfterCaptainTransfer } from "@/lib/grid/live-session";
 import { nextLeadSeq, noteLeadSeq, parseLeadSeq } from "@/lib/grid/lead-seq";
+import { abandonTeamSession } from "@/lib/grid/session-recovery";
 import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
 import type { LobbyPlayer, PlayerSession } from "@/lib/grid/types";
 import { usesPhasedPlay } from "@/lib/grid/play-slots";
@@ -327,6 +328,7 @@ export function GameRoom({
     (eventContent.levels.length === 1 ? eventContent.levels[0] : null);
   const isNavigator = session.canUnlockGps || Boolean(teamState.isNavigator);
   const soloAlpha = session.isAlpha && session.effectiveBeta;
+  const canReleaseOwnSeat = lobbyPlayers.length > 1;
   const purchasedTileHints = teamState.gameState.purchased_tile_hints[String(activeLevel)] ?? {};
   const solveDisabled = levelState?.status !== "active" || Boolean(modal) || isHintPending;
 
@@ -813,8 +815,9 @@ export function GameRoom({
         return;
       }
       clearPlayerSession();
+      abandonTeamSession();
       clearWalkedDistanceStorage(walkStorageKey);
-      router.replace(eventTeamJoinPath(inviteCode, joinCode));
+      router.replace(`${eventTeamJoinPath(inviteCode, joinCode)}?rejoin=1`);
     });
   }
 
@@ -1016,7 +1019,7 @@ export function GameRoom({
         onReleasePlayerSeat={isAlpha ? handleReleasePlayerSeat : undefined}
         transferPending={transferPending}
         onReclaimSession={() => setSessionSuperseded(true)}
-        onReleaseMySeat={handleReleaseMySeat}
+        onReleaseMySeat={canReleaseOwnSeat ? handleReleaseMySeat : undefined}
         releasePending={releasePending}
         onArriveOutdoor={handleArriveOutdoor}
         onSolveGpsCheckpoint={handleSolveGpsCheckpoint}
@@ -1147,6 +1150,7 @@ export function GameRoom({
           joinCode={joinCode}
           session={session}
           showCopyPlayLink
+          showReleaseSeat={canReleaseOwnSeat}
         />
         {!sessionSuperseded && !isFinished ? (
           <GameHud

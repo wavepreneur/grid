@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GridShell } from "@/components/grid/grid-shell";
 import { LobbyGate } from "@/components/lobby/lobby-gate";
-import { needsBriefingBeforePlay } from "@/lib/cms/studio-test-session";
+import { isStudioTestEvent, needsBriefingBeforePlay } from "@/lib/cms/studio-test-session";
 
 type EventLobbyPageProps = {
   params: Promise<{ inviteCode: string; joinCode: string }>;
@@ -26,6 +26,7 @@ export default async function EventLobbyPage({ params, searchParams }: EventLobb
   if (!teamResult.success) notFound();
 
   const holdForBriefing = needsBriefingBeforePlay(eventResult.data);
+  const studioPlaytest = isStudioTestEvent(eventResult.data);
   const title = eventResult.data.title.replace(/^\[Test\]\s*/, "");
 
   return (
@@ -45,6 +46,7 @@ export default async function EventLobbyPage({ params, searchParams }: EventLobb
         manageMode={manageMode}
         eventTitle={title}
         studioTest={holdForBriefing}
+        studioPlaytest={studioPlaytest}
       />
     </GridShell>
   );

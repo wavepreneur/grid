@@ -8,12 +8,12 @@ import { eventPath } from "@/lib/grid/event-routes";
 
 type EventTeamPageProps = {
   params: Promise<{ inviteCode: string; joinCode: string }>;
-  searchParams: Promise<{ name?: string }>;
+  searchParams: Promise<{ name?: string; rejoin?: string }>;
 };
 
 export default async function EventTeamPage({ params, searchParams }: EventTeamPageProps) {
   const { inviteCode, joinCode } = await params;
-  const { name } = await searchParams;
+  const { name, rejoin } = await searchParams;
   const normalizedInvite = inviteCode.toUpperCase();
   const normalizedJoin = joinCode.toUpperCase();
 
@@ -67,6 +67,7 @@ export default async function EventTeamPage({ params, searchParams }: EventTeamP
         captainDisplayName={captainName}
         defaultDisplayName={name?.trim() ?? ""}
         studioTest={studioTest}
+        skipStoredSession={rejoin === "1"}
       />
     </GridShell>
   );

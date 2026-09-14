@@ -50,7 +50,9 @@ import {
   persistStartProgress,
   startOverlayCopy,
 } from "@/lib/grid/mission-start-signal";
+import { STUDIO_TEST_MAX_PLAYERS } from "@/lib/cms/studio-test-session";
 import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
+import { abandonTeamSession } from "@/lib/grid/session-recovery";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
 
 type LobbyRoomProps = {
@@ -62,8 +64,10 @@ type LobbyRoomProps = {
   eventTitle?: string;
   briefingIframeUrl?: string | null;
   roleLabels?: RoleDisplayLabels | null;
-  /** Studio test sessions may invite freely; live bookings are capped by paid seats. */
+  /** Briefing + Start first (Studio test or GRID pilot). */
   studioTest?: boolean;
+  /** Studio „Testen“ — seats stay at 3 so extra devices can join. */
+  studioPlaytest?: boolean;
 };
 
 function playerIsTeamLead(snapshot: LobbySnapshot, session: PlayerSession): boolean {
@@ -94,6 +98,7 @@ export function LobbyRoom({
   briefingIframeUrl = null,
   roleLabels = null,
   studioTest = false,
+  studioPlaytest = false,
 }: LobbyRoomProps) {
   const router = useRouter();
   const labels = roleLabels ?? DEFAULT_ROLE_LABELS;
@@ -441,7 +446,8 @@ export function LobbyRoom({
       }
 
       clearPlayerSession();
-      router.replace(eventTeamJoinPath(inviteCode, joinCode));
+      abandonTeamSession();
+      router.replace(`${eventTeamJoinPath(inviteCode, joinCode)}?rejoin=1`);
     });
   }
 
@@ -541,15 +547,19 @@ export function LobbyRoom({
   const isPlaying = snapshot.team_status === "playing";
   const playerCount = snapshot.active_player_count;
   const aloneNow = playerCount <= 1;
-  const teamAllowsMore = snapshot.max_size > 1;
+  const seatCap = studioPlaytest
+    ? Math.max(snapshot.max_size, STUDIO_TEST_MAX_PLAYERS)
+    : snapshot.max_size;
+  const teamAllowsMore = seatCap > 1;
   const canManageRoles = isAlpha && (isLobby || manageMode) && !aloneNow;
   const canStart = playerCount >= 1;
   const canInviteTeammates =
     isAlpha &&
     teamAllowsMore &&
-    playerCount < snapshot.max_size &&
+    playerCount < seatCap &&
     (isLobby || (manageMode && isPlaying));
-  const showTeamInvite = canInviteTeammates && !aloneNow;
+  const showTeamInvite = canInviteTeammates;
+  const showHandover = (isLobby || manageMode) && playerCount > 1;
   const showAutoStartCountdown =
     isLobby &&
     !studioTest &&
@@ -601,9 +611,9 @@ export function LobbyRoom({
             </p>
             <p className="mt-1 text-xl font-bold text-slate-900">{snapshot.team_name}</p>
             <p className="mt-1 text-sm text-slate-600">
-              {aloneNow
+              {aloneNow && !teamAllowsMore
                 ? `Hallo ${session.displayName} — lies kurz die Infos, dann kannst du starten.`
-                : `Hallo ${session.displayName} · ${playerCount}/${snapshot.max_size} im Team`}
+                : `Hallo ${session.displayName} · ${playerCount}/${seatCap} im Team`}
             </p>
           </div>
 
@@ -720,10 +730,10 @@ export function LobbyRoom({
           {showTeamInvite ? (
             <div className="space-y-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5">
               <p className="text-center text-sm font-semibold text-slate-800">
-                Freunde einladen
+                {studioPlaytest ? "Weitere Testgeräte einladen" : "Freunde einladen"}
               </p>
               <p className="text-center text-xs text-slate-500">
-                Noch {snapshot.max_size - playerCount} von {snapshot.max_size} Plätzen frei
+                Noch {seatCap - playerCount} von {seatCap} Plätzen frei
               </p>
               {teammateUrl ? (
                 <>
@@ -762,7 +772,7 @@ export function LobbyRoom({
                 Rollen verwalten
               </button>
             ) : null}
-            {(isLobby || manageMode) ? (
+            {showHandover ? (
               <GridButton type="button" variant="ghost" disabled={Boolean(busy) || isPending} onClick={handleHandover}>
                 Platz freigeben
               </GridButton>
