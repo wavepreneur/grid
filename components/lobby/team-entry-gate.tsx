@@ -19,7 +19,9 @@ import {
 } from "@/lib/grid/session-recovery";
 import { eventLobbyPath } from "@/lib/grid/event-routes";
 import { teamEntryPath } from "@/lib/grid/team-routes";
+import { cacheEventContent } from "@/lib/grid/offline-content";
 import { savePlayerSession } from "@/lib/grid/player-session";
+import type { ResolvedEventContent } from "@/lib/grid/level-types";
 import type { GridTeamStatus } from "@/lib/grid/types";
 
 type TeamEntryGateProps = {
@@ -31,6 +33,7 @@ type TeamEntryGateProps = {
   defaultDisplayName?: string;
   studioTest?: boolean;
   skipStoredSession?: boolean;
+  eventContent?: ResolvedEventContent | null;
 };
 
 export function TeamEntryGate({
@@ -42,6 +45,7 @@ export function TeamEntryGate({
   defaultDisplayName = "",
   studioTest = false,
   skipStoredSession = false,
+  eventContent = null,
 }: TeamEntryGateProps) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(defaultDisplayName);
@@ -54,6 +58,10 @@ export function TeamEntryGate({
   const [isPending, startTransition] = useTransition();
 
   const isMidGame = teamStatus === "playing" || teamStatus === "finished";
+
+  useEffect(() => {
+    if (eventContent) cacheEventContent(inviteCode, eventContent);
+  }, [eventContent, inviteCode]);
 
   useEffect(() => {
     if (skipStoredSession) {

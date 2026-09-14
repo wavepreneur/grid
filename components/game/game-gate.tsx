@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getEventContent } from "@/app/actions/content";
 import { getGameState, prepareTeamGame } from "@/app/actions/game";
-import { rewindUnplayedStudioTestToLobby } from "@/app/actions/lobby";
 import { GameRoom } from "@/components/game/game-room";
 import { GameGateSkeleton } from "@/components/game/game-gate-skeleton";
 import { GridError } from "@/components/grid/grid-shell";
@@ -39,14 +38,30 @@ type GameGateProps = {
   holdForBriefing?: boolean;
 };
 
-const PLAY_READY_TIMEOUT_MS = 45_000;
+const PLAY_READY_TIMEOUT_MS = 12_000;
+const CONTENT_TIMEOUT_MS = 12_000;
 
 function isPlayReady(result: Awaited<ReturnType<typeof getGameState>>): boolean {
   return (
     result.success &&
-    (result.data.status === "playing" || result.data.status === "finished") &&
-    result.data.gameState.content_ready !== false
+    (result.data.status === "playing" || result.data.status === "finished")
   );
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("timeout")), ms);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 /** Open GameRoom only after the team row is playing (and content is ready). */
@@ -62,13 +77,6 @@ async function waitForPlayReady(
   let last = await getGameState(input);
   while (!isCancelled() && !isPlayReady(last)) {
     if (Date.now() - started >= PLAY_READY_TIMEOUT_MS) break;
-    if (
-      last.success &&
-      (last.data.status === "playing" || last.data.status === "finished") &&
-      last.data.gameState.content_ready === false
-    ) {
-      void prepareTeamGame(input);
-    }
     await new Promise((resolve) => window.setTimeout(resolve, 200));
     last = await getGameState(input);
   }
@@ -168,21 +176,14 @@ export function GameGate({
       }
 
       const starting = isMissionStarting(inviteCode, joinCode);
+      const briefingDone = peek.data.gameState.briefing_confirmed === true;
       const studioNeedsBriefing =
         holdForBriefing &&
         !starting &&
-        (peek.data.status === "lobby" ||
-          peek.data.status === "setup" ||
-          (peek.data.status === "playing" && !peek.data.gameState.briefing_confirmed));
+        !briefingDone &&
+        (peek.data.status === "lobby" || peek.data.status === "setup");
 
       if (studioNeedsBriefing) {
-        if (peek.data.status === "playing") {
-          await rewindUnplayedStudioTestToLobby({
-            inviteCode,
-            joinCode,
-            sessionId: resolved.session.sessionId,
-          });
-        }
         router.replace(eventLobbyPath(inviteCode, joinCode));
         return;
       }
@@ -196,14 +197,20 @@ export function GameGate({
             revision: contentRevisionRef.current,
             error: null as string | null,
           })
-        : getEventContent(inviteCode).then((result) => {
-            const content = unwrapContent(result);
-            return {
-              content,
-              revision: result.success ? result.data.contentRevision : 1,
-              error: content ? null : (result.success ? null : result.error),
-            };
-          });
+        : withTimeout(getEventContent(inviteCode), CONTENT_TIMEOUT_MS)
+            .then((result) => {
+              const content = unwrapContent(result);
+              return {
+                content,
+                revision: result.success ? result.data.contentRevision : 1,
+                error: content ? null : (result.success ? null : result.error),
+              };
+            })
+            .catch(() => ({
+              content: loadCachedEventContent(inviteCode),
+              revision: contentRevisionRef.current,
+              error: "Inhalt dauert zu lange. Bitte Start erneut tippen.",
+            }));
 
       const playPromise = isPlayReady(peek)
         ? Promise.resolve(peek)
@@ -225,9 +232,21 @@ export function GameGate({
       }
 
       if (!isPlayReady(gameResult)) {
+        if (holdForBriefing && !starting && gameResult.data.status !== "playing") {
+          router.replace(eventLobbyPath(inviteCode, joinCode));
+          return;
+        }
+        setError("Start dauert zu lange. Bitte Start noch einmal tippen.");
         clearMissionStarting(inviteCode, joinCode);
-        router.replace(eventLobbyPath(inviteCode, joinCode));
         return;
+      }
+
+      if (gameResult.data.gameState.content_ready === false) {
+        void prepareTeamGame({
+          inviteCode,
+          joinCode,
+          sessionId: resolved.session.sessionId,
+        });
       }
 
       let freshContent = contentResult.content;
@@ -262,7 +281,6 @@ export function GameGate({
       setInitialState(gameResult);
       setProgress(100);
       persistStartProgress(inviteCode, joinCode, 100);
-      await new Promise((resolve) => window.setTimeout(resolve, 120));
       if (cancelled) return;
       clearMissionStarting(inviteCode, joinCode);
       setReady(true);

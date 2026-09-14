@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { cacheEventContent } from "@/lib/grid/offline-content";
+import type { ResolvedEventContent } from "@/lib/grid/level-types";
 import { ArrowRight, Flag, User } from "lucide-react";
 import {
   createTeamAsCaptain,
@@ -22,6 +24,7 @@ type CaptainSetupFormProps = {
   studioTest?: boolean;
   /** Event cap — form no longer asks for size. */
   maxPlayersPerTeam?: number;
+  eventContent?: ResolvedEventContent | null;
 };
 
 export function CaptainSetupForm({
@@ -29,9 +32,14 @@ export function CaptainSetupForm({
   joinCode,
   studioTest = false,
   maxPlayersPerTeam = 4,
+  eventContent = null,
 }: CaptainSetupFormProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (eventContent) cacheEventContent(inviteCode, eventContent);
+  }, [eventContent, inviteCode]);
   const isPrebooked = Boolean(joinCode);
   const teamCap = Math.min(MAX_PLAYERS_PER_TEAM, Math.max(1, maxPlayersPerTeam));
 

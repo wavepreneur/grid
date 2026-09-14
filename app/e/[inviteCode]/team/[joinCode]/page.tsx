@@ -68,6 +68,7 @@ export default async function EventTeamPage({ params, searchParams }: EventTeamP
         defaultDisplayName={name?.trim() ?? ""}
         studioTest={studioTest}
         skipStoredSession={rejoin === "1"}
+        eventContent={content}
       />
     </GridShell>
   );

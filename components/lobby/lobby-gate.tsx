@@ -18,6 +18,7 @@ import {
   abandonTeamSession,
   resolveTeamSession,
 } from "@/lib/grid/session-recovery";
+import { isMissionStarting } from "@/lib/grid/mission-start-signal";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
 
 type LobbyGateProps = {
@@ -104,12 +105,22 @@ export function LobbyGate({
           return;
         }
 
+        // Studio/pilot: rewind only an unconfirmed auto-start. After Alpha taps
+        // Start, send them to play instead of trapping them in the waiting room.
         if (isStudio && teamStatus === "playing" && !manageMode) {
-          await rewindUnplayedStudioTestToLobby({
+          if (isMissionStarting(inviteCode, joinCode)) {
+            routerRef.current.replace(eventPlayPath(inviteCode, joinCode));
+            return;
+          }
+          const rewind = await rewindUnplayedStudioTestToLobby({
             inviteCode,
             joinCode,
             sessionId: resolved.session.sessionId,
           });
+          if (!rewind.success || !rewind.data.rewound) {
+            routerRef.current.replace(eventPlayPath(inviteCode, joinCode));
+            return;
+          }
         }
 
         const result = await withTimeout(

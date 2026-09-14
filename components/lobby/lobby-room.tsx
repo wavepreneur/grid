@@ -166,9 +166,8 @@ export function LobbyRoom({
   }, [inviteCode, joinCode]);
 
   useEffect(() => {
-    if (studioTest) return;
     router.prefetch(eventPlayPath(inviteCode, joinCode));
-  }, [inviteCode, joinCode, router, studioTest]);
+  }, [inviteCode, joinCode, router]);
 
   const goToPlay = useCallback(() => {
     if (manageMode) return;
@@ -209,13 +208,12 @@ export function LobbyRoom({
     }
 
     // Polling often sees "playing" before/without Realtime — never leave the lobby stuck.
-    // Studio-Test stays until Alpha taps Start (briefing first, timer off).
-    if (
-      !studioTest &&
-      (result.data.team_status === "playing" || result.data.team_status === "finished")
-    ) {
-      goToPlay();
-      return;
+    // Studio/pilot stay until Alpha taps Start; after that briefing_confirmed opens play.
+    if (result.data.team_status === "playing" || result.data.team_status === "finished") {
+      if (!studioTest || result.data.briefing_confirmed) {
+        goToPlay();
+        return;
+      }
     }
 
     const heldId = holdCaptainIdRef.current;
@@ -257,7 +255,7 @@ export function LobbyRoom({
   const handleTeamStatusChange = useCallback(
     (status: string) => {
       if (status === "playing" || status === "finished") {
-        if (!studioTest) goToPlay();
+        if (!studioTest || snapshot.briefing_confirmed) goToPlay();
         else void refreshLobby();
         return;
       }
@@ -265,7 +263,7 @@ export function LobbyRoom({
       void refreshLobby();
       void syncSessionFromServer();
     },
-    [goToPlay, refreshLobby, studioTest, syncSessionFromServer],
+    [goToPlay, refreshLobby, snapshot.briefing_confirmed, studioTest, syncSessionFromServer],
   );
 
   const handlePlayersChange = useCallback(
@@ -308,6 +306,7 @@ export function LobbyRoom({
     onSyncEvent: (event) => {
       if (event.event_type === "game_started" || event.event_type === "game_finished") {
         if (studioTest && event.event_type === "game_started") {
+          goToPlay();
           return;
         }
         const count = Number(event.payload.player_count);
@@ -353,11 +352,10 @@ export function LobbyRoom({
 
   // Belt-and-suspenders: any path that marks the snapshot as playing must leave the lobby.
   useEffect(() => {
-    if (studioTest) return;
     if (snapshot.team_status === "playing" || snapshot.team_status === "finished") {
-      goToPlay();
+      if (!studioTest || snapshot.briefing_confirmed) goToPlay();
     }
-  }, [goToPlay, snapshot.team_status, studioTest]);
+  }, [goToPlay, snapshot.briefing_confirmed, snapshot.team_status, studioTest]);
 
   useEffect(() => {
     if (snapshot.team_status !== "lobby") return;
@@ -424,6 +422,7 @@ export function LobbyRoom({
         player_count: snapshot.players.length,
       });
       goToPlay();
+      startInFlightRef.current = false;
     });
   }
 

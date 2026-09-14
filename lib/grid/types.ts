@@ -88,6 +88,8 @@ export type LobbySnapshot = {
   beta_player_id: string | null;
   active_player_count: number;
   players: LobbyPlayer[];
+  /** Alpha already tapped Start — lobby must not hold the team. */
+  briefing_confirmed?: boolean;
 };
 
 export type PlayerSession = {

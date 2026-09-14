@@ -1034,11 +1034,21 @@ export async function initializeTeamGameState(
           startDef,
         )
       : undefined;
+  const { data: latest } = await supabase
+    .from("teams")
+    .select("game_state")
+    .eq("id", teamId)
+    .maybeSingle();
+  const keepBriefing =
+    parseTeamGameState(latest?.game_state).briefing_confirmed === true ||
+    parsed?.briefing_confirmed === true;
+
   const gameStateWithStart = {
     ...initialState,
     levels: stampedState,
     content_ready: true,
     current_phase: startPhase ?? "hub",
+    briefing_confirmed: keepBriefing,
   };
 
   await supabase

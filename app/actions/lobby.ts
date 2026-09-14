@@ -1171,6 +1171,7 @@ export async function getLobbySnapshot(input: {
         data: {
           ...data,
           players: Array.isArray(data.players) ? data.players : [],
+          briefing_confirmed: parseTeamGameState(team.game_state).briefing_confirmed === true,
         },
       };
     };
@@ -1236,17 +1237,8 @@ export async function startGameManually(input: {
       return startGate;
     }
 
-    await initializeTeamGameState(
-      team.id,
-      player.id,
-      event.id,
-      event.organization_id,
-      event.city_id,
-      event.content_config,
-      event.route_override,
-      event.studio_game_version_id,
-    );
-
+    // Status flip only. Mission compile happens in the lobby via prepareTeamGame
+    // so Start is not blocked by a second loadResolvedEventContent call.
     const startedAt = new Date().toISOString();
     const supabase = createAdminClient();
     const { data: readyRow } = await supabase
