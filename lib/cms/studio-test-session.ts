@@ -7,6 +7,10 @@ export function isStudioTestBookingReference(ref: string | null | undefined): bo
   return typeof ref === "string" && ref.startsWith("studio:test:");
 }
 
+export function isPilotBookingReference(ref: string | null | undefined): boolean {
+  return typeof ref === "string" && ref.startsWith("exitmania:pilot:");
+}
+
 export function isStudioTestEvent(event: {
   booking_reference?: string | null;
   content_config?: unknown;
@@ -22,13 +26,25 @@ export function isStudioTestEvent(event: {
   return false;
 }
 
-/** Studio tests stay in the start room until Alpha taps Start. */
+/**
+ * Studio tests and Exitmania GRID pilots: briefing + Start, no auto-start.
+ * Live booked events keep their roster timer.
+ */
+export function needsBriefingBeforePlay(event: {
+  booking_reference?: string | null;
+  content_config?: unknown;
+  title?: string | null;
+}): boolean {
+  return isStudioTestEvent(event) || isPilotBookingReference(event.booking_reference);
+}
+
+/** Hold on the start room until Alpha taps Start. */
 export function studioNeedsBriefing(input: {
-  event: Parameters<typeof isStudioTestEvent>[0];
+  event: Parameters<typeof needsBriefingBeforePlay>[0];
   teamStatus?: string | null;
   briefingConfirmed?: boolean;
 }): boolean {
-  if (!isStudioTestEvent(input.event)) return false;
+  if (!needsBriefingBeforePlay(input.event)) return false;
   if (input.teamStatus === "finished") return false;
   if (input.teamStatus === "playing" && input.briefingConfirmed) return false;
   return true;

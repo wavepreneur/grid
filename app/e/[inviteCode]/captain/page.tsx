@@ -3,7 +3,7 @@ import { getEventContent } from "@/app/actions/content";
 import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GridShell } from "@/components/grid/grid-shell";
 import { CaptainSetupForm } from "@/components/lobby/captain-setup-form";
-import { isStudioTestEvent } from "@/lib/cms/studio-test-session";
+import { isStudioTestEvent, needsBriefingBeforePlay } from "@/lib/cms/studio-test-session";
 import { eventLobbyPath, eventPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
 import Link from "next/link";
 
@@ -22,16 +22,20 @@ export default async function EventCaptainPage({ params, searchParams }: EventCa
   if (!eventResult.success) notFound();
 
   const studioTest = isStudioTestEvent(eventResult.data);
+  const holdForBriefing = needsBriefingBeforePlay(eventResult.data);
 
-  // Prebooked / Studio-Test link with join code: once the lead finished setup,
-  // teammates must land on the join form (name only) — not captain setup again.
+  // Prebooked / Studio-Test / GRID-Pilot: after names, the lead stays in the
+  // start room. Teammates of live games still use the join form.
   if (normalizedJoin) {
     const teamResult = await resolveTeamJoinCode({
       inviteCode: normalizedInvite,
       joinCode: normalizedJoin,
     });
     if (teamResult.success && teamResult.data.teamStatus !== "setup") {
-      if (studioTest && teamResult.data.teamStatus !== "finished") {
+      if (
+        teamResult.data.teamStatus === "lobby" ||
+        (holdForBriefing && teamResult.data.teamStatus !== "finished")
+      ) {
         redirect(eventLobbyPath(normalizedInvite, teamResult.data.joinCode));
       } else {
         redirect(eventTeamJoinPath(normalizedInvite, teamResult.data.joinCode));

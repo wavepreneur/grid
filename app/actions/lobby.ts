@@ -19,7 +19,7 @@ import { canStartTeamGame } from "@/lib/grid/archetype-roles";
 import { buildDefaultContentConfig, getBlueprint, isBlueprintSlug, resolveBlueprint, type BlueprintSlug } from "@/lib/grid/blueprints";
 import { parseContentConfig } from "@/lib/grid/content-engine";
 import { initializeTeamGameState } from "@/app/actions/game";
-import { isStudioTestEvent } from "@/lib/cms/studio-test-session";
+import { needsBriefingBeforePlay } from "@/lib/cms/studio-test-session";
 import { parseTeamGameState } from "@/lib/grid/game-state";
 import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
@@ -261,16 +261,16 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
     .single();
 
   if (!event) return;
-  // Studio-Test: briefing + manual start. Never skip the waiting room.
-  if (isStudioTestEvent(event)) return;
+  // Studio-Test + GRID-Pilot: briefing + manual start. Never skip the waiting room.
+  if (needsBriefingBeforePlay(event)) return;
 
-  const activePlayerCount = await countActivePlayers(teamId);
-  const rosterFull = activePlayerCount >= team.max_size;
   const timerExpired =
     Boolean(team.lobby_auto_start_at) &&
     new Date(team.lobby_auto_start_at).getTime() <= Date.now();
 
-  if (!rosterFull && !timerExpired) return;
+  // Wait for the countdown even when the roster is full (solo max_size 1
+  // used to start in the same request as name entry — skipping the lobby).
+  if (!timerExpired) return;
 
   const startGate = await assertCanStartGame(event as GridEvent, teamId);
   if (!startGate.success) return;
@@ -330,7 +330,7 @@ export async function rewindUnplayedStudioTestToLobby(input: {
     if (!event) {
       return { success: false, error: "Event nicht gefunden." };
     }
-    if (!isStudioTestEvent(event)) {
+    if (!needsBriefingBeforePlay(event)) {
       return { success: true, data: { rewound: false } };
     }
 
@@ -519,11 +519,11 @@ export async function createTeamAsCaptain(input: {
     const supabase = createAdminClient();
     const joinCode = generateJoinCode();
     const sessionId = randomUUID();
-    const studioTest = isStudioTestEvent(event);
+    const holdForBriefing = needsBriefingBeforePlay(event);
     const autoStartSeconds =
       event.lobby_auto_start_seconds || DEFAULT_LOBBY_AUTO_START_SECONDS;
     const lobbyOpenedAt = new Date();
-    const lobbyAutoStartAt = studioTest
+    const lobbyAutoStartAt = holdForBriefing
       ? null
       : computeLobbyAutoStartAt({
           autoStartSeconds,
@@ -581,7 +581,7 @@ export async function createTeamAsCaptain(input: {
       await supabase.from("events").update({ status: "lobby" }).eq("id", event.id);
     }
 
-    if (!studioTest) {
+    if (!holdForBriefing) {
       await maybeAutoStartTeam(team.id);
     }
 
@@ -954,15 +954,15 @@ export async function joinTeamAsPlayer(input: {
     // Minimal sync work before responding — lead already saw the insert via Realtime.
     // Full rebalance + auto-start continue in the background so the joiner is not blocked.
     const activeCount = activeBeforeJoin + 1;
+    const holdForBriefing = needsBriefingBeforePlay(event);
     const teamPatch: Record<string, unknown> = {};
     if (isFirst) {
       const lobbyOpenedAt = new Date();
-      const studioTest = isStudioTestEvent(event);
       teamPatch.captain_player_id = player.id;
       teamPatch.navigator_player_id = player.id;
       teamPatch.status = "lobby";
       teamPatch.lobby_opened_at = lobbyOpenedAt.toISOString();
-      teamPatch.lobby_auto_start_at = studioTest
+      teamPatch.lobby_auto_start_at = holdForBriefing
         ? null
         : computeLobbyAutoStartAt({
             autoStartSeconds:
@@ -979,6 +979,7 @@ export async function joinTeamAsPlayer(input: {
         teamPatch.status = "lobby";
       }
       if (
+        !holdForBriefing &&
         activeCount >= team.max_size &&
         (team.status === "lobby" || team.status === "setup")
       ) {
@@ -1139,7 +1140,7 @@ export async function getLobbySnapshot(input: {
     if (!first.success) return first;
 
     // Studio tests stay in briefing until Start — never compile/auto-start here.
-    if (team.status === "lobby" && !isStudioTestEvent(event)) {
+    if (team.status === "lobby" && !needsBriefingBeforePlay(event)) {
       await maybeAutoStartTeam(team.id);
       const next = await loadSnapshot();
       if (next.success) return next;
@@ -1443,11 +1444,11 @@ export async function setupPrebookedTeamAsCaptain(input: {
 
     const supabase = createAdminClient();
     const sessionId = randomUUID();
-    const studioTest = isStudioTestEvent(event);
+    const holdForBriefing = needsBriefingBeforePlay(event);
     const autoStartSeconds =
       event.lobby_auto_start_seconds || DEFAULT_LOBBY_AUTO_START_SECONDS;
     const lobbyOpenedAt = new Date();
-    const lobbyAutoStartAt = studioTest
+    const lobbyAutoStartAt = holdForBriefing
       ? null
       : computeLobbyAutoStartAt({
           autoStartSeconds,
@@ -1496,7 +1497,7 @@ export async function setupPrebookedTeamAsCaptain(input: {
       return { success: false, error: teamError.message };
     }
 
-    if (!studioTest) {
+    if (!holdForBriefing) {
       await maybeAutoStartTeam(team.id);
     }
 

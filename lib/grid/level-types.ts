@@ -316,6 +316,8 @@ export type ResolvedEventContent = {
   roleLabels?: import("@/lib/grid/role-labels").RoleDisplayLabels;
   /** Studio „Testen“ session — GPS may be triggered remotely. */
   isStudioTest?: boolean;
+  /** Briefing + Start first (Studio test or Exitmania GRID pilot). */
+  holdForBriefing?: boolean;
 };
 
 export type GeolocationSample = {

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { ArrowRight, Flag, User } from "lucide-react";
 import {
@@ -31,7 +30,6 @@ export function CaptainSetupForm({
   studioTest = false,
   maxPlayersPerTeam = 4,
 }: CaptainSetupFormProps) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const isPrebooked = Boolean(joinCode);
@@ -61,7 +59,7 @@ export function CaptainSetupForm({
       }
 
       savePlayerSession(result.data);
-      router.replace(eventLobbyPath(inviteCode, result.data.joinCode));
+      window.location.assign(eventLobbyPath(inviteCode, result.data.joinCode));
     });
   }
 

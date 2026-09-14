@@ -11,7 +11,7 @@ export function computeLobbyAutoStartAt(input: {
 }): Date {
   const base = input.from ?? new Date();
   const delaySeconds =
-    input.activePlayerCount >= input.maxSize
+    input.activePlayerCount >= input.maxSize && input.maxSize > 1
       ? FULL_ROSTER_AUTO_START_SECONDS
       : input.autoStartSeconds ?? DEFAULT_LOBBY_AUTO_START_SECONDS;
   return new Date(base.getTime() + delaySeconds * 1000);

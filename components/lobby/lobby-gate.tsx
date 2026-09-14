@@ -64,7 +64,7 @@ export function LobbyGate({
   const [snapshot, setSnapshot] = useState<LobbySnapshot | null>(null);
   const [session, setSession] = useState<PlayerSession | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const isStudio = studioTest || Boolean(eventContent?.isStudioTest);
+  const isStudio = studioTest || Boolean(eventContent?.isStudioTest || eventContent?.holdForBriefing);
 
   useEffect(() => {
     if (eventContent) cacheEventContent(inviteCode, eventContent);

@@ -180,8 +180,10 @@ export function GameGate({
         return;
       }
 
+      const holdForBriefing =
+        Boolean(freshContent.isStudioTest) || Boolean(freshContent.holdForBriefing);
       const studioNeedsBriefing =
-        Boolean(freshContent.isStudioTest) &&
+        holdForBriefing &&
         (peek.data.status === "lobby" ||
           peek.data.status === "setup" ||
           (peek.data.status === "playing" && !peek.data.gameState.briefing_confirmed));
