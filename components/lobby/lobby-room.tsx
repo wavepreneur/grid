@@ -160,8 +160,9 @@ export function LobbyRoom({
   }, [inviteCode, joinCode]);
 
   useEffect(() => {
+    if (studioTest) return;
     router.prefetch(eventPlayPath(inviteCode, joinCode));
-  }, [inviteCode, joinCode, router]);
+  }, [inviteCode, joinCode, router, studioTest]);
 
   const goToPlay = useCallback(() => {
     if (manageMode) return;
@@ -205,7 +206,6 @@ export function LobbyRoom({
     // Polling often sees "playing" before/without Realtime — never leave the lobby stuck.
     // Studio-Test stays until Alpha taps Start (briefing first, timer off).
     if (
-      !manageMode &&
       !studioTest &&
       (result.data.team_status === "playing" || result.data.team_status === "finished")
     ) {
@@ -218,7 +218,7 @@ export function LobbyRoom({
 
     setSnapshot({ ...result.data, players });
     setCountdown(formatCountdown(result.data.lobby_auto_start_at));
-  }, [goToPlay, inviteCode, joinCode, manageMode, session.sessionId]);
+  }, [goToPlay, inviteCode, joinCode, manageMode, session.sessionId, studioTest]);
 
   const syncSessionFromServer = useCallback(async () => {
     const verified = await verifyTeamSession({

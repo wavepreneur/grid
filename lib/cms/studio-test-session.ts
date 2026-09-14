@@ -10,14 +10,28 @@ export function isStudioTestBookingReference(ref: string | null | undefined): bo
 export function isStudioTestEvent(event: {
   booking_reference?: string | null;
   content_config?: unknown;
+  title?: string | null;
 }): boolean {
   if (isStudioTestBookingReference(event.booking_reference)) return true;
+  if (typeof event.title === "string" && event.title.startsWith("[Test]")) return true;
   if (event.content_config && typeof event.content_config === "object") {
     return Boolean(
       (event.content_config as { is_studio_test?: boolean }).is_studio_test,
     );
   }
   return false;
+}
+
+/** Studio tests stay in the start room until Alpha taps Start. */
+export function studioNeedsBriefing(input: {
+  event: Parameters<typeof isStudioTestEvent>[0];
+  teamStatus?: string | null;
+  briefingConfirmed?: boolean;
+}): boolean {
+  if (!isStudioTestEvent(input.event)) return false;
+  if (input.teamStatus === "finished") return false;
+  if (input.teamStatus === "playing" && input.briefingConfirmed) return false;
+  return true;
 }
 
 export const STUDIO_TEST_MAX_PLAYERS = 3;

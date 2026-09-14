@@ -8,6 +8,7 @@ import type { ResolvedEventContent } from "@/lib/grid/level-types";
 import type { ActionResult, GridEvent } from "@/lib/grid/types";
 import { bumpEventContentRevision, getEventContentRevisionByInviteCode } from "@/lib/grid/content-revision";
 import { normalizeCode } from "@/lib/grid/codes";
+import { isStudioTestEvent } from "@/lib/cms/studio-test-session";
 
 export type EventAdminDetails = {
   inviteCode: string;
@@ -77,6 +78,7 @@ export async function getEventContent(
       success: true,
       data: {
         ...resolved,
+        isStudioTest: resolved.isStudioTest || isStudioTestEvent(event),
         eventId: event.id,
         contentRevision,
       },

@@ -97,22 +97,18 @@ export function LobbyGate({
         const teamStatus = resolved.session.teamStatus;
         const isPlaying = teamStatus === "playing" || teamStatus === "finished";
 
-        if (isPlaying && !manageMode) {
-          if (isStudio && teamStatus === "playing") {
-            const rewind = await rewindUnplayedStudioTestToLobby({
-              inviteCode,
-              joinCode,
-              sessionId: resolved.session.sessionId,
-            });
-            const stayedInLobby = Boolean(rewind.success && rewind.data?.rewound);
-            if (!stayedInLobby && rewind.success) {
-              routerRef.current.replace(eventPlayPath(inviteCode, joinCode));
-              return;
-            }
-          } else if (!isStudio || teamStatus === "finished") {
-            routerRef.current.replace(eventPlayPath(inviteCode, joinCode));
-            return;
-          }
+        // Studio tests only leave this screen via Start in LobbyRoom.
+        if (isPlaying && !manageMode && !isStudio) {
+          routerRef.current.replace(eventPlayPath(inviteCode, joinCode));
+          return;
+        }
+
+        if (isStudio && teamStatus === "playing" && !manageMode) {
+          await rewindUnplayedStudioTestToLobby({
+            inviteCode,
+            joinCode,
+            sessionId: resolved.session.sessionId,
+          });
         }
 
         const result = await withTimeout(

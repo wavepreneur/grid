@@ -256,7 +256,7 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
 
   const { data: event } = await supabase
     .from("events")
-    .select("id, organization_id, city_id, content_config, route_override, invite_code, studio_game_version_id, booking_reference")
+    .select("id, title, organization_id, city_id, content_config, route_override, invite_code, studio_game_version_id, booking_reference")
     .eq("id", team.event_id)
     .single();
 
@@ -519,15 +519,18 @@ export async function createTeamAsCaptain(input: {
     const supabase = createAdminClient();
     const joinCode = generateJoinCode();
     const sessionId = randomUUID();
+    const studioTest = isStudioTestEvent(event);
     const autoStartSeconds =
       event.lobby_auto_start_seconds || DEFAULT_LOBBY_AUTO_START_SECONDS;
     const lobbyOpenedAt = new Date();
-    const lobbyAutoStartAt = computeLobbyAutoStartAt({
-      autoStartSeconds,
-      maxSize,
-      activePlayerCount: 1,
-      from: lobbyOpenedAt,
-    });
+    const lobbyAutoStartAt = studioTest
+      ? null
+      : computeLobbyAutoStartAt({
+          autoStartSeconds,
+          maxSize,
+          activePlayerCount: 1,
+          from: lobbyOpenedAt,
+        });
 
     const { data: team, error: teamError } = await supabase
       .from("teams")
@@ -540,7 +543,7 @@ export async function createTeamAsCaptain(input: {
         region,
         status: "lobby",
         lobby_opened_at: lobbyOpenedAt.toISOString(),
-        lobby_auto_start_at: lobbyAutoStartAt.toISOString(),
+        lobby_auto_start_at: lobbyAutoStartAt ? lobbyAutoStartAt.toISOString() : null,
       })
       .select("id, join_code")
       .single();
@@ -578,7 +581,9 @@ export async function createTeamAsCaptain(input: {
       await supabase.from("events").update({ status: "lobby" }).eq("id", event.id);
     }
 
-    await maybeAutoStartTeam(team.id);
+    if (!studioTest) {
+      await maybeAutoStartTeam(team.id);
+    }
 
     await touchAccessOnJoin({ teamId: team.id, eventId: event.id, isNewPlayer: true });
 
