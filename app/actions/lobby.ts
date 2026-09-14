@@ -245,7 +245,7 @@ async function getTeamByJoinCode(joinCode: string, eventId: string) {
   const { data, error } = await supabase
     .from("teams")
     .select(
-      "id, event_id, join_code, name, max_size, department, region, status, lobby_opened_at, lobby_auto_start_at, started_at, captain_player_id, navigator_player_id, beta_player_id, current_level",
+      "id, event_id, join_code, name, max_size, department, region, status, lobby_opened_at, lobby_auto_start_at, started_at, captain_player_id, navigator_player_id, beta_player_id, current_level, game_state",
     )
     .eq("join_code", normalizeCode(joinCode))
     .eq("event_id", eventId)
