@@ -998,7 +998,7 @@ export async function pushLiveStudioGame(gameId: string): Promise<
   try {
     const orgId = await getStudioOrganizationId();
     const published = await publishGame(gameId, "Live-Teams aktualisieren");
-    if (!published.success || !published.data) {
+    if (!published.success) {
       return { success: false, error: published.error };
     }
 
