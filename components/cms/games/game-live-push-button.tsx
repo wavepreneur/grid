@@ -28,7 +28,7 @@ export function GameLivePushButton({ gameId, featureFlags }: Props) {
     setError(null);
     startTransition(async () => {
       const result = await pushLiveStudioGame(gameId);
-      if (!result.success || !result.data) {
+      if (!result.success) {
         setError(result.error);
         return;
       }
