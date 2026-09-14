@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { getPlayerResumeToken, recoverSessionByPlayerId } from "@/app/actions/lobby";
+import { recoverSessionByPlayerId } from "@/app/actions/lobby";
 import { GridButton } from "@/components/grid/grid-shell";
 import { IconPlay } from "@/components/cms/studio-icons";
-import { syncResumeTokenInUrl } from "@/lib/grid/play-url";
 import { savePlayerSession } from "@/lib/grid/player-session";
 
 type SessionHandoffScreenProps = {
@@ -38,17 +37,6 @@ export function SessionHandoffScreen({
       }
 
       savePlayerSession(recovered.data.session);
-
-      const tokenResult = await getPlayerResumeToken({
-        inviteCode,
-        joinCode,
-        sessionId: recovered.data.session.sessionId,
-      });
-
-      if (tokenResult.success) {
-        syncResumeTokenInUrl(tokenResult.data.resumeToken);
-      }
-
       window.location.reload();
     });
   }

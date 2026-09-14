@@ -2,7 +2,6 @@
 
 import {
   claimPlayerSession,
-  getPlayerResumeToken,
   recoverSessionByPlayerId,
   verifyTeamSession,
 } from "@/app/actions/lobby";
@@ -12,25 +11,13 @@ import {
   loadPlayerSessionForTeam,
   savePlayerSession,
 } from "@/lib/grid/player-session";
-import { readResumeTokenFromUrl, syncResumeTokenInUrl } from "@/lib/grid/play-url";
+import { readResumeTokenFromUrl, stripResumeTokenFromUrl } from "@/lib/grid/play-url";
 import type { PlayerSession } from "@/lib/grid/types";
 
 export type ResolvedTeamSession = {
   session: PlayerSession;
   path: string;
 };
-
-async function attachResumeTokenToUrl(session: PlayerSession): Promise<void> {
-  const tokenResult = await getPlayerResumeToken({
-    inviteCode: session.inviteCode,
-    joinCode: session.joinCode,
-    sessionId: session.sessionId,
-  });
-
-  if (tokenResult.success) {
-    syncResumeTokenInUrl(tokenResult.data.resumeToken);
-  }
-}
 
 export async function resolveTeamSession(
   inviteCode: string,
@@ -47,13 +34,15 @@ export async function resolveTeamSession(
 
     if (claimed.success) {
       savePlayerSession(claimed.data.session);
-      syncResumeTokenInUrl(claimed.data.resumeToken);
+      stripResumeTokenFromUrl();
       return {
         session: claimed.data.session,
         path: claimed.data.path,
       };
     }
   }
+
+  stripResumeTokenFromUrl();
 
   const existing = loadPlayerSessionForTeam(inviteCode, joinCode);
   if (existing) {
@@ -65,7 +54,6 @@ export async function resolveTeamSession(
 
     if (verified.success) {
       savePlayerSession(verified.data.session);
-      void attachResumeTokenToUrl(verified.data.session);
       return verified.data;
     }
   }
@@ -86,7 +74,6 @@ export async function resolveTeamSession(
   }
 
   savePlayerSession(recovered.data.session);
-  void attachResumeTokenToUrl(recovered.data.session);
   return recovered.data;
 }
 

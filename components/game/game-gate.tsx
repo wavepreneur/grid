@@ -20,9 +20,11 @@ import {
 } from "@/lib/grid/session-recovery";
 import {
   clearMissionStarting,
-  missionStartBegunAt,
+  isMissionStarting,
+  missionStartPlayerCount,
   missionStartProgress,
   persistStartProgress,
+  startOverlayCopy,
 } from "@/lib/grid/mission-start-signal";
 import { savePlayerSession } from "@/lib/grid/player-session";
 import type { ResolvedEventContent } from "@/lib/grid/level-types";
@@ -33,7 +35,11 @@ type GameGateProps = {
   joinCode: string;
   teamName: string;
   eventTitle?: string;
+  /** Studio / GRID-Pilot: stay in lobby until Start, without waiting for content. */
+  holdForBriefing?: boolean;
 };
+
+const PLAY_READY_TIMEOUT_MS = 45_000;
 
 function isPlayReady(result: Awaited<ReturnType<typeof getGameState>>): boolean {
   return (
@@ -52,8 +58,10 @@ async function waitForPlayReady(
   },
   isCancelled: () => boolean,
 ) {
+  const started = Date.now();
   let last = await getGameState(input);
   while (!isCancelled() && !isPlayReady(last)) {
+    if (Date.now() - started >= PLAY_READY_TIMEOUT_MS) break;
     if (
       last.success &&
       (last.data.status === "playing" || last.data.status === "finished") &&
@@ -61,10 +69,18 @@ async function waitForPlayReady(
     ) {
       void prepareTeamGame(input);
     }
-    await new Promise((resolve) => window.setTimeout(resolve, 150));
+    await new Promise((resolve) => window.setTimeout(resolve, 200));
     last = await getGameState(input);
   }
   return last;
+}
+
+function unwrapContent(
+  result: Awaited<ReturnType<typeof getEventContent>>,
+): ResolvedEventContent | null {
+  if (!result.success) return null;
+  const { eventId: _eventId, contentRevision: _revision, ...content } = result.data;
+  return content;
 }
 
 export function GameGate({
@@ -72,6 +88,7 @@ export function GameGate({
   joinCode,
   teamName,
   eventTitle = "Mission",
+  holdForBriefing = false,
 }: GameGateProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +103,7 @@ export function GameGate({
     ReturnType<typeof getGameState>
   > | null>(null);
   const contentRevisionRef = useRef(1);
+  const overlay = startOverlayCopy(missionStartPlayerCount(inviteCode, joinCode));
 
   useEffect(() => {
     contentRevisionRef.current = contentRevision;
@@ -105,12 +123,9 @@ export function GameGate({
 
   useEffect(() => {
     if (ready) return;
-    const started = missionStartBegunAt(inviteCode, joinCode) ?? Date.now();
     const id = window.setInterval(() => {
-      const elapsed = Date.now() - started;
-      const crept = Math.min(88, 8 + (elapsed / 4500) * 80);
       setProgress((current) => {
-        const next = Math.max(current, crept);
+        const next = Math.max(current, missionStartProgress(inviteCode, joinCode));
         persistStartProgress(inviteCode, joinCode, next);
         return next;
       });
@@ -130,43 +145,15 @@ export function GameGate({
 
     async function boot() {
       bump(missionStartProgress(inviteCode, joinCode));
-      const cached = loadCachedEventContent(inviteCode);
-      const [resolved, contentResult] = await Promise.all([
-        resolveTeamSession(inviteCode, joinCode),
-        cached ? Promise.resolve(null) : getEventContent(inviteCode),
-      ]);
-
+      const resolved = await resolveTeamSession(inviteCode, joinCode);
       if (cancelled) return;
-      bump(32);
-
       if (!resolved) {
         abandonTeamSession();
         router.replace(eventTeamJoinPath(inviteCode, joinCode));
         return;
       }
 
-      let freshContent = cached;
-      if (!freshContent) {
-        if (!contentResult?.success) {
-          setError(contentResult?.error ?? "Inhalt konnte nicht geladen werden.");
-          return;
-        }
-        const { eventId: _eventId, contentRevision: revision, ...resolvedContent } =
-          contentResult.data;
-        freshContent = resolvedContent;
-        cacheEventContent(inviteCode, freshContent);
-        setContentRevision(revision);
-      } else {
-        void getEventContent(inviteCode).then((result) => {
-          if (!result.success || cancelled) return;
-          const { contentRevision: revision, eventId: _id, ...resolvedContent } = result.data;
-          cacheEventContent(inviteCode, resolvedContent);
-          setEventContent(resolvedContent);
-          setContentRevision(revision);
-        });
-      }
-
-      bump(62);
+      bump(28);
 
       const peek = await getGameState({
         inviteCode,
@@ -180,10 +167,10 @@ export function GameGate({
         return;
       }
 
-      const holdForBriefing =
-        Boolean(freshContent.isStudioTest) || Boolean(freshContent.holdForBriefing);
+      const starting = isMissionStarting(inviteCode, joinCode);
       const studioNeedsBriefing =
         holdForBriefing &&
+        !starting &&
         (peek.data.status === "lobby" ||
           peek.data.status === "setup" ||
           (peek.data.status === "playing" && !peek.data.gameState.briefing_confirmed));
@@ -200,15 +187,36 @@ export function GameGate({
         return;
       }
 
-      const gameResult = await waitForPlayReady(
-        {
-          inviteCode,
-          joinCode,
-          sessionId: resolved.session.sessionId,
-        },
-        () => cancelled,
-      );
+      bump(48);
 
+      const cached = loadCachedEventContent(inviteCode);
+      const contentPromise = cached
+        ? Promise.resolve({
+            content: cached,
+            revision: contentRevisionRef.current,
+            error: null as string | null,
+          })
+        : getEventContent(inviteCode).then((result) => {
+            const content = unwrapContent(result);
+            return {
+              content,
+              revision: result.success ? result.data.contentRevision : 1,
+              error: content ? null : (result.success ? null : result.error),
+            };
+          });
+
+      const playPromise = isPlayReady(peek)
+        ? Promise.resolve(peek)
+        : waitForPlayReady(
+            {
+              inviteCode,
+              joinCode,
+              sessionId: resolved.session.sessionId,
+            },
+            () => cancelled,
+          );
+
+      const [gameResult, contentResult] = await Promise.all([playPromise, contentPromise]);
       if (cancelled) return;
 
       if (!gameResult.success) {
@@ -216,7 +224,31 @@ export function GameGate({
         return;
       }
 
-      if (!isPlayReady(gameResult)) return;
+      if (!isPlayReady(gameResult)) {
+        clearMissionStarting(inviteCode, joinCode);
+        router.replace(eventLobbyPath(inviteCode, joinCode));
+        return;
+      }
+
+      let freshContent = contentResult.content;
+      if (!freshContent) {
+        setError(contentResult.error ?? "Inhalt konnte nicht geladen werden.");
+        return;
+      }
+
+      cacheEventContent(inviteCode, freshContent);
+      setContentRevision(contentResult.revision);
+
+      if (cached) {
+        void getEventContent(inviteCode).then((result) => {
+          if (!result.success || cancelled) return;
+          const next = unwrapContent(result);
+          if (!next) return;
+          cacheEventContent(inviteCode, next);
+          setEventContent(next);
+          setContentRevision(result.data.contentRevision);
+        });
+      }
 
       const syncedSession = {
         ...resolved.session,
@@ -230,7 +262,7 @@ export function GameGate({
       setInitialState(gameResult);
       setProgress(100);
       persistStartProgress(inviteCode, joinCode, 100);
-      await new Promise((resolve) => window.setTimeout(resolve, 180));
+      await new Promise((resolve) => window.setTimeout(resolve, 120));
       if (cancelled) return;
       clearMissionStarting(inviteCode, joinCode);
       setReady(true);
@@ -241,7 +273,7 @@ export function GameGate({
     return () => {
       cancelled = true;
     };
-  }, [inviteCode, joinCode, router]);
+  }, [holdForBriefing, inviteCode, joinCode, router]);
 
   if (error) {
     return <GridError message={error} />;
@@ -250,8 +282,8 @@ export function GameGate({
   if (!ready || !initialState?.success || !session || !eventContent) {
     return (
       <GameGateSkeleton
-        title="Alle Geräte laden…"
-        subtitle="Die Mission startet gemeinsam — niemand legt allein los."
+        title={overlay.title}
+        subtitle={overlay.subtitle}
         progress={progress}
       />
     );

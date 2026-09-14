@@ -17,6 +17,15 @@ export function syncResumeTokenInUrl(resumeToken: string): void {
   window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
+export function stripResumeTokenFromUrl(): void {
+  if (typeof window === "undefined") return;
+
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(PLAYER_RESUME_PARAM)) return;
+  url.searchParams.delete(PLAYER_RESUME_PARAM);
+  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 export function buildPlayUrlWithResume(
   inviteCode: string,
   joinCode: string,

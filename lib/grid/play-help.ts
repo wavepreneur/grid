@@ -14,7 +14,7 @@ export const INDOOR_STATION_TIP =
   "Indoor braucht kein GPS. Sucht den Zettel an der Station und gebt den Code ein — so öffnet ihr die Aufgabe.";
 
 export const ONLINE_SYNC_TIP =
-  "Alle Geräte sollten dasselbe sehen. Seite neu laden, einen Moment warten, oder im Team-Menü den Weiterspiel-Link und die Leitung nutzen.";
+  "Alle Geräte sollten dasselbe sehen. Seite neu laden, einen Moment warten, oder auf /go denselben Team-Code und deinen Namen eingeben.";
 
 export function playHelpMenuHint(mode: ContentMode): string {
   switch (mode) {

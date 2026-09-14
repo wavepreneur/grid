@@ -48,6 +48,7 @@ import {
   markMissionStarting,
   missionStartProgress,
   persistStartProgress,
+  startOverlayCopy,
 } from "@/lib/grid/mission-start-signal";
 import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
@@ -168,8 +169,7 @@ export function LobbyRoom({
     if (manageMode) return;
     markMissionStarting(inviteCode, joinCode, snapshot.players.length);
     setBusy({
-      title: "Alle Geräte laden…",
-      subtitle: "Die Mission startet gemeinsam — niemand legt allein los.",
+      ...startOverlayCopy(snapshot.players.length),
       variant: "start",
     });
     router.replace(eventPlayPath(inviteCode, joinCode));
@@ -336,8 +336,7 @@ export function LobbyRoom({
       if (action === "show") {
         markMissionStarting(inviteCode, joinCode, snapshot.players.length);
         setBusy({
-          title: "Alle Geräte laden…",
-          subtitle: "Die Mission startet gemeinsam — niemand legt allein los.",
+          ...startOverlayCopy(snapshot.players.length),
           variant: "start",
         });
         return;
@@ -380,8 +379,7 @@ export function LobbyRoom({
     setError(null);
     markMissionStarting(inviteCode, joinCode, snapshot.players.length);
     setBusy({
-      title: "Alle Geräte laden…",
-      subtitle: "Die Mission startet gemeinsam — niemand legt allein los.",
+      ...startOverlayCopy(snapshot.players.length),
       variant: "start",
     });
     void broadcast({
@@ -572,8 +570,8 @@ export function LobbyRoom({
       {busy?.variant === "start" ? (
         <div className="fixed inset-0 z-[200] bg-[var(--cg-bg,#f7f4ee)]">
           <GameGateSkeleton
-            title="Alle Geräte laden…"
-            subtitle="Die Mission startet gemeinsam — niemand legt allein los."
+            title={startOverlayCopy(snapshot.players.length).title}
+            subtitle={startOverlayCopy(snapshot.players.length).subtitle}
             progress={startProgress}
           />
         </div>

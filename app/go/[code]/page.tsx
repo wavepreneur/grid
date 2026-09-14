@@ -21,7 +21,7 @@ export default async function PlayGoCodePage({ params }: Props) {
       variant="welcome"
       eyebrow="Spiel starten"
       title="Team-Code"
-      description="Den Code aus der Mail oder vom Ticket hier eintippen."
+      description="Den Team-Code eintippen, dann deinen Namen — so kommst du wieder ins selbe Spiel."
     >
       <div className="space-y-4">
         <GridError message={result.error} />

@@ -1,7 +1,7 @@
 "use client";
 
-const WINDOW_MS = 20_000;
-const CREEP_MS = 4500;
+const WINDOW_MS = 15 * 60 * 1000;
+const CREEP_MS = 12_000;
 
 type MissionStartMeta = {
   at: number;
@@ -82,6 +82,23 @@ export function missionStartProgress(inviteCode: string, joinCode: string): numb
   const elapsed = meta ? Date.now() - meta.at : 0;
   const crept = Math.min(88, 8 + (elapsed / CREEP_MS) * 80);
   return Math.max(meta?.progress ?? 8, crept);
+}
+
+export function missionStartPlayerCount(inviteCode: string, joinCode: string): number {
+  return readMeta(inviteCode, joinCode)?.playerCount ?? 0;
+}
+
+export function startOverlayCopy(playerCount: number): { title: string; subtitle: string } {
+  if (playerCount > 1) {
+    return {
+      title: "Alle Geräte laden…",
+      subtitle: "Die Mission startet gemeinsam — niemand legt allein los.",
+    };
+  }
+  return {
+    title: "Spiel startet…",
+    subtitle: "Die Karte wird vorbereitet — einen Moment.",
+  };
 }
 
 export function isMissionStarting(inviteCode: string, joinCode: string): boolean {

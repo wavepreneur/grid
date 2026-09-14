@@ -8,7 +8,7 @@ import {
   eventPath,
   eventTeamJoinPath,
 } from "@/lib/grid/event-routes";
-import { buildManageTeamUrl, buildPlayUrlWithResume } from "@/lib/grid/play-url";
+import { buildManageTeamUrl } from "@/lib/grid/play-url";
 import { archetypeRoleLabel } from "@/lib/grid/archetype-roles";
 import { clearPlayerSession } from "@/lib/grid/player-session";
 import { IconHome, IconUsers } from "@/components/cms/studio-icons";
@@ -75,22 +75,8 @@ export function IdentityBar({
 
   function handleCopyPlayLink() {
     startTransition(async () => {
-      const result = await getPlayerResumeToken({
-        inviteCode,
-        joinCode,
-        sessionId: session.sessionId,
-      });
-
-      if (!result.success) {
-        setCopyState("error");
-        return;
-      }
-
-      const path = buildPlayUrlWithResume(inviteCode, joinCode, result.data.resumeToken);
-      const url = `${window.location.origin}${path}`;
-
       try {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(joinCode.toUpperCase());
         setCopyState("copied");
         window.setTimeout(() => setCopyState("idle"), 2500);
       } catch {
@@ -117,10 +103,10 @@ export function IdentityBar({
               className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
             >
               {copyState === "copied"
-                ? "✓ Kopiert"
+                ? "✓ Code kopiert"
                 : copyState === "error"
                   ? "Fehler"
-                  : "Link kopieren"}
+                  : "Code kopieren"}
             </button>
           ) : null}
           {showManageTeam ? (

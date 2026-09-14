@@ -91,6 +91,79 @@ export async function allocateUniqueAccessCode(
   throw new Error("Kein freier Zugangscode gefunden. Bitte erneut versuchen.");
 }
 
+async function lookupLiveTeamOrEventCode(
+  supabase: ReturnType<typeof createAdminClient>,
+  code: string,
+): Promise<
+  | { ok: true; data: ResolvedAccess }
+  | { ok: false; error: string }
+> {
+  const { data: teams } = await supabase
+    .from("teams")
+    .select("id, join_code, name, status, captain_player_id, event_id")
+    .eq("join_code", code)
+    .neq("status", "disbanded")
+    .limit(1);
+
+  const team = teams?.[0];
+  if (team?.event_id) {
+    const { data: event } = await supabase
+      .from("events")
+      .select("id, invite_code, title, status")
+      .eq("id", team.event_id)
+      .maybeSingle();
+
+    if (!event) return { ok: false, error: GENERIC_MISS };
+    if (event.status === "completed" || event.status === "archived") {
+      return { ok: false, error: "Dieses Spiel ist beendet." };
+    }
+
+    return {
+      ok: true,
+      data: {
+        code: team.join_code,
+        kind: "team",
+        inviteCode: event.invite_code,
+        joinCode: team.join_code,
+        eventId: event.id,
+        teamId: team.id,
+        eventTitle: event.title,
+        teamName: team.name,
+        path:
+          team.status === "setup" && !team.captain_player_id
+            ? `/e/${event.invite_code}/captain?team=${team.join_code}`
+            : `/e/${event.invite_code}/team/${team.join_code}`,
+      },
+    };
+  }
+
+  const { data: event } = await supabase
+    .from("events")
+    .select("id, invite_code, title, status")
+    .eq("invite_code", code)
+    .maybeSingle();
+
+  if (!event) return { ok: false, error: GENERIC_MISS };
+  if (event.status === "completed" || event.status === "archived") {
+    return { ok: false, error: "Dieses Spiel ist beendet." };
+  }
+
+  return {
+    ok: true,
+    data: {
+      code: event.invite_code,
+      kind: "event_pool",
+      inviteCode: event.invite_code,
+      joinCode: null,
+      eventId: event.id,
+      teamId: null,
+      eventTitle: event.title,
+      teamName: null,
+      path: `/e/${event.invite_code}`,
+    },
+  };
+}
+
 export async function lookupAccessCode(rawCode: string): Promise<
   | { ok: true; data: ResolvedAccess }
   | { ok: false; error: string }
@@ -110,7 +183,7 @@ export async function lookupAccessCode(rawCode: string): Promise<
     .maybeSingle();
 
   if (error) return { ok: false, error: error.message };
-  if (!data) return { ok: false, error: GENERIC_MISS };
+  if (!data) return lookupLiveTeamOrEventCode(supabase, code);
 
   const status = effectiveAccessStatus({
     status: data.status as AccessStatus,

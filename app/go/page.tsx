@@ -9,7 +9,7 @@ export default function PlayGoPage() {
       variant="welcome"
       eyebrow="Spiel starten"
       title="Team-Code"
-      description="Den Code aus der Mail oder vom Ticket hier eintippen. Keine App — dann seid ihr im Spiel."
+      description="Den Team-Code eintippen, dann deinen Namen — so kommst du wieder ins selbe Spiel."
     >
       <PlayCodeEntry />
     </GridShell>

@@ -983,13 +983,25 @@ export async function initializeTeamGameState(
     .eq("id", teamId)
     .maybeSingle();
   const inLobby = current?.status === "lobby" || current?.status === "setup";
-  // Playing teams keep their write path. Lobby/setup always re-stamp L1
-  // (hub / quiz) so a reused Studio-Test does not open in the level view.
-  if (
-    !inLobby &&
-    current?.game_state &&
-    parseTeamGameState(current.game_state).content_ready !== false
-  ) {
+  const parsed = current?.game_state ? parseTeamGameState(current.game_state) : null;
+  const levelsReady =
+    Boolean(parsed?.levels) &&
+    Object.keys(parsed?.levels ?? {}).length > 0 &&
+    parsed.content_ready !== false;
+  const alreadyPlayed = parsed
+    ? Object.values(parsed.levels).some((entry) => entry.status === "completed")
+    : false;
+  const atOpening =
+    !parsed?.current_phase ||
+    parsed.current_phase === "hub" ||
+    parsed.current_phase === "quiz";
+
+  // Playing teams keep their write path. Lobby reuses a prepared opening
+  // snapshot so Start does not compile the mission a second time.
+  if (!inLobby && levelsReady) {
+    return;
+  }
+  if (inLobby && levelsReady && atOpening && !alreadyPlayed) {
     return;
   }
 

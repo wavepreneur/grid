@@ -178,7 +178,7 @@ export function PlayMoreSheet({
                   />
                   <MenuRow
                     title="Team"
-                    hint="Namen, Weiterspiel-Link, Leitung, Platz freigeben"
+                    hint="Namen, Team-Code für /go, Leitung, Platz freigeben"
                     onClick={() => onOpen("team")}
                   />
                 </div>
@@ -219,7 +219,7 @@ export function PlayMoreSheet({
                   {mode === "online" ? (
                     <MenuRow
                       title="Geräte sehen nicht dasselbe"
-                      hint="Seite neu laden, warten, Weiterspiel-Link"
+                      hint="Seite neu laden, warten, /go mit Team-Code"
                       onClick={() => onOpen("sync")}
                     />
                   ) : null}
@@ -230,7 +230,7 @@ export function PlayMoreSheet({
                   />
                   <MenuRow
                     title="Verbindung oder anderes Gerät"
-                    hint="Seite neu laden, Weiterspiel-Link, Leitung übergeben"
+                    hint="Seite neu laden, /go mit Team-Code, Leitung übergeben"
                     onClick={() => onOpen("team")}
                   />
                   <MenuRow
@@ -338,7 +338,7 @@ export function PlayMoreSheet({
                   <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
                     <p className="font-bold text-[var(--cg-fg)]">Jemand ist raus oder wechselt Gerät</p>
                     <p className="mt-1 text-sm text-[var(--cg-muted)]">
-                      Weiterspiel-Link und Leitung liegen unter Team — ohne GPS, ohne neuen Code.
+                      /go, Team-Code und dein Name liegen unter Team — ohne GPS, ohne langen Link.
                     </p>
                     <div className="mt-3">
                       <BigButton variant="outline" onClick={() => onOpen("team")}>

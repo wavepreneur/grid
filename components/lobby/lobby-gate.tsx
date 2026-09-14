@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getEventContent } from "@/app/actions/content";
 import { prepareTeamGame } from "@/app/actions/game";
 import { getLobbySnapshot, rewindUnplayedStudioTestToLobby } from "@/app/actions/lobby";
 import { LobbyRoom } from "@/components/lobby/lobby-room";
@@ -141,6 +142,12 @@ export function LobbyGate({
           inviteCode,
           joinCode,
           sessionId: resolved.session.sessionId,
+        });
+        void getEventContent(inviteCode).then((contentResult) => {
+          if (!contentResult.success || cancelled) return;
+          const { eventId: _eventId, contentRevision: _revision, ...content } =
+            contentResult.data;
+          cacheEventContent(inviteCode, content);
         });
       } catch (bootError) {
         if (cancelled) return;
