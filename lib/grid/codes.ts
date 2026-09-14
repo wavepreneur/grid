@@ -60,8 +60,28 @@ export function buildEventInviteUrl(origin: string, inviteCode: string): string 
 
 /** Clipboard text so a saved note has both the /go page and the team code. */
 export function buildGoReturnSnippet(origin: string, joinCode: string): string {
+  return goReturnClipboardParts(origin, joinCode).plain;
+}
+
+export function goReturnClipboardParts(origin: string, joinCode: string): {
+  url: string;
+  code: string;
+  plain: string;
+  html: string;
+} {
   const url = `${origin.replace(/\/$/, "")}/go`;
-  return `url: ${url}\ncode: ${normalizeCode(joinCode)}`;
+  const code = normalizeCode(joinCode);
+  const plain = `url: ${url}\ncode: ${code}`;
+  const html = `url: <a href="${escapeHtml(url)}">${escapeHtml(url)}</a><br>code: ${escapeHtml(code)}`;
+  return { url, code, plain, html };
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 export function normalizeCode(value: string): string {

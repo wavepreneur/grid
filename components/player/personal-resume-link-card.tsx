@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { buildGoReturnSnippet } from "@/lib/grid/codes";
+import { copyGoReturnSnippet } from "@/lib/grid/play-url";
 
 type Props = {
   inviteCode: string;
@@ -24,9 +24,7 @@ export function PersonalResumeLinkCard({
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(
-        buildGoReturnSnippet(window.location.origin, code),
-      );
+      await copyGoReturnSnippet(window.location.origin, code);
       setCopyState("copied");
       window.setTimeout(() => setCopyState("idle"), 2500);
     } catch {

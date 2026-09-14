@@ -8,8 +8,7 @@ import {
   eventPath,
   eventTeamJoinPath,
 } from "@/lib/grid/event-routes";
-import { buildGoReturnSnippet } from "@/lib/grid/codes";
-import { buildManageTeamUrl } from "@/lib/grid/play-url";
+import { buildManageTeamUrl, copyGoReturnSnippet } from "@/lib/grid/play-url";
 import { archetypeRoleLabel } from "@/lib/grid/archetype-roles";
 import { clearPlayerSession } from "@/lib/grid/player-session";
 import { IconHome, IconUsers } from "@/components/cms/studio-icons";
@@ -77,9 +76,7 @@ export function IdentityBar({
   function handleCopyPlayLink() {
     startTransition(async () => {
       try {
-        await navigator.clipboard.writeText(
-          buildGoReturnSnippet(window.location.origin, joinCode),
-        );
+        await copyGoReturnSnippet(window.location.origin, joinCode);
         setCopyState("copied");
         window.setTimeout(() => setCopyState("idle"), 2500);
       } catch {
