@@ -17,6 +17,7 @@ import {
   abandonTeamSession,
   resolveTeamSession,
 } from "@/lib/grid/session-recovery";
+import { eventLobbyPath } from "@/lib/grid/event-routes";
 import { teamEntryPath } from "@/lib/grid/team-routes";
 import { savePlayerSession } from "@/lib/grid/player-session";
 import type { GridTeamStatus } from "@/lib/grid/types";
@@ -28,6 +29,7 @@ type TeamEntryGateProps = {
   teamStatus: GridTeamStatus;
   captainDisplayName?: string | null;
   defaultDisplayName?: string;
+  studioTest?: boolean;
 };
 
 export function TeamEntryGate({
@@ -37,6 +39,7 @@ export function TeamEntryGate({
   teamStatus,
   captainDisplayName = null,
   defaultDisplayName = "",
+  studioTest = false,
 }: TeamEntryGateProps) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(defaultDisplayName);
@@ -53,6 +56,10 @@ export function TeamEntryGate({
   useEffect(() => {
     resolveTeamSession(inviteCode, joinCode).then((resolved) => {
       if (resolved) {
+        if (studioTest && resolved.session.teamStatus !== "finished") {
+          router.replace(eventLobbyPath(inviteCode, joinCode));
+          return;
+        }
         router.replace(resolved.path);
         return;
       }
@@ -60,7 +67,7 @@ export function TeamEntryGate({
       abandonTeamSession();
       setCheckingSession(false);
     });
-  }, [inviteCode, joinCode, router]);
+  }, [inviteCode, joinCode, router, studioTest]);
 
   useEffect(() => {
     if (checkingSession) return;
@@ -100,11 +107,14 @@ export function TeamEntryGate({
       }
 
       savePlayerSession(result.data);
-      const path = teamEntryPath(
-        inviteCode,
-        joinCode,
-        result.data.teamStatus ?? teamStatus,
-      );
+      const path =
+        studioTest && result.data.teamStatus !== "finished"
+          ? eventLobbyPath(inviteCode, joinCode)
+          : teamEntryPath(
+              inviteCode,
+              joinCode,
+              result.data.teamStatus ?? teamStatus,
+            );
       router.replace(path);
     });
   }

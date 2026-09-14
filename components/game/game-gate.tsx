@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getEventContent } from "@/app/actions/content";
 import { getGameState, prepareTeamGame } from "@/app/actions/game";
+import { rewindUnplayedStudioTestToLobby } from "@/app/actions/lobby";
 import { GameRoom } from "@/components/game/game-room";
 import { GameGateSkeleton } from "@/components/game/game-gate-skeleton";
 import { GridError } from "@/components/grid/grid-shell";
@@ -11,7 +12,7 @@ import {
   cacheEventContent,
   loadCachedEventContent,
 } from "@/lib/grid/offline-content";
-import { eventTeamJoinPath } from "@/lib/grid/event-routes";
+import { eventLobbyPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
 import { useQuietContentRefresh } from "@/lib/hooks/use-quiet-content-refresh";
 import {
   abandonTeamSession,
@@ -166,6 +167,32 @@ export function GameGate({
       }
 
       bump(62);
+
+      const peek = await getGameState({
+        inviteCode,
+        joinCode,
+        sessionId: resolved.session.sessionId,
+      });
+      if (cancelled) return;
+
+      const studioNeedsBriefing =
+        Boolean(freshContent.isStudioTest) &&
+        (!peek.success ||
+          peek.data.status === "lobby" ||
+          peek.data.status === "setup" ||
+          (peek.data.status === "playing" && !peek.data.gameState.briefing_confirmed));
+
+      if (studioNeedsBriefing) {
+        if (peek.success && peek.data.status === "playing") {
+          await rewindUnplayedStudioTestToLobby({
+            inviteCode,
+            joinCode,
+            sessionId: resolved.session.sessionId,
+          });
+        }
+        router.replace(eventLobbyPath(inviteCode, joinCode));
+        return;
+      }
 
       const gameResult = await waitForPlayReady(
         {

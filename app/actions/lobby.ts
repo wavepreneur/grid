@@ -19,6 +19,8 @@ import { canStartTeamGame } from "@/lib/grid/archetype-roles";
 import { buildDefaultContentConfig, getBlueprint, isBlueprintSlug, resolveBlueprint, type BlueprintSlug } from "@/lib/grid/blueprints";
 import { parseContentConfig } from "@/lib/grid/content-engine";
 import { initializeTeamGameState } from "@/app/actions/game";
+import { isStudioTestEvent } from "@/lib/cms/studio-test-session";
+import { parseTeamGameState } from "@/lib/grid/game-state";
 import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
 import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
 import {
@@ -254,18 +256,18 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
 
   const { data: event } = await supabase
     .from("events")
-    .select("id, organization_id, city_id, content_config, route_override, invite_code, studio_game_version_id")
+    .select("id, organization_id, city_id, content_config, route_override, invite_code, studio_game_version_id, booking_reference")
     .eq("id", team.event_id)
     .single();
 
   if (!event) return;
   // Studio-Test: briefing + manual start. Never skip the waiting room.
-  if (parseContentConfig(event.content_config).is_studio_test) return;
+  if (isStudioTestEvent(event)) return;
 
   const activePlayerCount = await countActivePlayers(teamId);
   const rosterFull = activePlayerCount >= team.max_size;
   const timerExpired =
-    !team.lobby_auto_start_at ||
+    Boolean(team.lobby_auto_start_at) &&
     new Date(team.lobby_auto_start_at).getTime() <= Date.now();
 
   if (!rosterFull && !timerExpired) return;
@@ -310,6 +312,75 @@ async function maybeAutoStartTeam(teamId: string): Promise<void> {
     .update({ status: "active", started_at: startedAt })
     .eq("id", event.id)
     .in("status", ["draft", "lobby"]);
+}
+
+/**
+ * Studio-Test raced into play before briefing. If nothing is solved yet,
+ * put the team back in the start room and clear the timer.
+ */
+export async function rewindUnplayedStudioTestToLobby(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+}): Promise<ActionResult<{ rewound: boolean }>> {
+  try {
+    const inviteCode = normalizeCode(input.inviteCode);
+    const joinCode = normalizeCode(input.joinCode);
+    const event = await getEventByInviteCode(inviteCode);
+    if (!event) {
+      return { success: false, error: "Event nicht gefunden." };
+    }
+    if (!isStudioTestEvent(event)) {
+      return { success: true, data: { rewound: false } };
+    }
+
+    const [team, player] = await Promise.all([
+      getTeamByJoinCode(joinCode, event.id),
+      getPlayerBySessionId(input.sessionId),
+    ]);
+    if (!team || !player || player.team_id !== team.id) {
+      return { success: false, error: "Session ungültig." };
+    }
+    if (team.status !== "playing") {
+      return { success: true, data: { rewound: false } };
+    }
+
+    const supabase = createAdminClient();
+    const { data: stateRow } = await supabase
+      .from("teams")
+      .select("game_state")
+      .eq("id", team.id)
+      .maybeSingle();
+    const gameState = parseTeamGameState(stateRow?.game_state);
+    if (gameState.briefing_confirmed) {
+      return { success: true, data: { rewound: false } };
+    }
+    const alreadyPlayed = Object.values(gameState.levels).some(
+      (entry) => entry.status === "completed",
+    );
+    if (alreadyPlayed) {
+      return { success: true, data: { rewound: false } };
+    }
+
+    const { data: updated } = await supabase
+      .from("teams")
+      .update({
+        status: "lobby",
+        started_at: null,
+        lobby_auto_start_at: null,
+      })
+      .eq("id", team.id)
+      .eq("status", "playing")
+      .select("id")
+      .maybeSingle();
+
+    return { success: true, data: { rewound: Boolean(updated) } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Zurücksetzen fehlgeschlagen.",
+    };
+  }
 }
 
 export async function createEvent(input: {
@@ -878,17 +949,20 @@ export async function joinTeamAsPlayer(input: {
     const teamPatch: Record<string, unknown> = {};
     if (isFirst) {
       const lobbyOpenedAt = new Date();
+      const studioTest = isStudioTestEvent(event);
       teamPatch.captain_player_id = player.id;
       teamPatch.navigator_player_id = player.id;
       teamPatch.status = "lobby";
       teamPatch.lobby_opened_at = lobbyOpenedAt.toISOString();
-      teamPatch.lobby_auto_start_at = computeLobbyAutoStartAt({
-        autoStartSeconds:
-          event.lobby_auto_start_seconds || DEFAULT_LOBBY_AUTO_START_SECONDS,
-        maxSize: team.max_size,
-        activePlayerCount: 1,
-        from: lobbyOpenedAt,
-      }).toISOString();
+      teamPatch.lobby_auto_start_at = studioTest
+        ? null
+        : computeLobbyAutoStartAt({
+            autoStartSeconds:
+              event.lobby_auto_start_seconds || DEFAULT_LOBBY_AUTO_START_SECONDS,
+            maxSize: team.max_size,
+            activePlayerCount: 1,
+            from: lobbyOpenedAt,
+          }).toISOString();
     } else {
       if (initialRole === "beta") {
         teamPatch.beta_player_id = player.id;
@@ -1115,12 +1189,23 @@ export async function startGameManually(input: {
 
     const startedAt = new Date().toISOString();
     const supabase = createAdminClient();
+    const { data: readyRow } = await supabase
+      .from("teams")
+      .select("game_state")
+      .eq("id", team.id)
+      .maybeSingle();
+    const readyState = parseTeamGameState(readyRow?.game_state);
 
     const { data: startedTeam, error } = await supabase
       .from("teams")
       .update({
         status: "playing",
         started_at: startedAt,
+        game_state: {
+          ...readyState,
+          version: readyState.version + 1,
+          briefing_confirmed: true,
+        },
       })
       .eq("id", team.id)
       .eq("status", "lobby")
@@ -1338,15 +1423,18 @@ export async function setupPrebookedTeamAsCaptain(input: {
 
     const supabase = createAdminClient();
     const sessionId = randomUUID();
+    const studioTest = isStudioTestEvent(event);
     const autoStartSeconds =
       event.lobby_auto_start_seconds || DEFAULT_LOBBY_AUTO_START_SECONDS;
     const lobbyOpenedAt = new Date();
-    const lobbyAutoStartAt = computeLobbyAutoStartAt({
-      autoStartSeconds,
-      maxSize,
-      activePlayerCount: 1,
-      from: lobbyOpenedAt,
-    });
+    const lobbyAutoStartAt = studioTest
+      ? null
+      : computeLobbyAutoStartAt({
+          autoStartSeconds,
+          maxSize,
+          activePlayerCount: 1,
+          from: lobbyOpenedAt,
+        });
 
     const { data: player, error: playerError } = await supabase
       .from("players")
@@ -1376,7 +1464,8 @@ export async function setupPrebookedTeamAsCaptain(input: {
         region,
         status: "lobby",
         lobby_opened_at: lobbyOpenedAt.toISOString(),
-        lobby_auto_start_at: lobbyAutoStartAt.toISOString(),
+        lobby_auto_start_at: lobbyAutoStartAt ? lobbyAutoStartAt.toISOString() : null,
+        captain_player_id: player.id,
         navigator_player_id: player.id,
       })
       .eq("id", team.id)
@@ -1387,7 +1476,9 @@ export async function setupPrebookedTeamAsCaptain(input: {
       return { success: false, error: teamError.message };
     }
 
-    await maybeAutoStartTeam(team.id);
+    if (!studioTest) {
+      await maybeAutoStartTeam(team.id);
+    }
 
     await touchAccessOnJoin({ teamId: team.id, eventId: event.id, isNewPlayer: true });
 

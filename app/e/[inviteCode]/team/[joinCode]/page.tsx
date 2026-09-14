@@ -40,6 +40,12 @@ export default async function EventTeamPage({ params, searchParams }: EventTeamP
     );
   }
 
+  const contentConfig = eventResult.data.content_config as
+    | Record<string, unknown>
+    | null
+    | undefined;
+  const studioTest = Boolean(contentConfig?.is_studio_test);
+
   const midGame = teamResult.data.teamStatus === "playing";
   const captainName = teamResult.data.captainDisplayName;
   const shellDescription = midGame
@@ -63,6 +69,7 @@ export default async function EventTeamPage({ params, searchParams }: EventTeamP
         teamStatus={teamResult.data.teamStatus}
         captainDisplayName={captainName}
         defaultDisplayName={name?.trim() ?? ""}
+        studioTest={studioTest}
       />
     </GridShell>
   );

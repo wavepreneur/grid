@@ -9,7 +9,7 @@ import {
   studioTestBookingReference,
 } from "@/lib/cms/studio-test-session";
 import { generateInviteCode, generateJoinCode, generatePortalToken } from "@/lib/grid/codes";
-import { eventCaptainPath, eventTeamJoinPath, cockpitPath } from "@/lib/grid/event-routes";
+import { eventCaptainPath, eventLobbyPath, eventTeamJoinPath, cockpitPath } from "@/lib/grid/event-routes";
 import { getCityIdBySlug } from "@/lib/grid/organizations";
 import type { ActionResult } from "@/lib/grid/types";
 
@@ -89,6 +89,9 @@ function playPathForTestTeam(input: {
 }): string {
   if (input.teamStatus === "setup" || input.playerCount === 0) {
     return eventCaptainPath(input.inviteCode, input.joinCode);
+  }
+  if (input.teamStatus === "lobby") {
+    return eventLobbyPath(input.inviteCode, input.joinCode);
   }
   return eventTeamJoinPath(input.inviteCode, input.joinCode);
 }
@@ -294,6 +297,7 @@ export async function getOrCreateStudioTestSession(
           .update({
             studio_game_version_id: version?.id ?? null,
             title: `[Test] ${game.name}`,
+            max_players_per_team: STUDIO_TEST_MAX_PLAYERS,
             content_config: {
               ...prevConfig,
               cms_game_id: game.id,
@@ -306,6 +310,10 @@ export async function getOrCreateStudioTestSession(
             },
           })
           .eq("id", existing.id);
+        await supabase
+          .from("teams")
+          .update({ max_size: STUDIO_TEST_MAX_PLAYERS })
+          .eq("id", team.id);
         return {
           success: true,
           data: toSessionPayload({

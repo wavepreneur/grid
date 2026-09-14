@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { prepareTeamGame } from "@/app/actions/game";
-import { getLobbySnapshot } from "@/app/actions/lobby";
+import { getLobbySnapshot, rewindUnplayedStudioTestToLobby } from "@/app/actions/lobby";
 import { LobbyRoom } from "@/components/lobby/lobby-room";
 import { GridError } from "@/components/grid/grid-shell";
 import { eventPlayPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
@@ -47,7 +47,7 @@ export function LobbyGate({
   }, [eventContent, inviteCode]);
 
   useEffect(() => {
-    resolveTeamSession(inviteCode, joinCode).then((resolved) => {
+    resolveTeamSession(inviteCode, joinCode).then(async (resolved) => {
       if (!resolved) {
         abandonTeamSession();
         router.replace(eventTeamJoinPath(inviteCode, joinCode));
@@ -61,8 +61,19 @@ export function LobbyGate({
         resolved.session.teamStatus === "finished";
 
       if (isPlaying && !manageMode) {
-        router.replace(eventPlayPath(inviteCode, joinCode));
-        return;
+        let stayInLobby = false;
+        if (studioTest && resolved.session.teamStatus === "playing") {
+          const rewind = await rewindUnplayedStudioTestToLobby({
+            inviteCode,
+            joinCode,
+            sessionId: resolved.session.sessionId,
+          });
+          stayInLobby = Boolean(rewind.success && rewind.data.rewound);
+        }
+        if (!stayInLobby) {
+          router.replace(eventPlayPath(inviteCode, joinCode));
+          return;
+        }
       }
 
       getLobbySnapshot({
@@ -79,8 +90,10 @@ export function LobbyGate({
           !manageMode &&
           (result.data.team_status === "playing" || result.data.team_status === "finished")
         ) {
-          router.replace(eventPlayPath(inviteCode, joinCode));
-          return;
+          if (!studioTest) {
+            router.replace(eventPlayPath(inviteCode, joinCode));
+            return;
+          }
         }
 
         setSnapshot(result.data);
@@ -91,7 +104,7 @@ export function LobbyGate({
         });
       });
     });
-  }, [inviteCode, joinCode, manageMode, router]);
+  }, [inviteCode, joinCode, manageMode, router, studioTest]);
 
   if (error) {
     return <GridError message={error} />;

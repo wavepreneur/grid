@@ -203,8 +203,10 @@ export function LobbyRoom({
     }
 
     // Polling often sees "playing" before/without Realtime — never leave the lobby stuck.
+    // Studio-Test stays until Alpha taps Start (briefing first, timer off).
     if (
       !manageMode &&
+      !studioTest &&
       (result.data.team_status === "playing" || result.data.team_status === "finished")
     ) {
       goToPlay();
@@ -343,10 +345,11 @@ export function LobbyRoom({
 
   // Belt-and-suspenders: any path that marks the snapshot as playing must leave the lobby.
   useEffect(() => {
+    if (studioTest) return;
     if (snapshot.team_status === "playing" || snapshot.team_status === "finished") {
       goToPlay();
     }
-  }, [goToPlay, snapshot.team_status]);
+  }, [goToPlay, snapshot.team_status, studioTest]);
 
   useEffect(() => {
     if (snapshot.team_status !== "lobby") return;

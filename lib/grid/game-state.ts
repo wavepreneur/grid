@@ -158,6 +158,11 @@ export type TeamGameState = {
    */
   content_ready?: boolean;
   /**
+   * Set only when Alpha taps „Spiel starten“. Studio-Test must not show the
+   * map until this is true — auto-start / /play hops cannot skip briefing.
+   */
+  briefing_confirmed?: boolean;
+  /**
    * Server-held outdoor walk progress (mission meters + bonus meters).
    * Alpha device reports; all devices read via realtime.
    */
@@ -306,6 +311,7 @@ export function parseTeamGameState(value: unknown): TeamGameState {
     bonus_notice: parseBonusNotice(candidate.bonus_notice),
     content_ready:
       candidate.content_ready === false || !candidate.levels ? false : true,
+    briefing_confirmed: candidate.briefing_confirmed === true,
     outdoor_progress:
       candidate.outdoor_progress === null
         ? null
