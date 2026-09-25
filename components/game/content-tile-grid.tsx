@@ -39,7 +39,7 @@ export function ContentTileGrid({
     <div
       className={
         cityStyle
-          ? "min-w-0 w-full rounded-[1.75rem] bg-[var(--cg-accent)]/20 px-4 py-4 shadow-[var(--cg-shadow-soft)] sm:px-5 sm:py-5"
+          ? "min-w-0 w-full overflow-hidden rounded-[1.75rem] bg-[var(--cg-accent)]/20 px-4 py-4 shadow-[var(--cg-shadow-soft)] sm:px-5 sm:py-5"
           : isSidebar
             ? "flex min-h-0 flex-col"
             : "min-w-0 w-full"
@@ -51,7 +51,7 @@ export function ContentTileGrid({
             {heading}
           </p>
           <p className="mt-0.5 text-sm font-semibold text-[var(--cg-fg)]/70">
-            Antippen zum Öffnen
+            {single ? "Antippen zum Öffnen" : "Wischen oder antippen"}
           </p>
         </div>
       ) : (
@@ -65,7 +65,7 @@ export function ContentTileGrid({
           cityStyle
             ? single
               ? "flex justify-center"
-              : "flex items-start snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              : "flex min-w-0 touch-pan-x flex-nowrap items-start gap-3 overflow-x-auto overscroll-x-contain snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [touch-action:pan-x] [&::-webkit-scrollbar]:hidden"
             : single
               ? "flex justify-center"
               : isSidebar
@@ -90,8 +90,8 @@ export function ContentTileGrid({
                   disabled={disabled}
                   onClick={() => onOpen(tile)}
                   aria-label={label}
-                  className={`cg-tap-lift absolute inset-0 overflow-hidden rounded-[1.35rem] border-2 border-[var(--cg-primary)] shadow-[var(--cg-shadow-lift)] disabled:opacity-50 ${
-                    hasCover ? "" : "bg-[var(--cg-primary)] text-[var(--cg-primary-fg)]"
+                  className={`cg-tap-lift absolute inset-0 overflow-hidden rounded-[1.35rem] border-2 border-[var(--cg-success)] shadow-[var(--cg-shadow-soft)] disabled:opacity-50 ${
+                    hasCover ? "" : "bg-[var(--cg-success)] text-white"
                   }`}
                 >
                   {hasCover ? (
@@ -102,9 +102,9 @@ export function ContentTileGrid({
                       className="absolute inset-0 h-full w-full object-cover"
                     />
                   ) : (
-                    <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-2 text-[var(--cg-primary-fg)]">
+                    <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-2 text-white">
                       {mediaTypeLucideIcon(tile.type, "h-9 w-9")}
-                      <span className="max-w-full truncate text-sm font-extrabold text-[var(--cg-primary-fg)]">
+                      <span className="max-w-full truncate text-sm font-extrabold text-white">
                         {label}
                       </span>
                     </span>
