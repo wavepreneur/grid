@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Camera, X } from "lucide-react";
 import { uploadEventCapture } from "@/app/actions/captures";
 import { BigButton } from "@/components/game/city/ui";
@@ -133,6 +134,7 @@ export function MediaCapturePanel({
   const [elapsed, setElapsed] = useState(0);
   const [sending, setSending] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const isVideo = kind === "video";
   const busy = disabled || isPending || sending;
 
@@ -185,6 +187,10 @@ export function MediaCapturePanel({
       );
     }
   }, [attachStream, isVideo]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -575,8 +581,9 @@ export function MediaCapturePanel({
         }}
       />
 
-      {open ? (
-        <div className="city-game fixed inset-0 z-[300] flex flex-col bg-black">
+      {mounted && open
+        ? createPortal(
+            <div className="city-game fixed inset-0 z-[4000] flex h-[100dvh] w-screen flex-col bg-black">
           <div className="relative min-h-0 flex-1 bg-black">
             <video
               ref={videoRef}
@@ -681,19 +688,23 @@ export function MediaCapturePanel({
                     {shootLabel}
                   </PrimaryButton>
                 )}
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => fileRef.current?.click()}
-                  className="w-full text-center text-sm font-semibold text-[var(--cg-muted)] disabled:opacity-40"
-                >
-                  Datei wählen
-                </button>
+                {cameraError ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => fileRef.current?.click()}
+                    className="w-full text-center text-sm font-semibold text-[var(--cg-muted)] disabled:opacity-40"
+                  >
+                    Aus der Galerie
+                  </button>
+                ) : null}
               </>
             )}
           </div>
-        </div>
-      ) : null}
+        </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
