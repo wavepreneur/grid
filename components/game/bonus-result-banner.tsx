@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, X } from "lucide-react";
 import { IconGift } from "@/components/game/city/icons";
 
@@ -12,21 +14,28 @@ type Props = {
 };
 
 /**
- * Same card as the in-task bonus result — solid cream so HUD chrome cannot
- * bleed through (this banner lives outside `.city-game`).
+ * Same card as the in-task bonus result. Portaled to body so Leaflet map
+ * panes (z-index 200–1000) cannot cover the notice.
  */
 export function BonusResultBanner({ leaving, correct, headline, detail }: Props) {
+  const [mounted, setMounted] = useState(false);
   const failed = correct === false;
   const inProgress = correct === null;
 
-  return (
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <div
       role="status"
-      className={`city-game fixed inset-x-0 top-0 z-[200] bg-[var(--cg-bg)] ${
+      className={`city-game pointer-events-none fixed inset-x-0 top-0 z-[1100] bg-transparent ${
         leaving ? "cg-animate-slide-up" : "cg-animate-slide-down"
       }`}
     >
-      <div className="mx-auto w-full max-w-md px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <div className="pointer-events-auto mx-auto w-full max-w-md px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div
           className={`flex items-start gap-3 rounded-2xl bg-[var(--cg-card)] px-4 py-3.5 text-left shadow-[var(--cg-shadow-lift)] ring-2 ${
             failed
@@ -61,6 +70,7 @@ export function BonusResultBanner({ leaving, correct, headline, detail }: Props)
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
