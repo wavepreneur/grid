@@ -28,7 +28,25 @@ const ALLOWED_MIME = new Set([
 ]);
 
 export function isAllowedCaptureMime(mime: string): boolean {
-  return ALLOWED_MIME.has(mime);
+  const base = mime.split(";")[0].trim().toLowerCase();
+  return ALLOWED_MIME.has(base) || base === "image/jpg";
+}
+
+/** Strip codec suffixes (`video/mp4;codecs=…`) and map iOS aliases. */
+export function normalizeCaptureMime(
+  mime: string,
+  kind: EventCaptureKind,
+): string | null {
+  const base = mime.split(";")[0].trim().toLowerCase();
+  if (base === "image/jpg") return "image/jpeg";
+  if (ALLOWED_MIME.has(base)) return base;
+  if (kind === "video") {
+    if (base.includes("webm")) return "video/webm";
+    if (base.includes("quicktime") || base.endsWith("/mov")) return "video/quicktime";
+    return "video/mp4";
+  }
+  if (base.startsWith("image/")) return "image/jpeg";
+  return null;
 }
 
 export function parseCaptureKind(raw: unknown): EventCaptureKind | null {

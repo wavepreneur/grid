@@ -10,11 +10,22 @@ import type { ActionResult } from "@/lib/grid/types";
 import {
   EVENT_CAPTURES_BUCKET,
   EVENT_CAPTURE_MAX_BYTES,
-  isAllowedCaptureMime,
   listEventCapturesByEventId,
+  normalizeCaptureMime,
   parseCaptureKind,
   type EventCaptureItem,
+  type EventCaptureKind,
 } from "@/lib/grid/event-captures";
+
+function absoluteStorageUrl(signedUrl: string): string {
+  if (signedUrl.startsWith("http://") || signedUrl.startsWith("https://")) {
+    return signedUrl;
+  }
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
+  const path = signedUrl.startsWith("/") ? signedUrl : `/${signedUrl}`;
+  if (path.startsWith("/storage/v1")) return `${base}${path}`;
+  return `${base}/storage/v1${path}`;
+}
 
 function randomCaptureName(ext: string): string {
   const bytes = new Uint8Array(16);
@@ -23,95 +34,161 @@ function randomCaptureName(ext: string): string {
   return `${id}.${ext}`;
 }
 
-function extensionForMime(mime: string, fallbackName: string): string {
+function extensionForMime(mime: string): string {
   if (mime === "image/jpeg") return "jpg";
   if (mime === "image/png") return "png";
   if (mime === "image/webp") return "webp";
   if (mime === "video/mp4") return "mp4";
   if (mime === "video/webm") return "webm";
   if (mime === "video/quicktime") return "mov";
-  const fromName = fallbackName.split(".").pop()?.toLowerCase();
-  if (fromName && /^[a-z0-9]{2,5}$/.test(fromName)) return fromName;
   return mime.startsWith("video/") ? "mp4" : "jpg";
 }
 
-export async function uploadEventCapture(
-  formData: FormData,
-): Promise<ActionResult<{ id: string; publicUrl: string }>> {
+async function assertCaptureAllowed(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  levelNumber: number;
+  kind: EventCaptureKind;
+  bonusId?: string;
+}) {
+  const { event, team, player } = await assertPlayerSession(input);
+  if (team.status !== "playing") {
+    throw new Error("Das Spiel läuft gerade nicht.");
+  }
+
+  const content = await loadResolvedEventContent({
+    eventId: event.id,
+    organizationId: event.organization_id,
+    cityId: event.city_id,
+    contentConfig: event.content_config,
+    routeOverride: event.route_override,
+    studioGameVersionId: event.studio_game_version_id,
+  });
+  if (input.bonusId) {
+    const bonus = findBonusInContent(content.levels, input.bonusId, input.levelNumber);
+    const media = bonus ? bonusMediaKind(bonus) : null;
+    if (media && media !== input.kind) {
+      throw new Error(
+        media === "video"
+          ? "Diese Aufgabe erwartet ein Video."
+          : "Diese Aufgabe erwartet ein Foto.",
+      );
+    }
+  } else {
+    const level = getLevelDefinition(content, input.levelNumber);
+    if (!level || !isMediaInputMode(level.input_mode) || level.input_mode !== input.kind) {
+      throw new Error("Diese Aufgabe nimmt keine Aufnahme entgegen.");
+    }
+  }
+
+  return { event, team, player };
+}
+
+export async function prepareEventCaptureUpload(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  levelNumber: number;
+  kind: string;
+  bonusId?: string;
+  mimeType: string;
+  byteSize: number;
+}): Promise<ActionResult<{ path: string; token: string; signedUrl: string }>> {
   try {
-    const kind = parseCaptureKind(formData.get("kind"));
+    const kind = parseCaptureKind(input.kind);
     if (!kind) {
       return { success: false, error: "Unbekannter Aufnahme-Typ." };
     }
-
-    const inviteCode = String(formData.get("inviteCode") ?? "");
-    const joinCode = String(formData.get("joinCode") ?? "");
-    const sessionId = String(formData.get("sessionId") ?? "");
-    const levelNumber = Number(formData.get("levelNumber"));
-    const bonusId = String(formData.get("bonusId") ?? "").trim();
-    if (!inviteCode || !joinCode || !sessionId || !Number.isFinite(levelNumber)) {
+    if (!Number.isFinite(input.levelNumber)) {
       return { success: false, error: "Session ungültig." };
     }
-
-    const file = formData.get("file");
-    if (!(file instanceof File) || file.size === 0) {
+    if (!Number.isFinite(input.byteSize) || input.byteSize <= 0) {
       return { success: false, error: "Keine Datei ausgewählt." };
     }
-    if (file.size > EVENT_CAPTURE_MAX_BYTES) {
+    if (input.byteSize > EVENT_CAPTURE_MAX_BYTES) {
       return { success: false, error: "Datei zu groß (max. 25 MB)." };
     }
-    if (!isAllowedCaptureMime(file.type)) {
+    const mimeType = normalizeCaptureMime(input.mimeType, kind);
+    if (!mimeType) {
       return { success: false, error: "Dieses Dateiformat wird nicht unterstützt." };
     }
-    if (kind === "video" && !file.type.startsWith("video/")) {
+    if (kind === "video" && !mimeType.startsWith("video/")) {
       return { success: false, error: "Bitte ein Video senden." };
     }
-    if (kind !== "video" && !file.type.startsWith("image/")) {
+    if (kind !== "video" && !mimeType.startsWith("image/")) {
       return { success: false, error: "Bitte ein Foto senden." };
     }
 
-    const { event, team, player } = await assertPlayerSession({
-      inviteCode,
-      joinCode,
-      sessionId,
+    const { event } = await assertCaptureAllowed({
+      inviteCode: input.inviteCode,
+      joinCode: input.joinCode,
+      sessionId: input.sessionId,
+      levelNumber: input.levelNumber,
+      kind,
+      bonusId: input.bonusId?.trim() || undefined,
     });
-    if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft gerade nicht." };
-    }
 
-    const content = await loadResolvedEventContent({
-      eventId: event.id,
-      organizationId: event.organization_id,
-      cityId: event.city_id,
-      contentConfig: event.content_config,
-      routeOverride: event.route_override,
-      studioGameVersionId: event.studio_game_version_id,
-    });
-    if (bonusId) {
-      const bonus = findBonusInContent(content.levels, bonusId, levelNumber);
-      const media = bonus ? bonusMediaKind(bonus) : null;
-      if (media && media !== kind) {
-        return { success: false, error: "Diese Aufgabe nimmt keine Aufnahme entgegen." };
-      }
-    } else {
-      const level = getLevelDefinition(content, levelNumber);
-      if (!level || !isMediaInputMode(level.input_mode) || level.input_mode !== kind) {
-        return { success: false, error: "Diese Aufgabe nimmt keine Aufnahme entgegen." };
-      }
-    }
-
-    const ext = extensionForMime(file.type, file.name);
-    const path = `${event.id}/${randomCaptureName(ext)}`;
+    const path = `${event.id}/${randomCaptureName(extensionForMime(mimeType))}`;
     const supabase = createAdminClient();
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const { error: uploadError } = await supabase.storage
+    const { data, error } = await supabase.storage
       .from(EVENT_CAPTURES_BUCKET)
-      .upload(path, buffer, {
-        contentType: file.type,
-        upsert: false,
-      });
-    if (uploadError) throw new Error(uploadError.message);
+      .createSignedUploadUrl(path);
+    if (error || !data?.token || !data.signedUrl) {
+      throw new Error(error?.message || "Upload-Link fehlgeschlagen.");
+    }
 
+    return {
+      success: true,
+      data: {
+        path: data.path ?? path,
+        token: data.token,
+        signedUrl: absoluteStorageUrl(data.signedUrl),
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Upload fehlgeschlagen.",
+    };
+  }
+}
+
+export async function finalizeEventCapture(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  levelNumber: number;
+  kind: string;
+  bonusId?: string;
+  path: string;
+  mimeType: string;
+}): Promise<ActionResult<{ id: string; publicUrl: string }>> {
+  try {
+    const kind = parseCaptureKind(input.kind);
+    if (!kind) {
+      return { success: false, error: "Unbekannter Aufnahme-Typ." };
+    }
+    const mimeType = normalizeCaptureMime(input.mimeType, kind);
+    if (!mimeType) {
+      return { success: false, error: "Dieses Dateiformat wird nicht unterstützt." };
+    }
+
+    const { event, team, player } = await assertCaptureAllowed({
+      inviteCode: input.inviteCode,
+      joinCode: input.joinCode,
+      sessionId: input.sessionId,
+      levelNumber: input.levelNumber,
+      kind,
+      bonusId: input.bonusId?.trim() || undefined,
+    });
+
+    const path = input.path.trim();
+    if (!path.startsWith(`${event.id}/`) || path.includes("..")) {
+      return { success: false, error: "Upload ungültig." };
+    }
+
+    const supabase = createAdminClient();
     const { data: publicUrl } = supabase.storage
       .from(EVENT_CAPTURES_BUCKET)
       .getPublicUrl(path);
@@ -122,11 +199,11 @@ export async function uploadEventCapture(
         event_id: event.id,
         team_id: team.id,
         player_id: player.id,
-        level_number: levelNumber,
+        level_number: input.levelNumber,
         kind,
         storage_path: path,
         public_url: publicUrl.publicUrl,
-        mime_type: file.type,
+        mime_type: mimeType,
       })
       .select("id")
       .single();

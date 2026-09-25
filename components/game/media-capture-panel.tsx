@@ -3,10 +3,23 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Camera, X } from "lucide-react";
-import { uploadEventCapture } from "@/app/actions/captures";
+import { finalizeEventCapture, prepareEventCaptureUpload } from "@/app/actions/captures";
 import { BigButton } from "@/components/game/city/ui";
 import { GridButton, GridHint } from "@/components/grid/grid-shell";
-import { EVENT_CAPTURE_VIDEO_MAX_SECONDS } from "@/lib/grid/event-captures";
+import {
+  captureVideoTrackConstraints,
+  compressCaptureImage,
+  createCaptureRecorder,
+  encodeCanvasJpeg,
+  fitCaptureSize,
+} from "@/lib/grid/compress-capture";
+import {
+  EVENT_CAPTURES_BUCKET,
+  EVENT_CAPTURE_MAX_BYTES,
+  EVENT_CAPTURE_VIDEO_MAX_SECONDS,
+  normalizeCaptureMime,
+} from "@/lib/grid/event-captures";
+import { createClient } from "@/lib/supabase/client";
 import type { MediaInputMode, SolveLevelPayload } from "@/lib/grid/level-types";
 
 type CaptureContext = {
@@ -173,12 +186,12 @@ export function MediaCapturePanel({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: isVideo,
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
+        video: captureVideoTrackConstraints(),
       });
+      const track = stream.getVideoTracks()[0];
+      if (track) {
+        void track.applyConstraints(captureVideoTrackConstraints()).catch(() => {});
+      }
       streamRef.current = stream;
       attachStream(stream);
     } catch {
@@ -236,12 +249,13 @@ export function MediaCapturePanel({
   async function snapshotPhoto() {
     const video = videoRef.current;
     if (!video || video.videoWidth < 2) return;
+    const size = fitCaptureSize(video.videoWidth, video.videoHeight);
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = size.width;
+    canvas.height = size.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, size.width, size.height);
     const overlay = overlayRef.current;
     if (kind === "augmented_photo" && overlay && overlay.naturalWidth > 0) {
       drawContain(
@@ -253,9 +267,7 @@ export function MediaCapturePanel({
         canvas.height,
       );
     }
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", 0.88),
-    );
+    const blob = await encodeCanvasJpeg(canvas);
     if (blob) setPreview(blob);
   }
 
@@ -280,9 +292,7 @@ export function MediaCapturePanel({
     }
     chunksRef.current = [];
     const mime = pickRecorderMime();
-    const recorder = mime
-      ? new MediaRecorder(stream, { mimeType: mime })
-      : new MediaRecorder(stream);
+    const recorder = createCaptureRecorder(stream, mime);
     recorderRef.current = recorder;
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunksRef.current.push(event.data);
@@ -350,7 +360,11 @@ export function MediaCapturePanel({
   }
 
   async function sendCapture() {
-    if (!previewBlob || busy) return;
+    if (busy) return;
+    if (!previewBlob) {
+      setUploadError("Keine Aufnahme. Bitte nochmal aufnehmen.");
+      return;
+    }
     if (!captureContext) {
       setUploadError("Session fehlt. Bitte Seite neu laden und nochmal senden.");
       return;
@@ -358,27 +372,65 @@ export function MediaCapturePanel({
     setSending(true);
     setUploadError(null);
     try {
-      const formData = new FormData();
-      const mime = previewBlob.type || (isVideo ? "video/webm" : "image/jpeg");
-      const file = new File(
-        [previewBlob],
-        `capture.${extensionForMime(mime, kind)}`,
-        { type: mime },
+      const payload = isVideo ? previewBlob : await compressCaptureImage(previewBlob);
+      if (payload.size > EVENT_CAPTURE_MAX_BYTES) {
+        setUploadError("Datei zu groß (max. 25 MB). Kürzer aufnehmen.");
+        return;
+      }
+      const mime = normalizeCaptureMime(
+        payload.type || (isVideo ? "video/mp4" : "image/jpeg"),
+        kind,
       );
-      formData.append("file", file);
-      formData.append("inviteCode", captureContext.inviteCode);
-      formData.append("joinCode", captureContext.joinCode);
-      formData.append("sessionId", captureContext.sessionId);
-      formData.append("levelNumber", String(levelNumber));
-      formData.append("kind", kind);
-      if (bonusId) formData.append("bonusId", bonusId);
-      const result = await uploadEventCapture(formData);
-      if (!result.success) {
-        setUploadError(result.error);
+      if (!mime) {
+        setUploadError("Dieses Dateiformat wird nicht unterstützt.");
+        return;
+      }
+      const prepared = await prepareEventCaptureUpload({
+        inviteCode: captureContext.inviteCode,
+        joinCode: captureContext.joinCode,
+        sessionId: captureContext.sessionId,
+        levelNumber,
+        kind,
+        bonusId: bonusId || undefined,
+        mimeType: mime,
+        byteSize: payload.size,
+      });
+      if (!prepared.success) {
+        setUploadError(prepared.error);
+        return;
+      }
+      const supabase = createClient();
+      const { error: putError } = await supabase.storage
+        .from(EVENT_CAPTURES_BUCKET)
+        .uploadToSignedUrl(prepared.data.path, prepared.data.token, payload, {
+          contentType: mime,
+        });
+      if (putError) {
+        setUploadError(putError.message || "Upload fehlgeschlagen. Bitte nochmal senden.");
+        return;
+      }
+      const done = await finalizeEventCapture({
+        inviteCode: captureContext.inviteCode,
+        joinCode: captureContext.joinCode,
+        sessionId: captureContext.sessionId,
+        levelNumber,
+        kind,
+        bonusId: bonusId || undefined,
+        path: prepared.data.path,
+        mimeType: mime,
+      });
+      if (!done.success) {
+        setUploadError(done.error);
         return;
       }
       onSubmit({ answer: "ok" });
       closeCamera(true);
+    } catch (error) {
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : "Senden fehlgeschlagen. Bitte nochmal versuchen.",
+      );
     } finally {
       setSending(false);
     }
@@ -427,21 +479,24 @@ export function MediaCapturePanel({
         void compositeFileWithOverlay(file);
         return;
       }
-      setPreview(file);
+      void compressCaptureImage(file).then(setPreview);
     }
   }
 
   async function compositeFileWithOverlay(file: File) {
     const bitmap = await createImageBitmap(file);
+    const size = fitCaptureSize(bitmap.width, bitmap.height);
     const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
+    canvas.width = size.width;
+    canvas.height = size.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) {
+      bitmap.close();
       setPreview(file);
       return;
     }
     drawCover(ctx, bitmap, bitmap.width, bitmap.height, canvas.width, canvas.height);
+    bitmap.close();
     const overlay = overlayRef.current;
     if (overlay && overlay.naturalWidth > 0) {
       drawContain(
@@ -453,9 +508,7 @@ export function MediaCapturePanel({
         canvas.height,
       );
     }
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", 0.88),
-    );
+    const blob = await encodeCanvasJpeg(canvas);
     setPreview(blob ?? file);
   }
 
