@@ -33,14 +33,14 @@ export function LevelHero({
         </div>
       ) : null}
       {title?.trim() ? (
-        <div className="min-w-0 space-y-2.5 px-4 pt-4 sm:px-5 sm:pt-5">
-          <h1 className="break-words text-xl font-bold leading-tight text-[var(--cg-fg)] [overflow-wrap:anywhere] sm:text-2xl">
+        <div className="min-w-0 px-4 pt-4 sm:px-5 sm:pt-5">
+          <h1 className="break-words text-xl font-extrabold leading-snug text-[var(--cg-fg)] [overflow-wrap:anywhere] sm:text-2xl">
             {title.trim()}
           </h1>
           {description?.trim() ? (
             <FormattedTaskText
               text={description}
-              className="break-words text-sm leading-relaxed text-[var(--cg-muted)] [overflow-wrap:anywhere]"
+              className="mt-3 space-y-3 break-words text-[15px] leading-[1.65] text-[var(--cg-fg)] [overflow-wrap:anywhere] sm:text-base"
             />
           ) : null}
         </div>
