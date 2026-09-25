@@ -83,10 +83,10 @@ export function SyncModal({
             className="cg-animate-rise-in relative mt-6 rounded-3xl bg-[var(--cg-secondary)] px-5 py-5 text-center"
             style={{ animationDelay: "140ms" }}
           >
-            <p className="text-base font-extrabold uppercase leading-snug tracking-wide text-[var(--cg-fg)]">
+            <p className="font-[var(--font-cg-sans)] text-xs font-bold uppercase leading-snug tracking-[0.14em] text-[var(--cg-muted)]">
               {modal.message}
             </p>
-            <p className="mt-3 text-lg font-semibold leading-snug text-[var(--cg-fg)]">
+            <p className="mt-2.5 font-[var(--font-cg-display)] text-lg font-semibold leading-snug text-[var(--cg-fg)]">
               „{modal.body}“
             </p>
           </div>
