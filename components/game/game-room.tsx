@@ -8,6 +8,7 @@ import {
   dismissSyncModal,
   getGameState,
   purchaseHint,
+  purchaseWalletNote,
   revealLevelSolution,
   skipBonusPhase,
   expireMissionClock,
@@ -33,6 +34,8 @@ import type { OutdoorArriveInput } from "@/components/game/play-hub-view";
 import type { PlayMorePanel } from "@/components/game/play-more-sheet";
 import { GrowthRecapCard } from "@/components/game/growth-recap-card";
 import { TeamCaptureGallery } from "@/components/game/team-capture-gallery";
+import { TeamWalletList } from "@/components/game/team-wallet";
+import { visibleWalletNotes } from "@/lib/grid/wallet";
 import { MissionTimeAlerts } from "@/components/game/mission-time-alerts";
 import { TeamPlayRanking } from "@/components/game/team-play-ranking";
 import { SyncModal } from "@/components/game/sync-modal";
@@ -100,6 +103,7 @@ export function GameRoom({
   /** Only user solve/submit actions — never Realtime resync (that was flipping OK ↔ Sende…). */
   const [isSolvePending, startSolveTransition] = useTransition();
   const [isHintPending, startHintTransition] = useTransition();
+  const [isWalletPending, startWalletTransition] = useTransition();
   const [morePanel, setMorePanel] = useState<PlayMorePanel>(null);
   const [paused, setPaused] = useState(false);
   const [transferPending, setTransferPending] = useState(false);
@@ -376,6 +380,19 @@ export function GameRoom({
         cacheTeamState(next);
         return next;
       });
+    });
+  }
+
+  function handlePurchaseWallet(level: number) {
+    setError(null);
+    startWalletTransition(async () => {
+      const result = await purchaseWalletNote({
+        inviteCode,
+        joinCode,
+        sessionId: session.sessionId,
+        level,
+      });
+      applyTeamResult(result);
     });
   }
 
@@ -990,6 +1007,24 @@ export function GameRoom({
           euer Team
         </p>
       </div>
+      <section className="overflow-hidden rounded-3xl bg-[var(--cg-accent)] shadow-[var(--cg-shadow-lift)]">
+        <div className="px-5 py-4 text-[var(--cg-accent-fg)]">
+          <p className="text-sm font-extrabold uppercase tracking-[0.14em]">Wallet</p>
+          <p className="mt-0.5 text-sm opacity-80">Gesammelte Hinweise aus den Leveln</p>
+        </div>
+        <div className="rounded-t-2xl bg-[var(--cg-card)] px-5 py-5">
+          <TeamWalletList
+            notes={visibleWalletNotes(
+              teamState.gameState.wallet,
+              eventContent.levels,
+              teamState.gameState.levels,
+            )}
+            score={teamState.gameState.score ?? 0}
+            onPurchase={handlePurchaseWallet}
+            purchasePending={isWalletPending}
+          />
+        </div>
+      </section>
       <TeamCaptureGallery
         inviteCode={inviteCode}
         joinCode={joinCode}
@@ -1096,6 +1131,8 @@ export function GameRoom({
         onAdvanceQuizToLevel={handleAdvanceQuizToLevel}
         onSolveLevel={handleSolveLevel}
         onPurchaseHint={handlePurchaseHint}
+        onPurchaseWallet={handlePurchaseWallet}
+        walletPurchasePending={isWalletPending}
         onSubmitBonus={handleSubmitBonus}
         onBeginBonus={handleBeginBonus}
         onContinueBonus={handleContinueBonus}

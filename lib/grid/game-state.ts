@@ -5,6 +5,7 @@ import {
 } from "@/lib/grid/outdoor-unlock";
 import type { PlayPhase } from "@/lib/grid/play-surface";
 import { parseBonusTask } from "@/lib/grid/bonus";
+import { parseWalletNotes, type WalletNote } from "@/lib/grid/wallet";
 
 /** @deprecated Use EXITMANIA_TOTAL_LEVELS */
 export const PHASE2_DEMO_LEVELS = EXITMANIA_TOTAL_LEVELS;
@@ -178,6 +179,8 @@ export type TeamGameState = {
   outdoor_progress?: OutdoorProgressState | null;
   /** Why play stopped. Older saves omit this — infer from completed levels. */
   ended_reason?: "completed" | "time" | "ended";
+  /** Team folder of success-infos collected after solves. */
+  wallet?: WalletNote[];
   /** @deprecated Use purchased_tile_hints — kept for older saves. */
   hints_used: Record<string, number>;
   /** levelKey -> tileId -> revealed hint */
@@ -192,6 +195,8 @@ export type TeamGameState = {
       started_at?: string;
       completed_at?: string;
       completed_by?: string[];
+      /** True when the team used give-up / reveal instead of solving. */
+      revealed?: boolean;
       /** Furthest phase reached in this slot (optional). */
       phase?: PlayPhase;
     }
@@ -365,6 +370,7 @@ export function createInitialGameState(
     bonus_notice: null,
     content_ready: true,
     outdoor_progress: null,
+    wallet: [],
     hints_used: {},
     purchased_tile_hints: {},
     purchased_level_hints: {},
@@ -429,6 +435,7 @@ export function parseTeamGameState(value: unknown): TeamGameState {
       candidate.ended_reason === "ended"
         ? candidate.ended_reason
         : undefined,
+    wallet: parseWalletNotes(candidate.wallet),
     hints_used: candidate.hints_used ?? {},
     purchased_tile_hints: candidate.purchased_tile_hints ?? {},
     purchased_level_hints: candidate.purchased_level_hints ?? {},

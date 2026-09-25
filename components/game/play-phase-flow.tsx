@@ -32,6 +32,7 @@ import {
   type RoleDisplayLabels,
 } from "@/lib/grid/role-labels";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
+import { visibleWalletNotes } from "@/lib/grid/wallet";
 
 type Teammate = {
   id: string;
@@ -94,6 +95,8 @@ type Props = {
   onAdvanceQuizToLevel: () => void;
   onSolveLevel: (payload: SolveLevelPayload) => void;
   onPurchaseHint: (tileId: string) => void;
+  onPurchaseWallet?: (level: number) => void;
+  walletPurchasePending?: boolean;
   onSubmitBonus: (
     selectedOptionId: string,
     extras?: { timedOut?: boolean; clockStartedAt?: string | null; skip?: boolean },
@@ -169,6 +172,8 @@ export function PlayPhaseFlow({
   onAdvanceQuizToLevel,
   onSolveLevel,
   onPurchaseHint,
+  onPurchaseWallet,
+  walletPurchasePending = false,
   onSubmitBonus,
   onBeginBonus,
   onContinueBonus,
@@ -187,6 +192,11 @@ export function PlayPhaseFlow({
   const completed = Object.values(gameState.levels).filter((e) => e.status === "completed").length;
   const total = eventContent.levels.length;
   const roleLabels: RoleDisplayLabels = eventContent.roleLabels ?? DEFAULT_ROLE_LABELS;
+  const walletNotes = visibleWalletNotes(
+    gameState.wallet,
+    eventContent.levels,
+    gameState.levels,
+  );
 
   const prevPhaseRef = useRef(phase);
   const [unlockGate, setUnlockGate] = useState(false);
@@ -259,6 +269,10 @@ export function PlayPhaseFlow({
         onReleaseMySeat={onReleaseMySeat}
         releasePending={releasePending}
         mode={mode}
+        walletNotes={walletNotes}
+        walletScore={score}
+        onPurchaseWallet={onPurchaseWallet}
+        walletPurchasePending={walletPurchasePending}
         canUnlockGps={phase === "hub" && canUnlockGps}
         onForceUnlockGps={
           phase === "hub" && canUnlockGps

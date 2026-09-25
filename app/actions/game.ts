@@ -36,6 +36,12 @@ import {
   validateStationCode,
 } from "@/lib/grid/level-validation";
 import { HINT_POINT_COST, EXITMANIA_TOTAL_LEVELS, isMediaInputMode } from "@/lib/grid/level-types";
+import {
+  unlockWalletNote,
+  upsertLockedWalletNote,
+  upsertWalletNote,
+  WALLET_UNLOCK_COST,
+} from "@/lib/grid/wallet";
 import type { PlayerRole, SolveLevelPayload } from "@/lib/grid/level-types";
 import { resolveArchetypeRoleFlags } from "@/lib/grid/archetype-roles";
 import { resolveBlueprint } from "@/lib/grid/blueprints";
@@ -337,6 +343,7 @@ export async function solveCurrentLevel(input: {
             status: "completed",
             completed_at: new Date().toISOString(),
             completed_by: solvedBy,
+            revealed: Boolean(input.payload?.revealSolution) || undefined,
           },
         },
         authoredTotal,
@@ -365,6 +372,7 @@ export async function solveCurrentLevel(input: {
             status: "completed",
             completed_at: new Date().toISOString(),
             completed_by: solvedBy,
+            revealed: Boolean(input.payload?.revealSolution) || undefined,
           },
         },
         content.levels.length,
@@ -581,6 +589,17 @@ export async function solveCurrentLevel(input: {
         successTitle: levelDefinition.success_title,
         successInfo: input.payload?.revealSolution ? null : levelDefinition.success_info,
       }),
+      wallet: input.payload?.revealSolution
+        ? upsertLockedWalletNote(gameState.wallet, {
+            level: currentLevel,
+            title: levelDefinition.success_title,
+            hasInfo: Boolean(levelDefinition.success_info?.trim()),
+          })
+        : upsertWalletNote(gameState.wallet, {
+            level: currentLevel,
+            title: levelDefinition.success_title,
+            body: levelDefinition.success_info,
+          }),
       levels: progressionLevels,
     };
 
@@ -796,6 +815,122 @@ export async function purchaseHint(input: {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
+
+/** Unlock a skipped level's team-info in the wallet for a flat point cost. */
+export async function purchaseWalletNote(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+  level: number;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    const { event, team, player } = await assertPlayerSession(input);
+    if (team.status !== "playing" && team.status !== "finished") {
+      return { success: false, error: "Das Spiel läuft noch nicht." };
+    }
+
+    const gameState = parseTeamGameState(team.game_state);
+    const levelNumber = Number(input.level);
+    if (!Number.isFinite(levelNumber) || levelNumber < 1) {
+      return { success: false, error: "Level nicht gefunden." };
+    }
+
+    const content = await loadResolvedEventContent({
+      eventId: event.id,
+      organizationId: event.organization_id,
+      cityId: event.city_id,
+      contentConfig: event.content_config,
+      routeOverride: event.route_override,
+      studioGameVersionId: event.studio_game_version_id,
+    });
+    const levelDefinition = getLevelDefinition(content, levelNumber);
+    const info = levelDefinition?.success_info?.trim() ?? "";
+    if (!levelDefinition || !info) {
+      return { success: false, error: "Für dieses Level gibt es keinen Hinweis." };
+    }
+
+    const existing = (gameState.wallet ?? []).find((note) => note.level === levelNumber);
+    if (existing && !existing.locked && existing.body) {
+      return { success: true, data: buildRealtimeState(team, player) };
+    }
+
+    const levelEntry = gameState.levels[String(levelNumber)];
+    const canBuy =
+      existing?.locked === true ||
+      (levelEntry?.status === "completed" && Boolean(levelEntry.revealed));
+    if (!canBuy) {
+      return { success: false, error: "Diesen Hinweis könnt ihr erst nach Skip kaufen." };
+    }
+
+    if (gameState.score < WALLET_UNLOCK_COST) {
+      return {
+        success: false,
+        error: `Nicht genug Punkte (benötigt: ${WALLET_UNLOCK_COST}).`,
+      };
+    }
+
+    const nextGameState: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      score: gameState.score - WALLET_UNLOCK_COST,
+      wallet: unlockWalletNote(gameState.wallet, {
+        level: levelNumber,
+        title: levelDefinition.success_title,
+        body: info,
+        purchasedBy: player.display_name,
+        purchasedByPlayerId: player.id,
+      }),
+    };
+
+    const supabase = createAdminClient();
+    const { data: updatedTeam, error } = await supabase
+      .from("teams")
+      .update({ game_state: nextGameState })
+      .eq("id", team.id)
+      .in("status", ["playing", "finished"])
+      .select(
+        "id, status, current_level, game_state, started_at, lobby_auto_start_at, navigator_player_id",
+      )
+      .single();
+
+    if (error || !updatedTeam) {
+      return { success: false, error: error?.message ?? "Kauf fehlgeschlagen." };
+    }
+
+    await insertSyncEvent({
+      teamId: team.id,
+      eventType: "wallet_purchased",
+      level: levelNumber,
+      actorPlayerId: player.id,
+      payload: {
+        point_cost: WALLET_UNLOCK_COST,
+        score: nextGameState.score,
+        purchased_by: player.display_name,
+      },
+    });
+
+    await writeAuditLog({
+      organizationId: event.organization_id,
+      eventId: event.id,
+      teamId: team.id,
+      playerId: player.id,
+      action: "wallet_purchased",
+      payload: {
+        level: levelNumber,
+        point_cost: WALLET_UNLOCK_COST,
+        score: nextGameState.score,
+        purchased_by: player.display_name,
+      },
+    });
+
+    return { success: true, data: buildRealtimeState(updatedTeam, player) };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Kauf fehlgeschlagen.",
     };
   }
 }

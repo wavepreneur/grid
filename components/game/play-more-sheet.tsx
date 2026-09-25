@@ -16,9 +16,12 @@ import {
   Settings,
   Smartphone,
   Users,
+  Wallet,
 } from "lucide-react";
 import { BigButton } from "@/components/game/city/ui";
 import { PlayDocSheet } from "@/components/game/play-doc-sheet";
+import { TeamWalletList } from "@/components/game/team-wallet";
+import { walletMenuHint, type WalletNote } from "@/lib/grid/wallet";
 import { PersonalResumeLinkCard } from "@/components/player/personal-resume-link-card";
 import type { ContentMode } from "@/lib/cms/layer-model";
 import {
@@ -31,6 +34,7 @@ import {
 
 export type PlayMorePanel =
   | "menu"
+  | "wallet"
   | "briefing"
   | "faq"
   | "help"
@@ -70,6 +74,10 @@ type Props = {
   onForceUnlockGps?: () => void;
   /** Play surface — help copy must match outdoor / indoor / online. */
   mode?: ContentMode;
+  walletNotes?: WalletNote[];
+  walletScore?: number;
+  onPurchaseWallet?: (level: number) => void;
+  walletPurchasePending?: boolean;
 };
 
 /**
@@ -101,6 +109,10 @@ export function PlayMoreSheet({
   canUnlockGps = false,
   onForceUnlockGps,
   mode = "outdoor",
+  walletNotes = [],
+  walletScore = 0,
+  onPurchaseWallet,
+  walletPurchasePending = false,
 }: Props) {
   const view: PlayMorePanel =
     open === "gps" && mode === "indoor"
@@ -195,6 +207,22 @@ export function PlayMoreSheet({
             >
               {view === "menu" ? (
                 <div className="grid gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpen("wallet")}
+                    className="tap-lift flex w-full items-center gap-3 rounded-2xl bg-[var(--cg-accent)] px-3 py-4 text-left text-[var(--cg-accent-fg)] shadow-[var(--cg-shadow-lift)] sm:px-4"
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--cg-accent-fg)]/15">
+                      <Wallet className="h-6 w-6" strokeWidth={2.4} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-base font-extrabold">Wallet</span>
+                      <span className="mt-0.5 block text-sm opacity-80">
+                        {walletMenuHint(walletNotes)}
+                      </span>
+                    </span>
+                    <ChevronRight className="h-5 w-5 shrink-0 opacity-80" />
+                  </button>
                   <MenuRow
                     icon={<BookOpen className="h-5 w-5" />}
                     title="Spielregeln"
@@ -235,6 +263,20 @@ export function PlayMoreSheet({
                     hint="Namen, Code, Leitung"
                     onClick={() => onOpen("team")}
                   />
+                </div>
+              ) : null}
+
+              {view === "wallet" ? (
+                <div className="space-y-4">
+                  <TeamWalletList
+                    notes={walletNotes}
+                    score={walletScore}
+                    onPurchase={onPurchaseWallet}
+                    purchasePending={walletPurchasePending}
+                  />
+                  <BigButton variant="ghost" onClick={() => onOpen("menu")}>
+                    Zurück
+                  </BigButton>
                 </div>
               ) : null}
 
@@ -637,6 +679,8 @@ function panelTitle(panel: Exclude<PlayMorePanel, null>): string {
   switch (panel) {
     case "menu":
       return "Spiel-Menü";
+    case "wallet":
+      return "Wallet";
     case "briefing":
       return "Spielregeln";
     case "help":
