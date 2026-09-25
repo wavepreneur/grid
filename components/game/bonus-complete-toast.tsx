@@ -33,11 +33,12 @@ function markNoticeSeen(id: string) {
 }
 
 /**
- * Short team-wide banner after a bonus is finished — does not block play.
+ * Solid top banner after a bonus is finished — slides in, then leaves on its own.
  */
 export function BonusCompleteToast({ notice, onDismiss }: Props) {
   const seenRef = useRef<string | null>(null);
   const [visible, setVisible] = useState<BonusNoticeState | null>(null);
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     if (!notice?.id) return;
@@ -49,61 +50,54 @@ export function BonusCompleteToast({ notice, onDismiss }: Props) {
     seenRef.current = notice.id;
     markNoticeSeen(notice.id);
     playPlaySfx(notice.correct ? "correct" : "ping");
+    setLeaving(false);
     setVisible(notice);
   }, [notice]);
 
   useEffect(() => {
     if (!visible) return;
-    const timer = window.setTimeout(() => {
+    const hide = window.setTimeout(() => setLeaving(true), 4000);
+    return () => window.clearTimeout(hide);
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || !leaving) return;
+    const done = window.setTimeout(() => {
       const id = visible.id;
       setVisible(null);
+      setLeaving(false);
       onDismiss?.(id);
-    }, 4500);
-    return () => window.clearTimeout(timer);
-  }, [visible, onDismiss]);
+    }, 280);
+    return () => window.clearTimeout(done);
+  }, [visible, leaving, onDismiss]);
 
   if (!visible) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-[110] flex justify-center px-4">
-      <div
-        role="status"
-        className={`cg-animate-pop-in pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-2xl bg-[var(--cg-card)] px-4 py-3 shadow-[var(--cg-shadow-lift)] ring-1 ${
-          visible.correct
-            ? "ring-[var(--cg-accent)]/40"
-            : "ring-[var(--cg-destructive)]/35"
-        }`}
-      >
-        <span
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-            visible.correct
-              ? "bg-[var(--cg-accent)] text-[var(--cg-accent-fg)]"
-              : "bg-[var(--cg-destructive)] text-white"
-          }`}
-        >
+    <div
+      role="status"
+      className={`fixed inset-x-0 top-0 z-[110] ${
+        leaving ? "cg-animate-slide-up" : "cg-animate-slide-down"
+      } ${
+        visible.correct
+          ? "bg-[var(--cg-success)] text-white"
+          : "bg-[var(--cg-primary)] text-[var(--cg-primary-fg)]"
+      }`}
+    >
+      <div className="mx-auto flex w-full max-w-md items-start gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20">
           <IconGift size={20} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--cg-muted)]">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] opacity-80">
             Bonus erledigt
           </p>
-          <p className="mt-0.5 text-sm font-semibold text-[var(--cg-fg)]">
+          <p className="mt-0.5 text-sm font-semibold">
             {visible.correct
               ? `${visible.by} hat ${visible.reward} Punkte gerade geholt`
               : `${visible.by} konnte die Aufgabe nicht beantworten`}
           </p>
         </div>
-        <button
-          type="button"
-          className="shrink-0 text-xs font-bold text-[var(--cg-muted)]"
-          onClick={() => {
-            const id = visible.id;
-            setVisible(null);
-            onDismiss?.(id);
-          }}
-        >
-          OK
-        </button>
       </div>
     </div>
   );

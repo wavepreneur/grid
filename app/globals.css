@@ -324,6 +324,8 @@ select.grid-input option {
   .cg-animate-success-pulse,
   .cg-animate-celebrate,
   .cg-animate-score-pop,
+  .cg-animate-slide-down,
+  .cg-animate-slide-up,
   .cg-animate-bonus-gift {
     animation: none;
   }
@@ -416,6 +418,32 @@ select.grid-input option {
 
 .cg-animate-key-turn {
   animation: key-turn 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+@keyframes cg-slide-down {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes cg-slide-up {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-100%);
+  }
+}
+
+.cg-animate-slide-down {
+  animation: cg-slide-down 0.35s ease-out both;
+}
+
+.cg-animate-slide-up {
+  animation: cg-slide-up 0.28s ease-in both;
 }
 
 @keyframes cg-busy-slide {

@@ -1,6 +1,5 @@
 "use client";
 
-import { SectionLabel } from "@/components/game/city/ui";
 import { mediaTypeLucideIcon } from "@/components/game/city/level-screen-blocks";
 import type { PurchasedTileHint } from "@/lib/grid/game-state";
 import type { LevelContentTile } from "@/lib/grid/level-types";
@@ -37,15 +36,23 @@ export function ContentTileGrid({
   const heading = single ? "Rätselkachel" : `${tiles.length} Rätselkacheln`;
 
   return (
-    <div className={isSidebar ? "flex min-h-0 flex-col" : "min-w-0 w-full"}>
+    <div
+      className={
+        cityStyle
+          ? "min-w-0 w-full rounded-[1.75rem] bg-[var(--cg-accent)]/20 px-4 py-4 shadow-[var(--cg-shadow-soft)] sm:px-5 sm:py-5"
+          : isSidebar
+            ? "flex min-h-0 flex-col"
+            : "min-w-0 w-full"
+      }
+    >
       {cityStyle ? (
-        <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
-          <div>
-            <SectionLabel>{heading}</SectionLabel>
-          </div>
-          <span className="shrink-0 text-xs font-semibold text-[var(--cg-muted)]">
+        <div className="mb-4">
+          <p className="text-base font-extrabold leading-tight text-[var(--cg-fg)]">
+            {heading}
+          </p>
+          <p className="mt-0.5 text-sm font-semibold text-[var(--cg-fg)]/70">
             Antippen zum Öffnen
-          </span>
+          </p>
         </div>
       ) : (
         <div className="mb-3 flex shrink-0 items-end justify-between gap-2">
@@ -70,7 +77,7 @@ export function ContentTileGrid({
           tiles.map((tile) => {
             const label = tile.label ?? tileTypeLabel(tile.type);
             const size = single
-              ? "h-32 w-32 max-w-full"
+              ? "h-36 w-36 max-w-full sm:h-40 sm:w-40"
               : "h-32 w-32 snap-center sm:h-36 sm:w-36";
             const cover = tile.cover_image_url?.trim() || "";
             const hasCover = cover.length > 0;
@@ -83,8 +90,10 @@ export function ContentTileGrid({
                   disabled={disabled}
                   onClick={() => onOpen(tile)}
                   aria-label={label}
-                  className={`cg-tap-lift absolute inset-0 overflow-hidden rounded-[1.35rem] shadow-[var(--cg-shadow-tile)] disabled:opacity-50 ${
-                    hasCover ? "" : "bg-[var(--cg-secondary)]"
+                  className={`cg-tap-lift absolute inset-0 overflow-hidden rounded-[1.35rem] shadow-[var(--cg-shadow-lift)] ring-2 disabled:opacity-50 ${
+                    hasCover
+                      ? "ring-[var(--cg-primary)]/35"
+                      : "bg-[var(--cg-card)] ring-[var(--cg-primary)]"
                   }`}
                 >
                   {hasCover ? (
@@ -95,9 +104,9 @@ export function ContentTileGrid({
                       className="absolute inset-0 h-full w-full object-cover"
                     />
                   ) : (
-                    <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-2 text-[var(--cg-muted)]">
-                      {mediaTypeLucideIcon(tile.type)}
-                      <span className="max-w-full truncate text-sm font-semibold text-[var(--cg-fg)]">
+                    <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-2 text-[var(--cg-primary)]">
+                      {mediaTypeLucideIcon(tile.type, "h-9 w-9")}
+                      <span className="max-w-full truncate text-sm font-extrabold text-[var(--cg-fg)]">
                         {label}
                       </span>
                     </span>

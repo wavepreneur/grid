@@ -53,6 +53,8 @@ export function BonusSpectatorView({ items }: Props) {
     return true;
   });
 
+  const [leaving, setLeaving] = useState(false);
+
   useEffect(() => {
     for (const item of items) {
       const reveal = item.reveal;
@@ -65,66 +67,64 @@ export function BonusSpectatorView({ items }: Props) {
     }
   }, [items]);
 
-  function dismiss(item: BonusSpectatorItem) {
-    const key = dismissKey(item);
-    markDismissed(key);
-    if (item.reveal) markDismissed(resultSeenKey(item.bonusId));
-    setHiddenKeys((prev) => new Set(prev).add(key));
-  }
+  useEffect(() => {
+    if (!visible?.reveal) {
+      setLeaving(false);
+      return;
+    }
+    setLeaving(false);
+    const hide = window.setTimeout(() => setLeaving(true), 4000);
+    return () => window.clearTimeout(hide);
+  }, [visible?.bonusId, visible?.reveal?.revealed_at]);
+
+  useEffect(() => {
+    if (!visible?.reveal || !leaving) return;
+    const done = window.setTimeout(() => {
+      const key = dismissKey(visible);
+      markDismissed(key);
+      markDismissed(resultSeenKey(visible.bonusId));
+      setHiddenKeys((prev) => new Set(prev).add(key));
+      setLeaving(false);
+    }, 280);
+    return () => window.clearTimeout(done);
+  }, [visible, leaving]);
 
   if (!visible) return null;
 
   const reveal = visible.reveal;
+  const failed = Boolean(reveal && !reveal.correct);
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-[110] flex justify-center px-4">
-      <div
-        role="status"
-        className={`cg-animate-pop-in pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-2xl bg-[var(--cg-card)] px-4 py-3 shadow-[var(--cg-shadow-lift)] ring-1 ${
-          reveal
-            ? reveal.correct
-              ? "ring-[var(--cg-accent)]/40"
-              : "ring-[var(--cg-destructive)]/35"
-            : "ring-[var(--cg-accent)]/40"
-        }`}
-      >
-        <span
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-            reveal && !reveal.correct
-              ? "bg-[var(--cg-destructive)] text-white"
-              : "bg-[var(--cg-accent)] text-[var(--cg-accent-fg)]"
-          }`}
-        >
+    <div
+      role="status"
+      className={`fixed inset-x-0 top-0 z-[110] ${
+        leaving ? "cg-animate-slide-up" : "cg-animate-slide-down"
+      } ${
+        failed
+          ? "bg-[var(--cg-primary)] text-[var(--cg-primary-fg)]"
+          : "bg-[var(--cg-success)] text-white"
+      }`}
+    >
+      <div className="mx-auto flex w-full max-w-md items-start gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20">
           <IconGift size={20} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--cg-muted)]">
-            Bonusaufgabe
+          <p className="text-xs font-bold uppercase tracking-[0.14em] opacity-80">
+            {reveal ? "Bonus erledigt" : "Bonusaufgabe"}
           </p>
           {reveal ? (
-            <p className="mt-0.5 text-sm font-semibold text-[var(--cg-fg)]">
+            <p className="mt-0.5 text-sm font-semibold">
               {reveal.correct
                 ? `${visible.solverName} hat ${reveal.reward} Punkte gerade geholt`
                 : `${visible.solverName} konnte die Aufgabe nicht beantworten`}
             </p>
           ) : (
-            <>
-              <p className="mt-0.5 text-sm font-semibold text-[var(--cg-fg)]">
-                {visible.solverName} löst gerade eine Bonusaufgabe
-              </p>
-              <p className="mt-0.5 text-xs text-[var(--cg-muted)]">
-                Ihr könnt weitermachen — das Ergebnis erscheint hier.
-              </p>
-            </>
+            <p className="mt-0.5 text-sm font-semibold">
+              {visible.solverName} löst gerade eine Bonusaufgabe
+            </p>
           )}
         </div>
-        <button
-          type="button"
-          className="shrink-0 text-xs font-bold text-[var(--cg-muted)]"
-          onClick={() => dismiss(visible)}
-        >
-          OK
-        </button>
       </div>
     </div>
   );
