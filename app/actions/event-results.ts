@@ -5,7 +5,7 @@ import {
   loadEventResultsForEvent,
   type EventResultsSnapshot,
 } from "@/lib/grid/event-results";
-import { assertPlayerSession } from "@/lib/grid/session-auth";
+import { assertPlayerSession, getEventByInviteCode } from "@/lib/grid/session-auth";
 import type { ActionResult } from "@/lib/grid/types";
 
 export async function getPortalEventResults(
@@ -21,6 +21,24 @@ export async function getPortalEventResults(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Ergebnisse konnten nicht geladen werden.",
+    };
+  }
+}
+
+export async function getEventLiveRanking(
+  inviteCode: string,
+): Promise<ActionResult<EventResultsSnapshot>> {
+  try {
+    const event = await getEventByInviteCode(inviteCode);
+    if (!event) {
+      return { success: false, error: "Event nicht gefunden." };
+    }
+    const snapshot = await loadEventResultsForEvent(event);
+    return { success: true, data: snapshot };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Ranking nicht geladen.",
     };
   }
 }

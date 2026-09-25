@@ -46,20 +46,42 @@ export type GrowthOffer = {
 };
 
 export const STUDIO_DUMMY_DISCOUNT_CODE = "GRID-TEST-20";
+export const EXITMANIA_SHARE_URL = "https://exitmania.com";
 
 export function studioGrowthOffer(): GrowthOffer {
   return {
     enabled: true,
     surface: "studio",
     headline: "Mit Familie & Freunden spielen",
-    body: "20 % auf euer nächstes Exitmania-Spiel. Der Code gilt einmal — für Freunde oder die Familie.",
+    body: "20 % auf euer nächstes Exitmania-Spiel. Selbst einlösen — oder mit einem Tipp an Freunde senden.",
     ctaLabel: "Auswertung per Mail",
     skipLabel: "Jetzt nicht",
-    shareLabel: null,
-    shareUrl: null,
+    shareLabel: "Per Messenger senden",
+    shareUrl: EXITMANIA_SHARE_URL,
     discountCode: STUDIO_DUMMY_DISCOUNT_CODE,
     discountNote: "Studio-Test: Dummy-Code, einmal gedacht. Im Live-Checkout kommt der echte Code.",
     studioPreview: true,
+  };
+}
+
+export function buildVoucherShareMessage(input: {
+  score?: number | null;
+  discountCode?: string | null;
+  shareUrl?: string | null;
+}): { title: string; text: string; url: string } {
+  const url =
+    input.shareUrl && isSafeHttpUrl(input.shareUrl) ? input.shareUrl : EXITMANIA_SHARE_URL;
+  const challenge =
+    typeof input.score === "number"
+      ? `${input.score} Punkte. Auf geht's — schlag mich, wenn du kannst.`
+      : "Auf geht's — schlag mich, wenn du kannst.";
+  const codeLine = input.discountCode
+    ? `20 %-Code: ${input.discountCode} — einmal einlösbar.`
+    : null;
+  return {
+    title: "Schlag mich, wenn du kannst",
+    text: [challenge, codeLine, url].filter(Boolean).join("\n\n"),
+    url,
   };
 }
 
@@ -153,8 +175,8 @@ export function parseGrowthOffer(contentConfig: unknown): GrowthOffer | null {
     body: pack.body,
     ctaLabel: pack.cta_label,
     skipLabel: pack.skip_label || "Jetzt nicht",
-    shareLabel: pack.share_label,
-    shareUrl: pack.share_url,
+    shareLabel: pack.share_label ?? "Per Messenger senden",
+    shareUrl: pack.share_url ?? EXITMANIA_SHARE_URL,
     discountCode,
     discountNote: readTrimmed(
       (contentConfig as { growth?: { discount_note?: unknown } }).growth?.discount_note,

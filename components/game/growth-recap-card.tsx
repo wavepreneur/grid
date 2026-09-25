@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { getStudioRecapLinks, submitGrowthRecap } from "@/app/actions/growth";
 import { BigButton } from "@/components/game/city/ui";
-import type { GrowthOffer } from "@/lib/grid/growth-pack";
+import { buildVoucherShareMessage, type GrowthOffer } from "@/lib/grid/growth-pack";
 
 type RecapStats = {
   teamName: string;
@@ -38,7 +38,7 @@ export function GrowthRecapCard({
 }: Props) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"code" | "share" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [resultsUrl, setResultsUrl] = useState<string | null>(null);
@@ -96,32 +96,42 @@ export function GrowthRecapCard({
     });
   }
 
+  const shareMessage = buildVoucherShareMessage({
+    score: stats?.score,
+    discountCode: offer.discountCode,
+    shareUrl: offer.shareUrl,
+  });
+
   async function copyCode() {
     if (!offer.discountCode) return;
     try {
       await navigator.clipboard.writeText(offer.discountCode);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
+      setCopied("code");
+      window.setTimeout(() => setCopied(null), 1600);
     } catch {
-      setCopied(false);
+      setCopied(null);
     }
   }
 
   async function onShare() {
-    if (!offer.shareUrl) return;
-    const text = offer.shareLabel?.trim() || offer.headline;
     try {
       if (navigator.share) {
-        await navigator.share({ title: offer.headline, text, url: offer.shareUrl });
+        await navigator.share({
+          title: shareMessage.title,
+          text: shareMessage.text,
+          url: shareMessage.url,
+        });
         return;
       }
     } catch {
       /* user cancelled or share failed — fall through to copy */
     }
     try {
-      await navigator.clipboard.writeText(offer.shareUrl);
+      await navigator.clipboard.writeText(shareMessage.text);
+      setCopied("share");
+      window.setTimeout(() => setCopied(null), 1600);
     } catch {
-      window.open(offer.shareUrl, "_blank", "noopener,noreferrer");
+      window.open(shareMessage.url, "_blank", "noopener,noreferrer");
     }
   }
 
@@ -140,27 +150,26 @@ export function GrowthRecapCard({
             <p className="mt-1 font-mono text-2xl font-extrabold tracking-wide text-[var(--cg-fg)]">
               {offer.discountCode}
             </p>
-            <button
-              type="button"
-              onClick={() => void copyCode()}
-              className="mt-2 text-sm font-semibold text-[var(--cg-primary)]"
-            >
-              {copied ? "Kopiert" : "Code kopieren"}
-            </button>
             {offer.discountNote ? (
               <p className="mt-2 text-xs text-[var(--cg-muted)]">{offer.discountNote}</p>
             ) : null}
           </div>
         ) : null}
-        {offer.shareUrl && offer.shareLabel ? (
-          <button
-            type="button"
-            onClick={() => void onShare()}
-            className="mt-3 w-full text-center text-sm font-semibold text-[var(--cg-primary)]"
-          >
-            {offer.shareLabel}
-          </button>
-        ) : null}
+        <p className="mt-4 whitespace-pre-wrap rounded-2xl bg-[var(--cg-bg)] px-4 py-3 text-left text-sm leading-relaxed text-[var(--cg-fg)]">
+          {shareMessage.text}
+        </p>
+        <div className="mt-3 space-y-2">
+          <BigButton variant="accent" onClick={() => void onShare()}>
+            {copied === "share"
+              ? "Text kopiert"
+              : offer.shareLabel?.trim() || "Per Messenger senden"}
+          </BigButton>
+          {offer.discountCode ? (
+            <BigButton variant="ghost" onClick={() => void copyCode()}>
+              {copied === "code" ? "Code kopiert" : "Selbst nutzen · Code kopieren"}
+            </BigButton>
+          ) : null}
+        </div>
       </div>
 
       {isLead ? (

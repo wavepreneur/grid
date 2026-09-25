@@ -33,6 +33,13 @@ export function eventPlayPath(inviteCode: string, joinCode: string): string {
   return `/e/${code(inviteCode)}/play/${code(joinCode)}`;
 }
 
+/** Player-facing live highscore — not the operator cockpit. */
+export function eventRankingPath(inviteCode: string, joinCode?: string): string {
+  const base = `/e/${code(inviteCode)}/ranking`;
+  if (!joinCode) return base;
+  return `${base}?team=${code(joinCode)}`;
+}
+
 export function cockpitPath(inviteCode: string): string {
   return `/cockpit/${code(inviteCode)}`;
 }

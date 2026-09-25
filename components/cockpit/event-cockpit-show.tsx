@@ -1,11 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getEventCockpitSnapshot } from "@/app/actions/cockpit";
-import { IconArrowRight, IconPlay } from "@/components/cms/studio-icons";
+import { IconPlay } from "@/components/cms/studio-icons";
 import { useCockpitSync } from "@/lib/hooks/use-cockpit-sync";
-import { cockpitPath } from "@/lib/grid/event-routes";
 import { queryKeys } from "@/lib/platform/query-keys";
 
 type EventCockpitShowProps = {
@@ -72,13 +70,6 @@ export function EventCockpitShow({ inviteCode }: EventCockpitShowProps) {
               </p>
             </div>
           </div>
-          <Link
-            href={cockpitPath(inviteCode)}
-            className="inline-flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700"
-          >
-            Operator-Cockpit
-            <IconArrowRight size={16} />
-          </Link>
         </header>
 
         <ul className="flex flex-col gap-3">

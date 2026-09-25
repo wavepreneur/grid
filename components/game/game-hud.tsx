@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
-import { cockpitShowPath } from "@/lib/grid/event-routes";
+import { eventRankingPath } from "@/lib/grid/event-routes";
 import { IconCheck, IconMapPin, IconPlay } from "@/components/cms/studio-icons";
 
 type GameHudProps = {
   inviteCode: string;
+  joinCode?: string;
   teamName: string;
   eventTitle: string;
   currentLevel: number;
@@ -21,6 +22,7 @@ type GameHudProps = {
 
 export function GameHud({
   inviteCode,
+  joinCode,
   teamName,
   eventTitle,
   currentLevel,
@@ -62,7 +64,7 @@ export function GameHud({
           </span>
           {showLiveScore ? (
             <Link
-              href={cockpitShowPath(inviteCode)}
+              href={eventRankingPath(inviteCode, joinCode)}
               target="_blank"
               className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-700 hover:bg-emerald-100"
             >

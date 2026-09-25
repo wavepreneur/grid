@@ -37,13 +37,12 @@ import { TeamCaptureGallery } from "@/components/game/team-capture-gallery";
 import { TeamWalletList } from "@/components/game/team-wallet";
 import { visibleWalletNotes } from "@/lib/grid/wallet";
 import { MissionTimeAlerts } from "@/components/game/mission-time-alerts";
-import { TeamPlayRanking } from "@/components/game/team-play-ranking";
 import { SyncModal } from "@/components/game/sync-modal";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 import { IdentityBar } from "@/components/player/identity-bar";
 import { SessionHandoffScreen } from "@/components/player/session-handoff-screen";
 import { GridError } from "@/components/grid/grid-shell";
-import { cockpitShowPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
+import { eventRankingPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
 import { transferCaptain, handoverSession, removePlayerFromLobby } from "@/app/actions/lobby";
 import { useTeamSync, type GpsFixPayload } from "@/lib/hooks/use-team-sync";
 import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
@@ -979,12 +978,6 @@ export function GameRoom({
           );
         })()}
       </div>
-      <TeamPlayRanking
-        inviteCode={inviteCode}
-        joinCode={joinCode}
-        sessionId={session.sessionId}
-        myTeamName={teamName}
-      />
       {eventContent.growthOffer?.enabled ? (
         <GrowthRecapCard
           inviteCode={inviteCode}
@@ -1058,11 +1051,9 @@ export function GameRoom({
             : `${completedLevels} / ${eventContent.levels.length} Aufgaben · nur euer Team`}
         </p>
       </div>
-      {eventContent.showLiveScore ? (
-        <Link href={cockpitShowPath(inviteCode)} className="block">
-          <BigButton>Beamer-Ranking</BigButton>
-        </Link>
-      ) : null}
+      <Link href={eventRankingPath(inviteCode, joinCode)} className="block">
+        <BigButton>Live-Ranking</BigButton>
+      </Link>
       <details className="group overflow-hidden rounded-3xl bg-[var(--cg-accent)] shadow-[var(--cg-shadow-lift)]">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-[var(--cg-accent-fg)] marker:content-none [&::-webkit-details-marker]:hidden">
           <div>
@@ -1317,6 +1308,7 @@ export function GameRoom({
         {!sessionSuperseded && !isFinished ? (
           <GameHud
             inviteCode={inviteCode}
+            joinCode={joinCode}
             teamName={teamName}
             eventTitle={eventTitle}
             currentLevel={activeLevel}
