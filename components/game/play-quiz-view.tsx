@@ -55,8 +55,8 @@ export function PlayQuizView({
     mode === "online" ? "Einstiegsfrage" : mode === "indoor" ? "Frage vor Ort" : "Umgebungsquiz";
   const intro =
     mode === "online"
-      ? "Alle sehen dieselbe Frage. Eine Antwort genügt — sie ist der Schlüssel zum Rätsel."
-      : "Diese Frage ist der Schlüssel. Eine Antwort vom Team öffnet das Rätsel für alle.";
+      ? "Eine Antwort genügt — sie öffnet das Rätsel für alle."
+      : "Eine Antwort vom Team öffnet das Rätsel für alle.";
 
   function isRightOption(id: string) {
     return multi
@@ -116,45 +116,56 @@ export function PlayQuizView({
 
   return (
     <section className="mx-auto flex w-full max-w-md flex-col px-4 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-4 sm:px-5">
-      <div className="mt-1 flex flex-col items-center text-center sm:mt-2">
-        <span className="cg-animate-key-turn flex h-16 w-16 items-center justify-center rounded-3xl bg-[var(--cg-accent)] text-[var(--cg-accent-fg)] shadow-[var(--cg-shadow-lift)] sm:h-20 sm:w-20">
-          <IconKey size={36} />
-        </span>
-        <SectionLabel>{spotLabel}</SectionLabel>
-        <h1 className="mt-2 text-xl font-bold text-[var(--cg-fg)] sm:text-2xl">{heading}</h1>
-        <p className="mt-2 max-w-md text-[15px] leading-relaxed text-[var(--cg-fg)]/80 sm:text-base">
-          {intro}
-        </p>
-      </div>
+      <article className="overflow-hidden rounded-[1.75rem] bg-[var(--cg-card)] shadow-[var(--cg-shadow-soft)]">
+        <header className="bg-[var(--cg-accent)]/14 px-4 pb-4 pt-4 sm:px-5">
+          <div className="flex items-center gap-3">
+            <span className="cg-animate-key-turn flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--cg-accent)] text-[var(--cg-accent-fg)] shadow-[var(--cg-shadow-lift)]">
+              <IconKey size={26} />
+            </span>
+            <div className="min-w-0 text-left">
+              <SectionLabel>{spotLabel}</SectionLabel>
+              <h1 className="mt-0.5 text-lg font-bold leading-tight text-[var(--cg-fg)] sm:text-xl">
+                {heading}
+              </h1>
+            </div>
+          </div>
+          <p className="mt-3 flex items-start gap-2.5 rounded-2xl bg-[var(--cg-card)] px-3 py-2.5 text-[13px] leading-snug text-[var(--cg-fg)]/80 sm:text-sm">
+            <span className="mt-px shrink-0 rounded-full bg-[var(--cg-accent)]/22 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--cg-fg)]">
+              Schlüssel
+            </span>
+            <span>{intro}</span>
+          </p>
+        </header>
 
-      {quiz.image_url ? (
-        <div className="cg-animate-rise-in mx-auto mt-4 w-full max-w-md overflow-hidden rounded-2xl shadow-[var(--cg-shadow-soft)] sm:mt-5 sm:rounded-3xl">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={quiz.image_url}
-            alt=""
-            className="aspect-[16/10] max-h-[min(28vh,14rem)] w-full object-cover object-center"
-          />
-        </div>
-      ) : null}
-
-      <div className="mt-5 text-left sm:mt-6">
-        <h2 className="text-xl font-extrabold leading-snug text-[var(--cg-fg)] sm:text-2xl">
-          {displayTitle}
-        </h2>
-        {quiz.description?.trim() ? (
-          <FormattedTaskText
-            text={quiz.description}
-            className="mt-3 space-y-3 text-[15px] leading-[1.65] text-[var(--cg-fg)] sm:text-base"
-          />
+        {quiz.image_url ? (
+          <div className="cg-animate-rise-in">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={quiz.image_url}
+              alt=""
+              className="aspect-[16/10] max-h-[min(28vh,14rem)] w-full object-cover object-center"
+            />
+          </div>
         ) : null}
-      </div>
 
-      <p className="mt-6 border-l-4 border-[var(--cg-accent)] pl-3 text-lg font-bold leading-snug text-[var(--cg-fg)] sm:text-xl">
-        {quiz.question}
-      </p>
+        <div className="px-4 pb-5 pt-5 sm:px-5">
+          <div>
+            <h2 className="text-xl font-extrabold leading-snug text-[var(--cg-fg)] sm:text-2xl">
+              {displayTitle}
+            </h2>
+            {quiz.description?.trim() ? (
+              <FormattedTaskText
+                text={quiz.description}
+                className="mt-3 space-y-3 text-[15px] leading-[1.65] text-[var(--cg-fg)] sm:text-base"
+              />
+            ) : null}
+          </div>
 
-      <div className="mt-3 grid gap-2.5">
+          <p className="mt-5 border-l-4 border-[var(--cg-accent)] pl-3 text-lg font-bold leading-snug text-[var(--cg-fg)] sm:text-xl">
+            {quiz.question}
+          </p>
+
+          <div className="mt-3 grid gap-2.5">
         {quiz.options.map((opt, i) => {
           const isPicked = isSelectedOption(opt.id);
           const isRight = isRightOption(opt.id);
@@ -174,7 +185,7 @@ export function PlayQuizView({
                     ? "border-[var(--cg-destructive)] bg-[var(--cg-destructive)]/10"
                     : isPicked
                       ? "border-[var(--cg-primary)] bg-[var(--cg-primary)]/18 ring-2 ring-[var(--cg-primary)]/40"
-                      : "border-[var(--cg-border)] bg-[var(--cg-card)]"
+                      : "border-[var(--cg-border)] bg-[var(--cg-bg)]"
               }`}
             >
               <span
@@ -201,22 +212,22 @@ export function PlayQuizView({
         })}
       </div>
 
-      {multi && !show ? (
-        <div className="mt-6">
-          <BigButton
-            variant="accent"
-            disabled={disabled || submitting || pickedMulti.length === 0}
-            onClick={submitMulti}
-          >
-            {submitting ? "Wird geprüft…" : "Antwort fürs Team senden"}
-          </BigButton>
-        </div>
-      ) : null}
+          {multi && !show ? (
+            <div className="mt-6">
+              <BigButton
+                variant="accent"
+                disabled={disabled || submitting || pickedMulti.length === 0}
+                onClick={submitMulti}
+              >
+                {submitting ? "Wird geprüft…" : "Antwort fürs Team senden"}
+              </BigButton>
+            </div>
+          ) : null}
 
-      {show && teamReveal ? (
-        <div
-          className={`mt-6 space-y-4 ${correct ? "cg-animate-rise-in" : "cg-animate-shake"}`}
-        >
+          {show && teamReveal ? (
+            <div
+              className={`mt-6 space-y-4 ${correct ? "cg-animate-rise-in" : "cg-animate-shake"}`}
+            >
           <p className="text-center text-sm font-semibold text-[var(--cg-muted)]">
             Antwort von <span className="text-[var(--cg-fg)]">{teamReveal.answered_by}</span>
           </p>
@@ -264,8 +275,10 @@ export function PlayQuizView({
           ) : (
             <TeamPaceHint canPaceTeam={false} leadLabel={leadLabel} />
           )}
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      </article>
     </section>
   );
 }

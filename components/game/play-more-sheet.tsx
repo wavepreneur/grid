@@ -1,6 +1,22 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import {
+  BookOpen,
+  ChevronRight,
+  CircleHelp,
+  Lightbulb,
+  MapPin,
+  MessageCircle,
+  MessagesSquare,
+  MoreHorizontal,
+  Pause,
+  Play,
+  RotateCcw,
+  Settings,
+  Smartphone,
+  Users,
+} from "lucide-react";
 import { BigButton } from "@/components/game/city/ui";
 import { PlayDocSheet } from "@/components/game/play-doc-sheet";
 import { PersonalResumeLinkCard } from "@/components/player/personal-resume-link-card";
@@ -144,32 +160,33 @@ export function PlayMoreSheet({
               {view === "menu" ? (
                 <div className="grid gap-2">
                   <MenuRow
+                    icon={<BookOpen className="h-5 w-5" />}
                     title="Spielregeln"
-                    hint="Regeln und Ablauf — jederzeit nachlesen"
+                    hint="Ablauf nachlesen"
                     onClick={() => onOpen("briefing")}
                   />
                   <MenuRow
+                    icon={<CircleHelp className="h-5 w-5" />}
                     title="Steckt ihr fest?"
                     hint={playHelpMenuHint(mode)}
                     onClick={() => onOpen("help")}
                   />
                   <MenuRow
+                    icon={<MessagesSquare className="h-5 w-5" />}
                     title="FAQ"
-                    hint="Technik, Störungen und Tipps, wenn ihr nicht weiterkommt"
+                    hint="Häufige Fragen"
                     onClick={() => onOpen("faq")}
                   />
                   <MenuRow
+                    icon={<MessageCircle className="h-5 w-5" />}
                     title="Support-Chat"
-                    hint="Hilfe vom Team — öffnet den Chat im Spiel"
+                    hint="Mit dem Team sprechen"
                     onClick={() => onOpen("support")}
                   />
                   <MenuRow
+                    icon={paused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
                     title={paused ? "Weiterspielen" : "Pause"}
-                    hint={
-                      paused
-                        ? "Countdown läuft wieder"
-                        : "Zeit anhalten, z. B. für Toilettengang"
-                    }
+                    hint={paused ? "Countdown läuft wieder" : "Zeit anhalten"}
                     onClick={() => {
                       onTogglePause();
                       if (!paused) onOpen("pause");
@@ -177,8 +194,9 @@ export function PlayMoreSheet({
                     }}
                   />
                   <MenuRow
+                    icon={<Users className="h-5 w-5" />}
                     title="Team"
-                    hint="Namen, Team-Code für /go, Leitung, Platz freigeben"
+                    hint="Namen, Code, Leitung"
                     onClick={() => onOpen("team")}
                   />
                 </div>
@@ -198,43 +216,48 @@ export function PlayMoreSheet({
 
               {view === "help" ? (
                 <div className="space-y-2">
-                  <p className="mb-3 text-sm leading-relaxed text-[var(--cg-muted)]">
-                    Sagt kurz, was hakt. Technische Störungen heilt das Spiel selbst; bei Rätsel
-                    oder Verständnis gibt es Tipps, Freischalten und FAQ — ohne Support-Ticket.
+                  <p className="mb-3 text-sm font-medium text-[var(--cg-fg)]">
+                    Tippe, was gerade nicht klappt.
                   </p>
                   {mode === "outdoor" ? (
                     <MenuRow
-                      title="Standort / GPS"
-                      hint="Wir stehen davor, oder das Gerät liefert keinen Ort"
+                      icon={<MapPin className="h-5 w-5" />}
+                      title="Wir stehen am Punkt"
+                      hint="GPS öffnet die Aufgabe nicht"
                       onClick={() => onOpen("gps")}
                     />
                   ) : null}
                   {mode === "indoor" ? (
                     <MenuRow
-                      title="Station / Code"
-                      hint="Zettel nicht gefunden, oder der Code wird nicht angenommen"
+                      icon={<MapPin className="h-5 w-5" />}
+                      title="Station oder Code"
+                      hint="Zettel fehlt, oder der Code geht nicht"
                       onClick={() => onOpen("station")}
                     />
                   ) : null}
                   {mode === "online" ? (
                     <MenuRow
-                      title="Geräte sehen nicht dasselbe"
-                      hint="Seite neu laden, warten, /go mit Team-Code"
+                      icon={<Smartphone className="h-5 w-5" />}
+                      title="Nicht alle sehen dasselbe"
+                      hint="Seite neu laden oder Team-Code holen"
                       onClick={() => onOpen("sync")}
                     />
                   ) : null}
                   <MenuRow
-                    title="Wir kommen bei der Lösung nicht weiter"
-                    hint="Tipp auf einer Kachel, oder unten Lösung anzeigen"
+                    icon={<Lightbulb className="h-5 w-5" />}
+                    title="Das Rätsel hängt"
+                    hint="Zurück zur Aufgabe — Tipp oder Lösung holen"
                     onClick={onClose}
                   />
                   <MenuRow
-                    title="Verbindung oder anderes Gerät"
-                    hint="Seite neu laden, /go mit Team-Code, Leitung übergeben"
+                    icon={<Smartphone className="h-5 w-5" />}
+                    title="Anderes Handy"
+                    hint="Team-Code holen und Namen tippen"
                     onClick={() => onOpen("team")}
                   />
                   <MenuRow
-                    title="Wie funktioniert das Spiel?"
+                    icon={<CircleHelp className="h-5 w-5" />}
+                    title="So geht das Spiel"
                     hint={playHowToPlayHint(mode)}
                     onClick={() => onOpen("faq")}
                   />
@@ -243,54 +266,48 @@ export function PlayMoreSheet({
 
               {view === "gps" ? (
                 <div className="space-y-3">
-                  <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
-                    Was trifft zu? Technische GPS-Störungen heilt das Spiel mit, oder ihr schaltet
-                    den Punkt frei.
+                  <p className="text-sm font-medium text-[var(--cg-fg)]">
+                    Was soll jetzt passieren?
                   </p>
-                  <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
-                    <p className="font-bold text-[var(--cg-fg)]">
-                      Wir stehen direkt davor — GPS greift nicht
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--cg-muted)]">
-                      Radius-Heal läuft automatisch. Wenn ihr klar am Punkt seid, schaltet die
-                      Team-Leitung frei.
-                    </p>
+                  <HelpCard
+                    icon={<MapPin className="h-5 w-5" />}
+                    title="Wir stehen am Punkt"
+                    hint="Die Aufgabe soll jetzt starten."
+                  >
                     {canUnlockGps && onForceUnlockGps ? (
-                      <div className="mt-3">
-                        <BigButton
-                          disabled={busy}
-                          onClick={() => {
-                            onForceUnlockGps();
-                            onClose();
-                          }}
-                        >
-                          Aufgabe freischalten
-                        </BigButton>
-                      </div>
+                      <BigButton
+                        disabled={busy}
+                        onClick={() => {
+                          onForceUnlockGps();
+                          onClose();
+                        }}
+                      >
+                        Aufgabe jetzt öffnen
+                      </BigButton>
                     ) : (
-                      <p className="mt-2 text-sm font-semibold text-[var(--cg-fg)]">
-                        Alpha / GPS-Leiter tippt auf der Karte „Wir sind am Punkt“.
+                      <p className="text-sm font-semibold leading-snug text-[var(--cg-fg)]">
+                        Die Team-Leitung tippt auf der Karte „Wir sind am Punkt“.
                       </p>
                     )}
-                  </div>
-                  <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
-                    <p className="font-bold text-[var(--cg-fg)]">GPS funktioniert nicht richtig</p>
-                    <p className="mt-1 text-sm text-[var(--cg-muted)]">{GPS_SETTINGS_TIP}</p>
+                  </HelpCard>
+                  <HelpCard
+                    icon={<Settings className="h-5 w-5" />}
+                    title="Standort am Handy prüfen"
+                    hint={GPS_SETTINGS_TIP}
+                  >
                     {canUnlockGps && onForceUnlockGps ? (
-                      <div className="mt-3">
-                        <BigButton
-                          variant="outline"
-                          disabled={busy}
-                          onClick={() => {
-                            onForceUnlockGps();
-                            onClose();
-                          }}
-                        >
-                          Trotzdem freischalten
-                        </BigButton>
-                      </div>
+                      <BigButton
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => {
+                          onForceUnlockGps();
+                          onClose();
+                        }}
+                      >
+                        Trotzdem öffnen
+                      </BigButton>
                     ) : null}
-                  </div>
+                  </HelpCard>
                   <BigButton variant="ghost" onClick={() => onOpen("help")}>
                     Zurück
                   </BigButton>
@@ -299,24 +316,17 @@ export function PlayMoreSheet({
 
               {view === "station" ? (
                 <div className="space-y-3">
-                  <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
-                    {INDOOR_STATION_TIP}
-                  </p>
-                  <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
-                    <p className="font-bold text-[var(--cg-fg)]">Wir finden den Zettel nicht</p>
-                    <p className="mt-1 text-sm text-[var(--cg-muted)]">
-                      Der Code hängt an der Station im Raum — nicht am Handy. Sucht Schilder,
-                      Tische, Wände. Tippt danach die Station in der Liste an und gebt den Code
-                      ein.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
-                    <p className="font-bold text-[var(--cg-fg)]">Code wird nicht angenommen</p>
-                    <p className="mt-1 text-sm text-[var(--cg-muted)]">
-                      Genau den Code vom Zettel dieser Station. Groß- und Kleinschreibung ist egal,
-                      Leerzeichen nicht nötig. Anderer Zettel = andere Station.
-                    </p>
-                  </div>
+                  <p className="text-sm font-medium text-[var(--cg-fg)]">{INDOOR_STATION_TIP}</p>
+                  <HelpCard
+                    icon={<MapPin className="h-5 w-5" />}
+                    title="Wir finden den Zettel nicht"
+                    hint="Der Code hängt im Raum — Schilder, Tische, Wände. Danach Station antippen und Code eingeben."
+                  />
+                  <HelpCard
+                    icon={<CircleHelp className="h-5 w-5" />}
+                    title="Code wird nicht angenommen"
+                    hint="Genau den Code von diesem Zettel. Groß/klein ist egal. Anderer Zettel = andere Station."
+                  />
                   <BigButton variant="ghost" onClick={() => onOpen("help")}>
                     Zurück
                   </BigButton>
@@ -325,27 +335,21 @@ export function PlayMoreSheet({
 
               {view === "sync" ? (
                 <div className="space-y-3">
-                  <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
-                    {ONLINE_SYNC_TIP}
-                  </p>
-                  <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
-                    <p className="font-bold text-[var(--cg-fg)]">Nicht alle sehen dasselbe</p>
-                    <p className="mt-1 text-sm text-[var(--cg-muted)]">
-                      Kurz warten oder die Seite neu laden. Eine Antwort vom Team gilt für alle
-                      Geräte.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
-                    <p className="font-bold text-[var(--cg-fg)]">Jemand ist raus oder wechselt Gerät</p>
-                    <p className="mt-1 text-sm text-[var(--cg-muted)]">
-                      /go, Team-Code und dein Name liegen unter Team — ohne GPS, ohne langen Link.
-                    </p>
-                    <div className="mt-3">
-                      <BigButton variant="outline" onClick={() => onOpen("team")}>
-                        Zum Team
-                      </BigButton>
-                    </div>
-                  </div>
+                  <p className="text-sm font-medium text-[var(--cg-fg)]">{ONLINE_SYNC_TIP}</p>
+                  <HelpCard
+                    icon={<Smartphone className="h-5 w-5" />}
+                    title="Nicht alle sehen dasselbe"
+                    hint="Kurz warten oder die Seite neu laden. Eine Antwort gilt für alle."
+                  />
+                  <HelpCard
+                    icon={<Users className="h-5 w-5" />}
+                    title="Jemand ist raus oder wechselt Handy"
+                    hint="Team-Code holen und denselben Namen tippen."
+                  >
+                    <BigButton variant="outline" onClick={() => onOpen("team")}>
+                      Team-Code holen
+                    </BigButton>
+                  </HelpCard>
                   <BigButton variant="ghost" onClick={() => onOpen("help")}>
                     Zurück
                   </BigButton>
@@ -386,23 +390,23 @@ export function PlayMoreSheet({
               ) : null}
 
               {view === "team" ? (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {nameRoster.length > 0 ? (
                     <div className="space-y-2">
-                      <p className="text-sm font-semibold text-[var(--cg-fg)]">
-                        Namen im Team
-                      </p>
-                      <p className="text-xs text-[var(--cg-muted)]">
-                        Exakte Schreibweise — bei Gerätewechsel tippt die Person ihren Namen
-                        an oder nutzt den persönlichen Link.
+                      <p className="text-sm font-bold text-[var(--cg-fg)]">Wer spielt</p>
+                      <p className="text-sm text-[var(--cg-muted)]">
+                        Neues Handy? Denselben Namen tippen.
                       </p>
                       <ul className="space-y-1.5">
                         {nameRoster.map((m) => (
                           <li
                             key={m.id}
-                            className="flex items-center justify-between gap-2 rounded-xl bg-[var(--cg-secondary)] px-3 py-2.5"
+                            className="flex items-center gap-3 rounded-2xl bg-[var(--cg-secondary)] px-3 py-2.5"
                           >
-                            <span className="min-w-0 truncate font-semibold text-[var(--cg-fg)]">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--cg-card)] text-sm font-bold text-[var(--cg-fg)]">
+                              {m.name.trim().slice(0, 1).toUpperCase() || "?"}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate font-semibold text-[var(--cg-fg)]">
                               {m.name}
                               {"isMe" in m && m.isMe ? (
                                 <span className="ml-1.5 text-xs font-medium text-[var(--cg-muted)]">
@@ -410,7 +414,7 @@ export function PlayMoreSheet({
                                 </span>
                               ) : null}
                             </span>
-                            <span className="shrink-0 text-xs text-[var(--cg-muted)]">
+                            <span className="shrink-0 rounded-full bg-[var(--cg-card)] px-2 py-1 text-[11px] font-semibold text-[var(--cg-muted)]">
                               {m.roleLabel}
                             </span>
                           </li>
@@ -429,18 +433,14 @@ export function PlayMoreSheet({
                   ) : null}
 
                   {isAlpha ? (
-                    <>
-                      <p className="text-sm text-[var(--cg-muted)]">
-                        Du führst das Team. Gib die Leitung ab oder gib einen Platz frei, damit
-                        jemand anderes (oder du auf einem neuen Gerät) weiterspielen kann.
-                      </p>
-                      <ul className="space-y-2">
-                        {teammates.length === 0 ? (
-                          <li className="rounded-2xl bg-[var(--cg-secondary)] px-4 py-3 text-sm text-[var(--cg-muted)]">
-                            Keine anderen Spieler im Team.
-                          </li>
-                        ) : (
-                          teammates.map((m) => (
+                    teammates.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-sm font-bold text-[var(--cg-fg)]">Leitung abgeben</p>
+                        <p className="text-sm text-[var(--cg-muted)]">
+                          Du führst das Team. Tippe, wer als Nächstes führen soll.
+                        </p>
+                        <ul className="space-y-2">
+                          {teammates.map((m) => (
                             <li
                               key={m.id}
                               className="flex flex-col gap-2 rounded-2xl bg-[var(--cg-secondary)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
@@ -472,20 +472,37 @@ export function PlayMoreSheet({
                                 ) : null}
                               </div>
                             </li>
-                          ))
-                        )}
-                      </ul>
-                    </>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-[var(--cg-muted)]">
+                        Du spielst allein — die Leitung bleibt bei dir.
+                      </p>
+                    )
                   ) : (
                     <p className="text-sm text-[var(--cg-muted)]">
-                      Die Team-Leitung aktiviert die Aufgaben. Wenn du das Gerät wechselst oder
-                      den Platz für jemand anderen freigibst, nutze die Aktionen unten.
+                      Die Team-Leitung startet die Aufgaben.
                     </p>
                   )}
                   {onReclaimSession ? (
-                    <BigButton variant="outline" onClick={onReclaimSession}>
-                      Meine Sitzung zurückholen
-                    </BigButton>
+                    <button
+                      type="button"
+                      onClick={onReclaimSession}
+                      className="tap-lift flex w-full items-center gap-3 rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5 text-left"
+                    >
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--cg-secondary)] text-[var(--cg-fg)]">
+                        <RotateCcw className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-base font-bold text-[var(--cg-fg)]">
+                          Sitzung zurückholen
+                        </span>
+                        <span className="mt-0.5 block text-sm text-[var(--cg-muted)]">
+                          Wenn du rausgeflogen bist
+                        </span>
+                      </span>
+                    </button>
                   ) : null}
                   {onReleaseMySeat ? (
                     <BigButton
@@ -515,9 +532,9 @@ export function PlayMoreTrigger({ onClick }: { onClick: () => void }) {
       type="button"
       aria-label="Mehr Optionen"
       onClick={onClick}
-      className="tap-lift flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--cg-secondary)] text-lg font-bold text-[var(--cg-fg)]"
+      className="tap-lift flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--cg-primary)] text-[var(--cg-primary-fg)] shadow-[var(--cg-shadow-lift)] ring-2 ring-[var(--cg-bg)]"
     >
-      ···
+      <MoreHorizontal className="h-6 w-6" strokeWidth={2.75} />
     </button>
   );
 }
@@ -525,21 +542,58 @@ export function PlayMoreTrigger({ onClick }: { onClick: () => void }) {
 function MenuRow({
   title,
   hint,
+  icon,
   onClick,
 }: {
   title: string;
   hint: string;
+  icon?: ReactNode;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="tap-lift w-full rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5 text-left"
+      className="tap-lift flex w-full items-center gap-3 rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-3 py-3.5 text-left sm:px-4"
     >
-      <span className="block text-base font-bold text-[var(--cg-fg)]">{title}</span>
-      <span className="mt-0.5 block text-sm text-[var(--cg-muted)]">{hint}</span>
+      {icon ? (
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--cg-secondary)] text-[var(--cg-fg)]">
+          {icon}
+        </span>
+      ) : null}
+      <span className="min-w-0 flex-1">
+        <span className="block text-base font-bold text-[var(--cg-fg)]">{title}</span>
+        <span className="mt-0.5 block text-sm text-[var(--cg-muted)]">{hint}</span>
+      </span>
+      <ChevronRight className="h-5 w-5 shrink-0 text-[var(--cg-muted)]" />
     </button>
+  );
+}
+
+function HelpCard({
+  icon,
+  title,
+  hint,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  hint: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--cg-secondary)] text-[var(--cg-fg)]">
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-[var(--cg-fg)]">{title}</p>
+          <p className="mt-0.5 text-sm leading-snug text-[var(--cg-muted)]">{hint}</p>
+        </div>
+      </div>
+      {children ? <div className="mt-3">{children}</div> : null}
+    </div>
   );
 }
 

@@ -8,7 +8,7 @@ export const PLAY_HELP_IDLE_MS = 5 * 60_000;
 export const PLAY_HELP_FAIL_HINT_AT = 3;
 
 export const GPS_SETTINGS_TIP =
-  "Prüft in den Geräteeinstellungen, ob Standort für den Browser eingeschaltet ist. Ihr könnt den Punkt auch ohne GPS freischalten — bleibt trotzdem in der Nähe, das Spielerlebnis ist so deutlich besser.";
+  "Einstellungen → Standort für den Browser einschalten. Am Punkt bleiben — so macht das Spiel mehr Spaß.";
 
 export const INDOOR_STATION_TIP =
   "Indoor braucht kein GPS. Sucht den Zettel an der Station und gebt den Code ein — so öffnet ihr die Aufgabe.";
@@ -19,11 +19,11 @@ export const ONLINE_SYNC_TIP =
 export function playHelpMenuHint(mode: ContentMode): string {
   switch (mode) {
     case "indoor":
-      return "Code, Lösung, Verbindung — kurze Auswahl, dann der passende Hebel";
+      return "Code, Tipp oder anderes Handy";
     case "online":
-      return "Lösung, Verbindung, Geräte — kurze Auswahl, dann der passende Hebel";
+      return "Tipp, Verbindung oder anderes Handy";
     default:
-      return "GPS, Lösung, Verbindung — kurze Auswahl, dann der passende Hebel";
+      return "GPS, Tipp oder anderes Handy";
   }
 }
 

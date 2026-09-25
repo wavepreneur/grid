@@ -42,24 +42,26 @@ export function PersonalResumeLinkCard({
 
   if (compact) {
     return (
-      <button
-        type="button"
-        onClick={() => void handleCopy()}
-        className="tap-lift w-full rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5 text-left"
-      >
-        <span className="flex items-center gap-2 text-sm font-semibold text-[var(--cg-fg)]">
+      <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
+        <p className="flex items-center gap-2 text-sm font-bold text-[var(--cg-fg)]">
           <Smartphone className="h-4 w-4 shrink-0" aria-hidden />
-          Code aufs Handy legen
-        </span>
-        <span className="mt-1 block font-mono text-base font-bold tracking-[0.18em] text-[var(--cg-fg)]">
+          Team-Code für ein neues Handy
+        </p>
+        <p className="mt-2 font-mono text-2xl font-bold tracking-[0.18em] text-[var(--cg-fg)]">
           {code}
-        </span>
-        <span className="mt-0.5 block text-sm text-[var(--cg-muted)]">
-          {copyState === "idle"
-            ? "Tippen, dann in Notizen speichern"
-            : label}
-        </span>
-      </button>
+        </p>
+        <button
+          type="button"
+          onClick={() => void handleCopy()}
+          className="tap-lift mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--cg-primary)] px-4 py-2.5 text-sm font-bold text-[var(--cg-primary-fg)]"
+        >
+          <ClipboardCopy className="h-4 w-4" aria-hidden />
+          {label}
+        </button>
+        <p className="mt-2 text-sm leading-snug text-[var(--cg-muted)]">
+          Danach in Notizen speichern oder an dich selbst schicken.
+        </p>
+      </div>
     );
   }
 

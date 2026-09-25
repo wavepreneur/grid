@@ -74,7 +74,7 @@ export function PlayHelpNudge({
     ? "Ihr könnt einen Tipp auf einer Kachel freischalten — das kostet Punkte, bringt euch aber weiter."
     : canSkip
       ? "Kein Tipp hinterlegt. Die Team-Leitung kann die Aufgabe unten freischalten (Lösung anzeigen, 0 Punkte)."
-      : "Schaut ins FAQ, oder wählt kurz, was hakt — dann gibt es den passenden Hebel.";
+      : "Tippt, was gerade nicht klappt — oder schaut ins FAQ.";
 
   return (
     <div className="mx-4 mb-3 rounded-2xl bg-[var(--cg-primary)]/12 px-4 py-3.5 ring-1 ring-[var(--cg-primary)]/25">
