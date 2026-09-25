@@ -3,6 +3,7 @@
  * @see frontend_idee/bonus.tsx
  */
 
+import { isTaskNumberFieldCount } from "@/lib/cms/types";
 import type { ArrivalQuiz, BonusTask, LevelDefinition, PlayerRole } from "@/lib/grid/level-types";
 import { parseLevelTiles } from "@/lib/grid/level-content";
 import { parseLevelScoring } from "@/lib/grid/level-scoring";
@@ -59,13 +60,7 @@ export function parseBonusTask(raw: unknown): BonusTask | undefined {
     scoring: parseLevelScoring(b.scoring),
     answer_mode: mode === "choice" ? undefined : mode,
     answer: typeof b.answer === "string" ? b.answer : undefined,
-    number_fields:
-      b.number_fields === 1 ||
-      b.number_fields === 2 ||
-      b.number_fields === 3 ||
-      b.number_fields === 4
-        ? b.number_fields
-        : undefined,
+    number_fields: isTaskNumberFieldCount(b.number_fields) ? b.number_fields : undefined,
   };
 }
 

@@ -151,7 +151,8 @@ function assembleLevelDefinition(
     content.number_fields === 1 ||
     content.number_fields === 2 ||
     content.number_fields === 3 ||
-    content.number_fields === 4
+    content.number_fields === 4 ||
+    content.number_fields === 5
   ) {
     level.number_fields = content.number_fields;
   }

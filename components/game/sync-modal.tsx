@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { PartyPopper } from "lucide-react";
-import { BigButton, SectionLabel } from "@/components/game/city/ui";
+import { BigButton } from "@/components/game/city/ui";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 import type { GameModalState } from "@/lib/grid/game-state";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
@@ -80,11 +80,13 @@ export function SyncModal({
 
         {hasNote ? (
           <div
-            className="cg-animate-rise-in relative mt-6 rounded-3xl bg-[var(--cg-secondary)] px-5 py-5 text-left"
+            className="cg-animate-rise-in relative mt-6 rounded-3xl bg-[var(--cg-secondary)] px-5 py-5 text-center"
             style={{ animationDelay: "140ms" }}
           >
-            <SectionLabel>{modal.message}</SectionLabel>
-            <p className="mt-2 text-xl font-bold leading-snug text-[var(--cg-fg)]">
+            <p className="text-base font-extrabold uppercase leading-snug tracking-wide text-[var(--cg-fg)]">
+              {modal.message}
+            </p>
+            <p className="mt-3 text-lg font-semibold leading-snug text-[var(--cg-fg)]">
               „{modal.body}“
             </p>
           </div>

@@ -3,7 +3,9 @@ import {
   type StudioTaskContent,
   type TaskAnswerType,
   type TaskContentTile,
+  CODE_BOX_MAX,
   type TaskNumberFieldCount,
+  isTaskNumberFieldCount,
   type TaskScoring,
   type TaskTileMediaType,
 } from "@/lib/cms/types";
@@ -177,13 +179,12 @@ export function isMediaAnswerType(
 
 function migrateNumberFields(raw: unknown): TaskNumberFieldCount | undefined {
   const n = typeof raw === "number" ? raw : Number(raw);
-  if (n === 1 || n === 2 || n === 3 || n === 4) return n;
-  return undefined;
+  return isTaskNumberFieldCount(n) ? n : undefined;
 }
 
-/** Alphanumeric chars for code boxes (max 4). */
+/** Alphanumeric chars for code boxes (max 5). */
 export function codeBoxChars(answer: string | undefined): string {
-  return (answer ?? "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 4);
+  return (answer ?? "").replace(/[^a-zA-Z0-9]/g, "").slice(0, CODE_BOX_MAX);
 }
 
 /**
@@ -197,7 +198,7 @@ export function charsToCodeBoxAnswer(raw: string): {
   const chars = codeBoxChars(raw);
   const number_fields = (chars.length === 0
     ? 1
-    : Math.min(4, chars.length)) as TaskNumberFieldCount;
+    : Math.min(CODE_BOX_MAX, chars.length)) as TaskNumberFieldCount;
   return {
     answer: chars,
     number_fields,
@@ -225,7 +226,7 @@ export function splitNumberAnswerParts(
   answer: string | undefined,
   fieldCount: number,
 ): string[] {
-  const count = Math.min(4, Math.max(1, fieldCount));
+  const count = Math.min(CODE_BOX_MAX, Math.max(1, fieldCount));
   const chars = codeBoxChars(answer);
   if (chars.length > 0) {
     return Array.from({ length: count }, (_, i) => chars[i] ?? "");
@@ -239,7 +240,7 @@ function deriveCodeBoxFields(
   fallback: unknown,
 ): TaskNumberFieldCount {
   const chars = codeBoxChars(answer);
-  if (chars.length >= 1 && chars.length <= 4) {
+  if (chars.length >= 1 && chars.length <= CODE_BOX_MAX) {
     return chars.length as TaskNumberFieldCount;
   }
   return migrateNumberFields(fallback) ?? 1;

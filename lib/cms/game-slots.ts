@@ -11,7 +11,13 @@ import {
 import { parseBonusBindings, type BonusBinding } from "@/lib/cms/bonus-bindings";
 import type { ContentMode } from "@/lib/cms/layer-model";
 import { LAYER_GAME_PRESETS, type LayerGamePreset } from "@/lib/cms/layer-model";
-import type { StudioGameTaskLink, StudioTask, StudioTaskContent } from "@/lib/cms/types";
+import {
+  CODE_BOX_MAX,
+  isTaskNumberFieldCount,
+  type StudioGameTaskLink,
+  type StudioTask,
+  type StudioTaskContent,
+} from "@/lib/cms/types";
 import type { ArrivalQuiz, BonusTask, LevelContentTile, QuizOption } from "@/lib/grid/level-types";
 import { normalizeTaskContent, studioScoringToLevelScoring, studioTilesToLevelTiles } from "@/lib/cms/task-content";
 
@@ -306,14 +312,16 @@ export function taskContentToBonus(
   // text / number / code boxes — always show an input (never silent „Weiter“).
   const answer = (content.answer ?? "").trim();
   const boxed = Boolean(content.code_boxes) || /code|passwort|\bpin\b/i.test(question);
-  const fields =
-    content.number_fields === 2 ||
-    content.number_fields === 3 ||
-    content.number_fields === 4
-      ? content.number_fields
-      : boxed
-        ? Math.min(4, Math.max(1, answer.length || 4)) as 1 | 2 | 3 | 4
-        : undefined;
+  const fields = isTaskNumberFieldCount(content.number_fields)
+    ? content.number_fields
+    : boxed
+      ? (Math.min(CODE_BOX_MAX, Math.max(1, answer.length || CODE_BOX_MAX)) as
+          | 1
+          | 2
+          | 3
+          | 4
+          | 5)
+      : undefined;
 
   return {
     for_role: role,

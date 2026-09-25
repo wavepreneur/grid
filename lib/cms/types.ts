@@ -30,7 +30,12 @@ export type TaskAnswerType =
   | "video"
   | "augmented_photo";
 
-export type TaskNumberFieldCount = 1 | 2 | 3 | 4;
+export const CODE_BOX_MAX = 5;
+export type TaskNumberFieldCount = 1 | 2 | 3 | 4 | 5;
+
+export function isTaskNumberFieldCount(n: unknown): n is TaskNumberFieldCount {
+  return n === 1 || n === 2 || n === 3 || n === 4 || n === 5;
+}
 
 export type TaskContentTile = {
   id: string;
@@ -66,11 +71,11 @@ export type StudioTaskContent = {
   answer?: string;
   answer_type: TaskAnswerType;
   /**
-   * Freitext: show one box per character (letters/digits/mix), max 4.
+   * Freitext: show one box per character (letters/digits/mix), max 5.
    * Field count follows answer length.
    */
   code_boxes?: boolean;
-  /** How many code boxes (1–4) when code_boxes is on. */
+  /** How many code boxes (1–5) when code_boxes is on. */
   number_fields?: TaskNumberFieldCount;
   options?: Array<{ id: string; label: string; correct?: boolean }>;
   tiles?: TaskContentTile[];

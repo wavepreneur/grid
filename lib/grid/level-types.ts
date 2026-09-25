@@ -78,7 +78,7 @@ export type BonusTask = {
   answer_mode?: "choice" | "text" | "boxes" | "confirm";
   /** Expected free-text / code answer when answer_mode is text or boxes. */
   answer?: string;
-  number_fields?: 1 | 2 | 3 | 4;
+  number_fields?: 1 | 2 | 3 | 4 | 5;
 };
 
 /** When a compiled bonus may fire. @see docs/BONUS_LAYER3_MODEL.md */
@@ -180,8 +180,8 @@ export type LevelDefinition = {
   input_mode?: "text" | "number" | "boxes" | "confirm" | "photo" | "video" | "augmented_photo";
   /** PNG overlay for augmented_photo. */
   overlay_image_url?: string;
-  /** Boxes for input_mode "boxes" / legacy "number" (1–4). */
-  number_fields?: 1 | 2 | 3 | 4;
+  /** Boxes for input_mode "boxes" / legacy "number" (1–5). */
+  number_fields?: 1 | 2 | 3 | 4 | 5;
   role_required?: PlayerRole | null;
   media?: LevelMedia;
   hints?: LevelHint[];

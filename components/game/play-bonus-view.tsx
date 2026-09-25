@@ -10,6 +10,7 @@ import { FormattedTaskText } from "@/components/game/formatted-task-text";
 import { LevelScoringBar } from "@/components/game/level-scoring-bar";
 import { MediaModal } from "@/components/game/media-modal";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
+import { CODE_BOX_MAX } from "@/lib/cms/types";
 import type { BonusTask, LevelContentTile } from "@/lib/grid/level-types";
 import type { BonusSessionState } from "@/lib/grid/game-state";
 import { formatBonusSolution } from "@/lib/grid/bonus";
@@ -103,7 +104,8 @@ export function PlayBonusView({
   onHandOff,
 }: Props) {
   const answerMode = bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
-  const boxCount = bonus.number_fields ?? Math.min(4, Math.max(1, (bonus.answer ?? "").length || 4));
+  const boxCount =
+    bonus.number_fields ?? Math.min(CODE_BOX_MAX, Math.max(1, (bonus.answer ?? "").length || CODE_BOX_MAX));
 
   const [localIntro, setLocalIntro] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
@@ -376,7 +378,7 @@ export function PlayBonusView({
         {bonus.description?.trim() ? (
           <FormattedTaskText
             text={bonus.description}
-            className="text-left text-sm leading-relaxed text-[var(--cg-muted)]"
+            className="space-y-3 text-left text-[15px] leading-[1.65] text-[var(--cg-fg)] sm:text-base"
           />
         ) : null}
 

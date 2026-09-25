@@ -33,6 +33,7 @@ import {
   normalizeTaskContent,
 } from "@/lib/cms/task-content";
 import {
+  CODE_BOX_MAX,
   DEFAULT_TASK_CONTENT,
   type StudioTask,
   type StudioTaskContent,
@@ -293,7 +294,7 @@ export function TaskEditor({ task, returnTo }: Props) {
                         ? codeBoxChars(content.answer)
                         : (content.answer ?? "")
                     }
-                    maxLength={content.code_boxes ? 4 : undefined}
+                    maxLength={content.code_boxes ? CODE_BOX_MAX : undefined}
                     className={
                       content.code_boxes
                         ? "text-center text-2xl font-bold tracking-[0.35em]"
@@ -310,7 +311,7 @@ export function TaskEditor({ task, returnTo }: Props) {
                       }
                       patchContent({ answer: e.target.value });
                     }}
-                    placeholder={content.code_boxes ? "z. B. A3B4 oder 0364" : "Lösung"}
+                    placeholder={content.code_boxes ? "z. B. A3B47 oder 03641" : "Lösung"}
                   />
                   {content.code_boxes ? (
                     <p className="mt-2 text-xs text-muted-foreground">
@@ -351,7 +352,7 @@ export function TaskEditor({ task, returnTo }: Props) {
                         Getrenntes Kästchen pro Zeichen
                       </span>
                       <span className="mt-0.5 block text-sm text-muted-foreground">
-                        Max. 4 Zeichen — Zahlen, Buchstaben oder Mix
+                        Max. 5 Zeichen — Zahlen, Buchstaben oder Mix
                       </span>
                     </span>
                   </label>
