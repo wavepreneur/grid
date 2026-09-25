@@ -159,7 +159,7 @@ export function PlayMoreSheet({
       />
       <PlayDocSheet
         open={showFaqDoc}
-        title="FAQ"
+        title="Häufige Fragen"
         url={faqIframeUrl}
         emptyHint="Für dieses Spiel ist noch kein FAQ-Link hinterlegt."
         onClose={onClose}
@@ -209,8 +209,8 @@ export function PlayMoreSheet({
                   />
                   <MenuRow
                     icon={<MessagesSquare className="h-5 w-5" />}
-                    title="FAQ"
-                    hint="Häufige Fragen"
+                    title="Häufige Fragen"
+                    hint="Technik und Tipps"
                     onClick={() => onOpen("faq")}
                   />
                   <MenuRow
@@ -648,7 +648,7 @@ function panelTitle(panel: Exclude<PlayMorePanel, null>): string {
     case "sync":
       return "Geräte";
     case "faq":
-      return "FAQ";
+      return "Häufige Fragen";
     case "support":
       return "Support";
     case "pause":

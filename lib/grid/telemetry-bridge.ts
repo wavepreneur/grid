@@ -29,6 +29,7 @@ function clamp01(value: number): number {
 }
 
 export function computeStressIndex(score: number): number {
+  if (DEFAULT_STARTING_SCORE <= 0) return 0;
   return clamp01(score / DEFAULT_STARTING_SCORE);
 }
 

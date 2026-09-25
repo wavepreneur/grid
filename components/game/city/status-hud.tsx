@@ -40,7 +40,10 @@ function Stat({
       <span className="max-w-full truncate text-sm font-bold leading-none text-[var(--cg-fg)] sm:text-base">
         {value}
       </span>
-      <span className="truncate text-[10px] font-medium text-[var(--cg-muted)] sm:text-[11px]">
+      <span
+        className="truncate text-[10px] font-medium text-[var(--cg-muted)] sm:text-[11px]"
+        translate={label === "Level" ? "no" : undefined}
+      >
         {label}
       </span>
     </div>

@@ -245,13 +245,9 @@ export function taskContentToBonus(
   const reward =
     content.scoring?.points && content.scoring.points > 0 ? content.scoring.points : 150;
   const title = task.title?.trim() || "Bonusaufgabe";
-  const description = [
-    typeof task.description === "string" ? task.description.trim() : "",
-    typeof content.success_info === "string" ? content.success_info.trim() : "",
-  ]
-    .filter(Boolean)
-    .filter((part, index, all) => all.indexOf(part) === index)
-    .join("\n\n");
+  const description = typeof task.description === "string" ? task.description.trim() : "";
+  const success_info =
+    typeof content.success_info === "string" ? content.success_info.trim() : "";
   const hero_image_url = content.hero_image_url?.trim() || undefined;
   const tiles: LevelContentTile[] | undefined = studioTilesToLevelTiles(content.tiles);
   const scoring = studioScoringToLevelScoring(content.scoring);
@@ -275,6 +271,7 @@ export function taskContentToBonus(
       title,
       intro,
       description: description || undefined,
+      success_info: success_info || undefined,
       hero_image_url,
       tiles,
       question,
@@ -293,6 +290,7 @@ export function taskContentToBonus(
       title,
       intro,
       description: description || undefined,
+      success_info: success_info || undefined,
       hero_image_url,
       tiles,
       question,
@@ -315,6 +313,7 @@ export function taskContentToBonus(
       title,
       intro,
       description: description || undefined,
+      success_info: success_info || undefined,
       hero_image_url,
       tiles,
       question,
@@ -352,6 +351,7 @@ export function taskContentToBonus(
     title,
     intro,
     description: description || undefined,
+    success_info: success_info || undefined,
     hero_image_url,
     tiles,
     question,

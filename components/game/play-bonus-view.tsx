@@ -14,7 +14,7 @@ import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
 import { CODE_BOX_MAX } from "@/lib/cms/types";
 import type { BonusTask, LevelContentTile } from "@/lib/grid/level-types";
 import type { BonusSessionState } from "@/lib/grid/game-state";
-import { bonusMediaKind, formatBonusSolution } from "@/lib/grid/bonus";
+import { bonusMediaKind, formatBonusSolution, resolveBonusPlayerCopy } from "@/lib/grid/bonus";
 import { earliestIsoTimestamp } from "@/lib/grid/level-scoring";
 import { useLevelScoringTimer } from "@/lib/hooks/use-level-scoring-timer";
 import {
@@ -117,6 +117,7 @@ export function PlayBonusView({
 }: Props) {
   const answerMode = bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
   const mediaKind = bonusMediaKind(bonus);
+  const { taskText, successText } = resolveBonusPlayerCopy(bonus);
   const boxCount =
     bonus.number_fields ?? Math.min(CODE_BOX_MAX, Math.max(1, (bonus.answer ?? "").length || CODE_BOX_MAX));
 
@@ -388,9 +389,9 @@ export function PlayBonusView({
           </div>
         ) : null}
 
-        {bonus.description?.trim() ? (
+        {taskText ? (
           <FormattedTaskText
-            text={bonus.description}
+            text={taskText}
             className="space-y-3 text-left text-[15px] leading-[1.65] text-[var(--cg-fg)] sm:text-base"
           />
         ) : null}
@@ -407,9 +408,11 @@ export function PlayBonusView({
           />
         ) : null}
 
-        <p className="rounded-2xl bg-[var(--cg-card)] p-5 text-lg font-semibold shadow-[var(--cg-shadow-soft)] text-[var(--cg-fg)]">
-          {bonus.question}
-        </p>
+        {!mediaKind && bonus.question.trim() && bonus.question.trim() !== taskText ? (
+          <p className="rounded-2xl bg-[var(--cg-card)] p-5 text-lg font-semibold shadow-[var(--cg-shadow-soft)] text-[var(--cg-fg)]">
+            {bonus.question}
+          </p>
+        ) : null}
 
         {mediaKind && !show ? (
           <MediaCapturePanel
@@ -583,6 +586,19 @@ export function PlayBonusView({
                   <p className="mt-0.5 text-sm text-[var(--cg-muted)]">
                     +{reveal?.reward ?? bonus.reward} Punkte für das Team.
                   </p>
+                  {mediaKind ? (
+                    <>
+                      <p className="mt-2 text-sm leading-snug text-[var(--cg-fg)]">
+                        {successText ||
+                          (mediaKind === "video"
+                            ? "Das Video liegt in der Team-Galerie. Ihr könnt es später herunterladen."
+                            : "Das Bild liegt in der Team-Galerie. Ihr könnt es später herunterladen.")}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--cg-fg)]">
+                        Macht weiter mit eurer Mission.
+                      </p>
+                    </>
+                  ) : null}
                 </div>
               </div>
             ) : (

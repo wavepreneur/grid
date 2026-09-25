@@ -523,18 +523,31 @@ export function MediaCapturePanel({
           Kamera öffnen
         </span>
       </PrimaryButton>
-      <button
-        type="button"
-        disabled={disabled || isPending}
-        onClick={() => fileRef.current?.click()}
-        className={
-          cityStyle
-            ? "w-full text-center text-sm font-semibold text-[var(--cg-muted)] underline-offset-2 hover:underline disabled:opacity-40"
-            : "w-full text-center text-sm text-slate-500 underline"
-        }
-      >
-        Datei wählen
-      </button>
+      {cameraError ? (
+        <>
+          <p
+            className={
+              cityStyle
+                ? "text-center text-sm text-[var(--cg-muted)]"
+                : "text-sm text-slate-600"
+            }
+          >
+            {cameraError}
+          </p>
+          <button
+            type="button"
+            disabled={disabled || isPending}
+            onClick={() => fileRef.current?.click()}
+            className={
+              cityStyle
+                ? "w-full text-center text-sm font-semibold text-[var(--cg-muted)] underline-offset-2 hover:underline disabled:opacity-40"
+                : "w-full text-center text-sm text-slate-500 underline"
+            }
+          >
+            Aus der Galerie
+          </button>
+        </>
+      ) : null}
 
       {allowSkip ? (
         <button
@@ -555,7 +568,6 @@ export function MediaCapturePanel({
         ref={fileRef}
         type="file"
         accept={isVideo ? "video/*" : "image/*"}
-        capture="environment"
         className="hidden"
         onChange={(event) => {
           handleFilePick(event.target.files?.[0] ?? null);

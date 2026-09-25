@@ -463,6 +463,7 @@ export async function solveCurrentLevel(input: {
               title: def.title,
               intro: def.intro,
               description: def.description,
+              success_info: def.success_info,
               hero_image_url: def.hero_image_url,
               tiles: def.tiles,
               question: def.question,

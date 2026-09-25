@@ -58,8 +58,10 @@ export type BonusTask = {
   for_team?: boolean;
   title: string;
   intro?: string;
-  /** Longer briefing from the Studio task (description / success copy). */
+  /** Longer briefing from the Studio task. */
   description?: string;
+  /** Shown after a photo/video is sent — not before. */
+  success_info?: string;
   hero_image_url?: string;
   /** Media tiles (minigame iframe, image, …) — same as Layer-2 missions. */
   tiles?: LevelContentTile[];
@@ -356,5 +358,5 @@ export function isMediaInputMode(
 export const EXITMANIA_TOTAL_LEVELS = 10;
 export const DEFAULT_TEMPLATE_SLUG = "default-exitmania";
 export const DEFAULT_CITY_SLUG = "berlin";
-export const DEFAULT_STARTING_SCORE = 1000;
+export const DEFAULT_STARTING_SCORE = 0;
 export const HINT_POINT_COST = 50;

@@ -48,6 +48,10 @@ export function parseBonusTask(raw: unknown): BonusTask | undefined {
     title: b.title,
     intro: typeof b.intro === "string" ? b.intro : undefined,
     description: typeof b.description === "string" ? b.description : undefined,
+    success_info:
+      typeof b.success_info === "string" && b.success_info.trim()
+        ? b.success_info.trim()
+        : undefined,
     hero_image_url:
       typeof b.hero_image_url === "string" && b.hero_image_url.trim()
         ? b.hero_image_url.trim()
@@ -74,6 +78,25 @@ export function parseBonusTask(raw: unknown): BonusTask | undefined {
         ? b.overlay_image_url.trim()
         : undefined,
   };
+}
+
+/** Task text once; success copy only after a media send. */
+export function resolveBonusPlayerCopy(bonus: BonusTask): {
+  taskText: string;
+  successText: string | null;
+} {
+  const question = bonus.question.trim();
+  const description = (bonus.description ?? "").trim();
+  const authored = bonus.success_info?.trim() || null;
+
+  if (!description || description === question) {
+    return { taskText: question, successText: authored };
+  }
+  if (question && description.startsWith(question)) {
+    const rest = description.slice(question.length).trim();
+    return { taskText: question, successText: authored ?? (rest || null) };
+  }
+  return { taskText: description, successText: authored };
 }
 
 /** Camera bonus — including older snapshots compiled as confirm + „Erledigt“. */
