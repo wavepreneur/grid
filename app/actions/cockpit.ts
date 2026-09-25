@@ -2,7 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadResolvedEventContent } from "@/lib/grid/content-loader";
-import { completedLevelNumbers } from "@/lib/grid/event-results";
+import { completedLevelNumbers, revealedLevelNumbers } from "@/lib/grid/event-results";
 import { parseTeamGameState } from "@/lib/grid/game-state";
 import { setTeamNavigator } from "@/lib/grid/team-session";
 import { writeAuditLog } from "@/lib/grid/audit-log";
@@ -42,6 +42,7 @@ export type CockpitTeam = {
   current_phase: string | null;
   level_started_at: string | null;
   done_levels: number[];
+  revealed_levels: number[];
   players: CockpitPlayer[];
 };
 
@@ -153,6 +154,7 @@ export async function getEventCockpitSnapshot(
         level_started_at:
           gameState.levels[String(team.current_level ?? 0)]?.started_at ?? null,
         done_levels: completedLevelNumbers(team.game_state, levelNumbers),
+        revealed_levels: revealedLevelNumbers(team.game_state, levelNumbers),
         players: teamPlayers.map((player) => ({
           id: player.id,
           display_name: player.display_name,

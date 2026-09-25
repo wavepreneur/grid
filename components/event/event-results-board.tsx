@@ -60,14 +60,18 @@ export function EventResultsBoard({ snapshot }: Props) {
           </div>
           <ol className="mt-3 flex flex-wrap gap-1.5">
             {snapshot.levels.map((level) => {
+              const revealed = team.revealed_levels.includes(level.level);
               const done = team.done_levels.includes(level.level);
+              const tone = revealed
+                ? "bg-amber-500 text-white"
+                : done
+                  ? "bg-emerald-600 text-white"
+                  : "bg-slate-100 text-slate-400";
               return (
                 <li
                   key={level.level}
-                  title={level.title}
-                  className={`flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold ${
-                    done ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-400"
-                  }`}
+                  title={revealed ? `${level.title} · direkt gelöst · 0 Punkte` : level.title}
+                  className={`flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-bold ${tone}`}
                 >
                   {level.level}
                 </li>

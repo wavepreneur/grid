@@ -267,6 +267,16 @@ export function ensureLevelSlots(
   return next;
 }
 
+export type LevelPlayOutcome = "solved" | "revealed" | "open";
+
+/** Solved for points vs. give-up / Direkt lösen (0 points). */
+export function levelPlayOutcome(
+  entry?: { status?: string; revealed?: boolean } | null,
+): LevelPlayOutcome {
+  if (entry?.status !== "completed") return "open";
+  return entry.revealed ? "revealed" : "solved";
+}
+
 export function countCompletedLevels(
   levels: TeamGameState["levels"],
   totalLevels: number,

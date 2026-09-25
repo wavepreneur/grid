@@ -53,7 +53,12 @@ import { findForeignActiveBonuses } from "@/lib/grid/bonus-queue";
 import { StudioDeskTestBar } from "@/components/game/studio-desk-test-bar";
 import { useBonusQueueTick } from "@/lib/hooks/use-bonus-queue-tick";
 import { clearWalkedDistanceStorage } from "@/lib/hooks/use-walked-distance";
-import { pickNewerTeamState, type TeamGameState, type TeamRealtimeState } from "@/lib/grid/game-state";
+import {
+  levelPlayOutcome,
+  pickNewerTeamState,
+  type TeamGameState,
+  type TeamRealtimeState,
+} from "@/lib/grid/game-state";
 import { isSessionSupersededResult } from "@/lib/grid/session-codes";
 import type {
   ResolvedEventContent,
@@ -301,6 +306,21 @@ export function GameRoom({
   const completedLevels = useMemo(
     () => countCompletedLevels(teamState.gameState),
     [teamState.gameState],
+  );
+  const solvedLevels = useMemo(
+    () =>
+      eventContent.levels.filter(
+        (level) => levelPlayOutcome(teamState.gameState.levels[String(level.level)]) === "solved",
+      ).length,
+    [eventContent.levels, teamState.gameState.levels],
+  );
+  const revealedLevels = useMemo(
+    () =>
+      eventContent.levels.filter(
+        (level) =>
+          levelPlayOutcome(teamState.gameState.levels[String(level.level)]) === "revealed",
+      ).length,
+    [eventContent.levels, teamState.gameState.levels],
   );
 
   const playPhase = teamState.gameState.current_phase ?? "hub";
@@ -1000,16 +1020,22 @@ export function GameRoom({
         </p>
         <ol className="mt-4 flex flex-wrap justify-center gap-1.5">
           {eventContent.levels.map((level) => {
-            const done = teamState.gameState.levels[String(level.level)]?.status === "completed";
+            const outcome = levelPlayOutcome(teamState.gameState.levels[String(level.level)]);
+            const tone =
+              outcome === "solved"
+                ? "bg-[var(--cg-success)] text-white"
+                : outcome === "revealed"
+                  ? "bg-[var(--cg-accent)] text-[var(--cg-accent-fg)]"
+                  : "bg-[var(--cg-muted)]/15 text-[var(--cg-muted)]";
             return (
               <li
                 key={level.level}
-                title={level.title}
-                className={`flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold ${
-                  done
-                    ? "bg-[var(--cg-success)] text-white"
-                    : "bg-[var(--cg-muted)]/15 text-[var(--cg-muted)]"
-                }`}
+                title={
+                  outcome === "revealed"
+                    ? `${level.title} · direkt gelöst · 0 Punkte`
+                    : level.title
+                }
+                className={`flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-bold ${tone}`}
               >
                 {level.level}
               </li>
@@ -1017,8 +1043,9 @@ export function GameRoom({
           })}
         </ol>
         <p className="mt-3 text-xs text-[var(--cg-muted)]">
-          {countCompletedLevels(teamState.gameState)} / {eventContent.levels.length} Aufgaben · nur
-          euer Team
+          {revealedLevels > 0
+            ? `${solvedLevels} gelöst · ${revealedLevels} direkt gelöst · nur euer Team`
+            : `${completedLevels} / ${eventContent.levels.length} Aufgaben · nur euer Team`}
         </p>
       </div>
       <section className="overflow-hidden rounded-3xl bg-[var(--cg-accent)] shadow-[var(--cg-shadow-lift)]">

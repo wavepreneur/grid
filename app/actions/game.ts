@@ -5,6 +5,7 @@ import { writeAuditLog } from "@/lib/grid/audit-log";
 import {
   computeAttemptDurations,
   logPlayAttempt,
+  logPlayReveal,
 } from "@/lib/grid/attempt-analytics";
 import { loadResolvedEventContent } from "@/lib/grid/content-loader";
 import {
@@ -629,6 +630,11 @@ export async function solveCurrentLevel(input: {
       return { success: false, error: error?.message ?? "Level-Update fehlgeschlagen." };
     }
 
+    const durations = computeAttemptDurations({
+      levelStartedAt: levelState.started_at,
+      teamStartedAt: team.started_at,
+    });
+
     await insertSyncEvent({
       teamId: team.id,
       eventType: isFinished ? "game_finished" : "level_completed",
@@ -641,6 +647,10 @@ export async function solveCurrentLevel(input: {
         score: nextGameState.score,
         points_earned: pointsEarned,
         reveal_solution: Boolean(input.payload?.revealSolution),
+        duration_ms: durations.durationMs,
+        elapsed_mission_ms: durations.elapsedMissionMs,
+        player_name: player.display_name,
+        player_role: player.role ?? null,
       },
     });
 
@@ -658,8 +668,38 @@ export async function solveCurrentLevel(input: {
         points_earned: pointsEarned,
         reveal_solution: Boolean(input.payload?.revealSolution),
         force_unlock: forceUnlock ?? null,
+        duration_ms: durations.durationMs,
+        elapsed_mission_ms: durations.elapsedMissionMs,
+        player_name: player.display_name,
+        player_role: player.role ?? null,
       },
     });
+
+    const attemptBase = {
+      organizationId: event.organization_id,
+      eventId: event.id,
+      teamId: team.id,
+      playerId: player.id,
+      playerName: player.display_name,
+      playerRole: player.role,
+      level: currentLevel,
+      phase: "level" as const,
+      durationMs: durations.durationMs,
+      elapsedMissionMs: durations.elapsedMissionMs,
+      contentMode: content.contentMode,
+      levelTitle: levelDefinition.title ?? null,
+    };
+    if (input.payload?.revealSolution) {
+      await logPlayReveal({ ...attemptBase, forceUnlock: forceUnlock ?? null });
+    } else {
+      await logPlayAttempt({
+        ...attemptBase,
+        correct: true,
+        answer: input.payload?.answer ?? null,
+        selectedOptionId: input.payload?.selectedOptionId ?? null,
+        selectedOptionIds: input.payload?.selectedOptionIds ?? null,
+      });
+    }
 
     if (isFinished) {
       queueGrowthTeamFinished(team.id);
@@ -676,6 +716,8 @@ export async function solveCurrentLevel(input: {
           level: currentLevel,
           mode: forceUnlock,
           path: "solve",
+          player_name: player.display_name,
+          player_role: player.role ?? null,
           geolocation: input.payload?.geolocation ?? null,
         },
       });
@@ -1640,6 +1682,8 @@ export async function advanceFromHub(input: {
           level: currentLevel,
           mode: input.forceUnlock,
           walked_meters: outdoorProgress?.walked_meters ?? null,
+          player_name: player.display_name,
+          player_role: player.role ?? null,
           geolocation: input.geolocation ?? null,
         },
       });

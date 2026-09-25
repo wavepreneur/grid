@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { EventDebriefPanel } from "@/components/event/event-debrief-panel";
 import { EventResultsLive } from "@/components/event/event-results-live";
 import { loadEventResultsByPortalToken } from "@/lib/grid/event-results";
 
@@ -23,12 +24,25 @@ export default async function PortalEventResultsPage({ params }: Props) {
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight">{snapshot.title}</h1>
         <p className="mt-2 text-sm text-slate-500">
-          {snapshot.teams.length} Teams · {finished} fertig · nur für den Bucher · Aufgaben grün =
-          gelöst
+          {snapshot.teams.length} Teams · {finished} fertig · nur für den Bucher · Grün = gelöst ·
+          Orange = direkt gelöst
         </p>
         <div className="mt-8">
           <EventResultsLive portalToken={token} initial={snapshot} />
         </div>
+        <section className="mt-10">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-teal-800">
+            Manöverkritik
+          </p>
+          <h2 className="mt-2 text-2xl font-bold tracking-tight">Was das Team getan hat</h2>
+          <p className="mt-2 text-sm text-slate-500">
+            Zeiten, falsche Eingaben, gekaufte Tipps, GPS-Skip und Aufgaben, die an eine andere
+            Rolle gingen.
+          </p>
+          <div className="mt-5">
+            <EventDebriefPanel portalToken={token} />
+          </div>
+        </section>
       </div>
     </main>
   );

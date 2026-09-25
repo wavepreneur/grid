@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadResolvedEventContent } from "@/lib/grid/content-loader";
-import { parseTeamGameState } from "@/lib/grid/game-state";
+import { levelPlayOutcome, parseTeamGameState } from "@/lib/grid/game-state";
 import { loadPortalEventByToken } from "@/lib/grid/portal";
 
 export type EventResultsLevel = {
@@ -18,6 +18,7 @@ export type EventResultsTeam = {
   captain_name: string | null;
   finished_at: string | null;
   done_levels: number[];
+  revealed_levels: number[];
 };
 
 export type EventResultsSnapshot = {
@@ -31,6 +32,11 @@ export type EventResultsSnapshot = {
 export function completedLevelNumbers(gameState: unknown, levelNumbers: number[]): number[] {
   const parsed = parseTeamGameState(gameState);
   return levelNumbers.filter((level) => parsed.levels[String(level)]?.status === "completed");
+}
+
+export function revealedLevelNumbers(gameState: unknown, levelNumbers: number[]): number[] {
+  const parsed = parseTeamGameState(gameState);
+  return levelNumbers.filter((level) => levelPlayOutcome(parsed.levels[String(level)]) === "revealed");
 }
 
 export async function loadEventResultsByPortalToken(
@@ -110,6 +116,7 @@ export async function loadEventResultsForEvent(event: {
         null,
       finished_at: team.finished_at,
       done_levels: completedLevelNumbers(team.game_state, levelNumbers),
+      revealed_levels: revealedLevelNumbers(team.game_state, levelNumbers),
     };
   });
 

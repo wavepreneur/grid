@@ -74,3 +74,28 @@ export async function logPlayAttempt(input: AttemptAnalyticsInput): Promise<void
     },
   });
 }
+
+/** Direkt lösen / give-up — not a solve, not a wrong answer. */
+export async function logPlayReveal(input: Omit<AttemptAnalyticsInput, "correct"> & {
+  forceUnlock?: string | null;
+}): Promise<void> {
+  await writeAuditLog({
+    organizationId: input.organizationId,
+    eventId: input.eventId,
+    teamId: input.teamId,
+    playerId: input.playerId,
+    action: "play_attempt_revealed",
+    payload: {
+      phase: input.phase,
+      level: input.level,
+      level_title: input.levelTitle ?? null,
+      player_name: input.playerName,
+      player_role: input.playerRole ?? null,
+      duration_ms: input.durationMs ?? null,
+      elapsed_mission_ms: input.elapsedMissionMs ?? null,
+      content_mode: input.contentMode ?? null,
+      force_unlock: input.forceUnlock ?? null,
+      at: new Date().toISOString(),
+    },
+  });
+}
