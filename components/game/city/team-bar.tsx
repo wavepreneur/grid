@@ -30,7 +30,14 @@ export function CityTeamBar({
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <IconUsers size={16} className="shrink-0 text-[var(--cg-primary)]" />
-          <span className="truncate text-sm font-bold text-[var(--cg-fg)]">{teamName}</span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--cg-muted)]">
+              Team
+            </p>
+            <p className="truncate text-sm font-bold leading-tight text-[var(--cg-fg)]">
+              {teamName.trim() || "Team"}
+            </p>
+          </div>
         </div>
         <span className="max-w-[11.5rem] truncate rounded-full bg-[var(--cg-primary)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[var(--cg-primary-fg)] sm:max-w-none sm:px-3 sm:text-xs">
           Du: {meName} · {meRoleLabel}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getEventContent } from "@/app/actions/content";
 import { getGameState, prepareTeamGame } from "@/app/actions/game";
+import { resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GameRoom } from "@/components/game/game-room";
 import { GameGateSkeleton } from "@/components/game/game-gate-skeleton";
 import { GridError } from "@/components/grid/grid-shell";
@@ -105,6 +106,7 @@ export function GameGate({
     typeof window === "undefined" ? 8 : missionStartProgress(inviteCode, joinCode),
   );
   const [session, setSession] = useState<PlayerSession | null>(null);
+  const [resolvedTeamName, setResolvedTeamName] = useState(teamName);
   const [eventContent, setEventContent] = useState<ResolvedEventContent | null>(null);
   const [contentRevision, setContentRevision] = useState(1);
   const [initialState, setInitialState] = useState<Awaited<
@@ -275,6 +277,13 @@ export function GameGate({
       };
       savePlayerSession(syncedSession);
 
+      if (!teamName.trim()) {
+        const teamResult = await resolveTeamJoinCode({ inviteCode, joinCode });
+        if (!cancelled && teamResult.success && teamResult.data.teamName.trim()) {
+          setResolvedTeamName(teamResult.data.teamName.trim());
+        }
+      }
+
       bump(100);
       setSession(syncedSession);
       setEventContent(freshContent);
@@ -314,7 +323,7 @@ export function GameGate({
       session={session}
       initialState={initialState.data}
       eventContent={eventContent}
-      teamName={teamName}
+      teamName={resolvedTeamName.trim() || teamName}
       eventTitle={eventTitle}
       onQuietContentUpdate={pullIfNewer}
     />
