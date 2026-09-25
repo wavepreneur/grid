@@ -614,7 +614,7 @@ export function MediaCapturePanel({
             <button
               type="button"
               disabled={busy}
-              onClick={closeCamera}
+              onClick={() => closeCamera()}
               className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white disabled:opacity-40"
               aria-label="Kamera schließen"
             >
