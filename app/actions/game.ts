@@ -521,17 +521,6 @@ export async function solveCurrentLevel(input: {
         bonus_id: immediateTeam.bonus_id,
       };
     } else if (soloBonus && immediateSolo) {
-      // Team advances; assigned role gets an overlay via active_bonus.
-      const nextSlot = getLevelDefinition(content, isFinished ? currentLevel : nextLevel);
-      nextPhase = isFinished
-        ? gameState.current_phase
-        : nextSlot && usesPhasedPlay(content)
-          ? initialPhaseForSurface(
-              content.contentMode,
-              buildPlaySlot(nextSlot, content.contentMode),
-              nextSlot,
-            )
-          : "hub";
       activeBonus = {
         from_level: currentLevel,
         for_role: immediateSolo.for_role,
@@ -540,7 +529,23 @@ export async function solveCurrentLevel(input: {
         bonus_id: immediateSolo.bonus_id,
       };
       immediateSolo.status = "active";
-      teamCurrentLevel = isFinished ? currentLevel : nextLevel;
+      if (isFinished) {
+        // Abschlussaufgabe / last slot: the role bonus is still part of the task.
+        nextPhase = "bonus";
+        pendingNext = null;
+        teamCurrentLevel = currentLevel;
+      } else {
+        const nextSlot = getLevelDefinition(content, nextLevel);
+        nextPhase =
+          nextSlot && usesPhasedPlay(content)
+            ? initialPhaseForSurface(
+                content.contentMode,
+                buildPlaySlot(nextSlot, content.contentMode),
+                nextSlot,
+              )
+            : "hub";
+        teamCurrentLevel = nextLevel;
+      }
     } else {
       // Keep phase on the solved slot under the modal; hub opens on Weiter.
       // Delayed bonuses stay in queue until ready_at / meters.
@@ -566,7 +571,7 @@ export async function solveCurrentLevel(input: {
       score: gameState.score + pointsEarned,
       current_phase: nextPhase,
       pending_next_level: pendingNext,
-      ends_game_pending: Boolean(isFinished && teamBonus),
+      ends_game_pending: Boolean(isFinished && (teamBonus || soloBonus)),
       quiz_reveal: null,
       level_reveal: null,
       active_bonus: activeBonus,

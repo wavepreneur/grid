@@ -1134,9 +1134,10 @@ export function GameSlotsPanel({
                 <span>
                   <span className="block text-base font-bold">Abschlussaufgabe</span>
                   <span className="mt-0.5 block text-sm text-muted-foreground">
-                    Nach dem Lösen endet das Spiel — Punkte, Ranking und Game Over. Weitere Stops
-                    danach werden übersprungen. Ideal für die Verabschiedung; Outdoor am besten mit
-                    „Sofort nach vorheriger Aufgabe“.
+                    Nach der gesamten Aufgabe endet das Spiel — inklusive Bonus, falls einer
+                    dranhängt. Dann Punkte, Ranking und Game Over. Weitere Stops danach werden
+                    übersprungen. Ideal für die Verabschiedung; Outdoor am besten mit „Sofort nach
+                    vorheriger Aufgabe“.
                   </span>
                 </span>
               </label>

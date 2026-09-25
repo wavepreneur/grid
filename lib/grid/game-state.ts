@@ -146,8 +146,9 @@ export type TeamGameState = {
   /** After bonus: level index to open next (set when entering bonus phase). */
   pending_next_level?: number | null;
   /**
-   * Solve decided the mission ends after the current team bonus
-   * (Abschlussaufgabe). Missing pending without this flag must not finish.
+   * Solve decided the mission ends after the current bonus
+   * (Abschlussaufgabe / last slot, team or role bonus). Missing pending
+   * without this flag must not finish.
    */
   ends_game_pending?: boolean;
   /** Team-wide entry-quiz reveal while still in phase "quiz". */

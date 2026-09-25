@@ -339,6 +339,12 @@ export function GameRoom({
   const canReleaseOwnSeat = lobbyPlayers.length > 1;
   const purchasedTileHints = teamState.gameState.purchased_tile_hints[String(activeLevel)] ?? {};
   const solveDisabled = levelState?.status !== "active" || Boolean(modal) || isHintPending;
+  const bonusPlayable =
+    teamState.gameState.current_phase === "bonus" ||
+    Boolean(teamState.gameState.active_bonus) ||
+    (teamState.gameState.bonus_queue ?? []).some(
+      (item) => item.status === "active" || item.status === "ready",
+    );
 
   function handlePurchaseHint(tileId: string) {
     setError(null);
@@ -1053,7 +1059,7 @@ export function GameRoom({
         timeLabel={remainingLabel}
         purchasedHints={purchasedTileHints}
         score={teamState.gameState.score ?? 0}
-        disabled={solveDisabled && teamState.gameState.current_phase !== "bonus"}
+        disabled={solveDisabled && !bonusPlayable}
         isPending={isSolvePending || isHintPending}
         canUnlockGps={isNavigator}
         effectiveBeta={session.effectiveBeta}

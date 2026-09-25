@@ -367,7 +367,7 @@ export function PlayPhaseFlow({
             teamName={teamName}
             roleLabels={roleLabels}
             asymmetricOverlay={!presentBonusMeta.for_team}
-            disabled={disabled}
+            disabled={false}
             isPending={isPending}
             teamSession={gameState.bonus_sessions?.[bonusId] ?? null}
             canPaceTeam={presentBonusMeta.for_team ? canPaceTeam : true}
@@ -417,7 +417,7 @@ export function PlayPhaseFlow({
             myRoleLabel={myRoleLabel}
             teamName={teamName}
             roleLabels={roleLabels}
-            disabled={disabled}
+            disabled={false}
             isPending={isPending}
             teamSession={gameState.bonus_sessions?.[bonusId] ?? null}
             canPaceTeam={canPaceTeam}
