@@ -108,11 +108,7 @@ export function PlayQuizView({
   }
 
   const openLabel =
-    mode === "online"
-      ? "Rätsel für alle öffnen"
-      : mode === "indoor"
-        ? "Rätsel aufschließen"
-        : "Zurück zum Spiel — Rätsel öffnen";
+    mode === "online" ? "Level für alle aufschließen" : "Level aufschließen";
 
   return (
     <section className="mx-auto flex w-full max-w-md flex-col px-4 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-4 sm:px-5">
@@ -231,6 +227,27 @@ export function PlayQuizView({
           <p className="text-center text-sm font-semibold text-[var(--cg-muted)]">
             Antwort von <span className="text-[var(--cg-fg)]">{teamReveal.answered_by}</span>
           </p>
+          {!correct && selectedIds.length > 0 ? (
+            <p className="flex flex-wrap items-center justify-center gap-2 text-sm font-semibold text-[var(--cg-fg)]">
+              <span className="text-[var(--cg-muted)]">Gewählt</span>
+              {quiz.options.map((opt, i) => {
+                if (!selectedIds.includes(opt.id)) return null;
+                const right = isRightOption(opt.id);
+                return (
+                  <span
+                    key={opt.id}
+                    className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm font-bold ${
+                      right
+                        ? "bg-[var(--cg-success)]/20 text-[var(--cg-success)]"
+                        : "bg-[var(--cg-destructive)]/15 text-[var(--cg-destructive)]"
+                    }`}
+                  >
+                    {String.fromCharCode(65 + i)}
+                  </span>
+                );
+              })}
+            </p>
+          ) : null}
           <p
             className={`text-center text-base font-semibold ${
               correct ? "text-[var(--cg-success)]" : "text-[var(--cg-destructive)]"
@@ -242,18 +259,6 @@ export function PlayQuizView({
                 : "Richtig! Der Schlüssel passt."
               : "Leider falsch — der Schlüssel passt trotzdem, aber ohne Bonuspunkte."}
           </p>
-
-          {!correct ? (
-            <div className="rounded-2xl border border-[var(--cg-success)]/40 bg-[var(--cg-success)]/10 px-4 py-3 text-sm text-[var(--cg-fg)]">
-              <p className="font-semibold">Richtige Antwort</p>
-              <p className="mt-1">
-                {quiz.options
-                  .filter((o) => isRightOption(o.id))
-                  .map((o) => o.label)
-                  .join(" · ")}
-              </p>
-            </div>
-          ) : null}
 
           {quiz.side_fact?.trim() ? (
             <div className="rounded-2xl bg-[var(--cg-secondary)] px-4 py-4 text-left">
@@ -267,10 +272,11 @@ export function PlayQuizView({
           {canPaceTeam ? (
             <BigButton
               variant="accent"
+              icon={<IconKey size={20} />}
               disabled={disabled || isPending || advancing}
               onClick={handleAdvance}
             >
-              {advancing || isPending ? "Öffnet…" : openLabel}
+              {advancing || isPending ? "Schließt auf…" : openLabel}
             </BigButton>
           ) : (
             <TeamPaceHint canPaceTeam={false} leadLabel={leadLabel} />
