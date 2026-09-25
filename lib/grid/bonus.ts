@@ -102,13 +102,16 @@ export function resolveBonusPlayerCopy(bonus: BonusTask): {
 /** Camera bonus — including older snapshots compiled as confirm + „Erledigt“. */
 export function bonusMediaKind(bonus: BonusTask): MediaInputMode | null {
   if (isMediaInputMode(bonus.answer_mode)) return bonus.answer_mode;
-  const blob = `${bonus.title}\n${bonus.question}\n${bonus.description ?? ""}`.toLowerCase();
+  const optionText = bonus.options.map((opt) => opt.label).join("\n").toLowerCase();
+  const blob =
+    `${bonus.title}\n${bonus.question}\n${bonus.description ?? ""}\n${optionText}`.toLowerCase();
   const looksLikeConfirmDone =
     bonus.answer_mode === "confirm" ||
-    bonus.options.some((opt) => opt.id === "done" && /erledigt/i.test(opt.label));
+    bonus.options.some((opt) => opt.id === "done");
   if (!looksLikeConfirmDone) return null;
-  if (/\bvideo|\bfilm/.test(blob)) return "video";
-  if (/foto|fotograf|kamera|photo/.test(blob)) return "photo";
+  if (/\bvideo|\bfilm|filmen|videoclip|video senden/.test(blob)) return "video";
+  if (/augmented|rahmen|schablone/.test(blob)) return "augmented_photo";
+  if (/foto|fotograf|kamera|photo|foto senden/.test(blob)) return "photo";
   return null;
 }
 
@@ -193,15 +196,31 @@ export function findBonusInContent(
 }
 
 /**
- * Prefer the queue snapshot (exactly what the player saw) when scoring/presenting.
+ * Prefer the queue snapshot for copy, but take camera type from compiled
+ * content so a republished Video task is not stuck on an old Foto snapshot.
  */
 export function resolveBonusForPlay(
   level: LevelDefinition | null | undefined,
   bonusId: string | null | undefined,
   snapshot?: BonusTask | null,
 ): BonusTask | null {
-  if (snapshot) return snapshot;
-  return findBonusTaskById(level, bonusId);
+  const compiled = findBonusTaskById(level, bonusId);
+  if (!snapshot) return compiled;
+  const compiledKind = compiled
+    ? isMediaInputMode(compiled.answer_mode)
+      ? compiled.answer_mode
+      : bonusMediaKind(compiled)
+    : null;
+  const snapKind = bonusMediaKind(snapshot);
+  if (compiledKind && compiledKind !== snapKind) {
+    return {
+      ...snapshot,
+      answer_mode: compiledKind,
+      overlay_image_url: compiled?.overlay_image_url ?? snapshot.overlay_image_url,
+      options: compiled?.options?.length ? compiled.options : snapshot.options,
+    };
+  }
+  return snapshot;
 }
 
 export function normalizeBonusRole(

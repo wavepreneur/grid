@@ -476,6 +476,8 @@ export function MediaCapturePanel({
       : kind === "augmented_photo"
         ? "Der Rahmen liegt über der Kamera. Foto machen, prüfen, dann senden."
         : "Foto machen, prüfen, bei Bedarf neu — dann senden.";
+  const remainingSeconds = Math.max(0, EVENT_CAPTURE_VIDEO_MAX_SECONDS - elapsed);
+  const recordProgress = Math.min(1, elapsed / EVENT_CAPTURE_VIDEO_MAX_SECONDS);
 
   function PrimaryButton({
     children,
@@ -625,9 +627,37 @@ export function MediaCapturePanel({
                 />
               )
             ) : null}
-            {recording ? (
-              <div className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
-                ● {elapsed}s / {EVENT_CAPTURE_VIDEO_MAX_SECONDS}s
+            {isVideo && phase === "live" ? (
+              <div className="pointer-events-none absolute inset-x-0 top-0 px-3 pe-16 pt-[max(0.75rem,env(safe-area-inset-top))]">
+                <div className="mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-black/65 px-3 py-2.5 text-white backdrop-blur-sm">
+                  <span
+                    className={`flex h-2.5 w-2.5 shrink-0 rounded-full ${
+                      recording ? "animate-pulse bg-red-500" : "bg-white/50"
+                    }`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold leading-none">
+                      {recording
+                        ? `${remainingSeconds} s übrig`
+                        : `Maximal ${EVENT_CAPTURE_VIDEO_MAX_SECONDS} Sekunden`}
+                    </p>
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/25">
+                      <div
+                        className={`h-full rounded-full ${
+                          recording ? "bg-red-500" : "bg-white/55"
+                        }`}
+                        style={{
+                          width: recording
+                            ? `${Math.round(recordProgress * 100)}%`
+                            : "100%",
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <p className="shrink-0 text-2xl font-extrabold tabular-nums leading-none">
+                    {recording ? remainingSeconds : EVENT_CAPTURE_VIDEO_MAX_SECONDS}
+                  </p>
+                </div>
               </div>
             ) : null}
             <button
@@ -681,7 +711,9 @@ export function MediaCapturePanel({
                     disabled={busy || (!cameraReady && !cameraError)}
                     onClick={() => (recording ? stopRecording() : startRecording())}
                   >
-                    {recording ? "Aufnahme stoppen" : shootLabel}
+                    {recording
+                      ? `Aufnahme stoppen · ${remainingSeconds} s`
+                      : shootLabel}
                   </PrimaryButton>
                 ) : (
                   <PrimaryButton disabled={busy || !cameraReady} onClick={() => void snapshotPhoto()}>
