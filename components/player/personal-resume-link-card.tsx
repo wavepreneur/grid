@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ClipboardCopy, Smartphone, StickyNote } from "lucide-react";
 import { copyGoReturnSnippet } from "@/lib/grid/play-url";
 
 type Props = {
@@ -34,10 +35,10 @@ export function PersonalResumeLinkCard({
 
   const label =
     copyState === "copied"
-      ? "Kopiert — speichern!"
+      ? "Kopiert — in Notizen einfügen"
       : copyState === "error"
         ? "Kopieren fehlgeschlagen"
-        : "Kopieren";
+        : "Aufs Handy kopieren";
 
   if (compact) {
     return (
@@ -46,12 +47,16 @@ export function PersonalResumeLinkCard({
         onClick={() => void handleCopy()}
         className="tap-lift w-full rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5 text-left"
       >
-        <span className="block text-base font-bold tracking-[0.18em] text-[var(--cg-fg)]">
+        <span className="flex items-center gap-2 text-sm font-semibold text-[var(--cg-fg)]">
+          <Smartphone className="h-4 w-4 shrink-0" aria-hidden />
+          Code aufs Handy legen
+        </span>
+        <span className="mt-1 block font-mono text-base font-bold tracking-[0.18em] text-[var(--cg-fg)]">
           {code}
         </span>
         <span className="mt-0.5 block text-sm text-[var(--cg-muted)]">
           {copyState === "idle"
-            ? "Kopiert /go und den Code — dann deinen Namen"
+            ? "Tippen, dann in Notizen speichern"
             : label}
         </span>
       </button>
@@ -60,12 +65,40 @@ export function PersonalResumeLinkCard({
 
   return (
     <div className="rounded-2xl border border-dashed border-teal-200 bg-teal-50/60 px-4 py-4">
-      <p className="text-sm font-bold text-teal-950">Wieder rein</p>
-      <p className="mt-1 text-xs leading-relaxed text-teal-900/80">
-        Kopieren speichert die Seite und den Code. Später öffnest du{" "}
-        <span className="font-semibold">/go</span>, tippst den Code, dann deinen
-        Namen — allein oder zu zehnt im selben Spiel.
-      </p>
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-700 text-white">
+          <Smartphone className="h-5 w-5" aria-hidden />
+        </span>
+        <div>
+          <p className="text-sm font-bold text-teal-950">Code aufs Handy legen</p>
+          <p className="mt-0.5 text-xs leading-snug text-teal-900/80">
+            Speichere ihn irgendwo auf dem Smartphone — Notizen, Foto oder
+            Nachricht an dich selbst.
+          </p>
+        </div>
+      </div>
+
+      <ol className="mt-3 grid grid-cols-3 gap-1.5 text-center">
+        <li className="rounded-xl bg-white/80 px-1.5 py-2">
+          <ClipboardCopy className="mx-auto h-4 w-4 text-teal-700" aria-hidden />
+          <span className="mt-1 block text-[10px] font-semibold leading-tight text-teal-950">
+            1. Tippen
+          </span>
+        </li>
+        <li className="rounded-xl bg-white/80 px-1.5 py-2">
+          <StickyNote className="mx-auto h-4 w-4 text-teal-700" aria-hidden />
+          <span className="mt-1 block text-[10px] font-semibold leading-tight text-teal-950">
+            2. Speichern
+          </span>
+        </li>
+        <li className="rounded-xl bg-white/80 px-1.5 py-2">
+          <Smartphone className="mx-auto h-4 w-4 text-teal-700" aria-hidden />
+          <span className="mt-1 block text-[10px] font-semibold leading-tight text-teal-950">
+            3. Fertig
+          </span>
+        </li>
+      </ol>
+
       <p className="mt-3 text-center font-mono text-2xl font-bold tracking-[0.22em] text-teal-950">
         {code}
       </p>
