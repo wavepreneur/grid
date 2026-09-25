@@ -37,7 +37,6 @@ export function GrowthRecapCard({
   stats,
 }: Props) {
   const [email, setEmail] = useState("");
-  const [skipped, setSkipped] = useState(false);
   const [sent, setSent] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +48,6 @@ export function GrowthRecapCard({
     try {
       const raw = window.localStorage.getItem(storageKey(playerId));
       if (raw === "sent") setSent(true);
-      if (raw === "skipped") setSkipped(true);
     } catch {
       /* private mode */
     }
@@ -71,9 +69,9 @@ export function GrowthRecapCard({
     };
   }, [offer.studioPreview, isLead, inviteCode, joinCode, sessionId]);
 
-  function remember(value: "sent" | "skipped") {
+  function rememberSent() {
     try {
-      window.localStorage.setItem(storageKey(playerId), value);
+      window.localStorage.setItem(storageKey(playerId), "sent");
     } catch {
       /* ignore */
     }
@@ -94,7 +92,7 @@ export function GrowthRecapCard({
         return;
       }
       setSent(true);
-      remember("sent");
+      rememberSent();
     });
   }
 
@@ -125,10 +123,6 @@ export function GrowthRecapCard({
     } catch {
       window.open(offer.shareUrl, "_blank", "noopener,noreferrer");
     }
-  }
-
-  if (skipped) {
-    return null;
   }
 
   return (
@@ -253,17 +247,6 @@ export function GrowthRecapCard({
           )}
         </div>
       ) : null}
-
-      <button
-        type="button"
-        onClick={() => {
-          setSkipped(true);
-          remember("skipped");
-        }}
-        className="w-full text-center text-sm text-[var(--cg-muted)]"
-      >
-        {offer.skipLabel}
-      </button>
     </div>
   );
 }
