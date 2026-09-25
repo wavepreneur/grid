@@ -18,6 +18,10 @@ import {
   patchBonusSession,
   type TeamGameState,
   type TeamRealtimeState,
+  allAuthoredLevelsCompleted,
+  endedReasonForFinish,
+  ensureLevelSlots,
+  resolveAfterTeamBonus,
 } from "@/lib/grid/game-state";
 import {
   createInitialGameStateFromCompiled,
@@ -301,16 +305,21 @@ export async function solveCurrentLevel(input: {
     let progressionLevels: TeamGameState["levels"];
 
     if (compiledLogic && compiledLogic.levels.length > 0) {
+      const authoredTotal = content.levels.length;
       const partialState: TeamGameState = {
         ...gameState,
-        levels: {
-          ...gameState.levels,
-          [levelKey]: {
-            status: "completed",
-            completed_at: new Date().toISOString(),
-            completed_by: solvedBy,
+        total_levels: authoredTotal,
+        levels: ensureLevelSlots(
+          {
+            ...gameState.levels,
+            [levelKey]: {
+              status: "completed",
+              completed_at: new Date().toISOString(),
+              completed_by: solvedBy,
+            },
           },
-        },
+          authoredTotal,
+        ),
       };
 
       const progression = resolveProgressionAfterSolve({
@@ -321,19 +330,22 @@ export async function solveCurrentLevel(input: {
         elapsedMinutes: elapsedMinutes ?? undefined,
       });
 
-      progressionLevels = {
-        ...progression.gameState.levels,
-        [levelKey]: {
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          completed_by: solvedBy,
+      progressionLevels = ensureLevelSlots(
+        {
+          ...progression.gameState.levels,
+          [levelKey]: {
+            status: "completed",
+            completed_at: new Date().toISOString(),
+            completed_by: solvedBy,
+          },
         },
-      };
+        authoredTotal,
+      );
 
       const unlockedNext = progression.nextCurrentLevel;
       if (
         unlockedNext !== currentLevel &&
-        unlockedNext <= content.levels.length &&
+        unlockedNext <= authoredTotal &&
         progressionLevels[String(unlockedNext)]?.status !== "completed"
       ) {
         progressionLevels = activateLevelEntry(progressionLevels, String(unlockedNext));
@@ -342,19 +354,21 @@ export async function solveCurrentLevel(input: {
       nextLevel = unlockedNext;
       isFinished =
         progression.endGame ||
-        nextLevel > content.levels.length ||
-        Object.values(progressionLevels).every((entry) => entry.status === "completed");
+        allAuthoredLevelsCompleted(progressionLevels, authoredTotal);
     } else {
       nextLevel = currentLevel + 1;
       isFinished = nextLevel > content.levels.length;
-      progressionLevels = {
-        ...gameState.levels,
-        [levelKey]: {
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          completed_by: solvedBy,
+      progressionLevels = ensureLevelSlots(
+        {
+          ...gameState.levels,
+          [levelKey]: {
+            status: "completed",
+            completed_at: new Date().toISOString(),
+            completed_by: solvedBy,
+          },
         },
-      };
+        content.levels.length,
+      );
       if (!isFinished) {
         progressionLevels = activateLevelEntry(progressionLevels, String(nextLevel));
       }
@@ -543,12 +557,16 @@ export async function solveCurrentLevel(input: {
       score: gameState.score + pointsEarned,
       current_phase: nextPhase,
       pending_next_level: pendingNext,
+      ends_game_pending: Boolean(isFinished && teamBonus),
       quiz_reveal: null,
       level_reveal: null,
       active_bonus: activeBonus,
       bonus_queue: mergedQueue,
       bonus_sessions: bonusSessions,
       bonus_notice: null,
+      ended_reason: isFinished
+        ? endedReasonForFinish(progressionLevels, content.levels.length)
+        : undefined,
       outdoor_progress: {
         level: isFinished ? currentLevel : nextLevel,
         walked_meters: 0,
@@ -1023,7 +1041,7 @@ export async function initializeTeamGameState(
   const totalLevels = content.levels.length || EXITMANIA_TOTAL_LEVELS;
   const initialState =
     content.compiledLogic && content.compiledLogic.levels.length > 0
-      ? createInitialGameStateFromCompiled(content.compiledLogic)
+      ? createInitialGameStateFromCompiled(content.compiledLogic, totalLevels)
       : createInitialGameState(totalLevels);
 
   const firstActive = Object.entries(initialState.levels).find(
@@ -1832,9 +1850,8 @@ async function finishRevealedBonus(input: {
     studioGameVersionId: event.studio_game_version_id,
   });
 
-  const allDoneLevels = Object.values(gameState.levels).every(
-    (entry) => entry.status === "completed",
-  );
+  const authoredTotal = content.levels.length;
+  const allDoneLevels = allAuthoredLevelsCompleted(gameState.levels, authoredTotal);
   const now = new Date();
   let nextQueue = markBonusDone(gameState.bonus_queue ?? [], bonusId, now);
   const stillActive = nextQueue.find((item) => item.status === "active");
@@ -1853,17 +1870,20 @@ async function finishRevealedBonus(input: {
   let nextPhase = gameState.current_phase;
   let pendingNext = gameState.pending_next_level ?? null;
   let nextLevel = team.current_level || active.from_level;
-  let levels = gameState.levels;
+  let levels = ensureLevelSlots(gameState.levels, authoredTotal);
   let finished = false;
 
   if (wasTeamPhase && !nextActive) {
-    const pending = gameState.pending_next_level;
-    finished =
-      pending === null ||
-      pending === undefined ||
-      pending > content.levels.length ||
-      allDoneLevels;
-    nextLevel = finished ? active.from_level : (pending ?? active.from_level + 1);
+    const afterBonus = resolveAfterTeamBonus({
+      pending: gameState.pending_next_level,
+      fromLevel: active.from_level,
+      levels,
+      totalLevels: authoredTotal,
+      endsGamePending: gameState.ends_game_pending === true,
+    });
+    finished = afterBonus.finished;
+    nextLevel = afterBonus.nextLevel;
+    levels = afterBonus.levels;
     const nextSlot = getLevelDefinition(content, nextLevel);
     nextPhase = finished
       ? gameState.current_phase
@@ -1875,9 +1895,6 @@ async function finishRevealedBonus(input: {
           )
         : "hub";
     pendingNext = null;
-    if (!finished) {
-      levels = activateLevelEntry(levels, String(nextLevel));
-    }
   }
 
   const nextGameState: TeamGameState = {
@@ -1885,6 +1902,7 @@ async function finishRevealedBonus(input: {
     version: gameState.version + 1,
     current_phase: nextPhase,
     pending_next_level: pendingNext,
+    ends_game_pending: false,
     active_bonus: nextActive,
     bonus_queue: nextQueue,
     bonus_sessions: clearBonusSession(gameState.bonus_sessions, bonusId),
@@ -1898,6 +1916,10 @@ async function finishRevealedBonus(input: {
           created_at: now.toISOString(),
           bonus_id: bonusId,
         },
+    ended_reason:
+      finished || allDoneLevels
+        ? endedReasonForFinish(levels, authoredTotal)
+        : undefined,
     levels,
   };
 
@@ -2121,9 +2143,8 @@ async function completeActiveBonus(input: {
     });
   }
 
-  const allDoneLevels = Object.values(gameState.levels).every(
-    (entry) => entry.status === "completed",
-  );
+  const authoredTotal = content.levels.length;
+  const allDoneLevels = allAuthoredLevelsCompleted(gameState.levels, authoredTotal);
   const noticeId = `bonus-${Date.now()}-${player.id.slice(0, 8)}`;
   const now = new Date();
   const doneId = active.bonus_id ?? `${active.from_level}`;
@@ -2148,17 +2169,20 @@ async function completeActiveBonus(input: {
   let nextPhase = gameState.current_phase;
   let pendingNext = gameState.pending_next_level ?? null;
   let nextLevel = team.current_level || active.from_level;
-  let levels = gameState.levels;
+  let levels = ensureLevelSlots(gameState.levels, authoredTotal);
   let finished = false;
 
   if (wasTeamPhase && !nextActive) {
-    const pending = gameState.pending_next_level;
-    finished =
-      pending === null ||
-      pending === undefined ||
-      pending > content.levels.length ||
-      allDoneLevels;
-    nextLevel = finished ? active.from_level : (pending ?? active.from_level + 1);
+    const afterBonus = resolveAfterTeamBonus({
+      pending: gameState.pending_next_level,
+      fromLevel: active.from_level,
+      levels,
+      totalLevels: authoredTotal,
+      endsGamePending: gameState.ends_game_pending === true,
+    });
+    finished = afterBonus.finished;
+    nextLevel = afterBonus.nextLevel;
+    levels = afterBonus.levels;
     const nextSlot = getLevelDefinition(content, nextLevel);
     nextPhase = finished
       ? gameState.current_phase
@@ -2170,15 +2194,13 @@ async function completeActiveBonus(input: {
           )
         : "hub";
     pendingNext = null;
-    if (!finished) {
-      levels = activateLevelEntry(levels, String(nextLevel));
-    }
   }
 
   const nextGameState: TeamGameState = {
     ...gameState,
     version: gameState.version + 1,
     score: gameState.score + reward,
+    ends_game_pending: false,
     current_phase: nextPhase,
     pending_next_level: pendingNext,
     active_bonus: nextActive,
@@ -2192,6 +2214,10 @@ async function completeActiveBonus(input: {
       created_at: now.toISOString(),
       skipped: Boolean(input.skip),
     },
+    ended_reason:
+      finished || allDoneLevels
+        ? endedReasonForFinish(levels, content.levels.length)
+        : undefined,
     levels,
   };
 
@@ -2456,14 +2482,16 @@ async function leaveBonusPhase(input: {
     studioGameVersionId: event.studio_game_version_id,
   });
 
-  const pending = gameState.pending_next_level;
-  const isFinished =
-    pending === null ||
-    pending === undefined ||
-    pending > content.levels.length ||
-    Object.values(gameState.levels).every((entry) => entry.status === "completed");
-
-  const nextLevel = isFinished ? bonusLevel : (pending ?? bonusLevel + 1);
+  const afterBonus = resolveAfterTeamBonus({
+    pending: gameState.pending_next_level,
+    fromLevel: bonusLevel,
+    levels: gameState.levels,
+    totalLevels: content.levels.length,
+    endsGamePending: gameState.ends_game_pending === true,
+  });
+  const isFinished = afterBonus.finished;
+  const nextLevel = afterBonus.nextLevel;
+  const levels = afterBonus.levels;
   const nextSlot = getLevelDefinition(content, nextLevel);
   const hubPhase: PlayPhase =
     nextSlot && usesPhasedPlay(content)
@@ -2473,11 +2501,6 @@ async function leaveBonusPhase(input: {
           nextSlot,
         )
       : "hub";
-
-  let levels = gameState.levels;
-  if (!isFinished) {
-    levels = activateLevelEntry(levels, String(nextLevel));
-  }
 
   const now = new Date();
   let queue = gameState.bonus_queue ?? [];
@@ -2493,12 +2516,16 @@ async function leaveBonusPhase(input: {
     version: gameState.version + 1,
     current_phase: isFinished ? gameState.current_phase : hubPhase,
     pending_next_level: null,
+    ends_game_pending: false,
     active_bonus: null,
     bonus_queue: queue,
     bonus_sessions: activeItem
       ? clearBonusSession(gameState.bonus_sessions, activeItem.bonus_id)
       : gameState.bonus_sessions,
     bonus_notice: null,
+    ended_reason: isFinished
+      ? endedReasonForFinish(levels, content.levels.length)
+      : undefined,
     levels,
   };
 
@@ -2868,6 +2895,62 @@ export async function skipBonusPhase(input: {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Bonus überspringen fehlgeschlagen.",
+    };
+  }
+}
+
+/** Mission clock hit 00:00 — first device wins, others get the finished snapshot. */
+export async function expireMissionClock(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+}): Promise<ActionResult<TeamRealtimeState>> {
+  try {
+    const { event, team, player } = await assertPlayerSession(input);
+    if (team.status === "finished") {
+      return { success: true, data: buildRealtimeState(team, player) };
+    }
+    if (team.status !== "playing") {
+      return { success: false, error: "Das Spiel läuft gerade nicht." };
+    }
+    if (!team.started_at) {
+      return { success: true, data: buildRealtimeState(team, player) };
+    }
+
+    const content = await loadResolvedEventContent({
+      eventId: event.id,
+      organizationId: event.organization_id,
+      cityId: event.city_id,
+      contentConfig: event.content_config,
+      routeOverride: event.route_override,
+      studioGameVersionId: event.studio_game_version_id,
+    });
+    const durationMs = Math.max(1, content.missionDurationMinutes) * 60 * 1000;
+    const endsAt = Date.parse(team.started_at) + durationMs;
+    if (!Number.isFinite(endsAt) || Date.now() < endsAt - 1500) {
+      return { success: true, data: buildRealtimeState(team, player) };
+    }
+
+    const gameState = parseTeamGameState(team.game_state);
+    const nextGameState: TeamGameState = {
+      ...gameState,
+      version: gameState.version + 1,
+      ended_reason: "time",
+    };
+    return persistPlayingGameState({
+      teamId: team.id,
+      player,
+      gameState: nextGameState,
+      expectedVersion: gameState.version,
+      patch: {
+        status: "finished",
+        finished_at: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Zeitablauf fehlgeschlagen.",
     };
   }
 }

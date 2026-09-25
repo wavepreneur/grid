@@ -144,6 +144,11 @@ export type TeamGameState = {
   current_phase?: PlayPhase;
   /** After bonus: level index to open next (set when entering bonus phase). */
   pending_next_level?: number | null;
+  /**
+   * Solve decided the mission ends after the current team bonus
+   * (Abschlussaufgabe). Missing pending without this flag must not finish.
+   */
+  ends_game_pending?: boolean;
   /** Team-wide entry-quiz reveal while still in phase "quiz". */
   quiz_reveal?: QuizRevealState | null;
   /** Give-up solution on the current mission — wait for team lead before completing. */
@@ -171,6 +176,8 @@ export type TeamGameState = {
    * Alpha device reports; all devices read via realtime.
    */
   outdoor_progress?: OutdoorProgressState | null;
+  /** Why play stopped. Older saves omit this — infer from completed levels. */
+  ended_reason?: "completed" | "time" | "ended";
   /** @deprecated Use purchased_tile_hints — kept for older saves. */
   hints_used: Record<string, number>;
   /** levelKey -> tileId -> revealed hint */
@@ -236,6 +243,101 @@ export function pickNewerTeamState(
     return current;
   }
   return incoming;
+}
+
+/** Fill missing 1..N keys as locked — a sparse map must never look „all done“. */
+export function ensureLevelSlots(
+  levels: TeamGameState["levels"],
+  totalLevels: number,
+): TeamGameState["levels"] {
+  if (totalLevels <= 0) return levels;
+  const next = { ...levels };
+  for (let n = 1; n <= totalLevels; n += 1) {
+    const key = String(n);
+    if (!next[key]) {
+      next[key] = { status: "locked" };
+    }
+  }
+  return next;
+}
+
+export function countCompletedLevels(
+  levels: TeamGameState["levels"],
+  totalLevels: number,
+): number {
+  let done = 0;
+  for (let n = 1; n <= totalLevels; n += 1) {
+    if (levels[String(n)]?.status === "completed") done += 1;
+  }
+  return done;
+}
+
+export function allAuthoredLevelsCompleted(
+  levels: TeamGameState["levels"],
+  totalLevels: number,
+): boolean {
+  return totalLevels > 0 && countCompletedLevels(levels, totalLevels) >= totalLevels;
+}
+
+export function endedReasonForFinish(
+  levels: TeamGameState["levels"],
+  totalLevels: number,
+): "completed" | "ended" {
+  if (totalLevels <= 0) return "ended";
+  return allAuthoredLevelsCompleted(levels, totalLevels) ? "completed" : "ended";
+}
+
+/**
+ * After a team bonus: missing pending means „go to the next authored slot“,
+ * never „mission over“. Explicit `null` still means the solve decided to end
+ * (Abschlussaufgabe / last slot).
+ */
+export function resolveAfterTeamBonus(input: {
+  pending: number | null | undefined;
+  fromLevel: number;
+  levels: TeamGameState["levels"];
+  totalLevels: number;
+  endsGamePending?: boolean;
+}): { nextLevel: number; finished: boolean; levels: TeamGameState["levels"] } {
+  const total = input.totalLevels;
+  const levels = ensureLevelSlots(input.levels, total);
+
+  if (allAuthoredLevelsCompleted(levels, total)) {
+    return { nextLevel: input.fromLevel, finished: true, levels };
+  }
+
+  if (input.endsGamePending) {
+    return { nextLevel: input.fromLevel, finished: true, levels };
+  }
+
+  let candidate =
+    typeof input.pending === "number" && input.pending >= 1
+      ? input.pending
+      : input.fromLevel + 1;
+
+  if (candidate > total) {
+    return { nextLevel: input.fromLevel, finished: true, levels };
+  }
+
+  if (levels[String(candidate)]?.status === "completed") {
+    let found: number | null = null;
+    for (let n = 1; n <= total; n += 1) {
+      if (levels[String(n)]?.status !== "completed") {
+        found = n;
+        break;
+      }
+    }
+    if (found == null) {
+      return { nextLevel: input.fromLevel, finished: true, levels };
+    }
+    candidate = found;
+  }
+
+  return {
+    nextLevel: candidate,
+    finished: false,
+    levels: activateLevelEntry(levels, String(candidate)),
+  };
 }
 
 export function createInitialGameState(
@@ -304,6 +406,7 @@ export function parseTeamGameState(value: unknown): TeamGameState {
       typeof candidate.pending_next_level === "number" || candidate.pending_next_level === null
         ? candidate.pending_next_level
         : undefined,
+    ends_game_pending: candidate.ends_game_pending === true ? true : undefined,
     quiz_reveal: parseQuizReveal(candidate.quiz_reveal),
     level_reveal: parseLevelReveal(candidate.level_reveal),
     active_bonus: parseActiveBonus(candidate.active_bonus),
@@ -320,6 +423,12 @@ export function parseTeamGameState(value: unknown): TeamGameState {
       candidate.outdoor_progress === null
         ? null
         : parseOutdoorProgress(candidate.outdoor_progress) ?? undefined,
+    ended_reason:
+      candidate.ended_reason === "completed" ||
+      candidate.ended_reason === "time" ||
+      candidate.ended_reason === "ended"
+        ? candidate.ended_reason
+        : undefined,
     hints_used: candidate.hints_used ?? {},
     purchased_tile_hints: candidate.purchased_tile_hints ?? {},
     purchased_level_hints: candidate.purchased_level_hints ?? {},
@@ -571,8 +680,7 @@ export function activateLevelEntry(
   levels: TeamGameState["levels"],
   levelKey: string,
 ): TeamGameState["levels"] {
-  const entry = levels[levelKey];
-  if (!entry) return levels;
+  const entry = levels[levelKey] ?? { status: "locked" as const };
   const now = new Date().toISOString();
   return {
     ...levels,

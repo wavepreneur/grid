@@ -1,6 +1,11 @@
 "use server";
 
-import { loadEventResultsByPortalToken, type EventResultsSnapshot } from "@/lib/grid/event-results";
+import {
+  loadEventResultsByPortalToken,
+  loadEventResultsForEvent,
+  type EventResultsSnapshot,
+} from "@/lib/grid/event-results";
+import { assertPlayerSession } from "@/lib/grid/session-auth";
 import type { ActionResult } from "@/lib/grid/types";
 
 export async function getPortalEventResults(
@@ -16,6 +21,23 @@ export async function getPortalEventResults(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Ergebnisse konnten nicht geladen werden.",
+    };
+  }
+}
+
+export async function listPlayEventRanking(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+}): Promise<ActionResult<EventResultsSnapshot>> {
+  try {
+    const { event } = await assertPlayerSession(input);
+    const snapshot = await loadEventResultsForEvent(event);
+    return { success: true, data: snapshot };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Ranking nicht geladen.",
     };
   }
 }

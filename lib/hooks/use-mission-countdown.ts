@@ -18,7 +18,7 @@ export function useMissionCountdown(
   startedAt: string | null | undefined,
   durationMinutes: number,
   paused = false,
-): { remainingLabel: string; isExpired: boolean } {
+): { remainingLabel: string; remainingSeconds: number; isExpired: boolean } {
   const [remainingSeconds, setRemainingSeconds] = useState(() =>
     computeRemaining(startedAt, durationMinutes, 0),
   );
@@ -53,7 +53,8 @@ export function useMissionCountdown(
 
   return {
     remainingLabel: formatCountdown(remainingSeconds),
-    isExpired: remainingSeconds <= 0 && !paused,
+    remainingSeconds,
+    isExpired: remainingSeconds <= 0 && Boolean(startedAt) && !paused,
   };
 }
 

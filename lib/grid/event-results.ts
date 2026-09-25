@@ -41,7 +41,7 @@ export async function loadEventResultsByPortalToken(
   return loadEventResultsForEvent(event);
 }
 
-async function loadEventResultsForEvent(event: {
+export async function loadEventResultsForEvent(event: {
   id: string;
   title: string;
   status: string;

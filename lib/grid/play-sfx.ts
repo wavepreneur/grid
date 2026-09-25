@@ -14,7 +14,8 @@ export type PlaySfxKind =
   | "complete"
   | "ping"
   | "arrive"
-  | "bonus";
+  | "bonus"
+  | "tick";
 
 const SFX_SRC: Record<PlaySfxKind, string> = {
   correct: "/sfx/correct.wav",
@@ -25,6 +26,7 @@ const SFX_SRC: Record<PlaySfxKind, string> = {
   ping: "/sfx/ping.wav",
   arrive: "/sfx/arrive.wav",
   bonus: "/sfx/bonus.wav",
+  tick: "/sfx/ping.wav",
 };
 
 const VOLUME: Partial<Record<PlaySfxKind, number>> = {
@@ -33,6 +35,7 @@ const VOLUME: Partial<Record<PlaySfxKind, number>> = {
   unlock: 0.85,
   complete: 0.9,
   bonus: 0.95,
+  tick: 0.28,
 };
 
 let sharedCtx: AudioContext | null = null;
@@ -104,6 +107,10 @@ function playSynthFallback(kind: PlaySfxKind): void {
         gain: 0.06,
         slideTo: 110,
       });
+      return;
+    }
+    if (kind === "tick") {
+      tone(ctx, { frequency: 1240, start: t0, duration: 0.035, type: "square", gain: 0.05 });
       return;
     }
     if (kind === "ping") {

@@ -135,12 +135,13 @@ export function applyGameLogic(
 /** Build initial level map: all locked, then apply game_start rules. */
 export function createInitialGameStateFromCompiled(
   compiled: CompiledGameLogic,
+  totalLevels = compiled.levels.length,
 ): TeamGameState {
-  const totalLevels = compiled.levels.length;
-  const base = createInitialGameState(totalLevels);
+  const resolvedTotal = Math.max(compiled.levels.length, totalLevels);
+  const base = createInitialGameState(resolvedTotal);
 
   const allLocked: TeamGameState["levels"] = {};
-  for (let i = 1; i <= totalLevels; i += 1) {
+  for (let i = 1; i <= resolvedTotal; i += 1) {
     allLocked[levelKey(i)] = { status: "locked" };
   }
 
@@ -148,7 +149,7 @@ export function createInitialGameStateFromCompiled(
   state = applyGameLogic(state, compiled, { type: "game_start" });
 
   const hasActive = Object.values(state.levels).some((entry) => entry.status === "active");
-  if (!hasActive && totalLevels > 0) {
+  if (!hasActive && resolvedTotal > 0) {
     state = {
       ...state,
       levels: activateLevelEntry(state.levels, "1"),
@@ -204,7 +205,7 @@ export function resolveNextCurrentLevel(
   completedLevel: number,
   compiled: CompiledGameLogic,
 ): number {
-  const total = compiled.levels.length;
+  const total = Math.max(compiled.levels.length, gameState.total_levels ?? 0);
   for (let level = 1; level <= total; level += 1) {
     if (level === completedLevel) continue;
     const entry = gameState.levels[levelKey(level)];

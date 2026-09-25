@@ -10,6 +10,7 @@ import {
   purchaseHint,
   revealLevelSolution,
   skipBonusPhase,
+  expireMissionClock,
   beginBonusPresentation,
   advanceBonusAfterReveal,
   solveCurrentLevel,
@@ -32,6 +33,8 @@ import type { OutdoorArriveInput } from "@/components/game/play-hub-view";
 import type { PlayMorePanel } from "@/components/game/play-more-sheet";
 import { GrowthRecapCard } from "@/components/game/growth-recap-card";
 import { TeamCaptureGallery } from "@/components/game/team-capture-gallery";
+import { MissionTimeAlerts } from "@/components/game/mission-time-alerts";
+import { TeamPlayRanking } from "@/components/game/team-play-ranking";
 import { SyncModal } from "@/components/game/sync-modal";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 import { IdentityBar } from "@/components/player/identity-bar";
@@ -716,11 +719,20 @@ export function GameRoom({
   }
 
   const phased = usesPhasedPlay(eventContent);
-  const { remainingLabel } = useMissionCountdown(
+  const { remainingLabel, remainingSeconds, isExpired } = useMissionCountdown(
     teamState.startedAt,
     eventContent.missionDurationMinutes,
     paused,
   );
+
+  function handleExpireMission() {
+    if (teamState.status === "finished") return;
+    void expireMissionClock({
+      inviteCode,
+      joinCode,
+      sessionId: session.sessionId,
+    }).then(applyTeamResult);
+  }
   const isAlpha = session.isAlpha;
   const leadLabel = displayRoleLabel(
     "alpha",
@@ -869,22 +881,57 @@ export function GameRoom({
   ) : isFinished ? (
     <div className="cg-animate-rise-in space-y-6 px-5 pb-[max(2.5rem,calc(1.25rem+env(safe-area-inset-bottom)))] pt-[max(2.5rem,env(safe-area-inset-top))]">
       <div className="space-y-2 text-center">
-        <span
-          aria-hidden
-          className="cg-animate-celebrate mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[var(--cg-success)] text-4xl text-white shadow-[var(--cg-shadow-lift)]"
-        >
-          ✓
-        </span>
-        <p className="mt-4 text-sm font-semibold uppercase tracking-[0.2em] text-[var(--cg-muted)]">
-          Game Over
-        </p>
-        <p className="cg-animate-pop-in text-3xl font-bold text-[var(--cg-fg)]">
-          Mission abgeschlossen!
-        </p>
-        <p className="text-base text-[var(--cg-muted)]">
-          {teamName} · {eventContent.levels.length} Aufgaben
-        </p>
+        {(() => {
+          const total = eventContent.levels.length;
+          const reason =
+            teamState.gameState.ended_reason ??
+            (completedLevels >= total && total > 0 ? "completed" : "ended");
+          const timeUp = reason === "time";
+          const won = reason === "completed";
+          return (
+            <>
+              <span
+                aria-hidden
+                className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full text-4xl text-white shadow-[var(--cg-shadow-lift)] ${
+                  won
+                    ? "cg-animate-celebrate bg-[var(--cg-success)]"
+                    : "bg-[var(--cg-primary)]"
+                }`}
+              >
+                {won ? "✓" : timeUp ? "⏱" : "!"}
+              </span>
+              <p className="mt-4 text-sm font-semibold uppercase tracking-[0.2em] text-[var(--cg-muted)]">
+                Game Over
+              </p>
+              <p className="cg-animate-pop-in text-3xl font-bold text-[var(--cg-fg)]">
+                {won
+                  ? "Mission abgeschlossen!"
+                  : timeUp
+                    ? "Zeit ist abgelaufen."
+                    : "Game Over"}
+              </p>
+              <p className="text-base text-[var(--cg-muted)]">
+                {won
+                  ? `${teamName} · ${total} Aufgaben`
+                  : timeUp
+                    ? `${completedLevels} von ${total} Aufgaben — ${teamName}`
+                    : `${completedLevels} von ${total} Aufgaben geschafft.`}
+              </p>
+              {won ? null : (
+                <p className="text-base font-semibold text-[var(--cg-fg)]">
+                  Beim nächsten Mal schafft ihr es.
+                </p>
+              )}
+            </>
+          );
+        })()}
       </div>
+      <TeamPlayRanking
+        inviteCode={inviteCode}
+        joinCode={joinCode}
+        sessionId={session.sessionId}
+        myTeamName={teamName}
+      />
       {eventContent.growthOffer?.enabled ? (
         <GrowthRecapCard
           inviteCode={inviteCode}
@@ -1136,6 +1183,14 @@ export function GameRoom({
             </div>
           ) : null}
         </CityPlayShell>
+        {!isFinished && !sessionSuperseded ? (
+          <MissionTimeAlerts
+            remainingSeconds={remainingSeconds}
+            isExpired={isExpired}
+            paused={paused}
+            onExpire={handleExpireMission}
+          />
+        ) : null}
         <BonusSpectatorView items={foreignBonusToasts} />
         <BonusCompleteToast
           notice={teamState.gameState.bonus_notice}
@@ -1187,6 +1242,14 @@ export function GameRoom({
         {realtimeError ? <GridError message={realtimeError} /> : null}
         {error ? <GridError message={error} /> : null}
       </div>
+      {!isFinished && !sessionSuperseded ? (
+        <MissionTimeAlerts
+          remainingSeconds={remainingSeconds}
+          isExpired={isExpired}
+          paused={paused}
+          onExpire={handleExpireMission}
+        />
+      ) : null}
       {modal && !sessionSuperseded ? (
         <SyncModal
           modal={modal}
