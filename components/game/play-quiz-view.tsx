@@ -56,7 +56,7 @@ export function PlayQuizView({
   const intro =
     mode === "online"
       ? "Alle sehen dieselbe Frage. Eine Antwort genügt — sie ist der Schlüssel zum Rätsel."
-      : "Diese Frage ist euer Schlüssel. Eine Antwort vom Team öffnet das Rätsel für alle.";
+      : "Diese Frage ist der Schlüssel. Eine Antwort vom Team öffnet das Rätsel für alle.";
 
   function isRightOption(id: string) {
     return multi
@@ -70,21 +70,21 @@ export function PlayQuizView({
   }
 
   function toggleMulti(id: string) {
-    if (show || disabled || isPending || submitting) return;
+    if (show || disabled || submitting) return;
     setPickedMulti((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   }
 
   function submitSingle(id: string) {
-    if (show || disabled || isPending || submitting) return;
+    if (show || disabled || submitting) return;
     setPicked(id);
     setSubmitting(true);
     onSubmit({ selectedOptionId: id });
   }
 
   function submitMulti() {
-    if (show || pickedMulti.length === 0 || disabled || isPending || submitting) return;
+    if (show || pickedMulti.length === 0 || disabled || submitting) return;
     setSubmitting(true);
     onSubmit({ selectedOptionIds: pickedMulti, selectedOptionId: pickedMulti[0] });
   }
@@ -122,7 +122,9 @@ export function PlayQuizView({
         </span>
         <SectionLabel>{spotLabel}</SectionLabel>
         <h1 className="mt-2 text-xl font-bold text-[var(--cg-fg)] sm:text-2xl">{heading}</h1>
-        <p className="mt-2 max-w-md text-sm text-[var(--cg-muted)] sm:text-base">{intro}</p>
+        <p className="mt-2 max-w-md text-[15px] leading-relaxed text-[var(--cg-fg)]/80 sm:text-base">
+          {intro}
+        </p>
       </div>
 
       {quiz.image_url ? (
@@ -136,17 +138,19 @@ export function PlayQuizView({
         </div>
       ) : null}
 
-      <div className="mt-4 text-center sm:mt-5">
-        <h2 className="text-lg font-bold text-[var(--cg-fg)] sm:text-xl">{displayTitle}</h2>
+      <div className="mt-5 text-left sm:mt-6">
+        <h2 className="text-xl font-extrabold leading-snug text-[var(--cg-fg)] sm:text-2xl">
+          {displayTitle}
+        </h2>
         {quiz.description?.trim() ? (
           <FormattedTaskText
             text={quiz.description}
-            className="mt-2 text-sm text-[var(--cg-muted)] sm:text-base"
+            className="mt-3 space-y-3 text-[15px] leading-[1.65] text-[var(--cg-fg)] sm:text-base"
           />
         ) : null}
       </div>
 
-      <p className="mt-4 rounded-2xl bg-[var(--cg-card)] p-4 text-base font-semibold shadow-[var(--cg-shadow-soft)] text-[var(--cg-fg)]">
+      <p className="mt-6 border-l-4 border-[var(--cg-accent)] pl-3 text-lg font-bold leading-snug text-[var(--cg-fg)] sm:text-xl">
         {quiz.question}
       </p>
 
@@ -158,7 +162,7 @@ export function PlayQuizView({
             <button
               key={opt.id}
               type="button"
-              disabled={show || disabled || isPending || submitting}
+              disabled={show || disabled || submitting}
               onClick={() => {
                 if (multi) toggleMulti(opt.id);
                 else submitSingle(opt.id);
@@ -201,10 +205,10 @@ export function PlayQuizView({
         <div className="mt-6">
           <BigButton
             variant="accent"
-            disabled={disabled || isPending || submitting || pickedMulti.length === 0}
+            disabled={disabled || submitting || pickedMulti.length === 0}
             onClick={submitMulti}
           >
-            {submitting || isPending ? "Wird geprüft…" : "Antwort fürs Team senden"}
+            {submitting ? "Wird geprüft…" : "Antwort fürs Team senden"}
           </BigButton>
         </div>
       ) : null}
