@@ -17,6 +17,7 @@ import {
   CopyInviteLink,
   QrInviteImage,
 } from "@/components/grid/copy-invite-link";
+import { BookOpen } from "lucide-react";
 import { PlayDocSheet } from "@/components/game/play-doc-sheet";
 import { SessionHandoffScreen } from "@/components/player/session-handoff-screen";
 import { PersonalResumeLinkCard } from "@/components/player/personal-resume-link-card";
@@ -589,9 +590,9 @@ export function LobbyRoom({
       ) : null}
       <PlayDocSheet
         open={briefingOpen}
-        title="Kurzinformationen"
+        title="Spielregeln"
         url={briefingIframeUrl}
-        emptyHint="Für dieses Spiel ist noch kein Briefing-Link hinterlegt. Du findest die Infos später auch im Spielmenü."
+        emptyHint="Für dieses Spiel sind noch keine Spielregeln hinterlegt. Du findest sie später auch im Spielmenü."
         onClose={() => setBriefingOpen(false)}
       />
 
@@ -616,33 +617,36 @@ export function LobbyRoom({
             </p>
           </div>
 
+          <button
+            type="button"
+            onClick={() => setBriefingOpen(true)}
+            className="w-full rounded-2xl bg-teal-700 px-4 py-5 text-left text-white shadow-lg ring-4 ring-teal-200"
+          >
+            <span className="flex items-center gap-3">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+                <BookOpen className="h-7 w-7" aria-hidden />
+              </span>
+              <span>
+                <span className="block text-xl font-extrabold leading-tight">
+                  Spielregeln
+                </span>
+                <span className="mt-0.5 block text-sm text-teal-50">
+                  {showAutoStartCountdown
+                    ? `Bitte jetzt lesen — Start in ${countdown}`
+                    : "Bitte vor dem Start lesen"}
+                </span>
+              </span>
+            </span>
+            <span className="mt-4 block w-full rounded-xl bg-white py-2.5 text-center text-sm font-bold text-teal-800">
+              Jetzt lesen
+            </span>
+          </button>
+
           <PersonalResumeLinkCard
             inviteCode={inviteCode}
             joinCode={joinCode}
             sessionId={session.sessionId}
           />
-
-          <button
-            type="button"
-            onClick={() => setBriefingOpen(true)}
-            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-teal-200 bg-white px-4 py-4 text-left shadow-sm transition hover:border-teal-300"
-          >
-            <span>
-              <span className="block text-base font-bold text-slate-900">
-                Kurzinformationen
-              </span>
-              <span className="mt-0.5 block text-sm text-slate-500">
-                {showAutoStartCountdown
-                  ? `Regeln lesen — Start in ${countdown}`
-                  : aloneNow
-                    ? "Spielregeln anschauen — bevor es losgeht"
-                    : "Regeln lesen — bevor es losgeht"}
-              </span>
-            </span>
-            <span className="rounded-full bg-teal-600 px-3 py-1 text-xs font-bold text-white">
-              Lesen
-            </span>
-          </button>
 
           {manageMode && isPlaying ? (
             <GridHint tone="success">
@@ -757,7 +761,7 @@ export function LobbyRoom({
           {!isAlpha && isLobby ? (
             <p className="rounded-2xl bg-slate-50 px-4 py-4 text-center text-sm text-slate-600">
               Warte auf den Start durch die Team-Leitung — nutze die Zeit für die
-              Kurzinformationen.
+              Spielregeln.
             </p>
           ) : null}
 

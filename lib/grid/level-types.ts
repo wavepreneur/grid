@@ -306,7 +306,7 @@ export type ResolvedEventContent = {
   compiledLogic?: CompiledGameLogic | null;
   /** Optional game-wide briefing shown from the play menu. */
   briefingText?: string | null;
-  /** Fullscreen iframe URL for Kurzinformationen / rules (Studio link). */
+  /** Fullscreen iframe URL for Spielregeln (Studio link). */
   briefingIframeUrl?: string | null;
   /** Fullscreen iframe URL for FAQ / troubleshooting. */
   faqIframeUrl?: string | null;

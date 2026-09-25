@@ -103,9 +103,9 @@ export function PlayMoreSheet({
     <>
       <PlayDocSheet
         open={showBriefingDoc}
-        title="Kurzinformationen"
+        title="Spielregeln"
         url={briefingIframeUrl}
-        emptyHint="Für dieses Spiel ist noch kein Briefing-Link hinterlegt."
+        emptyHint="Für dieses Spiel sind noch keine Spielregeln hinterlegt."
         onClose={onClose}
       />
       <PlayDocSheet
@@ -144,8 +144,8 @@ export function PlayMoreSheet({
               {view === "menu" ? (
                 <div className="grid gap-2">
                   <MenuRow
-                    title="Kurzinformationen"
-                    hint="Spielregeln und Ablauf — jederzeit nachlesen"
+                    title="Spielregeln"
+                    hint="Regeln und Ablauf — jederzeit nachlesen"
                     onClick={() => onOpen("briefing")}
                   />
                   <MenuRow
@@ -548,7 +548,7 @@ function panelTitle(panel: Exclude<PlayMorePanel, null>): string {
     case "menu":
       return "Spiel-Menü";
     case "briefing":
-      return "Kurzinformationen";
+      return "Spielregeln";
     case "help":
       return "Steckt ihr fest?";
     case "gps":

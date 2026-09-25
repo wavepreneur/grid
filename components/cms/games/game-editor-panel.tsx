@@ -362,7 +362,7 @@ export function GameEditorPanel({
               />
             </div>
             <div className="md:col-span-2">
-              <StudioLabel>Kurzinformationen (iframe-Link)</StudioLabel>
+              <StudioLabel>Spielregeln (iframe-Link)</StudioLabel>
               <StudioInput
                 type="url"
                 placeholder="https://…"

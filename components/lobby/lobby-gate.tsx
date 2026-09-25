@@ -70,11 +70,18 @@ export function LobbyGate({
   const [snapshot, setSnapshot] = useState<LobbySnapshot | null>(null);
   const [session, setSession] = useState<PlayerSession | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [resolvedBriefingUrl, setResolvedBriefingUrl] = useState<string | null>(
+    briefingIframeUrl,
+  );
   const isStudio = studioTest || Boolean(eventContent?.isStudioTest || eventContent?.holdForBriefing);
 
   useEffect(() => {
     if (eventContent) cacheEventContent(inviteCode, eventContent);
-  }, [eventContent, inviteCode]);
+    if (briefingIframeUrl) setResolvedBriefingUrl(briefingIframeUrl);
+    else if (eventContent?.briefingIframeUrl) {
+      setResolvedBriefingUrl(eventContent.briefingIframeUrl);
+    }
+  }, [eventContent, inviteCode, briefingIframeUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -159,6 +166,9 @@ export function LobbyGate({
           const { eventId: _eventId, contentRevision: _revision, ...content } =
             contentResult.data;
           cacheEventContent(inviteCode, content);
+          if (content.briefingIframeUrl) {
+            setResolvedBriefingUrl(content.briefingIframeUrl);
+          }
         });
       } catch (bootError) {
         if (cancelled) return;
@@ -202,7 +212,7 @@ export function LobbyGate({
       playerSession={session}
       manageMode={manageMode}
       eventTitle={eventTitle}
-      briefingIframeUrl={briefingIframeUrl}
+      briefingIframeUrl={resolvedBriefingUrl}
       roleLabels={roleLabels}
       studioTest={isStudio}
       studioPlaytest={studioPlaytest || Boolean(eventContent?.isStudioTest)}
