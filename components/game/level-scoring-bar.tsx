@@ -39,7 +39,7 @@ export function LevelScoringBar({
           {scoring.points >= 0 ? "+" : ""}
           {scoring.points} P
         </ScorePill>
-        <ScorePill>Lösung möglich</ScorePill>
+        <ScorePill>Kein Countdown</ScorePill>
       </LevelScoreHud>
     );
   }
@@ -74,7 +74,7 @@ export function LevelScoringBar({
             {formatCountdown(snapshot.remainingSeconds ?? 0)}
           </ScorePill>
         ) : (
-          <ScorePill tone="success">Lösung möglich</ScorePill>
+          <ScorePill>Kein Countdown</ScorePill>
         )}
       </LevelScoreHud>
 
