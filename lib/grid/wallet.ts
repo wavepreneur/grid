@@ -173,6 +173,7 @@ export function visibleWalletNotes(
   stored: WalletNote[] | undefined,
   levels: LevelDefinition[],
   statuses: TeamGameState["levels"],
+  options?: { revealLocked?: boolean },
 ): WalletNote[] {
   const merged = [...(stored ?? [])];
   for (const note of notesFromCompletedLevels(levels, statuses)) {
@@ -187,7 +188,14 @@ export function visibleWalletNotes(
     }
     merged.push(note);
   }
-  return merged.sort((a, b) => a.level - b.level);
+  const sorted = merged.sort((a, b) => a.level - b.level);
+  if (!options?.revealLocked) return sorted;
+  return sorted.map((note) => {
+    if (!note.locked) return note;
+    const level = levels.find((item) => item.level === note.level);
+    const body = level?.success_info?.trim() ?? note.body;
+    return body ? { ...note, body } : note;
+  });
 }
 
 export function walletMenuHint(notes: WalletNote[]): string {

@@ -38,17 +38,34 @@ export function TeamWalletList({
     <ol className="space-y-3">
       {notes.map((note) => {
         if (note.locked) {
+          if (purchasesClosed) {
+            return (
+              <li
+                key={note.id}
+                className="rounded-2xl border-2 border-[var(--cg-accent)] bg-[var(--cg-accent)]/15 px-4 py-3.5 shadow-[var(--cg-shadow-soft)]"
+              >
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--cg-accent-fg)]">
+                  Nach Level {note.level} · nicht gesammelt
+                </p>
+                <p className="mt-1 text-base font-bold text-[var(--cg-fg)]">{note.title}</p>
+                {note.body ? (
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-[var(--cg-fg)]">
+                    {note.body}
+                  </p>
+                ) : null}
+                <p className="mt-2 text-xs font-semibold text-[var(--cg-accent-fg)]">
+                  Lösung zum Level, das ihr direkt gelöst habt.
+                </p>
+              </li>
+            );
+          }
           const confirming = confirmLevel === note.level;
           const canAfford = score >= WALLET_UNLOCK_COST;
-          const canBuy = Boolean(onPurchase) && !purchasesClosed;
+          const canBuy = Boolean(onPurchase);
           return (
             <li
               key={note.id}
-              className={`rounded-2xl px-4 py-3.5 shadow-[var(--cg-shadow-soft)] ${
-                purchasesClosed
-                  ? "bg-[var(--cg-muted)]/20 opacity-70"
-                  : "bg-[var(--cg-bg)]"
-              }`}
+              className="rounded-2xl bg-[var(--cg-bg)] px-4 py-3.5 shadow-[var(--cg-shadow-soft)]"
             >
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--cg-muted)]">
                 Nach Level {note.level}
@@ -84,9 +101,7 @@ export function TeamWalletList({
               ) : (
                 <div className="mt-2 space-y-3">
                   <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
-                    {purchasesClosed
-                      ? "Nach Game Over nicht mehr kaufbar — die Punkte bleiben."
-                      : `Diesen Hinweis könnt ihr für ${WALLET_UNLOCK_COST} Punkte anzeigen lassen.`}
+                    Diesen Hinweis könnt ihr für {WALLET_UNLOCK_COST} Punkte anzeigen lassen.
                   </p>
                   {canBuy ? (
                     <BigButton

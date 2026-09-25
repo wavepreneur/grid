@@ -322,6 +322,16 @@ export function GameRoom({
       ).length,
     [eventContent.levels, teamState.gameState.levels],
   );
+  const gameOverWalletNotes = useMemo(
+    () =>
+      visibleWalletNotes(
+        teamState.gameState.wallet,
+        eventContent.levels,
+        teamState.gameState.levels,
+        { revealLocked: true },
+      ),
+    [teamState.gameState.wallet, eventContent.levels, teamState.gameState.levels],
+  );
 
   const playPhase = teamState.gameState.current_phase ?? "hub";
 
@@ -1048,33 +1058,41 @@ export function GameRoom({
             : `${completedLevels} / ${eventContent.levels.length} Aufgaben · nur euer Team`}
         </p>
       </div>
-      <section className="overflow-hidden rounded-3xl bg-[var(--cg-accent)] shadow-[var(--cg-shadow-lift)]">
-        <div className="px-5 py-4 text-[var(--cg-accent-fg)]">
-          <p className="text-sm font-extrabold uppercase tracking-[0.14em]">Wallet</p>
-          <p className="mt-0.5 text-sm opacity-80">Gesammelte Hinweise aus den Leveln</p>
-        </div>
-        <div className="rounded-t-2xl bg-[var(--cg-card)] px-5 py-5">
-          <TeamWalletList
-            notes={visibleWalletNotes(
-              teamState.gameState.wallet,
-              eventContent.levels,
-              teamState.gameState.levels,
-            )}
-            score={teamState.gameState.score ?? 0}
-            purchasesClosed
-          />
-        </div>
-      </section>
-      <TeamCaptureGallery
-        inviteCode={inviteCode}
-        joinCode={joinCode}
-        sessionId={session.sessionId}
-      />
       {eventContent.showLiveScore ? (
         <Link href={cockpitShowPath(inviteCode)} className="block">
           <BigButton>Beamer-Ranking</BigButton>
         </Link>
       ) : null}
+      <details className="group overflow-hidden rounded-3xl bg-[var(--cg-accent)] shadow-[var(--cg-shadow-lift)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-[var(--cg-accent-fg)] marker:content-none [&::-webkit-details-marker]:hidden">
+          <div>
+            <p className="text-sm font-extrabold uppercase tracking-[0.14em]">Wallet</p>
+            <p className="mt-0.5 text-sm opacity-80">
+              {gameOverWalletNotes.length === 0
+                ? "Noch leer"
+                : `${gameOverWalletNotes.length} ${gameOverWalletNotes.length === 1 ? "Hinweis" : "Hinweise"}`}
+            </p>
+          </div>
+          <span
+            aria-hidden
+            className="text-lg leading-none opacity-80 transition-transform group-open:rotate-180"
+          >
+            ▾
+          </span>
+        </summary>
+        <div className="rounded-t-2xl bg-[var(--cg-card)] px-5 py-5">
+          <TeamWalletList
+            notes={gameOverWalletNotes}
+            score={teamState.gameState.score ?? 0}
+            purchasesClosed
+          />
+        </div>
+      </details>
+      <TeamCaptureGallery
+        inviteCode={inviteCode}
+        joinCode={joinCode}
+        sessionId={session.sessionId}
+      />
     </div>
   ) : currentLevelDefinition ? (
     phased && usesMissionShell(eventContent) ? (
