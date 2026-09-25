@@ -3,7 +3,7 @@ import type { PurchasedTileHint } from "@/lib/grid/game-state";
 import { isMediaInputMode, type LevelDefinition } from "@/lib/grid/level-types";
 
 /** Human stall — no tap / no submit. Not used on the hub (walking is normal). */
-export const PLAY_HELP_IDLE_MS = 5 * 60_000;
+export const PLAY_HELP_IDLE_MS = 3 * 60_000;
 /** Human stall — similar wrong answers. */
 export const PLAY_HELP_FAIL_HINT_AT = 3;
 

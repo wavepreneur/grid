@@ -113,6 +113,39 @@ export function PlayMoreSheet({
   const busy = Boolean(transferPending || releasePending);
   const nameRoster = roster.length > 0 ? roster : teammates;
 
+  useEffect(() => {
+    if (!open) return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevHtmlOverscroll = html.style.overscrollBehavior;
+    const prevBodyOverscroll = body.style.overscrollBehavior;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
+    body.style.overscrollBehavior = "none";
+
+    function inSheetScroll(target: EventTarget | null) {
+      return target instanceof Element && Boolean(target.closest("[data-sheet-scroll]"));
+    }
+    function blockBackgroundScroll(event: Event) {
+      if (!inSheetScroll(event.target)) event.preventDefault();
+    }
+
+    window.addEventListener("wheel", blockBackgroundScroll, { passive: false });
+    window.addEventListener("touchmove", blockBackgroundScroll, { passive: false });
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      html.style.overscrollBehavior = prevHtmlOverscroll;
+      body.style.overscrollBehavior = prevBodyOverscroll;
+      window.removeEventListener("wheel", blockBackgroundScroll);
+      window.removeEventListener("touchmove", blockBackgroundScroll);
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return (
@@ -134,13 +167,13 @@ export function PlayMoreSheet({
 
       {!showBriefingDoc && !showFaqDoc ? (
         <div
-          className="fixed inset-0 z-[2000] flex items-end justify-center bg-[var(--cg-ink)]/50 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+          className="fixed inset-0 z-[2000] flex items-end justify-center overscroll-none bg-[var(--cg-ink)]/50 p-0 backdrop-blur-sm sm:items-center sm:p-6"
           onClick={onClose}
         >
           <div
             role="dialog"
             aria-modal="true"
-            className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[var(--cg-card)] pb-[env(safe-area-inset-bottom)] shadow-[var(--cg-shadow-lift)] sm:rounded-3xl sm:pb-0"
+            className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden overscroll-none rounded-t-3xl bg-[var(--cg-card)] pb-[env(safe-area-inset-bottom)] shadow-[var(--cg-shadow-lift)] sm:rounded-3xl sm:pb-0"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-[var(--cg-border)] px-5 py-4">
@@ -156,7 +189,10 @@ export function PlayMoreSheet({
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            <div
+              data-sheet-scroll
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5"
+            >
               {view === "menu" ? (
                 <div className="grid gap-2">
                   <MenuRow
