@@ -40,7 +40,28 @@ export type GrowthOffer = {
   skipLabel: string;
   shareLabel: string | null;
   shareUrl: string | null;
+  discountCode: string | null;
+  discountNote: string | null;
+  studioPreview: boolean;
 };
+
+export const STUDIO_DUMMY_DISCOUNT_CODE = "GRID-TEST-20";
+
+export function studioGrowthOffer(): GrowthOffer {
+  return {
+    enabled: true,
+    surface: "studio",
+    headline: "Mit Familie & Freunden spielen",
+    body: "20 % auf euer nächstes Exitmania-Spiel. Der Code gilt einmal — für Freunde oder die Familie.",
+    ctaLabel: "Auswertung per Mail",
+    skipLabel: "Jetzt nicht",
+    shareLabel: null,
+    shareUrl: null,
+    discountCode: STUDIO_DUMMY_DISCOUNT_CODE,
+    discountNote: "Studio-Test: Dummy-Code, einmal gedacht. Im Live-Checkout kommt der echte Code.",
+    studioPreview: true,
+  };
+}
 
 export const EMPTY_GROWTH_PACK: GrowthPack = {
   enabled: false,
@@ -111,9 +132,20 @@ export function parseGrowthPack(contentConfig: unknown): GrowthPack {
   };
 }
 
+export function resolvePlayGrowthOffer(
+  contentConfig: unknown,
+  isStudioTest: boolean,
+): GrowthOffer | null {
+  return parseGrowthOffer(contentConfig) ?? (isStudioTest ? studioGrowthOffer() : null);
+}
+
 export function parseGrowthOffer(contentConfig: unknown): GrowthOffer | null {
   const pack = parseGrowthPack(contentConfig);
   if (!pack.enabled) return null;
+  const discountCode = readTrimmed(
+    (contentConfig as { growth?: { discount_code?: unknown } }).growth?.discount_code,
+    40,
+  );
   return {
     enabled: true,
     surface: pack.surface,
@@ -123,6 +155,12 @@ export function parseGrowthOffer(contentConfig: unknown): GrowthOffer | null {
     skipLabel: pack.skip_label || "Jetzt nicht",
     shareLabel: pack.share_label,
     shareUrl: pack.share_url,
+    discountCode,
+    discountNote: readTrimmed(
+      (contentConfig as { growth?: { discount_note?: unknown } }).growth?.discount_note,
+      200,
+    ),
+    studioPreview: pack.surface === "studio",
   };
 }
 

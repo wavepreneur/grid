@@ -1,9 +1,14 @@
 "use server";
 
+import { headers } from "next/headers";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { assertPlayerSession } from "@/lib/grid/session-auth";
 import { parseTeamGameState } from "@/lib/grid/game-state";
 import { parseGrowthPack } from "@/lib/grid/growth-pack";
 import { postGrowthCapture } from "@/lib/grid/growth-dispatch";
+import { getPublicOrigin } from "@/lib/grid/booking-api";
+import { buildEventPortalResultsUrl } from "@/lib/grid/codes";
+import { ensureEventPortalToken } from "@/lib/grid/portal";
 import type { ActionResult } from "@/lib/grid/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -30,7 +35,6 @@ export async function submitGrowthRecap(input: {
       return { success: false, error: "Recap ist für dieses Event nicht aktiv." };
     }
 
-    const { createAdminClient } = await import("@/lib/supabase/admin");
     const supabase = createAdminClient();
     const { data: captures } = await supabase
       .from("event_captures")
@@ -68,6 +72,45 @@ export async function submitGrowthRecap(input: {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Recap fehlgeschlagen.",
+    };
+  }
+}
+
+/** Studio-Test: the results URL that would go in the HR recap mail. */
+export async function getStudioRecapLinks(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+}): Promise<ActionResult<{ resultsUrl: string }>> {
+  try {
+    const { event, team } = await assertPlayerSession(input);
+    if (team.status !== "finished") {
+      return { success: false, error: "Das Spiel läuft noch." };
+    }
+    const config = event.content_config;
+    const isStudio =
+      Boolean(config && typeof config === "object" && (config as { is_studio_test?: boolean }).is_studio_test);
+    if (!isStudio) {
+      return { success: false, error: "Nur im Studio-Test." };
+    }
+
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from("events")
+      .select("portal_token")
+      .eq("id", event.id)
+      .maybeSingle();
+
+    const token = await ensureEventPortalToken(event.id, data?.portal_token ?? null);
+    const headerList = await headers();
+    const proto = headerList.get("x-forwarded-proto") ?? "http";
+    const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "localhost:3000";
+    const origin = getPublicOrigin(new Request(`${proto}://${host}`));
+    return { success: true, data: { resultsUrl: buildEventPortalResultsUrl(origin, token) } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Link nicht verfügbar.",
     };
   }
 }

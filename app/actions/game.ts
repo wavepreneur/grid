@@ -833,7 +833,10 @@ export async function purchaseWalletNote(input: {
 }): Promise<ActionResult<TeamRealtimeState>> {
   try {
     const { event, team, player } = await assertPlayerSession(input);
-    if (team.status !== "playing" && team.status !== "finished") {
+    if (team.status === "finished") {
+      return { success: false, error: "Nach Game Over könnt ihr keine Hinweise mehr kaufen." };
+    }
+    if (team.status !== "playing") {
       return { success: false, error: "Das Spiel läuft noch nicht." };
     }
 

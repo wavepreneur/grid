@@ -962,6 +962,14 @@ export function GameRoom({
           sessionId={session.sessionId}
           playerId={session.playerId}
           offer={eventContent.growthOffer}
+          isLead={isAlpha}
+          stats={{
+            teamName,
+            score: teamState.gameState.score ?? 0,
+            completed: completedLevels,
+            total: eventContent.levels.length,
+            players: lobbyPlayers.map((p) => p.display_name),
+          }}
         />
       ) : null}
       {eventContent.followUpTrigger?.enabled ? (
@@ -1026,8 +1034,7 @@ export function GameRoom({
               teamState.gameState.levels,
             )}
             score={teamState.gameState.score ?? 0}
-            onPurchase={handlePurchaseWallet}
-            purchasePending={isWalletPending}
+            purchasesClosed
           />
         </div>
       </section>

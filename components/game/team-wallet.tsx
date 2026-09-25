@@ -9,6 +9,8 @@ type Props = {
   score?: number;
   onPurchase?: (level: number) => void;
   purchasePending?: boolean;
+  /** Game Over — locked hints stay visible but cannot be bought. */
+  purchasesClosed?: boolean;
 };
 
 export function TeamWalletList({
@@ -16,6 +18,7 @@ export function TeamWalletList({
   score = 0,
   onPurchase,
   purchasePending = false,
+  purchasesClosed = false,
 }: Props) {
   const [confirmLevel, setConfirmLevel] = useState<number | null>(null);
 
@@ -37,11 +40,15 @@ export function TeamWalletList({
         if (note.locked) {
           const confirming = confirmLevel === note.level;
           const canAfford = score >= WALLET_UNLOCK_COST;
-          const canBuy = Boolean(onPurchase);
+          const canBuy = Boolean(onPurchase) && !purchasesClosed;
           return (
             <li
               key={note.id}
-              className="rounded-2xl bg-[var(--cg-bg)] px-4 py-3.5 shadow-[var(--cg-shadow-soft)]"
+              className={`rounded-2xl px-4 py-3.5 shadow-[var(--cg-shadow-soft)] ${
+                purchasesClosed
+                  ? "bg-[var(--cg-muted)]/20 opacity-70"
+                  : "bg-[var(--cg-bg)]"
+              }`}
             >
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--cg-muted)]">
                 Nach Level {note.level}
@@ -77,8 +84,9 @@ export function TeamWalletList({
               ) : (
                 <div className="mt-2 space-y-3">
                   <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
-                    Diesen Hinweis könnt ihr für {WALLET_UNLOCK_COST} Punkte anzeigen
-                    lassen.
+                    {purchasesClosed
+                      ? "Nach Game Over nicht mehr kaufbar — die Punkte bleiben."
+                      : `Diesen Hinweis könnt ihr für ${WALLET_UNLOCK_COST} Punkte anzeigen lassen.`}
                   </p>
                   {canBuy ? (
                     <BigButton
