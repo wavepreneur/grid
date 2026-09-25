@@ -219,6 +219,46 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
         </p>
       </Panel>
 
+      <Panel
+        title="Galerie"
+        subtitle="Fotos und Videos dieses Spiels — gespeichert unter event_captures."
+      >
+        {snapshot.captures.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Noch keine Aufnahmen. Sobald ein Team sendet, erscheinen sie hier.
+          </p>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {snapshot.captures.map((item) => (
+              <li key={item.id} className="overflow-hidden rounded-2xl bg-secondary">
+                {item.kind === "video" ? (
+                  <video
+                    src={item.publicUrl}
+                    controls
+                    playsInline
+                    className="aspect-[3/4] w-full bg-black object-cover"
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={item.publicUrl}
+                    alt=""
+                    className="aspect-[3/4] w-full object-cover"
+                  />
+                )}
+                <div className="px-3 py-2.5">
+                  <p className="text-sm font-semibold">{item.teamName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {item.kind === "video" ? "Video" : "Foto"}
+                    {item.levelNumber > 0 ? ` · Aufgabe ${item.levelNumber}` : ""}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
       {message ? <GridSuccess message={message} /> : null}
       {displayError ? <GridError message={displayError} /> : null}
 

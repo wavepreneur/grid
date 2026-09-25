@@ -74,13 +74,17 @@ type Props = {
   leadLabel?: string;
   teammates?: TeammateOption[];
   clockScope?: string | null;
+  fromLevel?: number;
   captureContext?: {
     inviteCode: string;
     joinCode: string;
     sessionId: string;
   };
   onBegin: () => void;
-  onSubmit: (selectedOptionId: string, extras?: { timedOut?: boolean; clockStartedAt?: string | null }) => void;
+  onSubmit: (
+    selectedOptionId: string,
+    extras?: { timedOut?: boolean; clockStartedAt?: string | null; skip?: boolean },
+  ) => void;
   onContinue: () => void;
   onSkipWaiting: () => void;
   onHandOff?: (toPlayerId: string) => void;
@@ -107,6 +111,7 @@ export function PlayBonusView({
   onSkipWaiting,
   teammates = [],
   clockScope = null,
+  fromLevel = 0,
   captureContext,
   onHandOff,
 }: Props) {
@@ -410,13 +415,19 @@ export function PlayBonusView({
           <MediaCapturePanel
             kind={mediaKind}
             overlayImageUrl={bonus.overlay_image_url}
-            levelNumber={0}
+            levelNumber={fromLevel}
+            bonusId={bonusId}
             disabled={locked}
             isPending={isPending || submitting}
             captureContext={captureContext}
-            allowSkip={false}
+            allowSkip
             onSubmit={(payload) => {
-              if (payload.revealSolution || show || submitting) return;
+              if (show || submitting) return;
+              if (payload.revealSolution) {
+                setSubmitting(true);
+                onSubmit("", { skip: true, clockStartedAt: scoringStartedAt });
+                return;
+              }
               setSubmitting(true);
               onSubmit("done", { clockStartedAt: scoringStartedAt });
             }}
@@ -491,9 +502,23 @@ export function PlayBonusView({
         {!show ? (
           <>
             {!mediaKind ? (
-              <BigButton disabled={locked || !canCheck} onClick={checkAnswer}>
-                Antwort prüfen
-              </BigButton>
+              <>
+                <BigButton disabled={locked || !canCheck} onClick={checkAnswer}>
+                  Antwort prüfen
+                </BigButton>
+                <button
+                  type="button"
+                  disabled={locked}
+                  onClick={() => {
+                    if (show || submitting) return;
+                    setSubmitting(true);
+                    onSubmit("", { skip: true, clockStartedAt: scoringStartedAt });
+                  }}
+                  className="w-full pt-1 text-center text-sm font-semibold text-[var(--cg-muted)] disabled:opacity-40"
+                >
+                  Überspringen · 0 Punkte
+                </button>
+              </>
             ) : null}
             {onHandOff && teammates.length > 0 ? (
               <div className="space-y-2 pt-1">

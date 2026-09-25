@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { IconGift } from "@/components/game/city/icons";
+import { BonusResultBanner } from "@/components/game/bonus-result-banner";
 import { hasSeenBonusResult } from "@/components/game/bonus-spectator-view";
 import type { BonusNoticeState } from "@/lib/grid/game-state";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
@@ -33,7 +33,7 @@ function markNoticeSeen(id: string) {
 }
 
 /**
- * Solid top banner after a bonus is finished — slides in, then leaves on its own.
+ * Solid top card after a bonus is finished — same look as the in-task result.
  */
 export function BonusCompleteToast({ notice, onDismiss }: Props) {
   const seenRef = useRef<string | null>(null);
@@ -74,31 +74,21 @@ export function BonusCompleteToast({ notice, onDismiss }: Props) {
   if (!visible) return null;
 
   return (
-    <div
-      role="status"
-      className={`fixed inset-x-0 top-0 z-[110] ${
-        leaving ? "cg-animate-slide-up" : "cg-animate-slide-down"
-      } ${
+    <BonusResultBanner
+      leaving={leaving}
+      correct={visible.correct}
+      headline={
+        visible.skipped
+          ? `${visible.by} hat die Bonusaufgabe übersprungen`
+          : visible.correct
+            ? `${visible.by} hat ${visible.reward} Punkte gerade geholt`
+            : `${visible.by} konnte die Aufgabe nicht beantworten`
+      }
+      detail={
         visible.correct
-          ? "bg-[var(--cg-success)] text-white"
-          : "bg-[var(--cg-primary)] text-[var(--cg-primary-fg)]"
-      }`}
-    >
-      <div className="mx-auto flex w-full max-w-md items-start gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20">
-          <IconGift size={20} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] opacity-80">
-            Bonus erledigt
-          </p>
-          <p className="mt-0.5 text-sm font-semibold">
-            {visible.correct
-              ? `${visible.by} hat ${visible.reward} Punkte gerade geholt`
-              : `${visible.by} konnte die Aufgabe nicht beantworten`}
-          </p>
-        </div>
-      </div>
-    </div>
+          ? `+${visible.reward} Punkte für das Team.`
+          : "0 Extra-Punkte."
+      }
+    />
   );
 }

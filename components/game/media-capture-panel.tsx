@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Camera, X } from "lucide-react";
 import { uploadEventCapture } from "@/app/actions/captures";
 import { BigButton } from "@/components/game/city/ui";
 import { GridButton, GridHint } from "@/components/grid/grid-shell";
-import { TeamPaceHint } from "@/components/game/team-pace-hint";
 import { EVENT_CAPTURE_VIDEO_MAX_SECONDS } from "@/lib/grid/event-captures";
 import type { MediaInputMode, SolveLevelPayload } from "@/lib/grid/level-types";
 
@@ -18,6 +18,7 @@ type Props = {
   kind: MediaInputMode;
   overlayImageUrl?: string;
   levelNumber: number;
+  bonusId?: string;
   disabled: boolean;
   isPending: boolean;
   captureContext?: CaptureContext;
@@ -79,10 +80,31 @@ function drawContain(
   ctx.drawImage(source, (dstW - w) / 2, (dstH - h) / 2, w, h);
 }
 
+async function saveBlobToDevice(blob: Blob, filename: string) {
+  const file = new File([blob], filename, { type: blob.type || "image/jpeg" });
+  const nav = navigator as Navigator & {
+    canShare?: (data: ShareData) => boolean;
+  };
+  if (nav.canShare?.({ files: [file] })) {
+    await navigator.share({ files: [file], title: filename });
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
 export function MediaCapturePanel({
   kind,
   overlayImageUrl,
   levelNumber,
+  bonusId,
   disabled,
   isPending,
   captureContext,
@@ -100,6 +122,7 @@ export function MediaCapturePanel({
   const timerRef = useRef<number | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("live");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
@@ -109,8 +132,23 @@ export function MediaCapturePanel({
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [sending, setSending] = useState(false);
+  const [saving, setSaving] = useState(false);
   const isVideo = kind === "video";
   const busy = disabled || isPending || sending;
+
+  const attachStream = useCallback((stream: MediaStream) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute("playsinline", "true");
+    video.setAttribute("webkit-playsinline", "true");
+    void video.play().then(
+      () => setCameraReady(true),
+      () => setCameraReady(true),
+    );
+  }, []);
 
   const stopStream = useCallback(() => {
     recorderRef.current?.stop();
@@ -119,6 +157,7 @@ export function MediaCapturePanel({
       track.stop();
     }
     streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
     setCameraReady(false);
     setRecording(false);
   }, []);
@@ -139,29 +178,38 @@ export function MediaCapturePanel({
         },
       });
       streamRef.current = stream;
-      const video = videoRef.current;
-      if (!video) return;
-      video.srcObject = stream;
-      video.muted = true;
-      video.playsInline = true;
-      video.setAttribute("playsinline", "true");
-      video.setAttribute("webkit-playsinline", "true");
-      await video.play();
-      setCameraReady(true);
+      attachStream(stream);
     } catch {
       setCameraError(
         "Kamera-Zugriff abgelehnt oder nicht möglich. Ihr könnt eine Datei wählen.",
       );
     }
-  }, [isVideo]);
+  }, [attachStream, isVideo]);
 
   useEffect(() => {
+    if (!open) {
+      stopStream();
+      return;
+    }
     void startCamera();
     return () => {
-      stopStream();
       if (timerRef.current) window.clearInterval(timerRef.current);
     };
-  }, [startCamera, stopStream]);
+  }, [open, startCamera, stopStream]);
+
+  useEffect(() => {
+    if (!open) return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+    };
+  }, [open]);
 
   useEffect(() => {
     return () => {
@@ -271,42 +319,84 @@ export function MediaCapturePanel({
       return null;
     });
     setElapsed(0);
-    if (!streamRef.current) void startCamera();
+    setUploadError(null);
+    requestAnimationFrame(() => {
+      if (streamRef.current) {
+        attachStream(streamRef.current);
+      } else {
+        void startCamera();
+      }
+    });
+  }
+
+  function closeCamera(force = false) {
+    if (busy && !force) return;
+    setOpen(false);
+    setPhase("live");
+    setPreviewBlob(null);
+    setPreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+    setUploadError(null);
+    setCameraError(null);
+    stopStream();
   }
 
   async function sendCapture() {
     if (!previewBlob || busy) return;
+    if (!captureContext) {
+      setUploadError("Session fehlt. Bitte Seite neu laden und nochmal senden.");
+      return;
+    }
     setSending(true);
     setUploadError(null);
     try {
-      if (captureContext) {
-        const formData = new FormData();
-        const mime = previewBlob.type || (isVideo ? "video/webm" : "image/jpeg");
-        const file = new File(
-          [previewBlob],
-          `capture.${extensionForMime(mime, kind)}`,
-          { type: mime },
-        );
-        formData.append("file", file);
-        formData.append("inviteCode", captureContext.inviteCode);
-        formData.append("joinCode", captureContext.joinCode);
-        formData.append("sessionId", captureContext.sessionId);
-        formData.append("levelNumber", String(levelNumber));
-        formData.append("kind", kind);
-        const result = await uploadEventCapture(formData);
-        if (!result.success) {
-          setUploadError(result.error);
-          return;
-        }
+      const formData = new FormData();
+      const mime = previewBlob.type || (isVideo ? "video/webm" : "image/jpeg");
+      const file = new File(
+        [previewBlob],
+        `capture.${extensionForMime(mime, kind)}`,
+        { type: mime },
+      );
+      formData.append("file", file);
+      formData.append("inviteCode", captureContext.inviteCode);
+      formData.append("joinCode", captureContext.joinCode);
+      formData.append("sessionId", captureContext.sessionId);
+      formData.append("levelNumber", String(levelNumber));
+      formData.append("kind", kind);
+      if (bonusId) formData.append("bonusId", bonusId);
+      const result = await uploadEventCapture(formData);
+      if (!result.success) {
+        setUploadError(result.error);
+        return;
       }
       onSubmit({ answer: "ok" });
+      closeCamera(true);
     } finally {
       setSending(false);
     }
   }
 
+  async function handleSaveToDevice() {
+    if (!previewBlob || saving) return;
+    setSaving(true);
+    try {
+      const mime = previewBlob.type || (isVideo ? "video/webm" : "image/jpeg");
+      await saveBlobToDevice(
+        previewBlob,
+        `grid-${kind}-${Date.now()}.${extensionForMime(mime, kind)}`,
+      );
+    } catch {
+      /* share cancelled */
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function handleFilePick(file: File | null) {
     if (!file) return;
+    setOpen(true);
     if (isVideo && file.type.startsWith("video/")) {
       const url = URL.createObjectURL(file);
       const probe = document.createElement("video");
@@ -364,11 +454,11 @@ export function MediaCapturePanel({
   }
 
   function skipTask() {
-    if (busy || !canPaceTeam) return;
+    if (busy) return;
     onSubmit({ revealSolution: true });
   }
 
-  const title =
+  const shootLabel =
     kind === "video"
       ? "Video aufnehmen"
       : kind === "augmented_photo"
@@ -427,102 +517,39 @@ export function MediaCapturePanel({
         {hint}
       </p>
 
-      <div className="relative mx-auto aspect-[3/4] w-full max-w-sm overflow-hidden rounded-2xl bg-black">
-        {phase === "preview" && previewUrl ? (
-          isVideo ? (
-            <video
-              src={previewUrl}
-              controls
-              playsInline
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewUrl} alt="" className="h-full w-full object-cover" />
-          )
-        ) : (
-          <>
-            <video
-              ref={videoRef}
-              muted
-              playsInline
-              autoPlay
-              className="h-full w-full object-cover"
-            />
-            {kind === "augmented_photo" && overlayImageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                ref={overlayRef}
-                src={overlayImageUrl}
-                alt=""
-                className="pointer-events-none absolute inset-0 h-full w-full object-contain"
-              />
-            ) : overlayImageUrl ? (
-              // preload overlay for file-fallback composite
-              // eslint-disable-next-line @next/next/no-img-element
-              <img ref={overlayRef} src={overlayImageUrl} alt="" className="hidden" />
-            ) : null}
-            {recording ? (
-              <div className="absolute left-3 top-3 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
-                ● {elapsed}s / {EVENT_CAPTURE_VIDEO_MAX_SECONDS}s
-              </div>
-            ) : null}
-          </>
-        )}
-      </div>
+      <PrimaryButton disabled={disabled || isPending} onClick={() => setOpen(true)}>
+        <span className="inline-flex items-center justify-center gap-2">
+          <Camera className="h-5 w-5" strokeWidth={2.4} />
+          Kamera öffnen
+        </span>
+      </PrimaryButton>
+      <button
+        type="button"
+        disabled={disabled || isPending}
+        onClick={() => fileRef.current?.click()}
+        className={
+          cityStyle
+            ? "w-full text-center text-sm font-semibold text-[var(--cg-muted)] underline-offset-2 hover:underline disabled:opacity-40"
+            : "w-full text-center text-sm text-slate-500 underline"
+        }
+      >
+        Datei wählen
+      </button>
 
-      {cameraError ? (
-        cityStyle ? (
-          <p className="text-center text-sm text-[var(--cg-destructive)]">{cameraError}</p>
-        ) : (
-          <GridHint tone="warn">{cameraError}</GridHint>
-        )
+      {allowSkip ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={skipTask}
+          className={
+            cityStyle
+              ? "w-full pt-1 text-center text-sm font-semibold text-[var(--cg-muted)] disabled:opacity-40"
+              : "w-full text-center text-sm text-slate-500"
+          }
+        >
+          Überspringen · 0 Punkte
+        </button>
       ) : null}
-      {uploadError ? (
-        cityStyle ? (
-          <p className="text-center text-sm text-[var(--cg-destructive)]">{uploadError}</p>
-        ) : (
-          <GridHint tone="warn">{uploadError}</GridHint>
-        )
-      ) : null}
-
-      {phase === "preview" ? (
-        <div className="space-y-2">
-          <PrimaryButton disabled={busy || !previewBlob} onClick={() => void sendCapture()}>
-            {sending || isPending ? "Sende…" : "Senden"}
-          </PrimaryButton>
-          <SecondaryButton disabled={busy} onClick={retake}>
-            Neu versuchen
-          </SecondaryButton>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {isVideo ? (
-            <PrimaryButton
-              disabled={busy || (!cameraReady && !cameraError)}
-              onClick={() => (recording ? stopRecording() : startRecording())}
-            >
-              {recording ? "Aufnahme stoppen" : title}
-            </PrimaryButton>
-          ) : (
-            <PrimaryButton disabled={busy || !cameraReady} onClick={() => void snapshotPhoto()}>
-              {title}
-            </PrimaryButton>
-          )}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => fileRef.current?.click()}
-            className={
-              cityStyle
-                ? "w-full text-center text-sm font-semibold text-[var(--cg-muted)] underline-offset-2 hover:underline disabled:opacity-40"
-                : "w-full text-center text-sm text-slate-500 underline"
-            }
-          >
-            Datei wählen
-          </button>
-        </div>
-      )}
 
       <input
         ref={fileRef}
@@ -536,23 +563,124 @@ export function MediaCapturePanel({
         }}
       />
 
-      {phase !== "preview" && allowSkip ? (
-        canPaceTeam ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={skipTask}
-            className={
-              cityStyle
-                ? "w-full pt-1 text-center text-sm font-semibold text-[var(--cg-muted)] disabled:opacity-40"
-                : "w-full text-center text-sm text-slate-500"
-            }
-          >
-            Überspringen · 0 Punkte
-          </button>
-        ) : (
-          <TeamPaceHint canPaceTeam={false} leadLabel={leadLabel} />
-        )
+      {open ? (
+        <div className="city-game fixed inset-0 z-[300] flex flex-col bg-black">
+          <div className="relative min-h-0 flex-1 bg-black">
+            <video
+              ref={videoRef}
+              muted
+              playsInline
+              autoPlay
+              className={`absolute inset-0 h-full w-full object-cover ${
+                phase === "preview" ? "invisible" : "visible"
+              }`}
+            />
+            {kind === "augmented_photo" && overlayImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                ref={overlayRef}
+                src={overlayImageUrl}
+                alt=""
+                className={`pointer-events-none absolute inset-0 h-full w-full object-contain ${
+                  phase === "preview" ? "hidden" : ""
+                }`}
+              />
+            ) : overlayImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img ref={overlayRef} src={overlayImageUrl} alt="" className="hidden" />
+            ) : null}
+            {phase === "preview" && previewUrl ? (
+              isVideo ? (
+                <video
+                  src={previewUrl}
+                  controls
+                  playsInline
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={previewUrl}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              )
+            ) : null}
+            {recording ? (
+              <div className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
+                ● {elapsed}s / {EVENT_CAPTURE_VIDEO_MAX_SECONDS}s
+              </div>
+            ) : null}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={closeCamera}
+              className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white disabled:opacity-40"
+              aria-label="Kamera schließen"
+            >
+              <X className="h-5 w-5" strokeWidth={2.4} />
+            </button>
+          </div>
+
+          <div className="space-y-3 bg-[var(--cg-bg)] px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
+            {cameraError ? (
+              cityStyle ? (
+                <p className="text-center text-sm text-[var(--cg-destructive)]">{cameraError}</p>
+              ) : (
+                <GridHint tone="warn">{cameraError}</GridHint>
+              )
+            ) : null}
+            {uploadError ? (
+              cityStyle ? (
+                <p className="text-center text-sm text-[var(--cg-destructive)]">{uploadError}</p>
+              ) : (
+                <GridHint tone="warn">{uploadError}</GridHint>
+              )
+            ) : null}
+
+            {phase === "preview" ? (
+              <>
+                <PrimaryButton disabled={busy || !previewBlob} onClick={() => void sendCapture()}>
+                  {sending || isPending ? "Sende…" : "Senden"}
+                </PrimaryButton>
+                <SecondaryButton disabled={busy} onClick={retake}>
+                  Neu versuchen
+                </SecondaryButton>
+                <button
+                  type="button"
+                  disabled={busy || !previewBlob || saving}
+                  onClick={() => void handleSaveToDevice()}
+                  className="w-full text-center text-sm font-semibold text-[var(--cg-muted)] disabled:opacity-40"
+                >
+                  {saving ? "Speichern…" : "Aufs Handy speichern"}
+                </button>
+              </>
+            ) : (
+              <>
+                {isVideo ? (
+                  <PrimaryButton
+                    disabled={busy || (!cameraReady && !cameraError)}
+                    onClick={() => (recording ? stopRecording() : startRecording())}
+                  >
+                    {recording ? "Aufnahme stoppen" : shootLabel}
+                  </PrimaryButton>
+                ) : (
+                  <PrimaryButton disabled={busy || !cameraReady} onClick={() => void snapshotPhoto()}>
+                    {shootLabel}
+                  </PrimaryButton>
+                )}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => fileRef.current?.click()}
+                  className="w-full text-center text-sm font-semibold text-[var(--cg-muted)] disabled:opacity-40"
+                >
+                  Datei wählen
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       ) : null}
     </div>
   );

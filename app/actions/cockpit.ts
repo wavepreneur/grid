@@ -12,6 +12,10 @@ import { normalizeCode } from "@/lib/grid/codes";
 import type { LevelDefinition } from "@/lib/grid/level-types";
 import type { ActionResult } from "@/lib/grid/types";
 import {
+  listEventCapturesByEventId,
+  type EventCaptureItem,
+} from "@/lib/grid/event-captures";
+import {
   applyGpsTestOverride,
   getEventAdminDetails,
   updateEventRouteOverride,
@@ -55,6 +59,7 @@ export type EventCockpitSnapshot = {
   status: string;
   teams: CockpitTeam[];
   levels: CockpitLevel[];
+  captures: EventCaptureItem[];
   route_override_json: string;
 };
 
@@ -181,6 +186,7 @@ export async function getEventCockpitSnapshot(
         status: event.status,
         teams: cockpitTeams,
         levels,
+        captures: await listEventCapturesByEventId(event.id),
         route_override_json: formatRouteOverride(event.route_override),
       },
     };

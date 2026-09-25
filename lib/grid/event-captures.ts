@@ -36,19 +36,19 @@ export function parseCaptureKind(raw: unknown): EventCaptureKind | null {
   return isMediaInputMode(raw) ? raw : null;
 }
 
-export async function listEventCapturesByPortalToken(
-  token: string,
-): Promise<{ title: string; items: EventCaptureItem[] } | null> {
-  const event = await loadPortalEventByToken(token);
-  if (!event) return null;
-
+export async function listEventCapturesByEventId(
+  eventId: string,
+  teamId?: string,
+): Promise<EventCaptureItem[]> {
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("event_captures")
     .select("id, kind, public_url, mime_type, level_number, created_at, team_id")
-    .eq("event_id", event.id)
+    .eq("event_id", eventId)
     .order("created_at", { ascending: false });
+  if (teamId) query = query.eq("team_id", teamId);
 
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
 
   const teamIds = [...new Set((data ?? []).map((row) => row.team_id as string))];
@@ -64,16 +64,24 @@ export async function listEventCapturesByPortalToken(
     }
   }
 
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    kind: (row.kind as EventCaptureKind) ?? "photo",
+    publicUrl: row.public_url as string,
+    mimeType: row.mime_type as string,
+    levelNumber: row.level_number as number,
+    teamName: names.get(row.team_id as string) ?? "Team",
+    createdAt: row.created_at as string,
+  }));
+}
+
+export async function listEventCapturesByPortalToken(
+  token: string,
+): Promise<{ title: string; items: EventCaptureItem[] } | null> {
+  const event = await loadPortalEventByToken(token);
+  if (!event) return null;
   return {
     title: event.title,
-    items: (data ?? []).map((row) => ({
-      id: row.id as string,
-      kind: (row.kind as EventCaptureKind) ?? "photo",
-      publicUrl: row.public_url as string,
-      mimeType: row.mime_type as string,
-      levelNumber: row.level_number as number,
-      teamName: names.get(row.team_id as string) ?? "Team",
-      createdAt: row.created_at as string,
-    })),
+    items: await listEventCapturesByEventId(event.id),
   };
 }

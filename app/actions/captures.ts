@@ -4,13 +4,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { assertPlayerSession } from "@/lib/grid/session-auth";
 import { loadResolvedEventContent } from "@/lib/grid/content-loader";
 import { getLevelDefinition } from "@/lib/grid/content-engine";
+import { bonusMediaKind, findBonusInContent } from "@/lib/grid/bonus";
 import { isMediaInputMode } from "@/lib/grid/level-types";
 import type { ActionResult } from "@/lib/grid/types";
 import {
   EVENT_CAPTURES_BUCKET,
   EVENT_CAPTURE_MAX_BYTES,
   isAllowedCaptureMime,
+  listEventCapturesByEventId,
   parseCaptureKind,
+  type EventCaptureItem,
 } from "@/lib/grid/event-captures";
 
 function randomCaptureName(ext: string): string {
@@ -45,6 +48,7 @@ export async function uploadEventCapture(
     const joinCode = String(formData.get("joinCode") ?? "");
     const sessionId = String(formData.get("sessionId") ?? "");
     const levelNumber = Number(formData.get("levelNumber"));
+    const bonusId = String(formData.get("bonusId") ?? "").trim();
     if (!inviteCode || !joinCode || !sessionId || !Number.isFinite(levelNumber)) {
       return { success: false, error: "Session ungültig." };
     }
@@ -83,9 +87,17 @@ export async function uploadEventCapture(
       routeOverride: event.route_override,
       studioGameVersionId: event.studio_game_version_id,
     });
-    const level = getLevelDefinition(content, levelNumber);
-    if (!level || !isMediaInputMode(level.input_mode) || level.input_mode !== kind) {
-      return { success: false, error: "Diese Aufgabe nimmt keine Aufnahme entgegen." };
+    if (bonusId) {
+      const bonus = findBonusInContent(content.levels, bonusId, levelNumber);
+      const media = bonus ? bonusMediaKind(bonus) : null;
+      if (media && media !== kind) {
+        return { success: false, error: "Diese Aufgabe nimmt keine Aufnahme entgegen." };
+      }
+    } else {
+      const level = getLevelDefinition(content, levelNumber);
+      if (!level || !isMediaInputMode(level.input_mode) || level.input_mode !== kind) {
+        return { success: false, error: "Diese Aufgabe nimmt keine Aufnahme entgegen." };
+      }
     }
 
     const ext = extensionForMime(file.type, file.name);
@@ -129,6 +141,26 @@ export async function uploadEventCapture(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Upload fehlgeschlagen.",
+    };
+  }
+}
+
+export async function listTeamEventCaptures(input: {
+  inviteCode: string;
+  joinCode: string;
+  sessionId: string;
+}): Promise<ActionResult<{ items: EventCaptureItem[] }>> {
+  try {
+    const { event, team } = await assertPlayerSession(input);
+    if (team.status !== "playing" && team.status !== "finished") {
+      return { success: false, error: "Galerie ist jetzt nicht verfügbar." };
+    }
+    const items = await listEventCapturesByEventId(event.id, team.id);
+    return { success: true, data: { items } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Galerie nicht geladen.",
     };
   }
 }

@@ -31,6 +31,7 @@ import { PlayPhaseFlow } from "@/components/game/play-phase-flow";
 import type { OutdoorArriveInput } from "@/components/game/play-hub-view";
 import type { PlayMorePanel } from "@/components/game/play-more-sheet";
 import { GrowthRecapCard } from "@/components/game/growth-recap-card";
+import { TeamCaptureGallery } from "@/components/game/team-capture-gallery";
 import { SyncModal } from "@/components/game/sync-modal";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 import { IdentityBar } from "@/components/player/identity-bar";
@@ -616,7 +617,7 @@ export function GameRoom({
 
   function handleSubmitBonus(
     selectedOptionId: string,
-    extras?: { timedOut?: boolean; clockStartedAt?: string | null },
+    extras?: { timedOut?: boolean; clockStartedAt?: string | null; skip?: boolean },
   ) {
     setError(null);
     startSolveTransition(async () => {
@@ -628,6 +629,7 @@ export function GameRoom({
           selectedOptionId,
           timedOut: extras?.timedOut,
           clockStartedAt: extras?.clockStartedAt ?? null,
+          skip: extras?.skip,
         }),
       );
     });
@@ -941,6 +943,11 @@ export function GameRoom({
           euer Team
         </p>
       </div>
+      <TeamCaptureGallery
+        inviteCode={inviteCode}
+        joinCode={joinCode}
+        sessionId={session.sessionId}
+      />
       {eventContent.showLiveScore ? (
         <Link href={cockpitShowPath(inviteCode)} className="block">
           <BigButton>Beamer-Ranking</BigButton>

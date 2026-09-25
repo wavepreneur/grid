@@ -31,7 +31,7 @@ import {
   validateLevelSolution,
   validateStationCode,
 } from "@/lib/grid/level-validation";
-import { HINT_POINT_COST, EXITMANIA_TOTAL_LEVELS } from "@/lib/grid/level-types";
+import { HINT_POINT_COST, EXITMANIA_TOTAL_LEVELS, isMediaInputMode } from "@/lib/grid/level-types";
 import type { PlayerRole, SolveLevelPayload } from "@/lib/grid/level-types";
 import { resolveArchetypeRoleFlags } from "@/lib/grid/archetype-roles";
 import { resolveBlueprint } from "@/lib/grid/blueprints";
@@ -179,10 +179,6 @@ export async function solveCurrentLevel(input: {
         error: "Die Lösung liegt schon offen. Die Team-Leitung geht weiter.",
       };
     }
-    if (input.payload?.revealSolution && !(await playerCanPaceTeam(team.id, player))) {
-      return { success: false, error: "Nur die Team-Leitung kann weitergehen." };
-    }
-
     const content = await loadResolvedEventContent({
       eventId: event.id,
       organizationId: event.organization_id,
@@ -195,6 +191,14 @@ export async function solveCurrentLevel(input: {
 
     if (!levelDefinition) {
       return { success: false, error: "Level-Inhalt nicht gefunden." };
+    }
+
+    if (
+      input.payload?.revealSolution &&
+      !isMediaInputMode(levelDefinition.input_mode) &&
+      !(await playerCanPaceTeam(team.id, player))
+    ) {
+      return { success: false, error: "Nur die Team-Leitung kann weitergehen." };
     }
 
     const playerRole = (player.role ?? "gamma") as PlayerRole;
@@ -2186,6 +2190,7 @@ async function completeActiveBonus(input: {
       correct,
       reward,
       created_at: now.toISOString(),
+      skipped: Boolean(input.skip),
     },
     levels,
   };
@@ -2518,6 +2523,7 @@ export async function submitBonusAnswer(input: {
   selectedOptionId: string;
   timedOut?: boolean;
   clockStartedAt?: string | null;
+  skip?: boolean;
 }): Promise<ActionResult<TeamRealtimeState>> {
   try {
     const { event, team, player } = await assertPlayerSession(input);
@@ -2540,7 +2546,7 @@ export async function submitBonusAnswer(input: {
       player,
       gameState,
       selectedOptionId: input.selectedOptionId,
-      skip: false,
+      skip: Boolean(input.skip),
       timedOut: input.timedOut,
       clockStartedAt: input.clockStartedAt ?? null,
     });

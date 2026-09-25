@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { IconGift } from "@/components/game/city/icons";
+import { BonusResultBanner } from "@/components/game/bonus-result-banner";
 import type { BonusRevealState } from "@/lib/grid/game-state";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 
@@ -92,41 +92,26 @@ export function BonusSpectatorView({ items }: Props) {
   if (!visible) return null;
 
   const reveal = visible.reveal;
-  const failed = Boolean(reveal && !reveal.correct);
 
   return (
-    <div
-      role="status"
-      className={`fixed inset-x-0 top-0 z-[110] ${
-        leaving ? "cg-animate-slide-up" : "cg-animate-slide-down"
-      } ${
-        failed
-          ? "bg-[var(--cg-primary)] text-[var(--cg-primary-fg)]"
-          : "bg-[var(--cg-success)] text-white"
-      }`}
-    >
-      <div className="mx-auto flex w-full max-w-md items-start gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20">
-          <IconGift size={20} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] opacity-80">
-            {reveal ? "Bonus erledigt" : "Bonusaufgabe"}
-          </p>
-          {reveal ? (
-            <p className="mt-0.5 text-sm font-semibold">
-              {reveal.correct
-                ? `${visible.solverName} hat ${reveal.reward} Punkte gerade geholt`
-                : `${visible.solverName} konnte die Aufgabe nicht beantworten`}
-            </p>
-          ) : (
-            <p className="mt-0.5 text-sm font-semibold">
-              {visible.solverName} löst gerade eine Bonusaufgabe
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
+    <BonusResultBanner
+      leaving={Boolean(reveal && leaving)}
+      correct={reveal ? reveal.correct : null}
+      headline={
+        reveal
+          ? reveal.correct
+            ? `${visible.solverName} hat ${reveal.reward} Punkte gerade geholt`
+            : `${visible.solverName} konnte die Aufgabe nicht beantworten`
+          : `${visible.solverName} löst gerade eine Bonusaufgabe`
+      }
+      detail={
+        reveal
+          ? reveal.correct
+            ? `+${reveal.reward} Punkte für das Team.`
+            : "Keine Extra-Punkte."
+          : null
+      }
+    />
   );
 }
 

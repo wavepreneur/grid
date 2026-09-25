@@ -96,7 +96,7 @@ type Props = {
   onPurchaseHint: (tileId: string) => void;
   onSubmitBonus: (
     selectedOptionId: string,
-    extras?: { timedOut?: boolean; clockStartedAt?: string | null },
+    extras?: { timedOut?: boolean; clockStartedAt?: string | null; skip?: boolean },
   ) => void;
   onBeginBonus: (bonusId: string) => void;
   onContinueBonus: (bonusId: string) => void;
@@ -360,6 +360,7 @@ export function PlayPhaseFlow({
             leadLabel={leadLabel}
             teammates={teammates}
             clockScope={teamStartedAt}
+            fromLevel={presentBonusMeta.from_level}
             captureContext={captureContext}
             onBegin={() => onBeginBonus(bonusId)}
             onSubmit={onSubmitBonus}
@@ -408,6 +409,7 @@ export function PlayPhaseFlow({
             canPaceTeam={canPaceTeam}
             leadLabel={leadLabel}
             clockScope={teamStartedAt}
+            fromLevel={level.level}
             captureContext={captureContext}
             onBegin={() => onBeginBonus(bonusId)}
             onSubmit={onSubmitBonus}

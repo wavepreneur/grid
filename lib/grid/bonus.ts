@@ -150,6 +150,25 @@ export function findBonusTaskById(
   return resolveBonusTask(level);
 }
 
+export function findBonusInContent(
+  levels: LevelDefinition[],
+  bonusId: string,
+  levelNumber?: number,
+): BonusTask | null {
+  if (levelNumber && Number.isFinite(levelNumber) && levelNumber > 0) {
+    const fromLevel = findBonusTaskById(
+      levels.find((level) => level.level === levelNumber),
+      bonusId,
+    );
+    if (fromLevel) return fromLevel;
+  }
+  for (const level of levels) {
+    const found = findBonusTaskById(level, bonusId);
+    if (found) return found;
+  }
+  return null;
+}
+
 /**
  * Prefer the queue snapshot (exactly what the player saw) when scoring/presenting.
  */
