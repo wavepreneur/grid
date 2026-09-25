@@ -90,10 +90,8 @@ export function ContentTileGrid({
                   disabled={disabled}
                   onClick={() => onOpen(tile)}
                   aria-label={label}
-                  className={`cg-tap-lift absolute inset-0 overflow-hidden rounded-[1.35rem] shadow-[var(--cg-shadow-lift)] ring-2 disabled:opacity-50 ${
-                    hasCover
-                      ? "ring-[var(--cg-primary)]/35"
-                      : "bg-[var(--cg-card)] ring-[var(--cg-primary)]"
+                  className={`cg-tap-lift absolute inset-0 overflow-hidden rounded-[1.35rem] border-2 border-[var(--cg-primary)] shadow-[var(--cg-shadow-lift)] disabled:opacity-50 ${
+                    hasCover ? "" : "bg-[var(--cg-primary)] text-[var(--cg-primary-fg)]"
                   }`}
                 >
                   {hasCover ? (
@@ -104,9 +102,9 @@ export function ContentTileGrid({
                       className="absolute inset-0 h-full w-full object-cover"
                     />
                   ) : (
-                    <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-2 text-[var(--cg-primary)]">
+                    <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-2 text-[var(--cg-primary-fg)]">
                       {mediaTypeLucideIcon(tile.type, "h-9 w-9")}
-                      <span className="max-w-full truncate text-sm font-extrabold text-[var(--cg-fg)]">
+                      <span className="max-w-full truncate text-sm font-extrabold text-[var(--cg-primary-fg)]">
                         {label}
                       </span>
                     </span>
