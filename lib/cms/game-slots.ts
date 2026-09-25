@@ -286,12 +286,7 @@ export function taskContentToBonus(
     };
   }
 
-  if (
-    content.answer_type === "confirm" ||
-    content.answer_type === "photo" ||
-    content.answer_type === "video" ||
-    content.answer_type === "augmented_photo"
-  ) {
+  if (content.answer_type === "confirm") {
     return {
       for_role: role,
       for_team,
@@ -306,6 +301,34 @@ export function taskContentToBonus(
       reward,
       scoring,
       answer_mode: "confirm",
+    };
+  }
+
+  if (
+    content.answer_type === "photo" ||
+    content.answer_type === "video" ||
+    content.answer_type === "augmented_photo"
+  ) {
+    return {
+      for_role: role,
+      for_team,
+      title,
+      intro,
+      description: description || undefined,
+      hero_image_url,
+      tiles,
+      question,
+      options: [
+        {
+          id: "done",
+          label: content.answer_type === "video" ? "Video senden" : "Foto senden",
+        },
+      ],
+      correct_option_id: "done",
+      reward,
+      scoring,
+      answer_mode: content.answer_type,
+      overlay_image_url: content.overlay_image_url?.trim() || undefined,
     };
   }
 

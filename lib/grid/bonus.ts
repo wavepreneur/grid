@@ -4,7 +4,14 @@
  */
 
 import { isTaskNumberFieldCount } from "@/lib/cms/types";
-import type { ArrivalQuiz, BonusTask, LevelDefinition, PlayerRole } from "@/lib/grid/level-types";
+import {
+  isMediaInputMode,
+  type ArrivalQuiz,
+  type BonusTask,
+  type LevelDefinition,
+  type MediaInputMode,
+  type PlayerRole,
+} from "@/lib/grid/level-types";
 import { parseLevelTiles } from "@/lib/grid/level-content";
 import { parseLevelScoring } from "@/lib/grid/level-scoring";
 import { normalizeAnswer } from "@/lib/grid/content-engine";
@@ -20,7 +27,8 @@ export function parseBonusTask(raw: unknown): BonusTask | undefined {
     b.answer_mode === "text" ||
     b.answer_mode === "boxes" ||
     b.answer_mode === "confirm" ||
-    b.answer_mode === "choice"
+    b.answer_mode === "choice" ||
+    isMediaInputMode(b.answer_mode)
       ? b.answer_mode
       : Array.isArray(b.options) && b.options.length > 0
         ? "choice"
@@ -50,7 +58,7 @@ export function parseBonusTask(raw: unknown): BonusTask | undefined {
     correct_option_id:
       typeof b.correct_option_id === "string" && b.correct_option_id
         ? b.correct_option_id
-        : mode === "confirm"
+        : mode === "confirm" || isMediaInputMode(mode)
           ? "done"
           : "__text__",
     correct_option_ids: Array.isArray(b.correct_option_ids)
@@ -61,7 +69,24 @@ export function parseBonusTask(raw: unknown): BonusTask | undefined {
     answer_mode: mode === "choice" ? undefined : mode,
     answer: typeof b.answer === "string" ? b.answer : undefined,
     number_fields: isTaskNumberFieldCount(b.number_fields) ? b.number_fields : undefined,
+    overlay_image_url:
+      typeof b.overlay_image_url === "string" && b.overlay_image_url.trim()
+        ? b.overlay_image_url.trim()
+        : undefined,
   };
+}
+
+/** Camera bonus — including older snapshots compiled as confirm + „Erledigt“. */
+export function bonusMediaKind(bonus: BonusTask): MediaInputMode | null {
+  if (isMediaInputMode(bonus.answer_mode)) return bonus.answer_mode;
+  const blob = `${bonus.title}\n${bonus.question}\n${bonus.description ?? ""}`.toLowerCase();
+  const looksLikeConfirmDone =
+    bonus.answer_mode === "confirm" ||
+    bonus.options.some((opt) => opt.id === "done" && /erledigt/i.test(opt.label));
+  if (!looksLikeConfirmDone) return null;
+  if (/\bvideo|\bfilm/.test(blob)) return "video";
+  if (/foto|fotograf|kamera|photo/.test(blob)) return "photo";
+  return null;
 }
 
 /** Resolve bonus for a completed mission slot. */
@@ -171,6 +196,9 @@ export function canPresentBonus(
 
 /** Score a bonus submission (choice id or free-text / code). */
 export function isBonusAnswerCorrect(bonus: BonusTask, submission: string): boolean {
+  if (bonusMediaKind(bonus)) {
+    return Boolean(submission.trim());
+  }
   const mode =
     bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
   if (mode === "text" || mode === "boxes") {
@@ -190,6 +218,10 @@ export function isBonusAnswerCorrect(bonus: BonusTask, submission: string): bool
 
 /** What the team sees as the submitted attempt (choice label or typed text). */
 export function formatBonusAttemptLabel(bonus: BonusTask, submission: string): string | null {
+  const media = bonusMediaKind(bonus);
+  if (media) {
+    return media === "video" ? "Video gesendet" : "Foto gesendet";
+  }
   const mode =
     bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
   if (mode === "choice" || mode === "confirm") {
@@ -202,6 +234,7 @@ export function formatBonusAttemptLabel(bonus: BonusTask, submission: string): s
 
 /** Human-readable solution for post-answer reveal on bonus tasks. */
 export function formatBonusSolution(bonus: BonusTask): string | null {
+  if (bonusMediaKind(bonus)) return null;
   const mode =
     bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
   if (mode === "confirm") return null;

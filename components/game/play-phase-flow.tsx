@@ -290,6 +290,10 @@ export function PlayPhaseFlow({
 
   // Active / ready bonus from queue (supports parallel role packs).
   // Solo Alpha claims role-only bonuses so 1-device tests still see Layer 3.
+  const captureContext =
+    inviteCode && joinCode && sessionId
+      ? { inviteCode, joinCode, sessionId }
+      : undefined;
   const claimUnassigned = Boolean(soloAlpha) || (isAlpha && teammates.length === 0);
   const queueBonus = findPresentableBonusForRole(gameState, myRole, {
     claimUnassigned,
@@ -356,6 +360,7 @@ export function PlayPhaseFlow({
             leadLabel={leadLabel}
             teammates={teammates}
             clockScope={teamStartedAt}
+            captureContext={captureContext}
             onBegin={() => onBeginBonus(bonusId)}
             onSubmit={onSubmitBonus}
             onContinue={() => onContinueBonus(bonusId)}
@@ -403,6 +408,7 @@ export function PlayPhaseFlow({
             canPaceTeam={canPaceTeam}
             leadLabel={leadLabel}
             clockScope={teamStartedAt}
+            captureContext={captureContext}
             onBegin={() => onBeginBonus(bonusId)}
             onSubmit={onSubmitBonus}
             onContinue={() => onContinueBonus(bonusId)}

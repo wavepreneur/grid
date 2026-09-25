@@ -90,8 +90,10 @@ export function ContentTileGrid({
                   disabled={disabled}
                   onClick={() => onOpen(tile)}
                   aria-label={label}
-                  className={`cg-tap-lift absolute inset-0 overflow-hidden rounded-[1.35rem] border-2 border-[var(--cg-success)] shadow-[var(--cg-shadow-soft)] disabled:opacity-50 ${
-                    hasCover ? "" : "bg-[var(--cg-success)] text-white"
+                  className={`cg-tap-lift absolute inset-0 overflow-hidden rounded-[1.35rem] border-2 border-[var(--cg-primary)]/70 shadow-[var(--cg-shadow-soft)] disabled:opacity-50 ${
+                    hasCover
+                      ? ""
+                      : "bg-[var(--cg-primary)]/70 text-[var(--cg-primary-fg)]"
                   }`}
                 >
                   {hasCover ? (
@@ -102,16 +104,16 @@ export function ContentTileGrid({
                       className="absolute inset-0 h-full w-full object-cover"
                     />
                   ) : (
-                    <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-2 text-white">
+                    <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-2 text-[var(--cg-primary-fg)]">
                       {mediaTypeLucideIcon(tile.type, "h-9 w-9")}
-                      <span className="max-w-full truncate text-sm font-extrabold text-white">
+                      <span className="max-w-full truncate text-sm font-extrabold">
                         {label}
                       </span>
                     </span>
                   )}
                 </button>
                 {tip ? (
-                  <span className="pointer-events-none absolute left-2 top-2 z-10 rounded-full bg-[var(--cg-success)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow">
+                  <span className="pointer-events-none absolute left-2 top-2 z-10 rounded-full bg-[var(--cg-primary)]/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--cg-primary-fg)] shadow">
                     Tipp{tip.unlocked_by ? ` · ${tip.unlocked_by}` : ""}
                   </span>
                 ) : null}

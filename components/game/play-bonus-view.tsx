@@ -8,12 +8,13 @@ import { CodeBoxesInput } from "@/components/game/code-boxes-input";
 import { ContentTileGrid } from "@/components/game/content-tile-grid";
 import { FormattedTaskText } from "@/components/game/formatted-task-text";
 import { LevelScoringBar } from "@/components/game/level-scoring-bar";
+import { MediaCapturePanel } from "@/components/game/media-capture-panel";
 import { MediaModal } from "@/components/game/media-modal";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
 import { CODE_BOX_MAX } from "@/lib/cms/types";
 import type { BonusTask, LevelContentTile } from "@/lib/grid/level-types";
 import type { BonusSessionState } from "@/lib/grid/game-state";
-import { formatBonusSolution } from "@/lib/grid/bonus";
+import { bonusMediaKind, formatBonusSolution } from "@/lib/grid/bonus";
 import { earliestIsoTimestamp } from "@/lib/grid/level-scoring";
 import { useLevelScoringTimer } from "@/lib/hooks/use-level-scoring-timer";
 import {
@@ -73,6 +74,11 @@ type Props = {
   leadLabel?: string;
   teammates?: TeammateOption[];
   clockScope?: string | null;
+  captureContext?: {
+    inviteCode: string;
+    joinCode: string;
+    sessionId: string;
+  };
   onBegin: () => void;
   onSubmit: (selectedOptionId: string, extras?: { timedOut?: boolean; clockStartedAt?: string | null }) => void;
   onContinue: () => void;
@@ -101,9 +107,11 @@ export function PlayBonusView({
   onSkipWaiting,
   teammates = [],
   clockScope = null,
+  captureContext,
   onHandOff,
 }: Props) {
   const answerMode = bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
+  const mediaKind = bonusMediaKind(bonus);
   const boxCount =
     bonus.number_fields ?? Math.min(CODE_BOX_MAX, Math.max(1, (bonus.answer ?? "").length || CODE_BOX_MAX));
 
@@ -398,7 +406,24 @@ export function PlayBonusView({
           {bonus.question}
         </p>
 
-        {answerMode === "choice" || answerMode === "confirm" ? (
+        {mediaKind && !show ? (
+          <MediaCapturePanel
+            kind={mediaKind}
+            overlayImageUrl={bonus.overlay_image_url}
+            levelNumber={0}
+            disabled={locked}
+            isPending={isPending || submitting}
+            captureContext={captureContext}
+            allowSkip={false}
+            onSubmit={(payload) => {
+              if (payload.revealSolution || show || submitting) return;
+              setSubmitting(true);
+              onSubmit("done", { clockStartedAt: scoringStartedAt });
+            }}
+          />
+        ) : null}
+
+        {!mediaKind && (answerMode === "choice" || answerMode === "confirm") ? (
           <div className={`grid gap-3 ${bonus.options.length > 2 ? "grid-cols-2" : "grid-cols-1"}`}>
             {bonus.options.map((opt) => {
               const isPicked = selectedId === opt.id;
@@ -465,9 +490,11 @@ export function PlayBonusView({
       <div className="mt-auto space-y-3 pt-6">
         {!show ? (
           <>
-            <BigButton disabled={locked || !canCheck} onClick={checkAnswer}>
-              Antwort prüfen
-            </BigButton>
+            {!mediaKind ? (
+              <BigButton disabled={locked || !canCheck} onClick={checkAnswer}>
+                Antwort prüfen
+              </BigButton>
+            ) : null}
             {onHandOff && teammates.length > 0 ? (
               <div className="space-y-2 pt-1">
                 {pickOpen ? (

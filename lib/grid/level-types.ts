@@ -75,10 +75,12 @@ export type BonusTask = {
    * How the player answers. Default/omitted = choice (options).
    * text/boxes use `answer`; confirm is a single acknowledgement.
    */
-  answer_mode?: "choice" | "text" | "boxes" | "confirm";
+  answer_mode?: "choice" | "text" | "boxes" | "confirm" | MediaInputMode;
   /** Expected free-text / code answer when answer_mode is text or boxes. */
   answer?: string;
   number_fields?: 1 | 2 | 3 | 4 | 5;
+  /** PNG overlay for bonus augmented_photo. */
+  overlay_image_url?: string;
 };
 
 /** When a compiled bonus may fire. @see docs/BONUS_LAYER3_MODEL.md */

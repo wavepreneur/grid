@@ -24,6 +24,8 @@ type Props = {
   cityStyle?: boolean;
   canPaceTeam?: boolean;
   leadLabel?: string;
+  /** Level skip / pace hint. Bonus capture hides both. */
+  allowSkip?: boolean;
   onSubmit: (payload: SolveLevelPayload) => void;
 };
 
@@ -87,6 +89,7 @@ export function MediaCapturePanel({
   cityStyle = true,
   canPaceTeam = false,
   leadLabel = "Team Lead",
+  allowSkip = true,
   onSubmit,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -533,7 +536,7 @@ export function MediaCapturePanel({
         }}
       />
 
-      {phase !== "preview" ? (
+      {phase !== "preview" && allowSkip ? (
         canPaceTeam ? (
           <button
             type="button"
