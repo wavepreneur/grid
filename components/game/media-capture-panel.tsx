@@ -158,6 +158,7 @@ export function MediaCapturePanel({
   const [saving, setSaving] = useState(false);
   const [mounted, setMounted] = useState(false);
   const isVideo = kind === "video";
+  const hasFrame = Boolean(overlayImageUrl) && !isVideo;
   const busy = disabled || isPending || sending;
 
   const attachStream = useCallback((stream: MediaStream) => {
@@ -283,7 +284,7 @@ export function MediaCapturePanel({
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, size.width, size.height);
     const overlay = overlayRef.current;
-    if (kind === "augmented_photo" && overlay && overlay.naturalWidth > 0) {
+    if (hasFrame && overlay && overlay.naturalWidth > 0) {
       drawContain(
         ctx,
         overlay,
@@ -504,7 +505,7 @@ export function MediaCapturePanel({
       return;
     }
     if (!isVideo && file.type.startsWith("image/")) {
-      if (kind === "augmented_photo") {
+      if (hasFrame) {
         void compositeFileWithOverlay(file);
         return;
       }
@@ -549,14 +550,14 @@ export function MediaCapturePanel({
   const shootLabel =
     kind === "video"
       ? "Video aufnehmen"
-      : kind === "augmented_photo"
+      : hasFrame
         ? "Foto mit Rahmen"
         : "Foto machen";
   const hint =
     kind === "video"
       ? `Maximal ${EVENT_CAPTURE_VIDEO_MAX_SECONDS} Sekunden. Danach senden — oder neu versuchen.`
-      : kind === "augmented_photo"
-        ? "Der Rahmen liegt über der Kamera. Foto machen, prüfen, dann senden."
+      : hasFrame
+        ? "Der Rahmen liegt über der Kamera. Personen in die Aussparung setzen, dann auslösen."
         : "Foto machen, prüfen, bei Bedarf neu — dann senden.";
   const remainingSeconds = Math.max(0, EVENT_CAPTURE_VIDEO_MAX_SECONDS - elapsed);
   const recordProgress = Math.min(1, elapsed / EVENT_CAPTURE_VIDEO_MAX_SECONDS);
@@ -664,6 +665,11 @@ export function MediaCapturePanel({
         </button>
       ) : null}
 
+      {hasFrame ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img ref={overlayRef} src={overlayImageUrl} alt="" className="hidden" />
+      ) : null}
+
       <input
         ref={fileRef}
         type="file"
@@ -678,7 +684,7 @@ export function MediaCapturePanel({
       {mounted && open
         ? createPortal(
             <div className="city-game fixed inset-0 z-[4000] flex h-[100dvh] w-screen flex-col bg-black">
-          <div className="relative min-h-0 flex-1 bg-black">
+          <div className="relative isolate min-h-0 flex-1 bg-black">
             <video
               ref={videoRef}
               muted
@@ -687,23 +693,20 @@ export function MediaCapturePanel({
               onLoadedMetadata={() => {
                 if (streamRef.current) attachStream(streamRef.current);
               }}
-              className={`absolute inset-0 h-full w-full object-cover ${
+              className={`absolute inset-0 z-0 h-full w-full object-cover ${
                 phase === "preview" ? "invisible" : "visible"
               }`}
             />
-            {kind === "augmented_photo" && overlayImageUrl ? (
+            {hasFrame ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                ref={overlayRef}
                 src={overlayImageUrl}
                 alt=""
-                className={`pointer-events-none absolute inset-0 h-full w-full object-contain ${
+                className={`pointer-events-none absolute inset-0 z-10 h-full w-full object-contain ${
                   phase === "preview" ? "hidden" : ""
                 }`}
+                style={{ transform: "translateZ(1px)" }}
               />
-            ) : overlayImageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img ref={overlayRef} src={overlayImageUrl} alt="" className="hidden" />
             ) : null}
             {phase === "preview" && previewUrl ? (
               isVideo ? (
