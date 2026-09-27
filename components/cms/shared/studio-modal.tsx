@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 type StudioModalProps = {
   open: boolean;
@@ -44,9 +45,9 @@ export function StudioModal({
     };
   }, [open, onClose, closeOnEscape]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[200] flex items-end justify-center bg-ink/60 p-0 backdrop-blur-sm sm:items-center sm:p-6"
       onClick={closeOnBackdrop ? onClose : undefined}
@@ -77,7 +78,8 @@ export function StudioModal({
           <div className="border-t border-border bg-secondary/50 px-5 py-4">{footer}</div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
