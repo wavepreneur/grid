@@ -28,6 +28,7 @@ export type GrowthPack = {
   capture_url: string | null;
   webhook_url: string | null;
   capture_secret: string | null;
+  discount_code: string | null;
 };
 
 /** Player-visible subset — no capture/webhook secrets. */
@@ -45,24 +46,70 @@ export type GrowthOffer = {
   studioPreview: boolean;
 };
 
-export const STUDIO_DUMMY_DISCOUNT_CODE = "GRID-TEST-20";
+/**
+ * Shared live voucher. Change `code` + `issuedOn` together (~every 30 days).
+ * Each code stays redeemable for `validDays` from `issuedOn` and works for everyone.
+ */
+export const LIVE_FAMILY_VOUCHER = {
+  code: "EXIT3710",
+  percent: 20,
+  issuedOn: "2026-09-27",
+  validDays: 60,
+} as const;
+
 export const EXITMANIA_SHARE_URL = "https://exitmania.com";
 export const EXITMANIA_TEAM_RANKING_URL = "https://exitmania.com/team-ranking";
 
-export function studioGrowthOffer(): GrowthOffer {
+function addUtcDays(isoDate: string, days: number): Date {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days));
+}
+
+export function liveFamilyVoucherUntil(): Date {
+  return addUtcDays(LIVE_FAMILY_VOUCHER.issuedOn, LIVE_FAMILY_VOUCHER.validDays);
+}
+
+export function formatDeDay(date: Date): string {
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${day}.${month}.${date.getUTCFullYear()}`;
+}
+
+export function familyVoucherBadge(): string {
+  return `${LIVE_FAMILY_VOUCHER.percent} % · ${LIVE_FAMILY_VOUCHER.validDays} Tage · Team bis 4`;
+}
+
+function isHrProbeUrl(url: string | null): boolean {
+  return Boolean(url?.includes("/grid-hr-probe"));
+}
+
+export function familyVoucherOffer(input: {
+  surface: GrowthSurface;
+  discountCode?: string | null;
+  shareUrl?: string | null;
+}): GrowthOffer {
+  const code = (input.discountCode?.trim() || LIVE_FAMILY_VOUCHER.code).toUpperCase();
+  const shareUrl =
+    input.shareUrl && isSafeHttpUrl(input.shareUrl) && !isHrProbeUrl(input.shareUrl)
+      ? input.shareUrl
+      : EXITMANIA_SHARE_URL;
   return {
     enabled: true,
-    surface: "studio",
+    surface: input.surface,
     headline: "Mit Familie & Freunden spielen",
     body: "20 % auf euer nächstes Exitmania-Spiel. Selbst einlösen — oder mit einem Tipp an Freunde senden.",
-    ctaLabel: "Auswertung per Mail",
+    ctaLabel: "Per Messenger senden",
     skipLabel: "Jetzt nicht",
     shareLabel: "Per Messenger senden",
-    shareUrl: EXITMANIA_SHARE_URL,
-    discountCode: STUDIO_DUMMY_DISCOUNT_CODE,
-    discountNote: "Studio-Test: Dummy-Code, einmal gedacht. Im Live-Checkout kommt der echte Code.",
-    studioPreview: true,
+    shareUrl,
+    discountCode: code,
+    discountNote: `Einlösbar bis ${formatDeDay(liveFamilyVoucherUntil())}. Gilt für alle.`,
+    studioPreview: input.surface === "studio",
   };
+}
+
+export function studioGrowthOffer(): GrowthOffer {
+  return familyVoucherOffer({ surface: "studio" });
 }
 
 export function buildVoucherShareMessage(input: {
@@ -77,7 +124,7 @@ export function buildVoucherShareMessage(input: {
       ? `${input.score} Punkte. Schlag mich, wenn du kannst 🔥`
       : "Schlag mich, wenn du kannst 🔥";
   const codeLine = input.discountCode
-    ? `🎟️ 20 %-Code: ${input.discountCode} — einmal, Team bis 4 Personen`
+    ? `🎟️ ${LIVE_FAMILY_VOUCHER.percent} %-Code: ${input.discountCode} — ${LIVE_FAMILY_VOUCHER.validDays} Tage, Team bis 4 Personen`
     : null;
   return {
     title: "Schlag mich, wenn du kannst",
@@ -98,6 +145,7 @@ export const EMPTY_GROWTH_PACK: GrowthPack = {
   capture_url: null,
   webhook_url: null,
   capture_secret: null,
+  discount_code: null,
 };
 
 function isGrowthSurface(value: unknown): value is GrowthSurface {
@@ -152,6 +200,7 @@ export function parseGrowthPack(contentConfig: unknown): GrowthPack {
     capture_url: readHttpUrl(flags.capture_url),
     webhook_url: readHttpUrl(flags.webhook_url),
     capture_secret: readTrimmed(flags.capture_secret, 200),
+    discount_code: readTrimmed(flags.discount_code, 40),
   };
 }
 
@@ -159,16 +208,21 @@ export function resolvePlayGrowthOffer(
   contentConfig: unknown,
   isStudioTest: boolean,
 ): GrowthOffer | null {
-  return parseGrowthOffer(contentConfig) ?? (isStudioTest ? studioGrowthOffer() : null);
+  const pack = parseGrowthPack(contentConfig);
+  const liveSurface = pack.surface === "exitmania_b2c" || pack.surface === "exitmania_teamevent";
+  if (isStudioTest || (pack.enabled && liveSurface)) {
+    return familyVoucherOffer({
+      surface: isStudioTest ? "studio" : pack.surface,
+      discountCode: pack.discount_code,
+      shareUrl: pack.share_url,
+    });
+  }
+  return parseGrowthOffer(contentConfig);
 }
 
 export function parseGrowthOffer(contentConfig: unknown): GrowthOffer | null {
   const pack = parseGrowthPack(contentConfig);
   if (!pack.enabled) return null;
-  const discountCode = readTrimmed(
-    (contentConfig as { growth?: { discount_code?: unknown } }).growth?.discount_code,
-    40,
-  );
   return {
     enabled: true,
     surface: pack.surface,
@@ -178,7 +232,7 @@ export function parseGrowthOffer(contentConfig: unknown): GrowthOffer | null {
     skipLabel: pack.skip_label || "Jetzt nicht",
     shareLabel: pack.share_label ?? "Per Messenger senden",
     shareUrl: pack.share_url ?? EXITMANIA_SHARE_URL,
-    discountCode,
+    discountCode: pack.discount_code,
     discountNote: readTrimmed(
       (contentConfig as { growth?: { discount_note?: unknown } }).growth?.discount_note,
       200,

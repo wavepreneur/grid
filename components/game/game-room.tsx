@@ -1119,7 +1119,6 @@ export function GameRoom({
           sessionId: session.sessionId,
         }}
         brandStamp={{
-          score: teamState.gameState.score ?? 0,
           gameTitle: eventContent.templateName.trim() || eventTitle,
           siteUrl: "exitmania.com",
         }}

@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { BigButton } from "@/components/game/city/ui";
-import { buildVoucherShareMessage, type GrowthOffer } from "@/lib/grid/growth-pack";
+import {
+  buildVoucherShareMessage,
+  familyVoucherBadge,
+  type GrowthOffer,
+} from "@/lib/grid/growth-pack";
 
 type Props = {
   offer: GrowthOffer;
@@ -65,7 +69,7 @@ export function GrowthRecapCard({ offer, score }: Props) {
       {offer.discountCode ? (
         <div className="mt-4 rounded-2xl bg-[var(--cg-bg)] px-4 py-4 text-center">
           <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--cg-muted)]">
-            20 % · einmal · Team bis 4
+            {familyVoucherBadge()}
           </p>
           <p className="mt-1 font-mono text-2xl font-extrabold tracking-wide text-[var(--cg-fg)]">
             {offer.discountCode}

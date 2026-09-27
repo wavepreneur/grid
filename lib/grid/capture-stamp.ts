@@ -1,82 +1,111 @@
-import { encodeCanvasJpeg, fitCaptureSize } from "@/lib/grid/compress-capture";
-
 export type CaptureBrandStamp = {
-  score: number;
   gameTitle: string;
   siteUrl?: string;
 };
 
+const DEFAULT_SITE = "exitmania.com";
+
 export function resolveCaptureBrandStamp(input: {
-  score: number;
   gameTitle?: string | null;
+  siteUrl?: string | null;
 }): CaptureBrandStamp {
-  const gameTitle = input.gameTitle?.replace(/^\[Test\]\s*/, "").trim();
-  return {
-    score: input.score,
-    gameTitle: gameTitle || "GRID",
-    siteUrl: "exitmania.com",
-  };
+  const gameTitle = (input.gameTitle ?? "").trim() || "Exitmania";
+  const siteUrl = (input.siteUrl ?? "").trim() || DEFAULT_SITE;
+  return { gameTitle, siteUrl };
 }
 
-function fitLabel(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+function fitOneLine(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+): string {
   if (ctx.measureText(text).width <= maxWidth) return text;
-  let value = text;
-  while (value.length > 1 && ctx.measureText(`${value}…`).width > maxWidth) {
-    value = value.slice(0, -1);
+  const ellipsis = "…";
+  let cut = text.length;
+  while (cut > 1 && ctx.measureText(`${text.slice(0, cut)}${ellipsis}`).width > maxWidth) {
+    cut -= 1;
   }
-  return `${value}…`;
+  return `${text.slice(0, cut)}${ellipsis}`;
 }
 
-/** Instagram-ready footer: score, game name, site — baked into the JPEG. */
+/**
+ * Bakes a compact Exitmania footer onto a captured JPEG:
+ * logo wordmark, game name, website. No score.
+ */
 export async function stampCapturePhoto(
   blob: Blob,
   stamp: CaptureBrandStamp,
 ): Promise<Blob> {
-  if (!blob.type.startsWith("image/") && blob.type !== "") return blob;
+  if (typeof createImageBitmap !== "function") return blob;
+
   const bitmap = await createImageBitmap(blob);
-  const size = fitCaptureSize(bitmap.width, bitmap.height);
+  const w = bitmap.width;
+  const h = bitmap.height;
+  if (w < 32 || h < 32) {
+    bitmap.close();
+    return blob;
+  }
+
   const canvas = document.createElement("canvas");
-  canvas.width = size.width;
-  canvas.height = size.height;
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) {
     bitmap.close();
     return blob;
   }
-  ctx.drawImage(bitmap, 0, 0, size.width, size.height);
+
+  ctx.drawImage(bitmap, 0, 0);
   bitmap.close();
 
-  const w = canvas.width;
-  const h = canvas.height;
-  const pad = Math.max(18, Math.round(w * 0.045));
-  const barH = Math.max(120, Math.round(h * 0.26));
-  const textMax = w - pad * 2;
+  const pad = Math.round(w * 0.048);
+  const logoSize = Math.round(w * 0.036);
+  const titleSize = Math.round(w * 0.03);
+  const urlSize = Math.round(w * 0.024);
+  const gap = Math.round(w * 0.01);
+  const mark = Math.round(logoSize * 0.72);
+  const markGap = Math.round(w * 0.014);
 
-  const fade = ctx.createLinearGradient(0, h - barH, 0, h);
-  fade.addColorStop(0, "rgba(8, 16, 14, 0)");
-  fade.addColorStop(0.28, "rgba(8, 16, 14, 0.42)");
-  fade.addColorStop(1, "rgba(8, 16, 14, 0.92)");
+  const urlY = h - pad;
+  const titleY = urlY - urlSize - gap;
+  const logoY = titleY - titleSize - gap;
+  const footerTop = logoY - logoSize - pad * 0.55;
+  const fadeH = Math.round(w * 0.1);
+  const fadeTop = Math.max(0, footerTop - fadeH);
+
+  const fade = ctx.createLinearGradient(0, fadeTop, 0, footerTop);
+  fade.addColorStop(0, "rgba(8,6,4,0)");
+  fade.addColorStop(1, "rgba(8,6,4,0.78)");
   ctx.fillStyle = fade;
-  ctx.fillRect(0, h - barH, w, barH);
+  ctx.fillRect(0, fadeTop, w, footerTop - fadeTop);
+  ctx.fillStyle = "rgba(8,6,4,0.82)";
+  ctx.fillRect(0, footerTop, w, h - footerTop);
 
-  ctx.fillStyle = "#f97316";
-  ctx.fillRect(pad, h - barH + Math.round(pad * 0.55), Math.round(w * 0.11), 4);
+  ctx.fillStyle = "#FF6A00";
+  ctx.fillRect(0, footerTop, Math.max(4, Math.round(w * 0.01)), h - footerTop);
 
-  ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "rgba(255,255,255,0.72)";
-  ctx.font = `600 ${Math.round(w * 0.028)}px ui-sans-serif, system-ui, sans-serif`;
-  ctx.fillText("EXITMANIA", pad, h - barH + pad * 1.45);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "bottom";
+  ctx.fillStyle = "#FF6A00";
+  ctx.fillRect(pad, logoY - mark, mark, mark);
 
-  ctx.fillStyle = "#ffffff";
-  ctx.font = `800 ${Math.round(w * 0.086)}px ui-sans-serif, system-ui, sans-serif`;
-  ctx.fillText(fitLabel(ctx, `${stamp.score} P`, textMax), pad, h - pad * 2.15);
+  const textLeft = pad + mark + markGap;
+  const maxTextW = w - textLeft - pad;
 
-  ctx.font = `700 ${Math.round(w * 0.038)}px ui-sans-serif, system-ui, sans-serif`;
-  ctx.fillText(fitLabel(ctx, stamp.gameTitle, textMax), pad, h - pad * 1.2);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = `700 ${logoSize}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.fillText("EXITMANIA", textLeft, logoY);
 
-  ctx.fillStyle = "rgba(255,255,255,0.78)";
-  ctx.font = `600 ${Math.round(w * 0.03)}px ui-sans-serif, system-ui, sans-serif`;
-  ctx.fillText(stamp.siteUrl ?? "exitmania.com", pad, h - pad * 0.48);
+  ctx.fillStyle = "rgba(255,255,255,0.94)";
+  ctx.font = `600 ${titleSize}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.fillText(fitOneLine(ctx, stamp.gameTitle, maxTextW), textLeft, titleY);
 
-  return (await encodeCanvasJpeg(canvas)) ?? blob;
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.font = `500 ${urlSize}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.fillText(fitOneLine(ctx, stamp.siteUrl ?? DEFAULT_SITE, maxTextW), textLeft, urlY);
+
+  const stamped = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob((next) => resolve(next), "image/jpeg", 0.88);
+  });
+  return stamped ?? blob;
 }

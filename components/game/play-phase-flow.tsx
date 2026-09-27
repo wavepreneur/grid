@@ -213,7 +213,6 @@ export function PlayPhaseFlow({
     gameState.levels,
   );
   const brandStamp: CaptureBrandStamp = resolveCaptureBrandStamp({
-    score,
     gameTitle: eventContent.templateName,
   });
 
