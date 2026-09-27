@@ -47,7 +47,12 @@ import { transferCaptain, handoverSession, removePlayerFromLobby } from "@/app/a
 import { useTeamSync, type GpsFixPayload } from "@/lib/hooks/use-team-sync";
 import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
 import { cacheTeamState, readLocalPaused, writeLocalPaused, pauseStorageKey } from "@/lib/grid/offline-state";
-import { displayRoleLabel, bonusAudienceHeadline, DEFAULT_ROLE_LABELS } from "@/lib/grid/role-labels";
+import {
+  displayRoleLabel,
+  bonusAudiencePlayerNames,
+  formatBonusAudienceNames,
+  DEFAULT_ROLE_LABELS,
+} from "@/lib/grid/role-labels";
 import { findForeignActiveBonuses } from "@/lib/grid/bonus-queue";
 import { StudioDeskTestBar } from "@/components/game/studio-desk-test-bar";
 import { useBonusQueueTick } from "@/lib/hooks/use-bonus-queue-tick";
@@ -790,43 +795,47 @@ export function GameRoom({
     "alpha",
     eventContent.roleLabels ?? DEFAULT_ROLE_LABELS,
   );
-  const roleLabels = eventContent.roleLabels ?? DEFAULT_ROLE_LABELS;
   const foreignBonusToasts = useMemo(() => {
+    const roster = lobbyPlayers.map((p) => ({
+      id: p.id,
+      name: p.display_name,
+      role:
+        p.archetype_role ??
+        (p.is_alpha || p.is_captain ? "alpha" : p.is_beta ? "beta" : "gamma"),
+    }));
     return findForeignActiveBonuses(teamState.gameState, session.archetypeRole, {
       claimUnassigned: soloAlpha,
       playerId: session.playerId,
-    }).map((item) => ({
-      bonusId: item.bonus_id,
-      solverName:
-        teamState.gameState.bonus_sessions?.[item.bonus_id]?.solver_name ||
-        lobbyPlayers.find((p) => p.id === item.for_player_id)?.display_name ||
-        lobbyPlayers.find((p) => {
-          const role =
-            p.archetype_role ??
-            (p.is_alpha || p.is_captain ? "alpha" : p.is_beta ? "beta" : "gamma");
-          return role === item.for_role;
-        })?.display_name ||
-        bonusAudienceHeadline(
-          { for_role: item.for_role, for_team: false, for_player_id: item.for_player_id },
-          roleLabels,
-          {
-            players: lobbyPlayers.map((p) => ({
-              id: p.id,
-              name: p.display_name,
-              role:
-                p.archetype_role ??
-                (p.is_alpha || p.is_captain ? "alpha" : p.is_beta ? "beta" : "gamma"),
-            })),
-          },
-        ),
-      reveal: teamState.gameState.bonus_sessions?.[item.bonus_id]?.reveal ?? null,
-    }));
+    })
+      .map((item) => {
+        const sessionState = teamState.gameState.bonus_sessions?.[item.bonus_id];
+        const solverName =
+          sessionState?.solver_name?.trim() ||
+          sessionState?.reveal?.answered_by?.trim() ||
+          lobbyPlayers.find((p) => p.id === item.for_player_id)?.display_name?.trim() ||
+          formatBonusAudienceNames(
+            bonusAudiencePlayerNames(
+              {
+                for_role: item.for_role,
+                for_team: false,
+                for_player_id: item.for_player_id,
+              },
+              roster,
+            ),
+          );
+        return {
+          bonusId: item.bonus_id,
+          solverName,
+          reveal: sessionState?.reveal ?? null,
+        };
+      })
+      .filter((item) => item.solverName);
   }, [
     teamState.gameState,
     session.archetypeRole,
     soloAlpha,
+    session.playerId,
     lobbyPlayers,
-    roleLabels,
   ]);
 
   function handleTransferAlpha(targetPlayerId: string) {

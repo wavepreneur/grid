@@ -17,7 +17,10 @@ import { PlayQuizView } from "@/components/game/play-quiz-view";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
 import { levelAllowsSkip, levelHasUnusedTileHint } from "@/lib/grid/play-help";
 import { canPresentBonus, resolveBonusForPlay } from "@/lib/grid/bonus";
-import { findPresentableBonusForRole } from "@/lib/grid/bonus-queue";
+import {
+  bonusSessionIsLive,
+  findPresentableBonusForRole,
+} from "@/lib/grid/bonus-queue";
 import type { PurchasedTileHint, TeamGameState } from "@/lib/grid/game-state";
 import type {
   LevelDefinition,
@@ -27,7 +30,8 @@ import type {
 import { buildPlaySlot, missionFromLevel, usesPhasedPlay } from "@/lib/grid/play-slots";
 import type { GpsFixPayload } from "@/lib/hooks/use-team-sync";
 import {
-  bonusAudienceHeadline,
+  bonusAudiencePlayerNames,
+  formatBonusAudienceNames,
   DEFAULT_ROLE_LABELS,
   type RoleDisplayLabels,
 } from "@/lib/grid/role-labels";
@@ -465,18 +469,23 @@ export function PlayPhaseFlow({
   if (phase === "hub" || !level || !slot) {
     const pendingRoleItem = (gameState.bonus_queue ?? []).find(
       (item) =>
-        (item.status === "active" || item.status === "ready") && !item.for_team,
+        item.status === "active" &&
+        !item.for_team &&
+        bonusSessionIsLive(gameState.bonus_sessions?.[item.bonus_id]),
     );
     const pendingRoleHint = pendingRoleItem
-      ? bonusAudienceHeadline(
-          {
-            for_role: pendingRoleItem.for_role,
-            for_team: false,
-            for_player_id: pendingRoleItem.for_player_id,
-          },
-          roleLabels,
-          { players: audiencePlayers },
-        )
+      ? gameState.bonus_sessions?.[pendingRoleItem.bonus_id]?.solver_name?.trim() ||
+        formatBonusAudienceNames(
+          bonusAudiencePlayerNames(
+            {
+              for_role: pendingRoleItem.for_role,
+              for_team: false,
+              for_player_id: pendingRoleItem.for_player_id,
+            },
+            audiencePlayers,
+          ),
+        ) ||
+        null
       : null;
 
     return (
@@ -484,7 +493,10 @@ export function PlayPhaseFlow({
         {chrome}
         {sheets}
         {pendingRoleHint ? (
-          <p className="px-4 pb-2 text-center text-xs font-semibold text-[var(--cg-muted)]">
+          <p
+            className="px-4 pb-2 text-center text-xs font-semibold text-[var(--cg-muted)]"
+            translate="no"
+          >
             Bonus läuft bei {pendingRoleHint} — ihr könnt weiter.
           </p>
         ) : null}

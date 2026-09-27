@@ -3,7 +3,24 @@
  * @see docs/BONUS_LAYER3_MODEL.md
  */
 
-import type { BonusQueueItem, TeamGameState } from "@/lib/grid/game-state";
+import type {
+  BonusQueueItem,
+  BonusSessionState,
+  TeamGameState,
+} from "@/lib/grid/game-state";
+
+/** True only after someone opened or answered the bonus — not when it is merely armed. */
+export function bonusSessionIsLive(
+  session: BonusSessionState | null | undefined,
+): boolean {
+  if (!session) return false;
+  if (session.reveal) return true;
+  if (session.intro_done) return true;
+  if (typeof session.solver_name === "string" && session.solver_name.trim()) {
+    return true;
+  }
+  return Boolean(session.started_at);
+}
 
 export function promoteArmedBonuses(
   queue: BonusQueueItem[],
@@ -155,6 +172,7 @@ export function findForeignActiveBonuses(
   return queue.filter(
     (item) =>
       item.status === "active" &&
+      bonusSessionIsLive(gameState.bonus_sessions?.[item.bonus_id]) &&
       !bonusQueueItemMatchesPlayer(item, role, options?.playerId, options),
   );
 }

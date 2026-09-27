@@ -31,6 +31,7 @@ export function BonusResultBanner({ leaving, correct, headline, detail }: Props)
   return createPortal(
     <div
       role="status"
+      translate="no"
       className={`city-game pointer-events-none fixed inset-x-0 top-0 z-[1100] bg-transparent ${
         leaving ? "cg-animate-slide-up" : "cg-animate-slide-down"
       }`}
