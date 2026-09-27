@@ -43,6 +43,10 @@ import {
   upsertWalletNote,
   WALLET_UNLOCK_COST,
 } from "@/lib/grid/wallet";
+import {
+  SKIPPED_LEVEL_HEADLINE,
+  SKIPPED_LEVEL_WALLET_HINT,
+} from "@/lib/grid/play-help";
 import type { PlayerRole, SolveLevelPayload } from "@/lib/grid/level-types";
 import { resolveArchetypeRoleFlags } from "@/lib/grid/archetype-roles";
 import { resolveBlueprint } from "@/lib/grid/blueprints";
@@ -395,9 +399,8 @@ export async function solveCurrentLevel(input: {
       seenBonusIds.add(def.id);
       return true;
     });
-    // Bonus only after a real solve — reveal-solution completes without bonus.
-    const wantBonus =
-      Boolean(bonusDefs.length > 0) && !input.payload?.revealSolution;
+    // Skip / Direkt lösen still arms Layer-3 — only the solution stays hidden.
+    const wantBonus = Boolean(bonusDefs.length > 0);
 
     const armedAt = new Date();
     const bonusQueue: NonNullable<TeamGameState["bonus_queue"]> = wantBonus
@@ -592,8 +595,13 @@ export async function solveCurrentLevel(input: {
         level: currentLevel,
         solvedBy,
         pointsEarned,
-        successTitle: levelDefinition.success_title,
-        successInfo: input.payload?.revealSolution ? null : levelDefinition.success_info,
+        successTitle: input.payload?.revealSolution
+          ? SKIPPED_LEVEL_HEADLINE
+          : levelDefinition.success_title,
+        successInfo: input.payload?.revealSolution
+          ? SKIPPED_LEVEL_WALLET_HINT
+          : levelDefinition.success_info,
+        revealed: Boolean(input.payload?.revealSolution),
       }),
       wallet: input.payload?.revealSolution
         ? upsertLockedWalletNote(gameState.wallet, {

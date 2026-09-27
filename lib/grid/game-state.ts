@@ -23,6 +23,8 @@ export type GameModalState = {
   points_earned?: number;
   solved_by: string[];
   created_at: string;
+  /** Give-up / Direkt lösen — no solution on screen, wallet hint instead. */
+  outcome?: "solved" | "revealed";
 };
 
 /** Shared Schlüssel-Quiz reveal — every device shows the same answerer + result. */
@@ -716,6 +718,7 @@ export function buildLevelCompletedModal(input: {
   pointsEarned?: number;
   successTitle?: string | null;
   successInfo?: string | null;
+  revealed?: boolean;
 }): GameModalState {
   const body = input.successInfo?.trim() || undefined;
   const title = body
@@ -731,5 +734,6 @@ export function buildLevelCompletedModal(input: {
     points_earned: input.pointsEarned,
     solved_by: input.solvedBy,
     created_at: new Date().toISOString(),
+    outcome: input.revealed ? "revealed" : "solved",
   };
 }

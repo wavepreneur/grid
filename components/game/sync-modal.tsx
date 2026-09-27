@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { PartyPopper } from "lucide-react";
+import { Flag, PartyPopper } from "lucide-react";
 import { BigButton } from "@/components/game/city/ui";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 import type { GameModalState } from "@/lib/grid/game-state";
@@ -27,10 +27,11 @@ export function SyncModal({
       ? `${modal.points_earned >= 0 ? "+" : ""}${modal.points_earned} Punkte`
       : null;
   const hasNote = Boolean(modal.body?.trim());
+  const revealed = modal.outcome === "revealed";
 
   useEffect(() => {
-    playPlaySfx(hasNote ? "success" : "correct");
-  }, [modal.id, hasNote]);
+    playPlaySfx(revealed ? "ping" : hasNote ? "success" : "correct");
+  }, [modal.id, hasNote, revealed]);
 
   return (
     <div className="city-game fixed inset-0 z-[2000] flex items-center justify-center bg-[var(--cg-ink)]/75 p-4 backdrop-blur-sm">
@@ -49,19 +50,33 @@ export function SyncModal({
           className="pointer-events-none absolute -bottom-10 -right-6 h-36 w-36 rounded-full bg-[var(--cg-accent)]/25 blur-2xl"
         />
 
-        <span className="cg-animate-celebrate relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[var(--cg-success)] text-white shadow-[var(--cg-shadow-lift)]">
-          <PartyPopper className="h-10 w-10" strokeWidth={2} />
+        <span
+          className={`relative mx-auto flex h-20 w-20 items-center justify-center rounded-full text-white shadow-[var(--cg-shadow-lift)] ${
+            revealed
+              ? "bg-[var(--cg-accent)]"
+              : "cg-animate-celebrate bg-[var(--cg-success)]"
+          }`}
+        >
+          {revealed ? (
+            <Flag className="h-10 w-10" strokeWidth={2} />
+          ) : (
+            <PartyPopper className="h-10 w-10" strokeWidth={2} />
+          )}
         </span>
 
-        <p className="cg-animate-pop-in relative mt-5 text-xs font-bold uppercase tracking-[0.2em] text-[var(--cg-success)]">
-          Aufgabe geschafft
+        <p
+          className={`cg-animate-pop-in relative mt-5 text-xs font-bold uppercase tracking-[0.2em] ${
+            revealed ? "text-[var(--cg-muted)]" : "text-[var(--cg-success)]"
+          }`}
+        >
+          {revealed ? "0 Punkte" : "Aufgabe geschafft"}
         </p>
         <h2
           id="sync-modal-title"
           className="cg-animate-pop-in relative mt-2 text-3xl font-bold text-[var(--cg-fg)]"
           style={{ animationDelay: "60ms" }}
         >
-          {hasNote ? "Gelöst!" : modal.message}
+          {revealed ? modal.message : hasNote ? "Gelöst!" : modal.message}
         </h2>
 
         {points ? (
@@ -84,10 +99,10 @@ export function SyncModal({
             style={{ animationDelay: "140ms" }}
           >
             <p className="font-[var(--font-cg-sans)] text-xs font-bold uppercase leading-snug tracking-[0.14em] text-[var(--cg-muted)]">
-              {modal.message}
+              {revealed ? "Wallet" : modal.message}
             </p>
             <p className="mt-2.5 font-[var(--font-cg-display)] text-lg font-semibold leading-snug text-[var(--cg-fg)]">
-              „{modal.body}“
+              {revealed ? modal.body : `„${modal.body}“`}
             </p>
           </div>
         ) : null}

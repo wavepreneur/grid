@@ -19,6 +19,10 @@ export const ONLINE_SYNC_TIP =
 export const PLAY_RELOAD_TIP =
   "Wenn sich nichts mehr bewegen oder scrollen lässt: Seite neu laden. Ihr seid wieder genau hier — Punkte, Team und Stand bleiben.";
 
+export const SKIPPED_LEVEL_HEADLINE = "Nicht gelöst";
+export const SKIPPED_LEVEL_WALLET_HINT =
+  "Den Hinweis holt ihr in der Wallet — gegen Punkte.";
+
 export const PLAY_RULES_STEPS: ReadonlyArray<{ title: string; body: string }> = [
   {
     title: "Kacheln lösen",

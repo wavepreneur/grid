@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { Camera, X } from "lucide-react";
 import { finalizeEventCapture, prepareEventCaptureUpload } from "@/app/actions/captures";
@@ -135,6 +142,8 @@ export function MediaCapturePanel({
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const openedAtRef = useRef(0);
+  const startingRef = useRef(false);
 
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("live");
@@ -154,15 +163,13 @@ export function MediaCapturePanel({
   const attachStream = useCallback((stream: MediaStream) => {
     const video = videoRef.current;
     if (!video) return;
-    video.srcObject = stream;
+    if (video.srcObject !== stream) video.srcObject = stream;
     video.muted = true;
     video.playsInline = true;
     video.setAttribute("playsinline", "true");
     video.setAttribute("webkit-playsinline", "true");
-    void video.play().then(
-      () => setCameraReady(true),
-      () => setCameraReady(true),
-    );
+    const markReady = () => setCameraReady(true);
+    void video.play().then(markReady, markReady);
   }, []);
 
   const stopStream = useCallback(() => {
@@ -178,12 +185,19 @@ export function MediaCapturePanel({
   }, []);
 
   const startCamera = useCallback(async () => {
+    if (startingRef.current) return;
+    if (streamRef.current) {
+      attachStream(streamRef.current);
+      return;
+    }
     setCameraError(null);
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError("Kamera nicht verfügbar. Datei aus der Galerie wählen.");
       return;
     }
+    startingRef.current = true;
     try {
+      // Must start in the tap itself — iOS drops getUserMedia after the gesture.
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: isVideo,
         video: captureVideoTrackConstraints(),
@@ -198,8 +212,18 @@ export function MediaCapturePanel({
       setCameraError(
         "Kamera-Zugriff abgelehnt oder nicht möglich. Ihr könnt eine Datei wählen.",
       );
+    } finally {
+      startingRef.current = false;
     }
   }, [attachStream, isVideo]);
+
+  function openLiveCamera() {
+    if (disabled || isPending) return;
+    openedAtRef.current = Date.now();
+    setPhase("live");
+    setOpen(true);
+    void startCamera();
+  }
 
   useEffect(() => {
     setMounted(true);
@@ -207,14 +231,15 @@ export function MediaCapturePanel({
 
   useEffect(() => {
     if (!open) {
+      startingRef.current = false;
       stopStream();
       return;
     }
-    void startCamera();
+    if (streamRef.current) attachStream(streamRef.current);
     return () => {
       if (timerRef.current) window.clearInterval(timerRef.current);
     };
-  }, [open, startCamera, stopStream]);
+  }, [open, attachStream, stopStream]);
 
   useEffect(() => {
     if (!open) return;
@@ -247,6 +272,7 @@ export function MediaCapturePanel({
   }
 
   async function snapshotPhoto() {
+    if (Date.now() - openedAtRef.current < 450) return;
     const video = videoRef.current;
     if (!video || video.videoWidth < 2) return;
     const size = fitCaptureSize(video.videoWidth, video.videoHeight);
@@ -285,6 +311,7 @@ export function MediaCapturePanel({
   }
 
   function startRecording() {
+    if (Date.now() - openedAtRef.current < 450) return;
     const stream = streamRef.current;
     if (!stream || typeof MediaRecorder === "undefined") {
       setCameraError("Video-Aufnahme in diesem Browser nicht möglich. Datei wählen.");
@@ -347,6 +374,8 @@ export function MediaCapturePanel({
 
   function closeCamera(force = false) {
     if (busy && !force) return;
+    // iOS sends a delayed click at the same spot — don't treat it as "close".
+    if (!force && Date.now() - openedAtRef.current < 450) return;
     setOpen(false);
     setPhase("live");
     setPreviewBlob(null);
@@ -539,6 +568,7 @@ export function MediaCapturePanel({
     children: ReactNode;
     disabled?: boolean;
     onClick?: () => void;
+    onPointerDown?: (event: PointerEvent<HTMLButtonElement>) => void;
   }) {
     return cityStyle ? (
       <BigButton {...props}>{children}</BigButton>
@@ -578,7 +608,16 @@ export function MediaCapturePanel({
         {hint}
       </p>
 
-      <PrimaryButton disabled={disabled || isPending} onClick={() => setOpen(true)}>
+      <PrimaryButton
+        disabled={disabled || isPending}
+        onPointerDown={(event) => {
+          if (event.pointerType === "mouse" && event.button !== 0) return;
+          if (event.pointerType === "touch" || event.pointerType === "pen") {
+            openLiveCamera();
+          }
+        }}
+        onClick={openLiveCamera}
+      >
         <span className="inline-flex items-center justify-center gap-2">
           <Camera className="h-5 w-5" strokeWidth={2.4} />
           Kamera öffnen
@@ -645,6 +684,9 @@ export function MediaCapturePanel({
               muted
               playsInline
               autoPlay
+              onLoadedMetadata={() => {
+                if (streamRef.current) attachStream(streamRef.current);
+              }}
               className={`absolute inset-0 h-full w-full object-cover ${
                 phase === "preview" ? "invisible" : "visible"
               }`}

@@ -22,8 +22,8 @@ import { useLevelScoringTimer } from "@/lib/hooks/use-level-scoring-timer";
 import { LevelScoringBar } from "@/components/game/level-scoring-bar";
 import { CodeBoxesInput } from "@/components/game/code-boxes-input";
 import { hasLiveLevelScoring } from "@/lib/grid/level-scoring";
-import { formatLevelSolution } from "@/lib/grid/level-solution";
 import { isMediaInputMode, type LevelDefinition, type SolveLevelPayload } from "@/lib/grid/level-types";
+import { SKIPPED_LEVEL_HEADLINE, SKIPPED_LEVEL_WALLET_HINT } from "@/lib/grid/play-help";
 import type { LevelRevealState } from "@/lib/grid/game-state";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
 import { MediaCapturePanel } from "@/components/game/media-capture-panel";
@@ -110,7 +110,6 @@ export function LevelSolvePanel({
   const isMedia = isMediaInputMode(inputMode);
   const isCodeBoxes = inputMode === "boxes" || inputMode === "number";
   const numberFieldCount = level.number_fields ?? 1;
-  const solutionText = formatLevelSolution(level);
   const solutionShown = solutionRevealed || Boolean(teamReveal);
 
   useEffect(() => {
@@ -239,7 +238,7 @@ export function LevelSolvePanel({
         }
       >
         <Check className="h-5 w-5 text-[var(--cg-success)]" />
-        {isMedia ? "Übersprungen" : `Lösung: ${solutionText}`}
+        {isMedia ? "Übersprungen" : SKIPPED_LEVEL_HEADLINE}
       </p>
       <p
         className={
@@ -248,7 +247,7 @@ export function LevelSolvePanel({
             : "text-center text-sm text-slate-500"
         }
       >
-        Aufgabe abgeschlossen · 0 Punkte
+        {SKIPPED_LEVEL_WALLET_HINT}
       </p>
       {canPaceTeam ? (
         cityStyle ? (

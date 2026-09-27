@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { PointerEventHandler, ReactNode } from "react";
 
 /** Phone-column play frame — same proportions on phone, tablet, and desktop. */
 function PlayColumnShell({
@@ -35,6 +35,7 @@ export function StageShell({ children }: { children: ReactNode }) {
 export function BigButton({
   children,
   onClick,
+  onPointerDown,
   variant = "primary",
   disabled,
   icon,
@@ -42,6 +43,7 @@ export function BigButton({
 }: {
   children: ReactNode;
   onClick?: () => void;
+  onPointerDown?: PointerEventHandler<HTMLButtonElement>;
   variant?: "primary" | "accent" | "ghost" | "outline";
   disabled?: boolean;
   icon?: ReactNode;
@@ -58,6 +60,7 @@ export function BigButton({
     <button
       type={type}
       onClick={onClick}
+      onPointerDown={onPointerDown}
       disabled={disabled}
       className={`cg-tap-lift flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-3.5 text-base font-semibold disabled:opacity-40 ${styles[variant]}`}
     >
