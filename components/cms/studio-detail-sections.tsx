@@ -10,7 +10,13 @@ import {
 } from "@/lib/hooks/use-studio-game-detail";
 import { useStudioTask } from "@/lib/hooks/use-studio-task-detail";
 
-export function StudioGameDetailSection({ gameId }: { gameId: string }) {
+export function StudioGameDetailSection({
+  gameId,
+  locale,
+}: {
+  gameId: string;
+  locale?: string;
+}) {
   const gameQuery = useStudioGame(gameId);
   const linksQuery = useStudioGameTaskLinks(gameId);
 
@@ -44,7 +50,7 @@ export function StudioGameDetailSection({ gameId }: { gameId: string }) {
           : `Spiel-Code ${game.slug}${game.city_slug ? ` · Stadt ${game.city_slug}` : ""} — Veröffentlichen und Live-Events steuerst du in der Spiele-Liste.`
       }
     >
-      <GameEditorPanel game={game} taskLinks={linksQuery.data ?? []} />
+      <GameEditorPanel game={game} taskLinks={linksQuery.data ?? []} locale={locale} />
     </StudioPage>
   );
 }

@@ -94,6 +94,8 @@ export type GameLinkOverrides = {
     code?: string;
     kind?: string;
   };
+  /** Extra locale strings for this slot. Source copy stays on the task/overrides. */
+  locales?: Record<string, import("@/lib/cms/game-i18n").SlotLocaleCopy>;
 };
 
 export const MISSION_UNLOCK_OPTIONS: Array<{

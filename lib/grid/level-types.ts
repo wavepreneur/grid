@@ -253,6 +253,11 @@ export type EventContentConfig = {
   cms_game_id?: string;
   /** Published version number at booking/test time (informational). */
   cms_version_number?: number;
+  /**
+   * Booking-locked play language. Players do not switch.
+   * Studio source copy is used when missing or unknown.
+   */
+  language?: string;
   /** Studio playtest event — prefer live CMS compile over frozen snapshot. */
   is_studio_test?: boolean;
   /**

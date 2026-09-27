@@ -12,6 +12,7 @@ import { generateInviteCode, generateJoinCode, generatePortalToken } from "@/lib
 import { eventCaptainPath, eventLobbyPath, eventTeamJoinPath, cockpitPath } from "@/lib/grid/event-routes";
 import { getCityIdBySlug } from "@/lib/grid/organizations";
 import type { ActionResult } from "@/lib/grid/types";
+import { parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
 
 export type StudioTestSession = {
   eventId: string;
@@ -130,6 +131,7 @@ async function createTestEventAndTeam(input: {
   versionId: string | null;
   durationMinutes: number | null;
   runtimeProfiles: unknown;
+  language?: StudioLanguage;
 }): Promise<StudioTestSession> {
   const supabase = createAdminClient();
 
@@ -164,6 +166,7 @@ async function createTestEventAndTeam(input: {
         ? (input.runtimeProfiles as { allowed_fallbacks?: unknown }).allowed_fallbacks
         : undefined,
     is_studio_test: true,
+    language: parseStudioLanguage(input.language),
   };
 
   const { data: event, error: insertError } = await supabase
@@ -250,6 +253,7 @@ async function resolveGameForTest(gameId: string) {
  */
 export async function getOrCreateStudioTestSession(
   gameId: string,
+  language?: StudioLanguage,
 ): Promise<ActionResult<StudioTestSession>> {
   try {
     const resolved = await resolveGameForTest(gameId);
@@ -307,6 +311,7 @@ export async function getOrCreateStudioTestSession(
               runtime_profiles: game.runtime_profiles ?? undefined,
               allowed_fallbacks: game.runtime_profiles?.allowed_fallbacks,
               is_studio_test: true,
+              language: parseStudioLanguage(language ?? game.language),
             },
           })
           .eq("id", existing.id);
@@ -338,6 +343,7 @@ export async function getOrCreateStudioTestSession(
       versionId: version?.id ?? null,
       durationMinutes: game.duration_minutes,
       runtimeProfiles: game.runtime_profiles,
+      language: parseStudioLanguage(language ?? game.language),
     });
 
     revalidatePath(`/admin/games/${gameId}`);
@@ -353,6 +359,7 @@ export async function getOrCreateStudioTestSession(
 /** Archives the current test event and creates a fresh one (new invite + join codes). */
 export async function regenerateStudioTestSession(
   gameId: string,
+  language?: StudioLanguage,
 ): Promise<ActionResult<StudioTestSession>> {
   try {
     const resolved = await resolveGameForTest(gameId);
@@ -386,6 +393,7 @@ export async function regenerateStudioTestSession(
       versionId: version?.id ?? null,
       durationMinutes: game.duration_minutes,
       runtimeProfiles: game.runtime_profiles,
+      language: parseStudioLanguage(language ?? game.language),
     });
 
     revalidatePath(`/admin/games/${gameId}`);
@@ -453,6 +461,7 @@ export async function createLiveEventFromGame(
       content_mode: game.runtime_profiles?.default_mode,
       runtime_profiles: game.runtime_profiles ?? undefined,
       allowed_fallbacks: game.runtime_profiles?.allowed_fallbacks,
+      language: parseStudioLanguage(game.language),
     };
 
     const { data: event, error: insertError } = await supabase

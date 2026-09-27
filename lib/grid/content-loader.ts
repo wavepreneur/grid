@@ -38,6 +38,7 @@ import { parseBonusTask } from "@/lib/grid/bonus";
 import { parseGameHelpLinks } from "@/lib/grid/game-help-links";
 import { parseFollowUpTrigger } from "@/lib/grid/follow-up-trigger";
 import { resolvePlayGrowthOffer } from "@/lib/grid/growth-pack";
+import { parseStudioLanguage } from "@/lib/cms/languages";
 
 type GlobalLevelRow = {
   level_number: number;
@@ -383,11 +384,12 @@ export async function loadResolvedEventContent(input: {
 }): Promise<ResolvedEventContent> {
   const contentConfig = mergeContentConfigWithBlueprint(parseContentConfig(input.contentConfig));
   const routeOverride = parseRouteOverride(input.routeOverride);
+  const playLocale = parseStudioLanguage(contentConfig.language);
 
   // Studio test sessions always compile from the live editor state so „Testen“
   // reflects saved changes without requiring a new publish.
   if (contentConfig.is_studio_test && contentConfig.cms_game_id) {
-    const live = await loadLiveStudioGameSnapshot(contentConfig.cms_game_id);
+    const live = await loadLiveStudioGameSnapshot(contentConfig.cms_game_id, playLocale);
     if (live && live.levels.length > 0) {
       const { game, levels, compiledLogic } = live;
       const mergedConfig = mergeContentConfigWithBlueprint({
@@ -427,7 +429,7 @@ export async function loadResolvedEventContent(input: {
   }
 
   if (input.studioGameVersionId) {
-    const snapshot = await loadStudioVersionSnapshot(input.studioGameVersionId);
+    const snapshot = await loadStudioVersionSnapshot(input.studioGameVersionId, playLocale);
     if (snapshot && snapshot.levels.length > 0) {
       const { game, levels, compiledLogic } = snapshot;
       const mergedConfig = mergeContentConfigWithBlueprint({

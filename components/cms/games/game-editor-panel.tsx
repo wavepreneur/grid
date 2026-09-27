@@ -3,11 +3,16 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  addGameLocale,
   removeGameTemplate,
   saveGameAsTemplate,
   updateGame,
   updateGameLayerProfile,
 } from "@/app/actions/cms/games";
+import { GameLanguageCell } from "@/components/cms/games/game-language-cell";
+import { GameTranslationPanel } from "@/components/cms/games/game-translation-panel";
+import { gameLocales } from "@/lib/cms/game-i18n";
+import { parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
 import { StudioBadge, StudioPanel } from "@/components/cms/admin-shell";
 import { GameLayerProfilePanel } from "@/components/cms/games/game-layer-profile-panel";
 import { GameLogicPanel } from "@/components/cms/games/game-logic-panel";
@@ -58,6 +63,7 @@ import {
 type Props = {
   game: StudioGame;
   taskLinks: StudioGameTaskLink[];
+  locale?: string;
 };
 
 type GameEditorState = Omit<StudioGame, "logic_rules"> & { logic_rules: StudioLogicRule[] };
@@ -112,6 +118,7 @@ function SurfaceIcon({ mode, active }: { mode: ContentMode; active: boolean }) {
 export function GameEditorPanel({
   game: initialGame,
   taskLinks,
+  locale: localeParam,
 }: Props) {
   const router = useRouter();
   const cache = useStudioCache();
@@ -120,6 +127,8 @@ export function GameEditorPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const locale = parseStudioLanguage(localeParam ?? initialGame.language);
+  const isSourceLocale = locale === parseStudioLanguage(initialGame.language);
   const surface = parseRuntimeProfiles(game.runtime_profiles).default_mode;
   const routeOrder = parseRuntimeProfiles(game.runtime_profiles).route_order;
   const followUp = parseFollowUpTrigger(game.feature_flags);
@@ -257,11 +266,50 @@ export function GameEditorPanel({
     });
   }
 
+  function handleAddLocale(language: StudioLanguage) {
+    setError(null);
+    startTransition(async () => {
+      const result = await addGameLocale(game.id, language);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      cache.setGame(result.data!);
+      setGame(toEditorState(result.data!));
+      router.push(`/admin/games/${game.id}?lang=${language}`);
+    });
+  }
+
   return (
     <div className="space-y-8">
       {error ? <StudioError message={error} /> : null}
       {message ? <StudioSuccess message={message} /> : null}
 
+      <StudioPanel>
+        <StudioSectionTitle
+          title="Sprache"
+          description="Ein Spiel, mehrere Texte. Die Buchung sperrt die Sprache — Spieler wechseln sie nicht."
+        />
+        <GameLanguageCell
+          gameId={game.id}
+          locales={gameLocales(initialGame)}
+          sourceLocale={initialGame.language}
+          activeLocale={locale}
+          adding={pending}
+          onAdd={handleAddLocale}
+        />
+      </StudioPanel>
+
+      {!isSourceLocale ? (
+        taskLinks.length > 0 ? (
+          <GameTranslationPanel game={initialGame} locale={locale} taskLinks={taskLinks} />
+        ) : (
+          <p className="text-sm text-muted-foreground">Aufgaben werden geladen…</p>
+        )
+      ) : null}
+
+      {isSourceLocale ? (
+      <div className="space-y-8">
       <StudioPanel>
         <StudioSectionTitle
           title="1 · Layout"
@@ -699,7 +747,10 @@ export function GameEditorPanel({
         language={game.language}
         initialLinks={taskLinks}
       />
+      </div>
+      ) : null}
 
+      {isSourceLocale ? (
       <details className="group rounded-2xl border border-border bg-card">
         <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-foreground marker:content-none [&::-webkit-details-marker]:hidden">
           Erweitert
@@ -720,6 +771,7 @@ export function GameEditorPanel({
           />
         </div>
       </details>
+      ) : null}
     </div>
   );
 }

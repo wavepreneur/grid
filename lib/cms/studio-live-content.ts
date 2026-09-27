@@ -11,10 +11,19 @@ import {
 } from "@/lib/cms/layer-model";
 import { DEFAULT_TASK_CONTENT, type StudioGame, type StudioGameTaskLink, type StudioTask } from "@/lib/cms/types";
 import type { StudioVersionSnapshot } from "@/lib/cms/studio-snapshot";
+import { parseStudioLanguage } from "@/lib/cms/languages";
+import {
+  localizedFeatureFlags,
+  localizeStudioGameContent,
+  parseTranslations,
+} from "@/lib/cms/game-i18n";
+import { buildGameSlots } from "@/lib/cms/game-slots";
 
 function normalizeGameRow(row: StudioGame): StudioGame {
   return {
     ...row,
+    language: parseStudioLanguage(row.language),
+    translations: parseTranslations(row.translations),
     active_layers: parseActiveLayers(row.active_layers),
     runtime_profiles: parseRuntimeProfiles(row.runtime_profiles),
     logic_rules: row.logic_rules ?? [],
@@ -38,6 +47,7 @@ function mapTaskRow(raw: Record<string, unknown>): StudioTask {
  */
 export async function loadLiveStudioGameSnapshot(
   gameId: string,
+  locale?: string,
 ): Promise<StudioVersionSnapshot | null> {
   const supabase = createAdminClient();
   const { data: gameRow, error: gameError } = await supabase
@@ -160,10 +170,23 @@ export async function loadLiveStudioGameSnapshot(
 
   const rules = parseLogicRules(game.logic_rules);
   const compiled = compileGameLogic({ game, links, rules, openerTasksById });
-
-  return {
+  const language = parseStudioLanguage(locale ?? game.language);
+  const localized = localizeStudioGameContent({
     game,
     levels: compiled.levels,
-    compiledLogic: compiled,
+    slotLinks: buildGameSlots(links, { openerTasksById }).map((slot) => slot.levelLink),
+    locale: language,
+  });
+
+  return {
+    game: {
+      ...game,
+      name: localized.name,
+      description: localized.description,
+      farewell_text: localized.farewell_text,
+      feature_flags: localizedFeatureFlags(game.feature_flags, localized),
+    },
+    levels: localized.levels,
+    compiledLogic: { ...compiled, levels: localized.levels },
   };
 }

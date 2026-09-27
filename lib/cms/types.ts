@@ -7,10 +7,9 @@ import type {
   StudioLayer,
 } from "@/lib/cms/layer-model";
 import { DEFAULT_RUNTIME_PROFILES } from "@/lib/cms/layer-model";
+import type { StudioLanguage } from "@/lib/cms/languages";
 
-export type { ContentContext, RoleAssignment, RuntimeProfiles, StudioLayer };
-
-export type StudioLanguage = "de" | "en";
+export type { ContentContext, RoleAssignment, RuntimeProfiles, StudioLayer, StudioLanguage };
 
 export type StudioGameStatus = "draft" | "published" | "archived";
 
@@ -130,6 +129,8 @@ export type StudioGame = {
   logo_url: string | null;
   description: string;
   language: StudioLanguage;
+  /** Extra locales besides `language`. Source copy stays on name/description/farewell_text. */
+  translations: import("@/lib/cms/game-i18n").GameTranslations;
   city_slug: string | null;
   duration_minutes: number | null;
   gps_enabled: boolean;
@@ -213,6 +214,7 @@ export type UpdateGameInput = {
   name?: string;
   description?: string;
   language?: StudioLanguage;
+  translations?: import("@/lib/cms/game-i18n").GameTranslations;
   city_slug?: string | null;
   duration_minutes?: number | null;
   gps_enabled?: boolean;

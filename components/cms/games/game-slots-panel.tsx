@@ -161,7 +161,7 @@ type Props = {
   gameId: string;
   surface: ContentMode;
   routeOrder?: "linear" | "free";
-  language?: "de" | "en";
+  language?: string;
   initialLinks: StudioGameTaskLink[];
 };
 

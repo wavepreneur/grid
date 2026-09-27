@@ -35,7 +35,7 @@ import type { StudioGameTaskLink } from "@/lib/cms/types";
 
 type Props = {
   gameId: string;
-  language: "de" | "en";
+  language: string;
   gpsEnabled: boolean;
   citySlug?: string | null;
   activeLayers: StudioLayer[];

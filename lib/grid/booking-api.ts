@@ -13,6 +13,7 @@ import {
   resolvePublishedStudioGame,
   studioGameContentConfigFields,
 } from "@/lib/grid/studio-booking";
+import { parseStudioLanguage } from "@/lib/cms/languages";
 
 export type GridBookingRequest = {
   organization_slug?: string;
@@ -28,6 +29,8 @@ export type GridBookingRequest = {
   modules?: Partial<EventModules>;
   /** Commerce recap/share pack. GRID stores it; Exitmania owns mail. */
   growth?: GrowthPack | Record<string, unknown>;
+  /** Locks play copy for this booking. Players do not switch in-game. */
+  language?: string;
 };
 
 export type GridBookingTeam = {
@@ -267,10 +270,12 @@ export async function provisionGridBooking(input: {
   }
 
   const growth = sanitizeGrowthPackInput(input.body.growth);
+  const language = parseStudioLanguage(input.body.language);
   const contentConfig = {
     ...buildDefaultContentConfig(blueprintSlug),
     ...(requestedCity ? { city_slug: requestedCity } : {}),
     ...(studio ? studioGameContentConfigFields(studio.game) : {}),
+    language,
     modules: mergeBookingModules(input.body.modules),
     ...(growth ? { growth } : {}),
   };

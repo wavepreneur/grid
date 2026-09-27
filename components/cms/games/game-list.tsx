@@ -10,10 +10,14 @@ import {
   takeGamesOffline,
 } from "@/app/actions/cms/delete";
 import {
+  addGameLocale,
   createGame,
   createGameFromTemplate,
   duplicateGames,
 } from "@/app/actions/cms/games";
+import { LAUNCH_LOCALES, localeLabel, parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
+import { gameLocales, hasLaunchCoverage } from "@/lib/cms/game-i18n";
+import { GameLanguageCell } from "@/components/cms/games/game-language-cell";
 import type { GameDeleteStatus } from "@/lib/cms/delete-status";
 import {
   useGamesLiveMeta,
@@ -36,6 +40,7 @@ import {
   IconDevices,
   IconGamepad,
   IconKeyRound,
+  IconLanguages,
   IconLive,
   IconMapPin,
   IconPlay,
@@ -69,11 +74,12 @@ import {
 
 type GameWithLive = StudioGame & { liveEventCount: number };
 
-/** Checkbox · Spiel (flex) · Fläche · Status · Ver. · Code (≈ hew9geeus2) · Datum · Aktionen */
+/** Checkbox · Spiel (flex) · Sprache · Fläche · Status · Ver. · Code (≈ hew9geeus2) · Datum · Aktionen */
 const GAME_LIST_GRID =
-  "lg:grid lg:grid-cols-[2rem_minmax(0,1fr)_5.5rem_9.5rem_2.25rem_6.75rem_4.75rem_13rem] lg:items-center lg:gap-x-3";
+  "lg:grid lg:grid-cols-[2rem_minmax(0,1fr)_7.5rem_5.5rem_9.5rem_2.25rem_6.75rem_4.75rem_13rem] lg:items-center lg:gap-x-3";
 
-type GameSort = "updated" | "created" | "status" | "name";
+type GameSort = "updated" | "created" | "status" | "name" | "language";
+type LanguageFilter = "alle" | StudioLanguage | "missing";
 type CreateMode = "blank" | "template";
 
 const SURFACE_OPTIONS: ContentMode[] = ["outdoor", "indoor", "online"];
@@ -107,6 +113,12 @@ const SORT_OPTIONS: Array<StudioSortOption<GameSort>> = [
     description: "Alphabetisch nach Titel",
     icon: <IconAlpha size={15} />,
   },
+  {
+    id: "language",
+    label: "Sprache",
+    description: "Deutsch zuerst, dann weitere",
+    icon: <IconLanguages size={15} />,
+  },
 ];
 
 function sortGames<T extends StudioGame>(list: T[], sort: GameSort): T[] {
@@ -126,6 +138,14 @@ function sortGames<T extends StudioGame>(list: T[], sort: GameSort): T[] {
       return next.sort((a, b) =>
         a.name.localeCompare(b.name, "de", { sensitivity: "base" }),
       );
+    case "language":
+      return next.sort((a, b) => {
+        const coverage = Number(hasLaunchCoverage(a)) - Number(hasLaunchCoverage(b));
+        if (coverage !== 0) return coverage;
+        const count = gameLocales(b).length - gameLocales(a).length;
+        if (count !== 0) return count;
+        return a.name.localeCompare(b.name, "de", { sensitivity: "base" });
+      });
     case "updated":
     default:
       return next.sort(
@@ -180,6 +200,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
   const [sort, setSort] = useState<GameSort>("updated");
   const [statusTab, setStatusTab] = useState<"alle" | "draft" | "published" | "archived">("alle");
   const [surfaceTab, setSurfaceTab] = useState<"alle" | ContentMode>("alle");
+  const [languageTab, setLanguageTab] = useState<LanguageFilter>("alle");
   const [query, setQuery] = useState("");
 
   const filteredGames = useMemo(() => {
@@ -193,6 +214,11 @@ export function GameList({ initialGames, initialTemplates }: Props) {
       if (surfaceTab !== "alle" && gameDefaultSurface(g) !== surfaceTab) {
         return false;
       }
+      if (languageTab === "missing") {
+        if (hasLaunchCoverage(g)) return false;
+      } else if (languageTab !== "alle") {
+        if (!gameLocales(g).includes(languageTab)) return false;
+      }
       if (!q) return true;
       return (
         g.name.toLowerCase().includes(q) ||
@@ -200,7 +226,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         (g.city_slug ?? "").toLowerCase().includes(q)
       );
     });
-  }, [gamesWithLive, statusTab, surfaceTab, query]);
+  }, [gamesWithLive, statusTab, surfaceTab, languageTab, query]);
 
   const sortedGames = useMemo(() => sortGames(filteredGames, sort), [filteredGames, sort]);
   const sortedTemplates = useMemo(
@@ -640,6 +666,19 @@ export function GameList({ initialGames, initialTemplates }: Props) {
               })),
             ]}
           />
+          <FilterTrack
+            aria-label="Sprache"
+            value={languageTab}
+            onChange={setLanguageTab}
+            options={[
+              { id: "alle", label: "Alle Sprachen" },
+              ...LAUNCH_LOCALES.map((locale) => ({
+                id: locale,
+                label: localeLabel(locale),
+              })),
+              { id: "missing", label: "Übersetzung fehlt" },
+            ]}
+          />
         </div>
         {gamesWithLive.length > 0 && sortedGames.length > 0 ? (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
@@ -673,6 +712,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
             >
               <span />
               <span className="min-w-0 truncate">Spiel</span>
+              <span className="truncate">Sprache</span>
               <span className="truncate">Fläche</span>
               <span className="truncate">Status</span>
               <span className="truncate">Ver.</span>
@@ -845,6 +885,30 @@ function FilterTrack<T extends string>({
   );
 }
 
+function GameLanguageBadges({ game }: { game: StudioGame }) {
+  const router = useRouter();
+  const refreshGames = useRefreshStudioGamesList();
+  const [adding, setAdding] = useState(false);
+
+  return (
+    <GameLanguageCell
+      gameId={game.id}
+      locales={gameLocales(game)}
+      sourceLocale={parseStudioLanguage(game.language)}
+      adding={adding}
+      onAdd={(language) => {
+        setAdding(true);
+        void addGameLocale(game.id, language).then((result) => {
+          setAdding(false);
+          if (!result.success) return;
+          router.push(`/admin/games/${game.id}?lang=${language}`);
+          void refreshGames();
+        });
+      }}
+    />
+  );
+}
+
 function formatListDate(iso: string): string {
   const date = new Date(iso);
   if (!Number.isFinite(date.getTime())) return "—";
@@ -944,6 +1008,9 @@ function GameRow({
           </div>
         </Link>
 
+        <div className="hidden min-w-0 lg:block">
+          <GameLanguageBadges game={game} />
+        </div>
         <p className="hidden truncate text-xs font-semibold text-foreground lg:block">
           {surfaceChip}
         </p>

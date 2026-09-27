@@ -17,6 +17,7 @@ import {
   Home,
   Info,
   KeyRound,
+  Languages,
   Layers,
   LayoutGrid,
   MapPin,
@@ -156,4 +157,7 @@ export function IconRoute(props: IconProps) {
 }
 export function IconLayers(props: IconProps) {
   return wrap(Layers, props);
+}
+export function IconLanguages(props: IconProps) {
+  return wrap(Languages, props);
 }

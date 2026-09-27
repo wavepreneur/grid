@@ -10,6 +10,15 @@ import {
   type StudioTask,
   type UpdateGameInput,
 } from "@/lib/cms/types";
+import { isStudioLanguage, parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
+import {
+  buildSnapshotLocales,
+  parseTranslations,
+  seedLocaleCopy,
+  type GameLocaleCopy,
+  type SlotLocaleCopy,
+  withLinkLocale,
+} from "@/lib/cms/game-i18n";
 import { generateGameSlug } from "@/lib/grid/codes";
 import {
   DEFAULT_RUNTIME_PROFILES,
@@ -41,6 +50,8 @@ import { pingTeamsContentUpdated } from "@/lib/grid/content-ping";
 function normalizeGameRow(row: StudioGame): StudioGame {
   return {
     ...(row as StudioGame),
+    language: parseStudioLanguage((row as StudioGame).language),
+    translations: parseTranslations((row as StudioGame).translations),
     active_layers: parseActiveLayers((row as StudioGame).active_layers),
     runtime_profiles: parseRuntimeProfiles((row as StudioGame).runtime_profiles),
     logic_rules: (row as StudioGame).logic_rules ?? [],
@@ -99,6 +110,7 @@ export type CreateGameInput = {
   name: string;
   /** Player surface chosen at create time. */
   surface?: "outdoor" | "indoor" | "online";
+  language?: StudioLanguage;
 };
 
 async function ensureUniqueGameSlug(
@@ -142,7 +154,8 @@ export async function createGame(input: CreateGameInput): Promise<ActionResult<S
       slug,
       name: input.name.trim(),
       description: "",
-      language: "de" as const,
+      language: parseStudioLanguage(input.language),
+      translations: {},
       gps_enabled: preset.gpsEnabled,
       active_layers: [...preset.activeLayers],
       runtime_profiles,
@@ -260,6 +273,7 @@ export async function updateGame(input: UpdateGameInput): Promise<ActionResult<S
     }
     if (input.description !== undefined) payload.description = input.description.trim();
     if (input.language !== undefined) payload.language = input.language;
+    if (input.translations !== undefined) payload.translations = parseTranslations(input.translations);
     if (input.city_slug !== undefined) payload.city_slug = input.city_slug;
     if (input.duration_minutes !== undefined) payload.duration_minutes = input.duration_minutes;
     if (input.gps_enabled !== undefined) payload.gps_enabled = input.gps_enabled;
@@ -972,6 +986,12 @@ export async function publishGame(
       rules,
       openerTasksById,
     });
+    const slots = buildGameSlots(links, { openerTasksById });
+    const locales = buildSnapshotLocales({
+      game,
+      levels: compiled.levels,
+      slotLinks: slots.map((slot) => slot.levelLink),
+    });
 
     const nextVersion = game.published_version_number + 1;
     const snapshot = {
@@ -980,6 +1000,7 @@ export async function publishGame(
       logic_rules: rules,
       compiled_logic: compiled,
       levels: compiled.levels,
+      locales,
       layer_profile: buildLayerSnapshotMeta({
         activeLayers: game.active_layers,
         runtimeProfiles: game.runtime_profiles,
@@ -1331,6 +1352,7 @@ async function copyGameWithLinks(
       logo_url: source.logo_url,
       description: source.description,
       language: source.language,
+      translations: parseTranslations(source.translations),
       city_slug: source.city_slug,
       duration_minutes: source.duration_minutes,
       gps_enabled: source.gps_enabled,
@@ -1367,7 +1389,140 @@ async function copyGameWithLinks(
     if (linksError) throw new Error(linksError.message);
   }
 
-  return data as StudioGame;
+  return normalizeGameRow(data as StudioGame);
+}
+
+export async function addGameLocale(
+  gameId: string,
+  language: StudioLanguage,
+): Promise<ActionResult<StudioGame>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const { data: row, error } = await supabase
+      .from("studio_games")
+      .select("*")
+      .eq("id", gameId)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) return { success: false, error: "Spiel nicht gefunden." };
+
+    if (!isStudioLanguage(language)) {
+      return { success: false, error: "Diese Sprache wird noch nicht unterstützt." };
+    }
+
+    const game = normalizeGameRow(row as StudioGame);
+    if (language === game.language) {
+      return { success: true, data: game };
+    }
+    const translations = { ...game.translations };
+    if (!translations[language]) {
+      translations[language] = seedLocaleCopy(game);
+    }
+
+    const { data, error: updateError } = await supabase
+      .from("studio_games")
+      .update({ translations, updated_at: new Date().toISOString() })
+      .eq("id", gameId)
+      .eq("organization_id", orgId)
+      .select("*")
+      .single();
+    if (updateError) throw new Error(updateError.message);
+
+    revalidatePath("/admin/games");
+    revalidatePath(`/admin/games/${gameId}`);
+    return { success: true, data: normalizeGameRow(data as StudioGame) };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Sprache konnte nicht angelegt werden.",
+    };
+  }
+}
+
+export async function saveGameLocale(input: {
+  gameId: string;
+  language: StudioLanguage;
+  copy: GameLocaleCopy;
+  slots?: Array<{ linkId: string; copy: SlotLocaleCopy }>;
+}): Promise<ActionResult<StudioGame>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const { data: row, error } = await supabase
+      .from("studio_games")
+      .select("*")
+      .eq("id", input.gameId)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) return { success: false, error: "Spiel nicht gefunden." };
+
+    const game = normalizeGameRow(row as StudioGame);
+    const source = parseStudioLanguage(game.language);
+    const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+    if (input.language === source) {
+      if (input.copy.name !== undefined) payload.name = input.copy.name.trim();
+      if (input.copy.description !== undefined) payload.description = input.copy.description;
+      if (input.copy.farewell_text !== undefined) payload.farewell_text = input.copy.farewell_text;
+    } else {
+      payload.translations = {
+        ...game.translations,
+        [input.language]: {
+          ...game.translations[input.language],
+          ...input.copy,
+        },
+      };
+    }
+
+    const { data, error: updateError } = await supabase
+      .from("studio_games")
+      .update(payload)
+      .eq("id", input.gameId)
+      .eq("organization_id", orgId)
+      .select("*")
+      .single();
+    if (updateError) throw new Error(updateError.message);
+
+    if (input.slots?.length) {
+      const { data: links, error: linksError } = await supabase
+        .from("studio_game_tasks")
+        .select("id, overrides")
+        .eq("game_id", input.gameId)
+        .in(
+          "id",
+          input.slots.map((slot) => slot.linkId),
+        );
+      if (linksError) throw new Error(linksError.message);
+      const copyById = new Map(input.slots.map((slot) => [slot.linkId, slot.copy]));
+      for (const link of links ?? []) {
+        const copy = copyById.get(link.id as string);
+        if (!copy) continue;
+        const overrides = withLinkLocale(
+          (link.overrides as Record<string, unknown>) ?? {},
+          input.language,
+          copy,
+        );
+        const { error: linkError } = await supabase
+          .from("studio_game_tasks")
+          .update({ overrides })
+          .eq("id", link.id)
+          .eq("game_id", input.gameId);
+        if (linkError) throw new Error(linkError.message);
+      }
+    }
+
+    revalidatePath("/admin/games");
+    revalidatePath(`/admin/games/${input.gameId}`);
+    return { success: true, data: normalizeGameRow(data as StudioGame) };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Übersetzung konnte nicht gespeichert werden.",
+    };
+  }
 }
 
 export async function duplicateGames(

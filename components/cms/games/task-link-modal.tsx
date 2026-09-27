@@ -34,7 +34,7 @@ type Props = {
   link: StudioGameTaskLink | null;
   index: number;
   layer: StudioLayer;
-  language: "de" | "en";
+  language: string;
   gpsEnabled: boolean;
   gameId: string;
   mapDefault: GpsPin;
