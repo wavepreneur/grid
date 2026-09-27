@@ -192,6 +192,13 @@ export function PlayPhaseFlow({
   const completed = Object.values(gameState.levels).filter((e) => e.status === "completed").length;
   const total = eventContent.levels.length;
   const roleLabels: RoleDisplayLabels = eventContent.roleLabels ?? DEFAULT_ROLE_LABELS;
+  const audiencePlayers = (roster && roster.length > 0
+    ? roster
+    : [
+        { id: myPlayerId ?? "", name: myName, role: myRole, roleLabel: myRoleLabel },
+        ...teammates,
+      ]
+  ).map((p) => ({ id: p.id, name: p.name, role: p.role }));
   const walletNotes = visibleWalletNotes(
     gameState.wallet,
     eventContent.levels,
@@ -373,6 +380,8 @@ export function PlayPhaseFlow({
             canPaceTeam={presentBonusMeta.for_team ? canPaceTeam : true}
             leadLabel={leadLabel}
             teammates={teammates}
+            audiencePlayers={audiencePlayers}
+            assignedPlayerId={presentBonusMeta.for_player_id}
             clockScope={teamStartedAt}
             fromLevel={presentBonusMeta.from_level}
             captureContext={captureContext}
@@ -422,6 +431,8 @@ export function PlayPhaseFlow({
             teamSession={gameState.bonus_sessions?.[bonusId] ?? null}
             canPaceTeam={canPaceTeam}
             leadLabel={leadLabel}
+            audiencePlayers={audiencePlayers}
+            assignedPlayerId={activeItem.for_player_id ?? null}
             clockScope={teamStartedAt}
             fromLevel={level.level}
             captureContext={captureContext}
@@ -456,17 +467,17 @@ export function PlayPhaseFlow({
       (item) =>
         (item.status === "active" || item.status === "ready") && !item.for_team,
     );
-    const handedTo = pendingRoleItem?.for_player_id
-      ? roster?.find((p) => p.id === pendingRoleItem.for_player_id)?.name
+    const pendingRoleHint = pendingRoleItem
+      ? bonusAudienceHeadline(
+          {
+            for_role: pendingRoleItem.for_role,
+            for_team: false,
+            for_player_id: pendingRoleItem.for_player_id,
+          },
+          roleLabels,
+          { players: audiencePlayers },
+        )
       : null;
-    const pendingRoleHint = handedTo
-      ? handedTo
-      : pendingRoleItem
-        ? bonusAudienceHeadline(
-            { for_role: pendingRoleItem.for_role, for_team: false },
-            roleLabels,
-          )
-        : null;
 
     return (
       <>

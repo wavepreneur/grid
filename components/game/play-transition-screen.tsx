@@ -84,7 +84,7 @@ export function PlayTransitionScreen({
         <p
           className={`${
             kind === "bonus" ? "cg-animate-score-pop" : "cg-animate-pop-in"
-          } mt-4 text-xl font-extrabold uppercase tracking-[0.12em] text-[var(--cg-primary)]`}
+          } mt-4 text-xl font-extrabold tracking-tight text-[var(--cg-primary)]`}
         >
           {highlight}
         </p>

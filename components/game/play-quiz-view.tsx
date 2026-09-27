@@ -44,6 +44,7 @@ export function PlayQuizView({
   const [submitting, setSubmitting] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const sfxPlayedRef = useRef<string | null>(null);
+  const appearPlayedRef = useRef(false);
 
   const show = Boolean(teamReveal);
   const correct = teamReveal?.correct ?? false;
@@ -88,6 +89,12 @@ export function PlayQuizView({
     setSubmitting(true);
     onSubmit({ selectedOptionIds: pickedMulti, selectedOptionId: pickedMulti[0] });
   }
+
+  useEffect(() => {
+    if (appearPlayedRef.current || teamReveal) return;
+    appearPlayedRef.current = true;
+    playPlaySfx("arrive");
+  }, [teamReveal]);
 
   useEffect(() => {
     if (!teamReveal) {

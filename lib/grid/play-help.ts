@@ -16,6 +16,28 @@ export const INDOOR_STATION_TIP =
 export const ONLINE_SYNC_TIP =
   "Alle Geräte sollten dasselbe sehen. Seite neu laden, einen Moment warten, oder auf /go denselben Team-Code und deinen Namen eingeben.";
 
+export const PLAY_RELOAD_TIP =
+  "Wenn sich nichts mehr bewegen oder scrollen lässt: Seite neu laden. Ihr seid wieder genau hier — Punkte, Team und Stand bleiben.";
+
+export const PLAY_RULES_STEPS: ReadonlyArray<{ title: string; body: string }> = [
+  {
+    title: "Kacheln lösen",
+    body: "Tippt die Rätselkacheln an und löst die Aufgaben dort.",
+  },
+  {
+    title: "Code eintragen",
+    body: "Manche Aufgaben zeigen danach einen Code. Den tragt ihr in der App ein — erst dann ist das Level fertig.",
+  },
+  {
+    title: "Hinweis in der Wallet",
+    body: "Nach einer richtigen Lösung erscheint ein Hinweis. Den findet ihr jederzeit im Menü unter Wallet.",
+  },
+  {
+    title: "Nicht gelöst?",
+    body: "Ohne richtige Lösung gibt es keinen Hinweis. Den könnt ihr in der Wallet nachkaufen.",
+  },
+];
+
 export function playHelpMenuHint(mode: ContentMode): string {
   switch (mode) {
     case "indoor":

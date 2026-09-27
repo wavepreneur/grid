@@ -20,6 +20,8 @@ import { useLevelScoringTimer } from "@/lib/hooks/use-level-scoring-timer";
 import {
   bonusAudienceHeadline,
   bonusAudienceIconCount,
+  bonusAudiencePlayerNames,
+  type BonusAudiencePlayer,
   type RoleDisplayLabels,
 } from "@/lib/grid/role-labels";
 import type { ContentMode } from "@/lib/cms/layer-model";
@@ -73,6 +75,9 @@ type Props = {
   canPaceTeam?: boolean;
   leadLabel?: string;
   teammates?: TeammateOption[];
+  /** Full team including me — used to address bonuses by player name. */
+  audiencePlayers?: BonusAudiencePlayer[];
+  assignedPlayerId?: string | null;
   clockScope?: string | null;
   fromLevel?: number;
   captureContext?: {
@@ -110,6 +115,8 @@ export function PlayBonusView({
   onContinue,
   onSkipWaiting,
   teammates = [],
+  audiencePlayers = [],
+  assignedPlayerId = null,
   clockScope = null,
   fromLevel = 0,
   captureContext,
@@ -179,8 +186,21 @@ export function PlayBonusView({
       : textAnswer.trim();
 
   const hub = hubMeta(mode);
-  const audience = bonusAudienceIconCount(bonus);
-  const audienceLabel = bonusAudienceHeadline(bonus, roleLabels);
+  const audienceTarget = { ...bonus, for_player_id: assignedPlayerId };
+  const resolvedPlayers: BonusAudiencePlayer[] =
+    audiencePlayers.length > 0
+      ? audiencePlayers
+      : [
+          { id: "me", name: myName, role: bonus.for_role },
+          ...teammates.map((mate) => ({ id: mate.id, name: mate.name })),
+        ];
+  const audienceNames = bonusAudiencePlayerNames(audienceTarget, resolvedPlayers);
+  const audienceLabel = bonusAudienceHeadline(audienceTarget, roleLabels, {
+    players: resolvedPlayers,
+    fallbackName: isMine ? myName : null,
+  });
+  const audience = bonusAudienceIconCount(bonus, audienceNames.length || (isMine ? 1 : 0));
+  const audiencePlural = audienceNames.length > 1 || (bonus.for_team && !isMine);
   const tiles = bonus.tiles ?? [];
   const scoringSnapshot = useLevelScoringTimer(
     introDone ? bonus.scoring : undefined,
@@ -288,11 +308,11 @@ export function PlayBonusView({
           </span>
           <SectionLabel>Bonusaufgabe läuft</SectionLabel>
           <h2 className="mt-2 text-2xl font-bold text-[var(--cg-fg)]">
-            {audienceLabel} ist dran
+            {audiencePlural ? `${audienceLabel} sind dran` : `${audienceLabel} ist dran`}
           </h2>
           <p className="mt-3 max-w-sm text-base text-[var(--cg-muted)]">
-            Nur {audienceLabel} sieht die Aufgabe. Danach geht es für alle weiter zur{" "}
-            {hub.hubLabelDe}.
+            Nur {audienceLabel} {audiencePlural ? "sehen" : "sieht"} die Aufgabe. Danach geht
+            es für alle weiter zur {hub.hubLabelDe}.
           </p>
         </div>
         <div className="mt-auto pt-8">
@@ -311,13 +331,17 @@ export function PlayBonusView({
         title={
           bonus.for_team
             ? "Nächste Aufgabe für alle"
-            : "Folgende Aufgabe ist für dich"
+            : audienceNames.length > 1
+              ? "Folgende Aufgabe ist für euch"
+              : "Folgende Aufgabe ist für dich"
         }
         highlight={audienceLabel}
         subtitle={
           bonus.for_team
             ? "Macht euch bereit — die Bonusaufgabe erscheint gleich auf jedem Gerät."
-            : "Nur auf deinem Handy. Danach bist du wieder bei deinem Team."
+            : audienceNames.length > 1
+              ? "Nur auf euren Handys. Danach seid ihr wieder beim Team."
+              : "Nur auf deinem Handy. Danach bist du wieder bei deinem Team."
         }
         audienceIcons={audience}
         onDone={beginIntro}
@@ -363,7 +387,7 @@ export function PlayBonusView({
       <div className="mt-6 flex flex-col items-center gap-2">
         <span className="flex items-center gap-1.5 rounded-full bg-[var(--cg-primary)] px-3 py-2 text-sm font-bold text-[var(--cg-primary-fg)]">
           <IconUser size={16} />
-          {bonus.for_team ? audienceLabel : `${myName} · ${audienceLabel}`}
+          {audienceLabel}
         </span>
       </div>
 

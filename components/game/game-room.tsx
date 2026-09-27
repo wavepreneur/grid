@@ -806,7 +806,19 @@ export function GameRoom({
             (p.is_alpha || p.is_captain ? "alpha" : p.is_beta ? "beta" : "gamma");
           return role === item.for_role;
         })?.display_name ||
-        bonusAudienceHeadline({ for_role: item.for_role, for_team: false }, roleLabels),
+        bonusAudienceHeadline(
+          { for_role: item.for_role, for_team: false, for_player_id: item.for_player_id },
+          roleLabels,
+          {
+            players: lobbyPlayers.map((p) => ({
+              id: p.id,
+              name: p.display_name,
+              role:
+                p.archetype_role ??
+                (p.is_alpha || p.is_captain ? "alpha" : p.is_beta ? "beta" : "gamma"),
+            })),
+          },
+        ),
       reveal: teamState.gameState.bonus_sessions?.[item.bonus_id]?.reveal ?? null,
     }));
   }, [

@@ -28,6 +28,8 @@ import {
   GPS_SETTINGS_TIP,
   INDOOR_STATION_TIP,
   ONLINE_SYNC_TIP,
+  PLAY_RELOAD_TIP,
+  PLAY_RULES_STEPS,
   playHelpMenuHint,
   playHowToPlayHint,
 } from "@/lib/grid/play-help";
@@ -41,6 +43,7 @@ export type PlayMorePanel =
   | "gps"
   | "station"
   | "sync"
+  | "reload"
   | "support"
   | "pause"
   | "team"
@@ -120,10 +123,15 @@ export function PlayMoreSheet({
       : open === "gps" && mode === "online"
         ? "sync"
         : open;
-  const showBriefingDoc = view === "briefing" && Boolean(briefingIframeUrl?.trim());
+  const [briefingDocOpen, setBriefingDocOpen] = useState(false);
+  const showBriefingDoc = briefingDocOpen && Boolean(briefingIframeUrl?.trim());
   const showFaqDoc = view === "faq" && Boolean(faqIframeUrl?.trim());
   const busy = Boolean(transferPending || releasePending);
   const nameRoster = roster.length > 0 ? roster : teammates;
+
+  useEffect(() => {
+    if (view !== "briefing") setBriefingDocOpen(false);
+  }, [view]);
 
   useEffect(() => {
     if (!open) return;
@@ -149,10 +157,10 @@ export function PlayMoreSheet({
     window.addEventListener("wheel", blockBackgroundScroll, { passive: false });
     window.addEventListener("touchmove", blockBackgroundScroll, { passive: false });
     return () => {
-      html.style.overflow = prevHtmlOverflow;
-      body.style.overflow = prevBodyOverflow;
-      html.style.overscrollBehavior = prevHtmlOverscroll;
-      body.style.overscrollBehavior = prevBodyOverscroll;
+      html.style.overflow = prevHtmlOverflow || "";
+      body.style.overflow = prevBodyOverflow || "";
+      html.style.overscrollBehavior = prevHtmlOverscroll || "";
+      body.style.overscrollBehavior = prevBodyOverscroll || "";
       window.removeEventListener("wheel", blockBackgroundScroll);
       window.removeEventListener("touchmove", blockBackgroundScroll);
     };
@@ -167,11 +175,11 @@ export function PlayMoreSheet({
         title="Spielregeln"
         url={briefingIframeUrl}
         emptyHint="Für dieses Spiel sind noch keine Spielregeln hinterlegt."
-        onClose={onClose}
+        onClose={() => setBriefingDocOpen(false)}
       />
       <PlayDocSheet
         open={showFaqDoc}
-        title="Häufige Fragen"
+        title="FAQ"
         url={faqIframeUrl}
         emptyHint="Für dieses Spiel ist noch kein FAQ-Link hinterlegt."
         onClose={onClose}
@@ -185,17 +193,18 @@ export function PlayMoreSheet({
           <div
             role="dialog"
             aria-modal="true"
+            translate="no"
             className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden overscroll-none rounded-t-3xl bg-[var(--cg-card)] pb-[env(safe-area-inset-bottom)] shadow-[var(--cg-shadow-lift)] sm:rounded-3xl sm:pb-0"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-[var(--cg-border)] px-5 py-4">
-              <h2 className="text-lg font-bold text-[var(--cg-fg)]">
+            <div className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--cg-border)] px-5">
+              <h2 className="m-0 text-lg font-bold leading-none text-[var(--cg-fg)]">
                 {view ? panelTitle(view) : ""}
               </h2>
               <button
                 type="button"
                 onClick={onClose}
-                className="tap-lift rounded-full bg-[var(--cg-secondary)] px-3 py-1.5 text-sm font-semibold"
+                className="tap-lift inline-flex h-9 items-center rounded-full bg-[var(--cg-secondary)] px-3 text-sm font-semibold leading-none"
               >
                 Schließen
               </button>
@@ -237,8 +246,8 @@ export function PlayMoreSheet({
                   />
                   <MenuRow
                     icon={<MessagesSquare className="h-5 w-5" />}
-                    title="Häufige Fragen"
-                    hint="Technik und Tipps"
+                    title="FAQ"
+                    hint="Antworten zu Spiel und Technik"
                     onClick={() => onOpen("faq")}
                   />
                   <MenuRow
@@ -281,11 +290,37 @@ export function PlayMoreSheet({
               ) : null}
 
               {view === "briefing" ? (
-                <div className="space-y-4">
-                  <p className="whitespace-pre-wrap text-base leading-relaxed text-[var(--cg-muted)]">
-                    {briefingText?.trim() ||
-                      "Für dieses Spiel ist noch kein Briefing hinterlegt. Der Einstieg läuft über die erste Aufgabe."}
-                  </p>
+                <div className="space-y-5">
+                  {briefingText?.trim() ? (
+                    <p className="whitespace-pre-wrap text-base leading-relaxed text-[var(--cg-muted)]">
+                      {briefingText.trim()}
+                    </p>
+                  ) : null}
+                  <div>
+                    <h3 className="text-base font-extrabold text-[var(--cg-fg)]">
+                      So funktioniert&apos;s
+                    </h3>
+                    <ol className="mt-3 space-y-3">
+                      {PLAY_RULES_STEPS.map((step, index) => (
+                        <li key={step.title} className="flex gap-3">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--cg-secondary)] text-sm font-bold text-[var(--cg-fg)]">
+                            {index + 1}
+                          </span>
+                          <div className="min-w-0 pt-0.5">
+                            <p className="font-bold text-[var(--cg-fg)]">{step.title}</p>
+                            <p className="mt-0.5 text-sm leading-snug text-[var(--cg-muted)]">
+                              {step.body}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                  {briefingIframeUrl?.trim() ? (
+                    <BigButton variant="outline" onClick={() => setBriefingDocOpen(true)}>
+                      Ausführliche Regeln öffnen
+                    </BigButton>
+                  ) : null}
                   <BigButton variant="ghost" onClick={onClose}>
                     Verstanden
                   </BigButton>
@@ -326,6 +361,12 @@ export function PlayMoreSheet({
                     title="Das Rätsel hängt"
                     hint="Zurück zur Aufgabe — Tipp oder Lösung holen"
                     onClick={onClose}
+                  />
+                  <MenuRow
+                    icon={<RotateCcw className="h-5 w-5" />}
+                    title="Bildschirm steht still"
+                    hint="Seite neu laden — nichts geht verloren"
+                    onClick={() => onOpen("reload")}
                   />
                   <MenuRow
                     icon={<Smartphone className="h-5 w-5" />}
@@ -428,6 +469,25 @@ export function PlayMoreSheet({
                       Team-Code holen
                     </BigButton>
                   </HelpCard>
+                  <BigButton variant="ghost" onClick={() => onOpen("help")}>
+                    Zurück
+                  </BigButton>
+                </div>
+              ) : null}
+
+              {view === "reload" ? (
+                <div className="space-y-4">
+                  <p className="text-base leading-relaxed text-[var(--cg-fg)]">{PLAY_RELOAD_TIP}</p>
+                  <p className="text-sm text-[var(--cg-muted)]">
+                    Keine Angst — das ist dasselbe wie einmal aktualisieren. Danach einfach
+                    weiterspielen.
+                  </p>
+                  <BigButton
+                    icon={<RotateCcw className="h-5 w-5" />}
+                    onClick={() => window.location.reload()}
+                  >
+                    Seite neu laden
+                  </BigButton>
                   <BigButton variant="ghost" onClick={() => onOpen("help")}>
                     Zurück
                   </BigButton>
@@ -691,8 +751,10 @@ function panelTitle(panel: Exclude<PlayMorePanel, null>): string {
       return "Station / Code";
     case "sync":
       return "Geräte";
+    case "reload":
+      return "Bildschirm steht still";
     case "faq":
-      return "Häufige Fragen";
+      return "FAQ";
     case "support":
       return "Support";
     case "pause":
