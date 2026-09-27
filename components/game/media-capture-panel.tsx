@@ -711,9 +711,6 @@ export function MediaCapturePanel({
           handleFilePick(event.target.files?.[0] ?? null);
           event.target.value = "";
         }}
-        onCancel={() => {
-          if (!previewBlob) closeCamera(true);
-        }}
       />
       <input
         ref={fileRef}
