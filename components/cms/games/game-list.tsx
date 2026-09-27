@@ -49,7 +49,6 @@ import { Chip, Empty, inputCls } from "@/components/cms/ui";
 import { GameStatusSwitch } from "@/components/cms/games/game-status-switch";
 import { GameTestPlayModal } from "@/components/cms/games/game-test-play-modal";
 import { GameStationCodesModal } from "@/components/cms/games/game-station-codes-modal";
-import { GameLivePushButton } from "@/components/cms/games/game-live-push-button";
 import {
   StudioButton,
   StudioError,
@@ -69,6 +68,10 @@ import {
 } from "@/lib/cms/game-slots";
 
 type GameWithLive = StudioGame & { liveEventCount: number };
+
+/** Checkbox · Spiel (flex) · Fläche · Status · Ver. · Code (≈ hew9geeus2) · Datum · Aktionen */
+const GAME_LIST_GRID =
+  "lg:grid lg:grid-cols-[2rem_minmax(0,1fr)_5.5rem_9.5rem_2.25rem_6.75rem_4.75rem_13rem] lg:items-center lg:gap-x-3";
 
 type GameSort = "updated" | "created" | "status" | "name";
 type CreateMode = "blank" | "template";
@@ -609,7 +612,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Spiel oder Stadt suchen…"
+            placeholder="Name, Stadt oder Spiel-Code…"
             className={`${inputCls} mt-0 border-0 bg-secondary pl-11 shadow-none`}
           />
         </div>
@@ -664,17 +667,31 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         ) : sortedGames.length === 0 ? (
           <Empty>Keine Treffer für diese Filter.</Empty>
         ) : (
-          <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-            {sortedGames.map((game) => (
-              <GameRow
-                key={game.id}
-                game={game}
-                selected={selectedIds.has(game.id)}
-                onToggle={(checked) => toggleOne(game.id, checked)}
-                onDuplicate={() => openDuplicateModal([game.id])}
-                onDelete={() => openDeleteModal([game.id])}
-              />
-            ))}
+          <div className="overflow-hidden rounded-2xl bg-card shadow-soft">
+            <div
+              className={`hidden border-b border-border/70 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground ${GAME_LIST_GRID}`}
+            >
+              <span />
+              <span className="min-w-0 truncate">Spiel</span>
+              <span className="truncate">Fläche</span>
+              <span className="truncate">Status</span>
+              <span className="truncate">Ver.</span>
+              <span className="truncate">Code</span>
+              <span className="truncate text-right">Geändert</span>
+              <span className="truncate text-right">Aktionen</span>
+            </div>
+            <ul className="divide-y divide-border/70">
+              {sortedGames.map((game) => (
+                <GameRow
+                  key={game.id}
+                  game={game}
+                  selected={selectedIds.has(game.id)}
+                  onToggle={(checked) => toggleOne(game.id, checked)}
+                  onDuplicate={() => openDuplicateModal([game.id])}
+                  onDelete={() => openDeleteModal([game.id])}
+                />
+              ))}
+            </ul>
           </div>
         )}
       </section>
@@ -828,6 +845,15 @@ function FilterTrack<T extends string>({
   );
 }
 
+function formatListDate(iso: string): string {
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return "—";
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const year = String(date.getUTCFullYear()).slice(-2);
+  return `${day}.${month}.${year}`;
+}
+
 function GameRow({
   game,
   selected,
@@ -846,130 +872,170 @@ function GameRow({
   const [codesOpen, setCodesOpen] = useState(false);
   const canTest = game.status === "published" || game.status === "draft";
   const isIndoor = gameDefaultSurface(game) === "indoor";
+  const surface = gameDefaultSurface(game);
+  const surfaceChip = surfaceLabelDe(surface);
+  const city = game.city_slug?.trim() || "";
+  const openHref = `/admin/games/${game.id}`;
 
-  const surfaceChip = surfaceLabelDe(gameDefaultSurface(game));
+  function prefetch() {
+    void prefetchStudioGame(queryClient, game.id);
+  }
 
   return (
-    <article
-      className={`overflow-hidden rounded-3xl bg-card shadow-soft transition ${
-        selected ? "ring-2 ring-primary/40" : ""
+    <li
+      className={`[content-visibility:auto] [contain-intrinsic-size:auto_4.75rem] ${
+        selected ? "bg-primary/5" : "bg-card"
       }`}
     >
-      <Link
-        href={`/admin/games/${game.id}`}
-        prefetch
-        onMouseEnter={() => void prefetchStudioGame(queryClient, game.id)}
-        onFocus={() => void prefetchStudioGame(queryClient, game.id)}
-        className="relative block aspect-[2/1] bg-secondary"
-        aria-label={`${game.name} öffnen`}
-      >
-        {game.logo_url?.trim() ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={game.logo_url}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <span className="flex h-full items-center justify-center text-muted-foreground">
-            <IconGamepad size={36} />
-          </span>
-        )}
-      </Link>
-
-      <div className="p-5">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className={`flex items-start gap-2 px-3 py-2.5 ${GAME_LIST_GRID}`}>
+        <div className="shrink-0 pt-0.5 lg:pt-0">
           <StudioSelectCheckbox
             checked={selected}
             onChange={onToggle}
             label={`${game.name} auswählen`}
           />
-          <Chip tone="bg-primary/12 text-primary">{surfaceChip}</Chip>
-          {game.liveEventCount > 0 ? (
-            <Chip tone="bg-success/20 text-success-foreground">Live</Chip>
-          ) : null}
-          <GameStatusSwitch
-            gameId={game.id}
-            status={game.status}
-            publishedVersionNumber={game.published_version_number}
-            liveEventCount={game.liveEventCount}
-            compact
-          />
         </div>
 
-        <h2 className="mt-3 text-xl font-bold">{game.name}</h2>
-        <p className="text-sm text-muted-foreground">
-          Version {game.published_version_number}
-          {game.city_slug ? ` · Stadt ${game.city_slug}` : ""}
+        <Link
+          href={openHref}
+          prefetch
+          onMouseEnter={prefetch}
+          onFocus={prefetch}
+          className="min-w-0 overflow-hidden"
+        >
+          <div className="flex min-w-0 items-center gap-2.5">
+            {game.logo_url?.trim() ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={game.logo_url}
+                alt=""
+                className="h-8 w-8 shrink-0 rounded-lg object-cover"
+              />
+            ) : (
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+                <IconGamepad size={16} />
+              </span>
+            )}
+            <div className="min-w-0 overflow-hidden">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <h2
+                  className="min-w-0 truncate whitespace-nowrap text-sm font-bold text-foreground"
+                  title={game.name}
+                >
+                  {game.name}
+                </h2>
+                {game.liveEventCount > 0 ? (
+                  <span className="shrink-0">
+                    <Chip tone="bg-success/20 text-success-foreground">Live</Chip>
+                  </span>
+                ) : null}
+              </div>
+              <p className="truncate whitespace-nowrap font-mono text-[11px] text-muted-foreground lg:hidden">
+                {game.status === "published"
+                  ? "Veröffentlicht"
+                  : game.status === "archived"
+                    ? "Archiv"
+                    : "Entwurf"}
+                {` · ${game.slug}`}
+                {city ? ` · ${city}` : ""}
+                {` · v${game.published_version_number}`}
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <p className="hidden truncate text-xs font-semibold text-foreground lg:block">
+          {surfaceChip}
         </p>
-        <p className="mt-1 font-mono text-xs font-semibold text-foreground">
-          Spiel-Code: {game.slug}
+        <div className="hidden overflow-hidden lg:block">
+          {game.status === "archived" ? (
+            <Chip tone="bg-secondary text-muted-foreground">Archiv</Chip>
+          ) : (
+            <GameStatusSwitch
+              gameId={game.id}
+              status={game.status}
+              publishedVersionNumber={game.published_version_number}
+              liveEventCount={game.liveEventCount}
+              compact
+            />
+          )}
+        </div>
+        <p className="hidden truncate tabular-nums text-xs text-muted-foreground lg:block">
+          {game.published_version_number}
+        </p>
+        <div className="hidden min-w-0 overflow-hidden lg:block">
+          <p
+            className="truncate whitespace-nowrap font-mono text-[11px] font-semibold text-foreground"
+            title={city ? `${game.slug} · ${city}` : game.slug}
+          >
+            {game.slug}
+          </p>
+        </div>
+        <p
+          className="hidden truncate text-right text-xs tabular-nums text-muted-foreground lg:block"
+          title={game.updated_at}
+        >
+          {formatListDate(game.updated_at)}
         </p>
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="grid w-full shrink-0 grid-cols-[auto_2rem_2rem_2rem_2rem] items-center justify-items-end gap-0.5">
+          <span className="mr-1 lg:hidden">
+            <Chip tone="bg-primary/12 text-primary">{surfaceChip}</Chip>
+          </span>
           <Link
-            href={`/admin/games/${game.id}`}
+            href={openHref}
             prefetch
-            onMouseEnter={() => void prefetchStudioGame(queryClient, game.id)}
-            onFocus={() => void prefetchStudioGame(queryClient, game.id)}
-            className="tap-lift rounded-2xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+            onMouseEnter={prefetch}
+            onFocus={prefetch}
+            className="tap-lift inline-flex h-8 items-center rounded-xl bg-primary px-2.5 text-xs font-bold text-primary-foreground"
           >
             Öffnen
           </Link>
-          <StudioButton
+          <button
             type="button"
-            size="sm"
-            variant="secondary"
-            icon={<IconPlay size={16} />}
             disabled={!canTest}
-            title={
-              canTest
-                ? "Testen mit aktuellem Editor-Stand"
-                : "Archivierte Spiele können nicht getestet werden"
-            }
+            title={canTest ? "Testen" : "Archivierte Spiele können nicht getestet werden"}
+            aria-label={`${game.name} testen`}
             onClick={() => setTestOpen(true)}
+            className="tap-lift inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30"
           >
-            Testen
-          </StudioButton>
+            <IconPlay size={15} />
+          </button>
           {isIndoor ? (
-            <StudioButton
+            <button
               type="button"
-              size="sm"
-              variant="ghost"
-              icon={<IconDownload size={16} />}
+              title="Stationscodes"
+              aria-label={`${game.name} Codes`}
               onClick={() => setCodesOpen(true)}
+              className="tap-lift inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground"
             >
-              Codes
-            </StudioButton>
-          ) : null}
-          <StudioButton
+              <IconDownload size={15} />
+            </button>
+          ) : (
+            <span className="hidden h-8 w-8 lg:block" aria-hidden />
+          )}
+          <button
             type="button"
-            size="sm"
-            variant="ghost"
-            icon={<IconCopy size={16} />}
+            title="Duplizieren"
+            aria-label={`${game.name} duplizieren`}
             onClick={onDuplicate}
+            className="tap-lift inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground"
           >
-            Duplizieren
-          </StudioButton>
-          <StudioButton
+            <IconCopy size={15} />
+          </button>
+          <button
             type="button"
-            size="sm"
-            variant="outline"
-            icon={<IconTrash size={16} />}
+            title="Löschen"
+            aria-label={`${game.name} löschen`}
             onClick={onDelete}
+            className="tap-lift inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-destructive"
           >
-            Löschen
-          </StudioButton>
+            <IconTrash size={15} />
+          </button>
         </div>
-
-        {game.status !== "archived" ? (
-          <div className="mt-4 border-t border-border/70 pt-3">
-            <GameLivePushButton gameId={game.id} featureFlags={game.feature_flags} />
-          </div>
-        ) : null}
       </div>
 
-      {canTest ? (
+      {testOpen && canTest ? (
         <GameTestPlayModal
           open={testOpen}
           onClose={() => setTestOpen(false)}
@@ -978,7 +1044,7 @@ function GameRow({
           publishedVersionNumber={game.published_version_number}
         />
       ) : null}
-      {isIndoor ? (
+      {codesOpen && isIndoor ? (
         <GameStationCodesModal
           open={codesOpen}
           onClose={() => setCodesOpen(false)}
@@ -986,6 +1052,6 @@ function GameRow({
           gameName={game.name}
         />
       ) : null}
-    </article>
+    </li>
   );
 }
