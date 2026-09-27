@@ -1,13 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { submitGridDemoRequest } from "@/app/actions/demo-request";
 
 export function EnterpriseBriefingForm() {
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitted(true);
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get("name") ?? "");
+    const email = String(form.get("email") ?? "");
+    const company = String(form.get("organization") ?? "");
+    const note = [
+      form.get("title"),
+      form.get("workforce"),
+      form.get("regions"),
+      form.get("useCase"),
+    ]
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean)
+      .join(" · ");
+    setError(null);
+    startTransition(async () => {
+      const result = await submitGridDemoRequest({ name, email, company, note });
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      setSubmitted(true);
+    });
   }
 
   if (submitted) {
@@ -96,8 +120,16 @@ export function EnterpriseBriefingForm() {
         <input type="checkbox" required style={{ marginTop: 3 }} />
         <span>I agree to be contacted by The GRID.</span>
       </label>
-      <button type="submit" className="grid-cta" style={{ justifyContent: "center", width: "fit-content" }}>
-        Talk to The GRID
+      {error ? (
+        <p style={{ fontSize: 13, color: "#fda4af" }}>{error}</p>
+      ) : null}
+      <button
+        type="submit"
+        disabled={pending}
+        className="grid-cta"
+        style={{ justifyContent: "center", width: "fit-content", opacity: pending ? 0.6 : 1 }}
+      >
+        {pending ? "Sending…" : "Talk to The GRID"}
       </button>
       <p style={{ fontSize: 11, color: "rgba(240,244,255,0.35)" }}>
         Access is granted · Response within 24 hours · Mutual NDA available

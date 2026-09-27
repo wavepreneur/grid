@@ -3,10 +3,7 @@ import { parseGrowthPack } from "@/lib/grid/growth-pack";
 import { parseTeamGameState } from "@/lib/grid/game-state";
 import { buildEventPortalResultsUrl } from "@/lib/grid/codes";
 import { eventRecapPath } from "@/lib/grid/event-routes";
-import {
-  readHrRecapEmailFromConfig,
-  readHrRecapEmailFromFlags,
-} from "@/lib/grid/hr-recap";
+import { DEFAULT_HR_RECAP_EMAIL } from "@/lib/grid/flywheel";
 import { ensureEventPortalToken } from "@/lib/grid/portal";
 import { sendStudioHrRecapEmail, studioHrMailOrigin } from "@/lib/grid/studio-hr-mail";
 
@@ -94,7 +91,6 @@ export async function dispatchGrowthTeamFinished(teamId: string): Promise<void> 
   }
 
   await maybeSendHrRecap({
-    supabase,
     event,
     team,
     pack,
@@ -104,7 +100,6 @@ export async function dispatchGrowthTeamFinished(teamId: string): Promise<void> 
 }
 
 async function maybeSendHrRecap(input: {
-  supabase: ReturnType<typeof createAdminClient>;
   event: {
     id: string;
     invite_code: string;
@@ -116,56 +111,18 @@ async function maybeSendHrRecap(input: {
   score: number;
   photoUrls: string[];
 }): Promise<void> {
-  let hrEmail = readHrRecapEmailFromConfig(input.event.content_config);
-  if (!hrEmail) {
-    const cmsGameId =
-      input.event.content_config &&
-      typeof input.event.content_config === "object" &&
-      typeof (input.event.content_config as { cms_game_id?: unknown }).cms_game_id === "string"
-        ? (input.event.content_config as { cms_game_id: string }).cms_game_id
-        : null;
-    if (cmsGameId) {
-      const { data: game } = await input.supabase
-        .from("studio_games")
-        .select("feature_flags")
-        .eq("id", cmsGameId)
-        .maybeSingle();
-      hrEmail = readHrRecapEmailFromFlags(game?.feature_flags);
-    }
-  }
-  if (!hrEmail) return;
-
   const origin = studioHrMailOrigin();
   const token = await ensureEventPortalToken(input.event.id, input.event.portal_token ?? null);
   const resultsUrl = buildEventPortalResultsUrl(origin, token);
   const recapUrl = `${origin}${eventRecapPath(input.event.invite_code, input.team.join_code)}`;
 
-  if (input.pack.enabled && input.pack.capture_url) {
-    const posted = await postGrowthCapture({
-      captureUrl: input.pack.capture_url,
-      captureSecret: input.pack.capture_secret,
-      body: {
-        type: "player.recap",
-        booking_reference: null,
-        invite_code: input.event.invite_code,
-        team_id: input.team.id,
-        team_name: input.team.name,
-        email: hrEmail,
-        score: input.score,
-        photo_urls: input.photoUrls,
-        results_url: resultsUrl,
-      },
-    });
-    if (posted.ok) return;
-    console.error("[growth] HR recap capture failed", posted.error);
-  }
-
   const mailed = await sendStudioHrRecapEmail({
-    to: hrEmail,
+    to: DEFAULT_HR_RECAP_EMAIL,
     teamName: input.team.name,
     score: input.score,
     resultsUrl,
     recapUrl,
+    surface: input.pack.surface,
     photoUrls: input.photoUrls,
   });
   if (!mailed.ok) {

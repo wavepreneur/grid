@@ -126,19 +126,21 @@ export function GameOverFlywheel({
 
       <section className="rounded-3xl border border-[var(--cg-primary)]/25 bg-[var(--cg-card)] px-5 py-5 text-center">
         <p className="text-lg font-bold text-[var(--cg-fg)]">
-          🏆 Wie habt ihr im Highscore abgeschnitten?
+          {growthOffer?.surface === "exitmania_teamevent"
+            ? "🏆 Live-Ranking eures Events"
+            : "🏆 Wie habt ihr im Highscore abgeschnitten?"}
         </p>
-        <p className="mt-2 text-sm leading-relaxed text-[var(--cg-muted)]">
-          Kurz bewerten — dann seht ihr die Tabelle. Dauert 20 Sekunden.
-        </p>
-        <a
-          href={EXITMANIA_TEAM_RANKING_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 block"
-        >
-          <BigButton variant="accent">Highscore ansehen</BigButton>
-        </a>
+        <div className="mt-4 overflow-hidden rounded-2xl bg-slate-900 ring-1 ring-[var(--cg-border)]">
+          <iframe
+            src={
+              growthOffer?.surface === "exitmania_teamevent"
+                ? `${eventRankingPath(inviteCode, joinCode)}&embed=1`
+                : `${EXITMANIA_TEAM_RANKING_URL}?embed=1`
+            }
+            title="Highscore"
+            className="h-[min(70vh,36rem)] w-full border-0"
+          />
+        </div>
       </section>
 
       {growthOffer?.enabled ? (
@@ -149,10 +151,9 @@ export function GameOverFlywheel({
       ) : null}
 
       <section className="rounded-3xl bg-[var(--cg-card)] px-5 py-5 text-center">
-        <p className="text-lg font-bold text-[var(--cg-fg)]">📌 Für später speichern</p>
+        <p className="text-lg font-bold text-[var(--cg-fg)]">📌 Für später</p>
         <p className="mt-2 text-sm leading-relaxed text-[var(--cg-muted)]">
-          Link kopieren und in die Notizen legen — so findet ihr diese Seite auch nächste Woche
-          wieder.
+          Der Link wird nach 7 Tagen automatisch deaktiviert.
         </p>
         <div className="mt-4">
           <BigButton variant="ghost" onClick={() => void copyRecapLink()}>
@@ -161,14 +162,16 @@ export function GameOverFlywheel({
         </div>
       </section>
 
-      <p className="text-center text-sm">
-        <Link
-          href={eventRankingPath(inviteCode, joinCode)}
-          className="font-semibold text-[var(--cg-primary)] underline-offset-2 hover:underline"
-        >
-          Live-Ranking dieses Events
-        </Link>
-      </p>
+      {growthOffer?.surface === "exitmania_teamevent" ? null : (
+        <p className="text-center text-sm">
+          <Link
+            href={eventRankingPath(inviteCode, joinCode)}
+            className="font-semibold text-[var(--cg-primary)] underline-offset-2 hover:underline"
+          >
+            Live-Ranking dieses Events
+          </Link>
+        </p>
+      )}
 
       {extras ? <div className="space-y-5">{extras}</div> : null}
     </div>

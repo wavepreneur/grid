@@ -4,6 +4,9 @@ import { getEventByInviteCode, getTeamByJoinCode } from "@/lib/grid/session-auth
 import { normalizeCode } from "@/lib/grid/codes";
 import type { ResolvedEventContent } from "@/lib/grid/level-types";
 
+export const PUBLIC_RECAP_TTL_DAYS = 7;
+const PUBLIC_RECAP_TTL_MS = PUBLIC_RECAP_TTL_DAYS * 24 * 60 * 60 * 1000;
+
 export type PublicTeamRecap = {
   inviteCode: string;
   joinCode: string;
@@ -13,10 +16,20 @@ export type PublicTeamRecap = {
   eventContent: ResolvedEventContent;
 };
 
+export function isPublicRecapExpired(
+  finishedAt: string | null | undefined,
+  now = Date.now(),
+): boolean {
+  if (!finishedAt) return true;
+  const started = new Date(finishedAt).getTime();
+  if (!Number.isFinite(started)) return true;
+  return now >= started + PUBLIC_RECAP_TTL_MS;
+}
+
 export async function loadPublicTeamRecap(
   inviteCode: string,
   joinCode: string,
-): Promise<PublicTeamRecap | null> {
+): Promise<PublicTeamRecap | "expired" | null> {
   const invite = normalizeCode(inviteCode);
   const join = normalizeCode(joinCode);
   const event = await getEventByInviteCode(invite);
@@ -24,6 +37,9 @@ export async function loadPublicTeamRecap(
 
   const team = await getTeamByJoinCode(join, event.id);
   if (!team || team.status !== "finished") return null;
+  if (isPublicRecapExpired(typeof team.finished_at === "string" ? team.finished_at : null)) {
+    return "expired";
+  }
 
   const eventContent = await loadResolvedEventContent({
     eventId: event.id,
