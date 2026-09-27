@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getEventByInviteCode } from "@/lib/grid/session-auth";
 import { EventLiveRanking } from "@/components/event/event-live-ranking";
-import { eventPlayPath } from "@/lib/grid/event-routes";
+import { eventPlayPath, eventRecapPath } from "@/lib/grid/event-routes";
 import { normalizeCode } from "@/lib/grid/codes";
 
 export const dynamic = "force-dynamic";
@@ -36,11 +36,12 @@ export default async function EventRankingPage({ params, searchParams }: Props) 
           <EventLiveRanking inviteCode={invite} highlightJoinCode={join || undefined} />
         </div>
         {join ? (
-          <p className="mt-8 text-center">
-            <Link
-              href={eventPlayPath(invite, join)}
-              className="text-sm font-semibold text-teal-800 hover:underline"
-            >
+          <p className="mt-8 text-center text-sm font-semibold">
+            <Link href={eventRecapPath(invite, join)} className="text-teal-800 hover:underline">
+              Eure Ergebnisse
+            </Link>
+            <span className="mx-2 text-slate-300">·</span>
+            <Link href={eventPlayPath(invite, join)} className="text-teal-800 hover:underline">
               Zurück zum Team
             </Link>
           </p>

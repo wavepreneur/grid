@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   advanceFromHub,
@@ -23,7 +22,6 @@ import {
 } from "@/app/actions/game";
 import { usesMissionShell } from "@/lib/grid/blueprints";
 import { CityPlayShell } from "@/components/game/city/play-shell";
-import { BigButton } from "@/components/game/city/ui";
 import { BonusCompleteToast } from "@/components/game/bonus-complete-toast";
 import { BonusSpectatorView } from "@/components/game/bonus-spectator-view";
 import { ExitmaniaLevelView } from "@/components/game/exitmania-level-view";
@@ -32,7 +30,7 @@ import { LevelPanel } from "@/components/game/level-panel";
 import { PlayPhaseFlow } from "@/components/game/play-phase-flow";
 import type { OutdoorArriveInput } from "@/components/game/play-hub-view";
 import type { PlayMorePanel } from "@/components/game/play-more-sheet";
-import { GrowthRecapCard } from "@/components/game/growth-recap-card";
+import { GameOverFlywheel } from "@/components/game/game-over-flywheel";
 import { TeamCaptureGallery } from "@/components/game/team-capture-gallery";
 import { TeamWalletList } from "@/components/game/team-wallet";
 import { visibleWalletNotes } from "@/lib/grid/wallet";
@@ -42,7 +40,7 @@ import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner
 import { IdentityBar } from "@/components/player/identity-bar";
 import { SessionHandoffScreen } from "@/components/player/session-handoff-screen";
 import { GridError } from "@/components/grid/grid-shell";
-import { eventRankingPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
+import { eventTeamJoinPath } from "@/lib/grid/event-routes";
 import { transferCaptain, handoverSession, removePlayerFromLobby } from "@/app/actions/lobby";
 import { useTeamSync, type GpsFixPayload } from "@/lib/hooks/use-team-sync";
 import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
@@ -58,7 +56,6 @@ import { StudioDeskTestBar } from "@/components/game/studio-desk-test-bar";
 import { useBonusQueueTick } from "@/lib/hooks/use-bonus-queue-tick";
 import { clearWalkedDistanceStorage } from "@/lib/hooks/use-walked-distance";
 import {
-  levelPlayOutcome,
   pickNewerTeamState,
   type TeamGameState,
   type TeamRealtimeState,
@@ -310,21 +307,6 @@ export function GameRoom({
   const completedLevels = useMemo(
     () => countCompletedLevels(teamState.gameState),
     [teamState.gameState],
-  );
-  const solvedLevels = useMemo(
-    () =>
-      eventContent.levels.filter(
-        (level) => levelPlayOutcome(teamState.gameState.levels[String(level.level)]) === "solved",
-      ).length,
-    [eventContent.levels, teamState.gameState.levels],
-  );
-  const revealedLevels = useMemo(
-    () =>
-      eventContent.levels.filter(
-        (level) =>
-          levelPlayOutcome(teamState.gameState.levels[String(level.level)]) === "revealed",
-      ).length,
-    [eventContent.levels, teamState.gameState.levels],
   );
   const gameOverWalletNotes = useMemo(
     () =>
@@ -952,160 +934,49 @@ export function GameRoom({
       displayName={session.displayName}
     />
   ) : isFinished ? (
-    <div className="cg-animate-rise-in space-y-6 px-5 pb-[max(2.5rem,calc(1.25rem+env(safe-area-inset-bottom)))] pt-[max(2.5rem,env(safe-area-inset-top))]">
-      <div className="space-y-2 text-center">
-        {(() => {
-          const total = eventContent.levels.length;
-          const reason =
-            teamState.gameState.ended_reason ??
-            (completedLevels >= total && total > 0 ? "completed" : "ended");
-          const timeUp = reason === "time";
-          const won = reason === "completed";
-          return (
-            <>
+    <GameOverFlywheel
+      inviteCode={inviteCode}
+      joinCode={joinCode}
+      teamName={teamName}
+      score={teamState.gameState.score ?? 0}
+      levels={eventContent.levels}
+      gameState={teamState.gameState}
+      growthOffer={eventContent.growthOffer}
+      extras={
+        <>
+          <details className="group overflow-hidden rounded-3xl bg-[var(--cg-accent)] shadow-[var(--cg-shadow-lift)]">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-[var(--cg-accent-fg)] marker:content-none [&::-webkit-details-marker]:hidden">
+              <div>
+                <p className="text-sm font-extrabold uppercase tracking-[0.14em]">Wallet</p>
+                <p className="mt-0.5 text-sm opacity-80">
+                  {gameOverWalletNotes.length === 0
+                    ? "Noch leer"
+                    : `${gameOverWalletNotes.length} ${gameOverWalletNotes.length === 1 ? "Hinweis" : "Hinweise"}`}
+                </p>
+              </div>
               <span
                 aria-hidden
-                className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full text-4xl text-white shadow-[var(--cg-shadow-lift)] ${
-                  won
-                    ? "cg-animate-celebrate bg-[var(--cg-success)]"
-                    : "bg-[var(--cg-primary)]"
-                }`}
+                className="text-lg leading-none opacity-80 transition-transform group-open:rotate-180"
               >
-                {won ? "✓" : timeUp ? "⏱" : "!"}
+                ▾
               </span>
-              <p className="mt-4 text-sm font-semibold uppercase tracking-[0.2em] text-[var(--cg-muted)]">
-                Game Over
-              </p>
-              <p className="cg-animate-pop-in text-3xl font-bold text-[var(--cg-fg)]">
-                {won
-                  ? "Mission abgeschlossen!"
-                  : timeUp
-                    ? "Zeit ist abgelaufen."
-                    : "Game Over"}
-              </p>
-              <p className="text-base text-[var(--cg-muted)]">
-                {won
-                  ? `${teamName} · ${total} Aufgaben`
-                  : timeUp
-                    ? `${completedLevels} von ${total} Aufgaben — ${teamName}`
-                    : `${completedLevels} von ${total} Aufgaben geschafft.`}
-              </p>
-              {won ? null : (
-                <p className="text-base font-semibold text-[var(--cg-fg)]">
-                  Beim nächsten Mal schafft ihr es.
-                </p>
-              )}
-            </>
-          );
-        })()}
-      </div>
-      {eventContent.growthOffer?.enabled ? (
-        <GrowthRecapCard
-          inviteCode={inviteCode}
-          joinCode={joinCode}
-          sessionId={session.sessionId}
-          playerId={session.playerId}
-          offer={eventContent.growthOffer}
-          isLead={isAlpha}
-          stats={{
-            teamName,
-            score: teamState.gameState.score ?? 0,
-            completed: completedLevels,
-            total: eventContent.levels.length,
-            players: lobbyPlayers.map((p) => p.display_name),
-          }}
-        />
-      ) : null}
-      {eventContent.followUpTrigger?.enabled ? (
-        <div className="rounded-3xl border border-[var(--cg-primary)]/30 bg-[var(--cg-card)] px-5 py-5 text-center">
-          <p className="text-sm font-semibold text-[var(--cg-fg)]">
-            {eventContent.followUpTrigger.cta_label?.trim() || "Nächster Pulse"}
-          </p>
-          <p className="mt-2 text-sm text-[var(--cg-muted)]">
-            Folge-Trigger liegt im Snapshot. Buchung läuft über Exitmania oder Tabbrain — nicht in
-            GRID.
-          </p>
-          {eventContent.followUpTrigger.cta_url &&
-          /^https?:\/\//i.test(eventContent.followUpTrigger.cta_url) ? (
-            <a href={eventContent.followUpTrigger.cta_url} className="mt-4 block">
-              <BigButton variant="accent">
-                {eventContent.followUpTrigger.cta_label?.trim() || "Weiter"}
-              </BigButton>
-            </a>
-          ) : null}
-        </div>
-      ) : null}
-      <div className="cg-animate-pop-in rounded-3xl border-2 border-[var(--cg-success)]/35 bg-[var(--cg-card)] px-5 py-6 text-center shadow-[var(--cg-shadow-lift)]">
-        <p className="text-sm font-semibold uppercase tracking-wide text-[var(--cg-muted)]">
-          Eure Punkte
-        </p>
-        <p className="cg-animate-score-pop mt-2 text-5xl font-extrabold tabular-nums text-[var(--cg-fg)]">
-          {teamState.gameState.score ?? 0}
-        </p>
-        <ol className="mt-4 flex flex-wrap justify-center gap-1.5">
-          {eventContent.levels.map((level) => {
-            const outcome = levelPlayOutcome(teamState.gameState.levels[String(level.level)]);
-            const tone =
-              outcome === "solved"
-                ? "bg-[var(--cg-success)] text-white"
-                : outcome === "revealed"
-                  ? "bg-[var(--cg-accent)] text-[var(--cg-accent-fg)]"
-                  : "bg-[var(--cg-muted)]/15 text-[var(--cg-muted)]";
-            return (
-              <li
-                key={level.level}
-                title={
-                  outcome === "revealed"
-                    ? `${level.title} · direkt gelöst · 0 Punkte`
-                    : level.title
-                }
-                className={`flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-bold ${tone}`}
-              >
-                {level.level}
-              </li>
-            );
-          })}
-        </ol>
-        <p className="mt-3 text-xs text-[var(--cg-muted)]">
-          {revealedLevels > 0
-            ? `${solvedLevels} gelöst · ${revealedLevels} direkt gelöst · nur euer Team`
-            : `${completedLevels} / ${eventContent.levels.length} Aufgaben · nur euer Team`}
-        </p>
-      </div>
-      <Link href={eventRankingPath(inviteCode, joinCode)} className="block">
-        <BigButton>Live-Ranking</BigButton>
-      </Link>
-      <details className="group overflow-hidden rounded-3xl bg-[var(--cg-accent)] shadow-[var(--cg-shadow-lift)]">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-[var(--cg-accent-fg)] marker:content-none [&::-webkit-details-marker]:hidden">
-          <div>
-            <p className="text-sm font-extrabold uppercase tracking-[0.14em]">Wallet</p>
-            <p className="mt-0.5 text-sm opacity-80">
-              {gameOverWalletNotes.length === 0
-                ? "Noch leer"
-                : `${gameOverWalletNotes.length} ${gameOverWalletNotes.length === 1 ? "Hinweis" : "Hinweise"}`}
-            </p>
-          </div>
-          <span
-            aria-hidden
-            className="text-lg leading-none opacity-80 transition-transform group-open:rotate-180"
-          >
-            ▾
-          </span>
-        </summary>
-        <div className="rounded-t-2xl bg-[var(--cg-card)] px-5 py-5">
-          <TeamWalletList
-            notes={gameOverWalletNotes}
-            score={teamState.gameState.score ?? 0}
-            purchasesClosed
+            </summary>
+            <div className="rounded-t-2xl bg-[var(--cg-card)] px-5 py-5">
+              <TeamWalletList
+                notes={gameOverWalletNotes}
+                score={teamState.gameState.score ?? 0}
+                purchasesClosed
+              />
+            </div>
+          </details>
+          <TeamCaptureGallery
+            inviteCode={inviteCode}
+            joinCode={joinCode}
+            sessionId={session.sessionId}
           />
-        </div>
-      </details>
-      <TeamCaptureGallery
-        inviteCode={inviteCode}
-        joinCode={joinCode}
-        sessionId={session.sessionId}
-      />
-    </div>
+        </>
+      }
+    />
   ) : currentLevelDefinition ? (
     phased && usesMissionShell(eventContent) ? (
       <PlayPhaseFlow

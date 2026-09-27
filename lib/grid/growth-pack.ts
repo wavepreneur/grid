@@ -47,6 +47,7 @@ export type GrowthOffer = {
 
 export const STUDIO_DUMMY_DISCOUNT_CODE = "GRID-TEST-20";
 export const EXITMANIA_SHARE_URL = "https://exitmania.com";
+export const EXITMANIA_TEAM_RANKING_URL = "https://exitmania.com/team-ranking";
 
 export function studioGrowthOffer(): GrowthOffer {
   return {
@@ -73,10 +74,10 @@ export function buildVoucherShareMessage(input: {
     input.shareUrl && isSafeHttpUrl(input.shareUrl) ? input.shareUrl : EXITMANIA_SHARE_URL;
   const challenge =
     typeof input.score === "number"
-      ? `${input.score} Punkte. Auf geht's — schlag mich, wenn du kannst.`
-      : "Auf geht's — schlag mich, wenn du kannst.";
+      ? `${input.score} Punkte. Schlag mich, wenn du kannst 🔥`
+      : "Schlag mich, wenn du kannst 🔥";
   const codeLine = input.discountCode
-    ? `20 %-Code: ${input.discountCode} — einmal einlösbar.`
+    ? `🎟️ 20 %-Code: ${input.discountCode} — einmal, Team bis 4 Personen`
     : null;
   return {
     title: "Schlag mich, wenn du kannst",

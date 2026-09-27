@@ -54,6 +54,7 @@ import {
   withFollowUpTrigger,
   type FollowUpKind,
 } from "@/lib/grid/follow-up-trigger";
+import { readHrRecapEmailFromFlags, withHrRecapEmail } from "@/lib/grid/hr-recap";
 
 type Props = {
   game: StudioGame;
@@ -404,6 +405,24 @@ export function GameEditorPanel({
               />
               <p className="mt-1.5 text-xs text-muted-foreground">
                 Technik, Störungen, Tipps — im Spielmenü unter FAQ.
+              </p>
+            </div>
+            <div className="md:col-span-2">
+              <StudioLabel>HR-Auswertung (Test-E-Mail)</StudioLabel>
+              <StudioInput
+                type="email"
+                placeholder="leer = keine Mail"
+                value={readHrRecapEmailFromFlags(game.feature_flags) ?? ""}
+                onChange={(e) =>
+                  setGame({
+                    ...game,
+                    feature_flags: withHrRecapEmail(game.feature_flags, e.target.value),
+                  })
+                }
+              />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Nach Game Over: Score und Auswertungslink an diese Adresse — zum Weiterleiten an
+                HR. Leer lassen, wenn keine Mail soll. Erscheint nicht auf dem Spieler-Recap.
               </p>
             </div>
             <div className="md:col-span-2">

@@ -40,6 +40,11 @@ export function eventRankingPath(inviteCode: string, joinCode?: string): string 
   return `${base}?team=${code(joinCode)}`;
 }
 
+/** Public game-over recap — works without a player session, a week later too. */
+export function eventRecapPath(inviteCode: string, joinCode: string): string {
+  return `/e/${code(inviteCode)}/recap/${code(joinCode)}`;
+}
+
 export function cockpitPath(inviteCode: string): string {
   return `/cockpit/${code(inviteCode)}`;
 }
