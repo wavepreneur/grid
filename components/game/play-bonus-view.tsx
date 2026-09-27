@@ -29,6 +29,7 @@ import { hubMeta } from "@/lib/grid/play-slots";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
 import { CityTeamBar } from "@/components/game/city/team-bar";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
+import type { CaptureBrandStamp } from "@/lib/grid/capture-stamp";
 
 function bonusClockStorageKey(bonusId: string, clockScope: string): string {
   return `grid:bonus-clock:${clockScope}:${bonusId}`;
@@ -85,6 +86,7 @@ type Props = {
     joinCode: string;
     sessionId: string;
   };
+  brandStamp?: CaptureBrandStamp;
   onBegin: () => void;
   onSubmit: (
     selectedOptionId: string,
@@ -120,6 +122,7 @@ export function PlayBonusView({
   clockScope = null,
   fromLevel = 0,
   captureContext,
+  brandStamp,
   onHandOff,
 }: Props) {
   const answerMode = bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
@@ -447,6 +450,7 @@ export function PlayBonusView({
             disabled={locked}
             isPending={isPending || submitting}
             captureContext={captureContext}
+            brandStamp={brandStamp}
             allowSkip
             onSubmit={(payload) => {
               if (show || submitting) return;

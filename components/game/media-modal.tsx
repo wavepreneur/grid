@@ -23,7 +23,6 @@ export function MediaModal({
   tile,
   onClose,
   purchasedHints = {},
-  score = 0,
   isPending = false,
   onPurchaseHint,
 }: MediaModalProps) {
@@ -95,9 +94,7 @@ export function MediaModal({
         mode="confirm"
         label={title}
         hintCost={hintCost}
-        score={score}
         isPending={isPending}
-        canAfford={score >= hintCost}
         onConfirm={() => {
           if (!onPurchaseHint) return;
           onPurchaseHint(tile.id);

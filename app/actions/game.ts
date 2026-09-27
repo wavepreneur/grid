@@ -790,12 +790,6 @@ export async function purchaseHint(input: {
     }
 
     const pointCost = tile.hint.point_cost ?? HINT_POINT_COST;
-    if (gameState.score < pointCost) {
-      return {
-        success: false,
-        error: `Nicht genug Punkte (benötigt: ${pointCost}).`,
-      };
-    }
 
     const unlockedAt = new Date().toISOString();
     const nextGameState: TeamGameState = {

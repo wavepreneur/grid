@@ -11,6 +11,7 @@ import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner
 import type { GameLevelStatus, LevelRevealState, PurchasedTileHint } from "@/lib/grid/game-state";
 import type { LevelContentTile, LevelDefinition, SolveLevelPayload } from "@/lib/grid/level-types";
 import type { GpsFixPayload } from "@/lib/hooks/use-team-sync";
+import type { CaptureBrandStamp } from "@/lib/grid/capture-stamp";
 
 type ExitmaniaLevelViewProps = {
   level: LevelDefinition;
@@ -41,6 +42,7 @@ type ExitmaniaLevelViewProps = {
     joinCode: string;
     sessionId: string;
   };
+  brandStamp?: CaptureBrandStamp;
 };
 
 export function ExitmaniaLevelView({
@@ -68,6 +70,7 @@ export function ExitmaniaLevelView({
   mirroredGps: _mirroredGps = null,
   onBroadcastGpsFix: _onBroadcastGpsFix,
   captureContext,
+  brandStamp,
 }: ExitmaniaLevelViewProps) {
   void _allLevels;
   void _levelStatuses;
@@ -132,6 +135,7 @@ export function ExitmaniaLevelView({
           leadLabel={leadLabel}
           onReveal={onReveal}
           captureContext={captureContext}
+          brandStamp={brandStamp}
         />
       </div>
 

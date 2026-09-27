@@ -10,9 +10,7 @@ type TileHintModalProps = {
   label: string;
   hintText?: string;
   hintCost: number;
-  score: number;
   isPending?: boolean;
-  canAfford?: boolean;
   onConfirm?: () => void;
   onClose: () => void;
 };
@@ -23,9 +21,7 @@ export function TileHintModal({
   label,
   hintText,
   hintCost,
-  score,
   isPending = false,
-  canAfford = true,
   onConfirm,
   onClose,
 }: TileHintModalProps) {
@@ -70,16 +66,11 @@ export function TileHintModal({
             <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
               Kostet{" "}
               <span className="font-bold text-[var(--cg-fg)]">{hintCost} Punkte</span> vom
-              Team-Score. Pro Kachel gibt es einen Tipp.
+              Team-Score — auch ins Minus. Pro Kachel gibt es einen Tipp.
             </p>
-            {!canAfford ? (
-              <p className="text-sm font-semibold text-[var(--cg-destructive)]">
-                Nicht genug Punkte (habt {score}, braucht {hintCost}).
-              </p>
-            ) : null}
             <BigButton
               variant="accent"
-              disabled={isPending || !canAfford}
+              disabled={isPending}
               onClick={onConfirm}
             >
               {isPending ? "Wird geladen…" : "Freischalten & anzeigen"}

@@ -938,6 +938,7 @@ export function GameRoom({
       inviteCode={inviteCode}
       joinCode={joinCode}
       teamName={teamName}
+      eventTitle={eventContent.templateName.trim() || eventTitle}
       score={teamState.gameState.score ?? 0}
       levels={eventContent.levels}
       gameState={teamState.gameState}
@@ -1116,6 +1117,11 @@ export function GameRoom({
           inviteCode,
           joinCode,
           sessionId: session.sessionId,
+        }}
+        brandStamp={{
+          score: teamState.gameState.score ?? 0,
+          gameTitle: eventContent.templateName.trim() || eventTitle,
+          siteUrl: "exitmania.com",
         }}
       />
     ) : (

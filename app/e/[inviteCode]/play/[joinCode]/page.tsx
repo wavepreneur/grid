@@ -16,12 +16,14 @@ export default async function EventPlayPage({ params }: EventPlayPageProps) {
     resolveTeamJoinCode({ inviteCode: invite, joinCode: join }),
   ]);
 
+  const eventTitle = (event?.title ?? "").replace(/^\[Test\]\s*/, "").trim() || "Mission";
+
   return (
     <GameGate
       inviteCode={invite}
       joinCode={join}
       teamName={teamResult.success ? teamResult.data.teamName : ""}
-      eventTitle="Mission"
+      eventTitle={eventTitle}
       holdForBriefing={event ? needsBriefingBeforePlay(event) : false}
     />
   );

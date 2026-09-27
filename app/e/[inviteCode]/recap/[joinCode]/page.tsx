@@ -36,6 +36,7 @@ export default async function TeamRecapPage({ params }: Props) {
         inviteCode={recap.inviteCode}
         joinCode={recap.joinCode}
         teamName={recap.teamName}
+        eventTitle={recap.eventContent.templateName}
         score={recap.score}
         levels={recap.eventContent.levels}
         gameState={recap.gameState}

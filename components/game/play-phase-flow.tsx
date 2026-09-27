@@ -37,6 +37,10 @@ import {
 } from "@/lib/grid/role-labels";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 import { visibleWalletNotes } from "@/lib/grid/wallet";
+import {
+  resolveCaptureBrandStamp,
+  type CaptureBrandStamp,
+} from "@/lib/grid/capture-stamp";
 
 type Teammate = {
   id: string;
@@ -208,6 +212,10 @@ export function PlayPhaseFlow({
     eventContent.levels,
     gameState.levels,
   );
+  const brandStamp: CaptureBrandStamp = resolveCaptureBrandStamp({
+    score,
+    gameTitle: eventContent.templateName,
+  });
 
   const prevPhaseRef = useRef(phase);
   const [unlockGate, setUnlockGate] = useState(false);
@@ -389,6 +397,7 @@ export function PlayPhaseFlow({
             clockScope={teamStartedAt}
             fromLevel={presentBonusMeta.from_level}
             captureContext={captureContext}
+            brandStamp={brandStamp}
             onBegin={() => onBeginBonus(bonusId)}
             onSubmit={onSubmitBonus}
             onContinue={() => onContinueBonus(bonusId)}
@@ -440,6 +449,7 @@ export function PlayPhaseFlow({
             clockScope={teamStartedAt}
             fromLevel={level.level}
             captureContext={captureContext}
+            brandStamp={brandStamp}
             onBegin={() => onBeginBonus(bonusId)}
             onSubmit={onSubmitBonus}
             onContinue={() => onContinueBonus(bonusId)}
@@ -614,6 +624,7 @@ export function PlayPhaseFlow({
             ? { inviteCode, joinCode, sessionId }
             : undefined
         }
+        brandStamp={brandStamp}
       />
     </>
   );

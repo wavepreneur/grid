@@ -27,6 +27,7 @@ import { isMediaInputMode, type LevelDefinition, type SolveLevelPayload } from "
 import type { LevelRevealState } from "@/lib/grid/game-state";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
 import { MediaCapturePanel } from "@/components/game/media-capture-panel";
+import type { CaptureBrandStamp } from "@/lib/grid/capture-stamp";
 
 type LevelSolvePanelProps = {
   level: LevelDefinition;
@@ -53,6 +54,7 @@ type LevelSolvePanelProps = {
     joinCode: string;
     sessionId: string;
   };
+  brandStamp?: CaptureBrandStamp;
 };
 
 export function LevelSolvePanel({
@@ -73,6 +75,7 @@ export function LevelSolvePanel({
   leadLabel = "Team Lead",
   onReveal,
   captureContext,
+  brandStamp,
 }: LevelSolvePanelProps) {
   const [answer, setAnswer] = useState("");
   const [numberParts, setNumberParts] = useState<string[]>(() =>
@@ -426,6 +429,7 @@ export function LevelSolvePanel({
                 disabled={disabled}
                 isPending={isPending}
                 captureContext={captureContext}
+                brandStamp={brandStamp}
                 cityStyle
                 canPaceTeam={canPaceTeam}
                 leadLabel={leadLabel}
@@ -576,6 +580,7 @@ export function LevelSolvePanel({
               disabled={disabled}
               isPending={isPending}
               captureContext={captureContext}
+              brandStamp={brandStamp}
               cityStyle={false}
               canPaceTeam={canPaceTeam}
               leadLabel={leadLabel}

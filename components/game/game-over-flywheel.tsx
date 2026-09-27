@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
+import { X } from "lucide-react";
 import { GrowthRecapCard } from "@/components/game/growth-recap-card";
 import { BigButton } from "@/components/game/city/ui";
 import type { GrowthOffer } from "@/lib/grid/growth-pack";
@@ -14,6 +16,7 @@ type Props = {
   inviteCode: string;
   joinCode: string;
   teamName: string;
+  eventTitle?: string;
   score: number;
   levels: LevelDefinition[];
   gameState: TeamGameState;
@@ -21,10 +24,26 @@ type Props = {
   extras?: ReactNode;
 };
 
+function teamHeadline(name: string): string {
+  const trimmed = name.trim() || "Team";
+  return /^team\b/i.test(trimmed) ? trimmed : `Team ${trimmed}`;
+}
+
+function rankingSrc(
+  inviteCode: string,
+  joinCode: string,
+  teamevent: boolean,
+): string {
+  if (!teamevent) return `${EXITMANIA_TEAM_RANKING_URL}?embed=1`;
+  const path = eventRankingPath(inviteCode, joinCode);
+  return path.includes("?") ? `${path}&embed=1` : `${path}?embed=1`;
+}
+
 export function GameOverFlywheel({
   inviteCode,
   joinCode,
   teamName,
+  eventTitle,
   score,
   levels,
   gameState,
@@ -32,6 +51,8 @@ export function GameOverFlywheel({
   extras,
 }: Props) {
   const [copied, setCopied] = useState(false);
+  const [rankingOpen, setRankingOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const total = levels.length;
   const reason = gameState.ended_reason ?? (countDone(gameState) >= total && total > 0 ? "completed" : "ended");
   const timeUp = reason === "time";
@@ -43,6 +64,28 @@ export function GameOverFlywheel({
   const revealed = levels.filter(
     (level) => levelPlayOutcome(gameState.levels[String(level.level)]) === "revealed",
   ).length;
+  const missionName = eventTitle?.replace(/^\[Test\]\s*/, "").trim() || "";
+  const teamLabel = teamHeadline(teamName);
+  const teamevent = growthOffer?.surface === "exitmania_teamevent";
+  const embedSrc = rankingSrc(inviteCode, joinCode, teamevent);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!rankingOpen) return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+    };
+  }, [rankingOpen]);
 
   async function copyRecapLink() {
     const path = eventRecapPath(inviteCode, joinCode);
@@ -74,15 +117,18 @@ export function GameOverFlywheel({
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--cg-muted)]">
           Game Over
         </p>
+        {missionName ? (
+          <p className="text-base font-semibold text-[var(--cg-fg)]">{missionName}</p>
+        ) : null}
         <p className="cg-animate-pop-in text-3xl font-bold text-[var(--cg-fg)]">
           {won ? "Mission abgeschlossen!" : timeUp ? "Zeit ist abgelaufen." : "Game Over"}
         </p>
         <p className="text-base text-[var(--cg-muted)]">
           {won
-            ? `${teamName} · ${total} Aufgaben`
+            ? `${teamLabel} · ${total} Aufgaben`
             : timeUp
-              ? `${completed} von ${total} Aufgaben — ${teamName}`
-              : `${completed} von ${total} Aufgaben geschafft.`}
+              ? `${completed} von ${total} Aufgaben — ${teamLabel}`
+              : `${completed} von ${total} Aufgaben geschafft · ${teamLabel}`}
         </p>
       </div>
 
@@ -126,20 +172,19 @@ export function GameOverFlywheel({
 
       <section className="rounded-3xl border border-[var(--cg-primary)]/25 bg-[var(--cg-card)] px-5 py-5 text-center">
         <p className="text-lg font-bold text-[var(--cg-fg)]">
-          {growthOffer?.surface === "exitmania_teamevent"
+          {teamevent
             ? "🏆 Live-Ranking eures Events"
             : "🏆 Wie habt ihr im Highscore abgeschnitten?"}
         </p>
-        <div className="mt-4 overflow-hidden rounded-2xl bg-slate-900 ring-1 ring-[var(--cg-border)]">
-          <iframe
-            src={
-              growthOffer?.surface === "exitmania_teamevent"
-                ? `${eventRankingPath(inviteCode, joinCode)}&embed=1`
-                : `${EXITMANIA_TEAM_RANKING_URL}?embed=1`
-            }
-            title="Highscore"
-            className="h-[min(70vh,36rem)] w-full border-0"
-          />
+        <p className="mt-2 text-sm leading-relaxed text-[var(--cg-muted)]">
+          {teamevent
+            ? "Kurz bewerten — danach seht ihr das Ranking eures Events."
+            : "Kurz bewerten — danach seht ihr das All-Time-Highscore-Ranking."}
+        </p>
+        <div className="mt-4">
+          <BigButton onClick={() => setRankingOpen(true)}>
+            {teamevent ? "Event-Ranking öffnen" : "Highscore öffnen"}
+          </BigButton>
         </div>
       </section>
 
@@ -162,7 +207,7 @@ export function GameOverFlywheel({
         </div>
       </section>
 
-      {growthOffer?.surface === "exitmania_teamevent" ? null : (
+      {teamevent ? null : (
         <p className="text-center text-sm">
           <Link
             href={eventRankingPath(inviteCode, joinCode)}
@@ -174,6 +219,33 @@ export function GameOverFlywheel({
       )}
 
       {extras ? <div className="space-y-5">{extras}</div> : null}
+
+      {mounted && rankingOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[4000] bg-black">
+              <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 bg-black/90 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+                <p className="truncate text-sm font-semibold text-white">
+                  {teamevent ? "Event-Ranking" : "Highscore"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setRankingOpen(false)}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white"
+                  aria-label="Ranking schließen"
+                >
+                  <X className="h-5 w-5" strokeWidth={2.4} />
+                </button>
+              </div>
+              <iframe
+                src={embedSrc}
+                title={teamevent ? "Event-Ranking" : "Highscore"}
+                className="absolute inset-0 h-full w-full border-0 bg-white pt-14"
+                allow="fullscreen"
+              />
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

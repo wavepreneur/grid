@@ -28,6 +28,10 @@ import {
 } from "@/lib/grid/event-captures";
 import { createClient } from "@/lib/supabase/client";
 import type { MediaInputMode, SolveLevelPayload } from "@/lib/grid/level-types";
+import {
+  stampCapturePhoto,
+  type CaptureBrandStamp,
+} from "@/lib/grid/capture-stamp";
 
 type CaptureContext = {
   inviteCode: string;
@@ -43,6 +47,7 @@ type Props = {
   disabled: boolean;
   isPending: boolean;
   captureContext?: CaptureContext;
+  brandStamp?: CaptureBrandStamp;
   cityStyle?: boolean;
   canPaceTeam?: boolean;
   leadLabel?: string;
@@ -129,6 +134,7 @@ export function MediaCapturePanel({
   disabled,
   isPending,
   captureContext,
+  brandStamp,
   cityStyle = true,
   canPaceTeam = false,
   leadLabel = "Team Lead",
@@ -142,6 +148,7 @@ export function MediaCapturePanel({
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const selfieRef = useRef<HTMLInputElement | null>(null);
   const openedAtRef = useRef(0);
   const startingRef = useRef(false);
 
@@ -295,7 +302,28 @@ export function MediaCapturePanel({
       );
     }
     const blob = await encodeCanvasJpeg(canvas);
-    if (blob) setPreview(blob);
+    if (blob) void finishPhoto(blob);
+  }
+
+  async function finishPhoto(blob: Blob) {
+    try {
+      const compressed = await compressCaptureImage(blob);
+      const stamped =
+        brandStamp && compressed.type.startsWith("image/")
+          ? await stampCapturePhoto(compressed, brandStamp)
+          : compressed;
+      setPreview(stamped);
+    } catch {
+      setPreview(blob);
+    }
+  }
+
+  function openNativePhoto() {
+    if (disabled || isPending) return;
+    openedAtRef.current = Date.now();
+    setCameraError(null);
+    setUploadError(null);
+    selfieRef.current?.click();
   }
 
   function stopRecording() {
@@ -364,6 +392,11 @@ export function MediaCapturePanel({
     });
     setElapsed(0);
     setUploadError(null);
+    if (!isVideo) {
+      setOpen(false);
+      window.setTimeout(() => selfieRef.current?.click(), 50);
+      return;
+    }
     requestAnimationFrame(() => {
       if (streamRef.current) {
         attachStream(streamRef.current);
@@ -402,7 +435,7 @@ export function MediaCapturePanel({
     setSending(true);
     setUploadError(null);
     try {
-      const payload = isVideo ? previewBlob : await compressCaptureImage(previewBlob);
+      const payload = previewBlob;
       if (payload.size > EVENT_CAPTURE_MAX_BYTES) {
         setUploadError("Datei zu groß (max. 25 MB). Kürzer aufnehmen.");
         return;
@@ -509,7 +542,7 @@ export function MediaCapturePanel({
         void compositeFileWithOverlay(file);
         return;
       }
-      void compressCaptureImage(file).then(setPreview);
+      void finishPhoto(file);
     }
   }
 
@@ -539,7 +572,7 @@ export function MediaCapturePanel({
       );
     }
     const blob = await encodeCanvasJpeg(canvas);
-    setPreview(blob ?? file);
+    await finishPhoto(blob ?? file);
   }
 
   function skipTask() {
@@ -556,9 +589,7 @@ export function MediaCapturePanel({
   const hint =
     kind === "video"
       ? `Maximal ${EVENT_CAPTURE_VIDEO_MAX_SECONDS} Sekunden. Danach senden — oder neu versuchen.`
-      : hasFrame
-        ? "Der Rahmen liegt über der Kamera. Personen in die Aussparung setzen, dann auslösen."
-        : "Foto machen, prüfen, bei Bedarf neu — dann senden.";
+      : "Öffnet die Handy-Kamera — Selfie umdrehen geht dort. Danach prüft ihr das Foto hier und sendet.";
   const remainingSeconds = Math.max(0, EVENT_CAPTURE_VIDEO_MAX_SECONDS - elapsed);
   const recordProgress = Math.min(1, elapsed / EVENT_CAPTURE_VIDEO_MAX_SECONDS);
 
@@ -612,12 +643,14 @@ export function MediaCapturePanel({
       <PrimaryButton
         disabled={disabled || isPending}
         onPointerDown={(event) => {
-          if (event.pointerType === "mouse" && event.button !== 0) return;
-          if (event.pointerType === "touch" || event.pointerType === "pen") {
-            openLiveCamera();
+          if (isVideo) {
+            if (event.pointerType === "mouse" && event.button !== 0) return;
+            if (event.pointerType === "touch" || event.pointerType === "pen") {
+              openLiveCamera();
+            }
           }
         }}
-        onClick={openLiveCamera}
+        onClick={isVideo ? openLiveCamera : openNativePhoto}
       >
         <span className="inline-flex items-center justify-center gap-2">
           <Camera className="h-5 w-5" strokeWidth={2.4} />
@@ -625,30 +658,28 @@ export function MediaCapturePanel({
         </span>
       </PrimaryButton>
       {cameraError ? (
-        <>
-          <p
-            className={
-              cityStyle
-                ? "text-center text-sm text-[var(--cg-muted)]"
-                : "text-sm text-slate-600"
-            }
-          >
-            {cameraError}
-          </p>
-          <button
-            type="button"
-            disabled={disabled || isPending}
-            onClick={() => fileRef.current?.click()}
-            className={
-              cityStyle
-                ? "w-full text-center text-sm font-semibold text-[var(--cg-muted)] underline-offset-2 hover:underline disabled:opacity-40"
-                : "w-full text-center text-sm text-slate-500 underline"
-            }
-          >
-            Aus der Galerie
-          </button>
-        </>
+        <p
+          className={
+            cityStyle
+              ? "text-center text-sm text-[var(--cg-muted)]"
+              : "text-sm text-slate-600"
+          }
+        >
+          {cameraError}
+        </p>
       ) : null}
+      <button
+        type="button"
+        disabled={disabled || isPending}
+        onClick={() => fileRef.current?.click()}
+        className={
+          cityStyle
+            ? "w-full text-center text-sm font-semibold text-[var(--cg-muted)] underline-offset-2 hover:underline disabled:opacity-40"
+            : "w-full text-center text-sm text-slate-500 underline"
+        }
+      >
+        Aus der Galerie
+      </button>
 
       {allowSkip ? (
         <button
@@ -670,6 +701,20 @@ export function MediaCapturePanel({
         <img ref={overlayRef} src={overlayImageUrl} alt="" className="hidden" />
       ) : null}
 
+      <input
+        ref={selfieRef}
+        type="file"
+        accept="image/*"
+        capture="user"
+        className="hidden"
+        onChange={(event) => {
+          handleFilePick(event.target.files?.[0] ?? null);
+          event.target.value = "";
+        }}
+        onCancel={() => {
+          if (!previewBlob) closeCamera(true);
+        }}
+      />
       <input
         ref={fileRef}
         type="file"

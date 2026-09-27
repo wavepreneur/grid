@@ -324,7 +324,7 @@ export function GameGate({
       initialState={initialState.data}
       eventContent={eventContent}
       teamName={resolvedTeamName.trim() || teamName}
-      eventTitle={eventTitle}
+      eventTitle={eventContent.templateName.trim() || eventTitle}
       onQuietContentUpdate={pullIfNewer}
     />
   );
