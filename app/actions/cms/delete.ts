@@ -383,6 +383,29 @@ async function deleteTicketPoolsForGame(
   if (error) throw new Error(error.message);
 }
 
+async function deleteAccessBatchesForGame(
+  supabase: ReturnType<typeof createAdminClient>,
+  gameId: string,
+  organizationId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("studio_access_batches")
+    .delete()
+    .eq("game_id", gameId)
+    .eq("organization_id", organizationId);
+  if (error) throw new Error(error.message);
+}
+
+function friendlyGameDeleteError(message: string): string {
+  if (message.includes("studio_access_batches")) {
+    return "Zu diesem Spiel gehören noch Ticket-Sätze. Bitte erneut löschen.";
+  }
+  if (message.toLowerCase().includes("foreign key")) {
+    return "Dieses Spiel ist noch mit anderen Daten verknüpft und konnte nicht gelöscht werden.";
+  }
+  return message;
+}
+
 export async function deleteGames(gameIds: string[]): Promise<ActionResult<BulkDeleteGamesResult>> {
   try {
     if (gameIds.length === 0) {
@@ -406,6 +429,7 @@ export async function deleteGames(gameIds: string[]): Promise<ActionResult<BulkD
       }
 
       try {
+        await deleteAccessBatchesForGame(supabase, status.gameId, orgId);
         await deleteTicketPoolsForGame(supabase, status.gameId);
 
         const { error } = await supabase
@@ -415,14 +439,16 @@ export async function deleteGames(gameIds: string[]): Promise<ActionResult<BulkD
           .eq("organization_id", orgId);
 
         if (error) {
-          failed.push({ id: status.gameId, error: error.message, status });
+          failed.push({ id: status.gameId, error: friendlyGameDeleteError(error.message), status });
           continue;
         }
         deletedIds.push(status.gameId);
       } catch (err) {
         failed.push({
           id: status.gameId,
-          error: err instanceof Error ? err.message : "Löschen fehlgeschlagen.",
+          error: friendlyGameDeleteError(
+            err instanceof Error ? err.message : "Löschen fehlgeschlagen.",
+          ),
           status,
         });
       }
