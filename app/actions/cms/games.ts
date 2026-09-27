@@ -538,7 +538,7 @@ export async function updateGameTaskLinkConfig(
     const supabase = createAdminClient();
     const { data: existing, error: fetchError } = await supabase
       .from("studio_game_tasks")
-      .select("id, overrides")
+      .select("id, task_id, overrides")
       .eq("id", linkId)
       .eq("game_id", gameId)
       .maybeSingle();
@@ -655,7 +655,8 @@ export async function updateGameTaskLinkConfig(
         // Keep legacy pointer on first for older readers
         overrides.bonus_task_id = patch.bonus_bindings[0]!.task_id;
       } else {
-        delete overrides.bonus_bindings;
+        // Persist [] so reopen does not revive the bonus via Layer-3 trigger fallback.
+        overrides.bonus_bindings = [];
         delete overrides.bonus_task_id;
       }
     }
@@ -690,6 +691,43 @@ export async function updateGameTaskLinkConfig(
 
     // Bindings alone are not enough — compile only sees tasks linked on the game.
     // Auto-attach missing bonus pool tasks as Layer 3 so „Ganzes Team“ actually fires.
+    if (patch.bonus_bindings !== undefined) {
+      const keepIds = new Set(
+        (patch.bonus_bindings ?? []).map((b) => b.task_id).filter(Boolean),
+      );
+      const missionTaskId = (existing as { task_id?: string }).task_id;
+      if (missionTaskId) {
+        const { data: layer3, error: layer3Error } = await supabase
+          .from("studio_game_tasks")
+          .select("id, task_id, overrides")
+          .eq("game_id", gameId)
+          .eq("layer", 3);
+        if (layer3Error) throw new Error(layer3Error.message);
+        await Promise.all(
+          (layer3 ?? []).map(async (row) => {
+            if (keepIds.has(row.task_id as string)) return;
+            const sibling = {
+              ...(((row as { overrides: GameLinkOverrides }).overrides ??
+                {}) as GameLinkOverrides),
+            };
+            const trigger = sibling.trigger;
+            if (
+              trigger?.type !== "after_task_solved" ||
+              trigger.source_task_id !== missionTaskId
+            ) {
+              return;
+            }
+            delete sibling.trigger;
+            await supabase
+              .from("studio_game_tasks")
+              .update({ overrides: sibling })
+              .eq("id", row.id)
+              .eq("game_id", gameId);
+          }),
+        );
+      }
+    }
+
     if (patch.bonus_bindings && patch.bonus_bindings.length > 0) {
       const neededIds = Array.from(
         new Set(patch.bonus_bindings.map((b) => b.task_id).filter(Boolean)),

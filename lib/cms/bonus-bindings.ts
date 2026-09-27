@@ -80,9 +80,14 @@ export function parseBonusWhen(raw: unknown): BonusWhen {
   };
 }
 
+/** True when Studio has written bonus_bindings — including an empty list. */
+export function hasAuthoredBonusBindings(overrides: GameLinkOverrides): boolean {
+  return Array.isArray(overrides.bonus_bindings);
+}
+
 export function parseBonusBindings(overrides: GameLinkOverrides): BonusBinding[] {
   const raw = (overrides as GameLinkOverrides & { bonus_bindings?: unknown }).bonus_bindings;
-  if (Array.isArray(raw) && raw.length > 0) {
+  if (Array.isArray(raw)) {
     const out: BonusBinding[] = [];
     for (const entry of raw) {
       if (!entry || typeof entry !== "object") continue;

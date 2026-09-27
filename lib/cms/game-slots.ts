@@ -8,7 +8,11 @@ import {
   parseLinkOverrides,
   type GameLinkOverrides,
 } from "@/lib/cms/game-link-config";
-import { parseBonusBindings, type BonusBinding } from "@/lib/cms/bonus-bindings";
+import {
+  hasAuthoredBonusBindings,
+  parseBonusBindings,
+  type BonusBinding,
+} from "@/lib/cms/bonus-bindings";
 import type { ContentMode } from "@/lib/cms/layer-model";
 import { LAYER_GAME_PRESETS, type LayerGamePreset } from "@/lib/cms/layer-model";
 import {
@@ -460,8 +464,9 @@ export function buildGameSlots(
       if (found) bonusLinks.push(found);
     }
 
-    // Legacy fallbacks when no bindings yet
-    if (bonusLinks.length === 0) {
+    // Legacy fallbacks only when Studio never wrote bonus_bindings.
+    // An empty array means the author removed every bonus — do not reattach.
+    if (bonusLinks.length === 0 && !hasAuthoredBonusBindings(overrides)) {
       const bonusTaskId = overrides.bonus_task_id;
       let bonusLink =
         (bonusTaskId

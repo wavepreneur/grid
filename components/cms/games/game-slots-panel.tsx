@@ -451,7 +451,7 @@ export function GameSlotsPanel({
       const result = await updateGameTaskLinkConfig(gameId, editSlot.levelLink.id, {
         opener_task_id: quizEnabled ? openerTaskId : null,
         opener_points: quizEnabled ? quizPoints : null,
-        bonus_bindings: bonusBindings.length > 0 ? bonusBindings : null,
+        bonus_bindings: bonusBindings,
         unlock,
         visible_to: visibleTo,
         ends_game: endsGame,
@@ -470,8 +470,21 @@ export function GameSlotsPanel({
         return;
       }
 
+      const keepBonusIds = new Set(bonusBindings.map((b) => b.task_id).filter(Boolean));
+      const missionTaskId = editSlot.levelLink.task_id;
       let nextLinks = links.map((l) => {
         if (l.id === result.data!.id) return result.data!;
+        if (parseLinkLayer(l) === 3 && !keepBonusIds.has(l.task_id)) {
+          const bonusOverrides = parseLinkOverrides(l.overrides);
+          if (
+            bonusOverrides.trigger?.type === "after_task_solved" &&
+            bonusOverrides.trigger.source_task_id === missionTaskId
+          ) {
+            const { trigger: _cleared, ...rest } = bonusOverrides;
+            void _cleared;
+            return { ...l, overrides: rest };
+          }
+        }
         if (!endsGame) return l;
         const o = parseLinkOverrides(l.overrides);
         if (!o.ends_game) return l;
