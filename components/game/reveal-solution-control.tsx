@@ -91,9 +91,9 @@ export function RevealSolutionControl({ disabled = false, onConfirmReveal }: Pro
             </div>
 
             <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
-              Die Aufgabe gilt als erledigt mit{" "}
-              <span className="font-bold text-[var(--cg-fg)]">0 Punkten</span>. Die Lösung bleibt
-              verborgen — den Hinweis holt ihr in der Wallet, gegen Punkte.
+              Die Aufgabe gilt danach als erledigt, bringt aber{" "}
+              <span className="font-bold text-[var(--cg-fg)]">0 Punkte</span>. Das lässt sich nicht
+              rückgängig machen.
             </p>
 
             <BigButton
