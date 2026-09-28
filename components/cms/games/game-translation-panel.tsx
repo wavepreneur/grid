@@ -149,7 +149,7 @@ function TileFields({
                 label="Kurz-Label"
                 value={tile.label ?? ""}
                 source={source?.label}
-                confirmed={confirmedSet.has(`${keyPrefix}:tile:${tile.id}:label`)}
+                confirmed={confirmed.has(`${keyPrefix}:tile:${tile.id}:label`)}
                 onConfirm={onConfirm}
                 onChange={(label) => {
                   onValue(`${keyPrefix}:tile:${tile.id}:label`, source?.label ?? "", label);
@@ -163,7 +163,7 @@ function TileFields({
                 type="url"
                 value={tile.url ?? ""}
                 source={source?.url}
-                confirmed={confirmedSet.has(`${keyPrefix}:tile:${tile.id}:url`)}
+                confirmed={confirmed.has(`${keyPrefix}:tile:${tile.id}:url`)}
                 onConfirm={onConfirm}
                 onChange={(url) => {
                   onValue(`${keyPrefix}:tile:${tile.id}:url`, source?.url ?? "", url);
@@ -176,7 +176,7 @@ function TileFields({
                 multiline
                 value={tile.hint_text ?? ""}
                 source={source?.hint_text}
-                confirmed={confirmedSet.has(`${keyPrefix}:tile:${tile.id}:hint`)}
+                confirmed={confirmed.has(`${keyPrefix}:tile:${tile.id}:hint`)}
                 onConfirm={onConfirm}
                 onChange={(hint_text) => {
                   onValue(`${keyPrefix}:tile:${tile.id}:hint`, source?.hint_text ?? "", hint_text);
@@ -222,7 +222,7 @@ function OptionFields({
             label={`Antwort ${index + 1}`}
             value={option.label}
             source={source}
-            confirmed={confirmedSet.has(key)}
+            confirmed={confirmed.has(key)}
             onConfirm={onConfirm}
             onChange={(label) => {
               onValue(key, source, label);
