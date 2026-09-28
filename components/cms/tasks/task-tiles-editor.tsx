@@ -15,6 +15,7 @@ import {
   StudioSelect,
   StudioTextarea,
 } from "@/components/cms/studio-ui";
+import { HINT_POINT_COST } from "@/lib/grid/level-types";
 
 type Props = {
   tiles: TaskContentTile[];
@@ -123,7 +124,7 @@ export function TaskTilesEditor({ tiles, onChange }: Props) {
                   onChange={(e) =>
                     patchTile(tile.id, {
                       hint_text: e.target.value || undefined,
-                      hint_point_cost: tile.hint_point_cost ?? 50,
+                      hint_point_cost: tile.hint_point_cost ?? HINT_POINT_COST,
                     })
                   }
                   placeholder="Was der Spieler nach dem Freischalten sieht…"
@@ -137,7 +138,7 @@ export function TaskTilesEditor({ tiles, onChange }: Props) {
                   <StudioInput
                     type="number"
                     min={0}
-                    value={tile.hint_point_cost ?? 50}
+                    value={tile.hint_point_cost ?? HINT_POINT_COST}
                     onChange={(e) =>
                       patchTile(tile.id, {
                         hint_point_cost: Math.max(0, Number(e.target.value) || 0),

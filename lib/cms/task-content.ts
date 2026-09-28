@@ -9,7 +9,7 @@ import {
   type TaskScoring,
   type TaskTileMediaType,
 } from "@/lib/cms/types";
-import type { LevelContentTile, LevelScoring } from "@/lib/grid/level-types";
+import { HINT_POINT_COST, type LevelContentTile, type LevelScoring } from "@/lib/grid/level-types";
 
 export function createTaskTileId(): string {
   return `tile_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
@@ -358,7 +358,7 @@ export function studioTilesToLevelTiles(
     if (tile.hint_text?.trim()) {
       next.hint = {
         text: tile.hint_text.trim(),
-        point_cost: tile.hint_point_cost ?? 50,
+        point_cost: tile.hint_point_cost ?? HINT_POINT_COST,
       };
     }
     mapped.push(next);

@@ -5,6 +5,7 @@ import { Lightbulb } from "lucide-react";
 import type { StudioTaskContent, TaskContentTile, TaskTileMediaType } from "@/lib/cms/types";
 import { defaultTaskScoring, isMediaAnswerType } from "@/lib/cms/task-content";
 import { ContentMediaSheet } from "@/components/game/city/content-media-sheet";
+import { HINT_POINT_COST } from "@/lib/grid/level-types";
 import {
   LevelHero,
   LevelTaskCard,
@@ -64,7 +65,7 @@ export function TaskEditorPreview({ title, description, content }: Props) {
       coverImageUrl: tile.cover_image_url?.trim() || null,
       hintAvailable: hasHint && !unlocked,
       hintUnlocked: hasHint && unlocked,
-      hintCost: tile.hint_point_cost ?? 50,
+      hintCost: tile.hint_point_cost ?? HINT_POINT_COST,
       onOpen: () => setOpenTileId(tile.id),
       onHint: () => {
         if (unlocked) setViewHintId(tile.id);
@@ -241,7 +242,7 @@ export function TaskEditorPreview({ title, description, content }: Props) {
                     setHintConfirmId(openTile.id);
                   }}
                 >
-                  Tipp freischalten (−{openTile.hint_point_cost ?? 50} P)
+                  Tipp freischalten (−{openTile.hint_point_cost ?? HINT_POINT_COST} P)
                 </BigButton>
                 <BigButton variant="ghost" onClick={() => setOpenTileId(null)}>
                   Schließen
@@ -278,7 +279,7 @@ export function TaskEditorPreview({ title, description, content }: Props) {
             <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
               Kostet{" "}
               <span className="font-bold text-[var(--cg-fg)]">
-                {hintConfirmTile.hint_point_cost ?? 50} Punkte
+                {hintConfirmTile.hint_point_cost ?? HINT_POINT_COST} Punkte
               </span>{" "}
               vom Team-Score. Pro Kachel gibt es einen Tipp.
             </p>

@@ -126,7 +126,7 @@ export type LevelContentTile = {
   label?: string;
   /** Optional cover image for the tile button (1:1). */
   cover_image_url?: string;
-  /** Optional hint tied to this tile (default 50 points). */
+  /** Optional hint tied to this tile (default 100 points). */
   hint?: LevelTileHint;
 };
 
@@ -368,4 +368,4 @@ export const EXITMANIA_TOTAL_LEVELS = 10;
 export const DEFAULT_TEMPLATE_SLUG = "default-exitmania";
 export const DEFAULT_CITY_SLUG = "berlin";
 export const DEFAULT_STARTING_SCORE = 0;
-export const HINT_POINT_COST = 50;
+export const HINT_POINT_COST = 100;
