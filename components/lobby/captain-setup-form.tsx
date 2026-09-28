@@ -15,6 +15,7 @@ import {
 } from "@/components/lobby/lobby-identity";
 import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
 import { eventLobbyPath } from "@/lib/grid/event-routes";
+import { playUi } from "@/lib/grid/play-ui";
 import { savePlayerSession } from "@/lib/grid/player-session";
 
 type CaptainSetupFormProps = {
@@ -25,6 +26,7 @@ type CaptainSetupFormProps = {
   /** Event cap — form no longer asks for size. */
   maxPlayersPerTeam?: number;
   eventContent?: ResolvedEventContent | null;
+  language?: string | null;
 };
 
 export function CaptainSetupForm({
@@ -33,9 +35,11 @@ export function CaptainSetupForm({
   studioTest = false,
   maxPlayersPerTeam = 4,
   eventContent = null,
+  language,
 }: CaptainSetupFormProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const t = playUi(language ?? eventContent?.language);
 
   useEffect(() => {
     if (eventContent) cacheEventContent(inviteCode, eventContent);
@@ -74,18 +78,18 @@ export function CaptainSetupForm({
   return (
     <form action={handleSubmit} className="flex flex-col gap-4">
       <p className="text-center text-sm font-medium leading-relaxed text-slate-500">
-        Teamname fürs Ranking, dein Name fürs Team — dann ab in den Wartebereich.
+        {t.setup.intro}
       </p>
 
       <IdentityField
         name="teamName"
-        label="Teamname"
-        hint="So erscheint ihr im Ranking"
-        previewHint="Ranking-Name"
+        label={t.setup.teamLabel}
+        hint={t.setup.teamHint}
+        previewHint={t.setup.teamPreview}
         step="1 / 2"
         tone="team"
         icon={<Flag size={20} strokeWidth={2.25} />}
-        placeholder="z. B. Berlin Explorers"
+        placeholder={t.setup.teamPlaceholder}
         required
         minLength={2}
         maxLength={48}
@@ -96,13 +100,13 @@ export function CaptainSetupForm({
 
       <IdentityField
         name="displayName"
-        label="Dein Name"
-        hint="Dein Name im Team"
-        previewHint="Dein Anzeigename"
+        label={t.setup.nameLabel}
+        hint={t.setup.nameHint}
+        previewHint={t.setup.namePreview}
         step="2 / 2"
         tone="player"
         icon={<User size={20} strokeWidth={2.25} />}
-        placeholder="z. B. Dervis"
+        placeholder={t.setup.namePlaceholder}
         required
         minLength={2}
         maxLength={32}
@@ -117,13 +121,13 @@ export function CaptainSetupForm({
       {error ? <GridError message={error} /> : null}
 
       <LobbyPrimaryButton pending={isPending}>
-        {isPending ? "Gleich geht’s los…" : "Weiter zum Wartebereich"}
+        {isPending ? t.setup.pending : t.setup.submit}
         {isPending ? null : <ArrowRight size={20} strokeWidth={2.5} />}
       </LobbyPrimaryButton>
 
       {studioTest || isPrebooked ? (
         <p className="text-center text-xs font-medium text-slate-400">
-          {studioTest ? "Studio-Test" : `Team-Code ${joinCode}`}
+          {studioTest ? t.setup.studioTest : t.setup.teamCode(joinCode ?? "")}
         </p>
       ) : null}
     </form>

@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { BookOpen, MapPin, Navigation, Play } from "lucide-react";
 import { PlayDocSheet } from "@/components/game/play-doc-sheet";
+import { LanguageBadge } from "@/components/grid/language-badge";
 import { LobbyPrimaryButton } from "@/components/lobby/lobby-identity";
+import { playUi, playUiLang } from "@/lib/grid/play-ui";
 import { walkingDirectionsUrl, type StartCoords } from "@/lib/grid/start-location";
 
 type Props = {
@@ -12,45 +14,22 @@ type Props = {
   shortText?: string | null;
   briefingIframeUrl?: string | null;
   startCoords?: StartCoords | null;
-  language?: "de" | "en";
+  language?: string | null;
   onContinue: () => void;
 };
 
-function briefingUrlWithLang(url: string | null | undefined, language: "de" | "en"): string | null {
+function briefingUrlWithLang(url: string | null | undefined, language: string): string | null {
   const raw = url?.trim();
   if (!raw) return null;
+  const lang = playUiLang(language);
   try {
     const parsed = new URL(raw);
-    if (!parsed.searchParams.has("lang")) parsed.searchParams.set("lang", language);
+    if (!parsed.searchParams.has("lang")) parsed.searchParams.set("lang", lang);
     return parsed.toString();
   } catch {
     return raw;
   }
 }
-
-const COPY = {
-  de: {
-    rules: "Spielregeln",
-    start: "Starte das Spiel",
-    modalTitle: "Seid ihr am Start?",
-    modalBody:
-      "Starte das Spiel erst, wenn du ca. 100 Meter in der Nähe des Startpunkts bist.",
-    maps: "Route zum Startpunkt öffnen",
-    confirm: "Wir sind in der Nähe",
-    back: "Zurück",
-    rulesEmpty: "Für dieses Spiel sind noch keine Spielregeln hinterlegt.",
-  },
-  en: {
-    rules: "How to play",
-    start: "Start the game",
-    modalTitle: "Are you at the start?",
-    modalBody: "Only start the game when you are about 100 metres from the starting point.",
-    maps: "Open walking directions",
-    confirm: "We are nearby",
-    back: "Back",
-    rulesEmpty: "This game has no rules page yet.",
-  },
-} as const;
 
 export function GameStartIntro({
   gameTitle,
@@ -61,7 +40,7 @@ export function GameStartIntro({
   language = "de",
   onContinue,
 }: Props) {
-  const t = COPY[language];
+  const t = playUi(language);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const mapsUrl = startCoords ? walkingDirectionsUrl(startCoords) : null;
@@ -88,9 +67,12 @@ export function GameStartIntro({
       </div>
 
       <main className="relative z-[1] mx-auto flex w-full max-w-lg flex-1 flex-col px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2">
-        <h1 className="-mt-6 text-center text-[1.35rem] font-extrabold leading-snug tracking-tight text-slate-900 sm:text-2xl">
-          {gameTitle}
-        </h1>
+        <div className="-mt-6 flex items-center justify-center gap-2">
+          <h1 className="text-center text-[1.35rem] font-extrabold leading-snug tracking-tight text-slate-900 sm:text-2xl">
+            {gameTitle}
+          </h1>
+          <LanguageBadge language={language} />
+        </div>
         {text ? (
           <p className="mt-3 whitespace-pre-wrap text-center text-[1.05rem] leading-relaxed text-slate-600">
             {text}
@@ -104,10 +86,10 @@ export function GameStartIntro({
             className="tap-lift inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-base font-extrabold text-slate-800 shadow-sm"
           >
             <BookOpen size={20} strokeWidth={2.4} />
-            {t.rules}
+            {t.intro.rules}
           </button>
           <LobbyPrimaryButton type="button" onClick={() => setConfirmOpen(true)}>
-            {t.start}
+            {t.intro.start}
             <Play size={18} strokeWidth={2.6} fill="currentColor" />
           </LobbyPrimaryButton>
         </div>
@@ -115,9 +97,9 @@ export function GameStartIntro({
 
       <PlayDocSheet
         open={rulesOpen}
-        title={t.rules}
-        url={briefingUrlWithLang(briefingIframeUrl, language)}
-        emptyHint={t.rulesEmpty}
+        title={t.intro.rules}
+        url={briefingUrlWithLang(briefingIframeUrl, language ?? "de")}
+        emptyHint={t.intro.rulesEmpty}
         onClose={() => setRulesOpen(false)}
       />
 
@@ -135,10 +117,10 @@ export function GameStartIntro({
               id="start-confirm-title"
               className="text-center text-xl font-extrabold text-slate-900"
             >
-              {t.modalTitle}
+              {t.intro.modalTitle}
             </h2>
             <p className="mt-3 text-center text-base leading-relaxed text-slate-600">
-              {t.modalBody}
+              {t.intro.modalBody}
             </p>
             {mapsUrl ? (
               <a
@@ -148,7 +130,7 @@ export function GameStartIntro({
                 className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-teal-50 px-4 py-3 text-sm font-bold text-teal-800"
               >
                 <Navigation size={18} strokeWidth={2.4} />
-                {t.maps}
+                {t.intro.maps}
               </a>
             ) : null}
             <div className="mt-5 flex flex-col gap-2">
@@ -159,7 +141,7 @@ export function GameStartIntro({
                   onContinue();
                 }}
               >
-                {t.confirm}
+                {t.intro.confirm}
               </LobbyPrimaryButton>
               <button
                 type="button"

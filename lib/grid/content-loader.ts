@@ -366,6 +366,7 @@ function withSurfaceFields(
     routeOrder,
     roleLabels: profiles.role_labels,
     isStudioTest: Boolean(contentConfig.is_studio_test),
+    language: parseStudioLanguage(contentConfig.language),
     growthOffer: resolvePlayGrowthOffer(
       contentConfig,
       Boolean(contentConfig.is_studio_test),

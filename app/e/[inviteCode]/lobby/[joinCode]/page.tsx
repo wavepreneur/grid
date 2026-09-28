@@ -4,6 +4,7 @@ import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GridShell } from "@/components/grid/grid-shell";
 import { LobbyGate } from "@/components/lobby/lobby-gate";
 import { isStudioTestEvent, needsBriefingBeforePlay } from "@/lib/cms/studio-test-session";
+import { playUi } from "@/lib/grid/play-ui";
 
 type EventLobbyPageProps = {
   params: Promise<{ inviteCode: string; joinCode: string }>;
@@ -31,16 +32,17 @@ export default async function EventLobbyPage({ params, searchParams }: EventLobb
   const title = eventResult.data.title.replace(/^\[Test\]\s*/, "");
   const contentResult = await getEventContent(normalizedInvite);
   const content = contentResult.success ? contentResult.data : null;
+  const t = playUi(content?.language);
 
   return (
     <GridShell
       variant="welcome"
-      eyebrow={manageMode ? "Team" : "Bereit machen"}
+      eyebrow={manageMode ? t.lobbyPage.manageEyebrow : t.lobbyPage.eyebrow}
       title={title}
       description={
         manageMode
-          ? `Team ${teamResult.data.teamName}`
-          : "Spielregeln lesen — dann starten."
+          ? t.lobbyPage.teamPrefix(teamResult.data.teamName)
+          : t.lobbyPage.description
       }
       logoUrl={content?.logoUrl}
     >
@@ -53,6 +55,7 @@ export default async function EventLobbyPage({ params, searchParams }: EventLobb
         studioTest={holdForBriefing}
         studioPlaytest={studioPlaytest}
         eventContent={content}
+        language={content?.language}
       />
     </GridShell>
   );

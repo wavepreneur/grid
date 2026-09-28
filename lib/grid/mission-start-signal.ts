@@ -1,5 +1,7 @@
 "use client";
 
+import { startOverlayCopyFor } from "@/lib/grid/play-ui";
+
 const WINDOW_MS = 15 * 60 * 1000;
 const CREEP_MS = 12_000;
 
@@ -88,17 +90,11 @@ export function missionStartPlayerCount(inviteCode: string, joinCode: string): n
   return readMeta(inviteCode, joinCode)?.playerCount ?? 0;
 }
 
-export function startOverlayCopy(playerCount: number): { title: string; subtitle: string } {
-  if (playerCount > 1) {
-    return {
-      title: "Alle Geräte laden…",
-      subtitle: "Die Mission startet gemeinsam — niemand legt allein los.",
-    };
-  }
-  return {
-    title: "Spiel startet…",
-    subtitle: "Die Karte wird vorbereitet — einen Moment.",
-  };
+export function startOverlayCopy(
+  playerCount: number,
+  language?: string | null,
+): { title: string; subtitle: string } {
+  return startOverlayCopyFor(playerCount, language);
 }
 
 export function isMissionStarting(inviteCode: string, joinCode: string): boolean {

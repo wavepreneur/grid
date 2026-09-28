@@ -1122,6 +1122,7 @@ export function GameRoom({
           gameTitle: eventContent.templateName.trim() || eventTitle,
           siteUrl: "exitmania.com",
         }}
+        language={eventContent.language}
       />
     ) : (
       <LevelPanel
@@ -1130,6 +1131,7 @@ export function GameRoom({
         isPending={isSolvePending}
         isNavigator={isNavigator}
         onSubmit={handleSolveLevel}
+        language={eventContent.language}
       />
     )
   ) : (

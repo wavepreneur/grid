@@ -14,6 +14,7 @@ import {
 import { DEFAULT_TEMPLATE_SLUG, EXITMANIA_TOTAL_LEVELS } from "@/lib/grid/level-types";
 import { resolveContentMode } from "@/lib/grid/play-slots";
 import { parseRuntimeProfiles } from "@/lib/cms/layer-model";
+import { parseStudioLanguage } from "@/lib/cms/languages";
 
 export function parseLevelDefinitions(value: unknown): LevelDefinition[] {
   if (!Array.isArray(value)) return [];
@@ -119,6 +120,7 @@ export function resolveEventContent(input: {
     allowedFallbacks,
     routeOrder: profiles.route_order,
     roleLabels: profiles.role_labels,
+    language: parseStudioLanguage(contentConfig.language),
   };
 }
 

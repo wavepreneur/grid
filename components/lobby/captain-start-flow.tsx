@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CaptainSetupForm } from "@/components/lobby/captain-setup-form";
 import { GameStartIntro } from "@/components/lobby/game-start-intro";
 import { GridShell } from "@/components/grid/grid-shell";
-import { parseStudioLanguage } from "@/lib/cms/languages";
+import { playUi } from "@/lib/grid/play-ui";
 import { firstPuzzleLocation } from "@/lib/grid/start-location";
 import type { ResolvedEventContent } from "@/lib/grid/level-types";
 import Link from "next/link";
@@ -30,7 +30,7 @@ export function CaptainStartFlow({
   language,
 }: Props) {
   const [introDone, setIntroDone] = useState(false);
-  const locale = parseStudioLanguage(language) === "en" ? "en" : "de";
+  const t = playUi(language ?? eventContent?.language);
 
   if (!introDone) {
     return (
@@ -40,7 +40,7 @@ export function CaptainStartFlow({
         shortText={eventContent?.briefingText}
         briefingIframeUrl={eventContent?.briefingIframeUrl}
         startCoords={firstPuzzleLocation(eventContent?.levels)}
-        language={locale}
+        language={language ?? eventContent?.language}
         onContinue={() => setIntroDone(true)}
       />
     );
@@ -49,13 +49,9 @@ export function CaptainStartFlow({
   return (
     <GridShell
       variant="welcome"
-      eyebrow={studioTest ? "Testspiel" : "Willkommen"}
+      eyebrow={studioTest ? t.startFlow.testEyebrow : t.startFlow.eyebrow}
       title={gameTitle}
-      description={
-        locale === "en"
-          ? "Set a team name and your name — then you enter the waiting area."
-          : "Legt euren Teamnamen und deinen Namen fest — dann geht’s in den Wartebereich."
-      }
+      description={t.startFlow.description}
       logoUrl={eventContent?.logoUrl}
     >
       <CaptainSetupForm
@@ -64,6 +60,7 @@ export function CaptainStartFlow({
         studioTest={studioTest}
         maxPlayersPerTeam={maxPlayersPerTeam}
         eventContent={eventContent}
+        language={language ?? eventContent?.language}
       />
       {!studioTest ? (
         <p className="mt-5 text-center text-xs text-slate-400">
@@ -72,11 +69,11 @@ export function CaptainStartFlow({
             onClick={() => setIntroDone(false)}
             className="text-teal-700 hover:underline"
           >
-            {locale === "en" ? "← Back" : "← Zurück"}
+            {t.startFlow.back}
           </button>
           {" · "}
           <Link href={eventPath(inviteCode)} className="text-teal-700 hover:underline">
-            {locale === "en" ? "Event" : "Event"}
+            {t.startFlow.event}
           </Link>
         </p>
       ) : (
@@ -86,7 +83,7 @@ export function CaptainStartFlow({
             onClick={() => setIntroDone(false)}
             className="text-teal-700 hover:underline"
           >
-            {locale === "en" ? "← Back to intro" : "← Zurück zum Start"}
+            {t.startFlow.backToIntro}
           </button>
         </p>
       )}

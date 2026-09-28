@@ -6,7 +6,8 @@ import {
   type TranslationCoverage,
 } from "@/lib/cms/game-i18n";
 import {
-  LAUNCH_LOCALES,
+  STUDIO_TAB_LOCALES,
+  localeFlag,
   localeLabel,
   localeShort,
   type StudioLanguage,
@@ -32,8 +33,8 @@ export function GameLanguageCell({
   adding,
 }: Props) {
   const have = new Set(locales);
-  const extra = locales.filter((locale) => !LAUNCH_LOCALES.includes(locale));
-  const shown = [...LAUNCH_LOCALES, ...extra];
+  const extra = locales.filter((locale) => !STUDIO_TAB_LOCALES.includes(locale));
+  const shown = [...STUDIO_TAB_LOCALES, ...extra];
 
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -63,6 +64,7 @@ export function GameLanguageCell({
                     : "bg-amber-100 text-amber-900 hover:bg-amber-200"
               }`}
             >
+              {localeFlag(language)}
               {short}
               {percent !== null ? (
                 <span className="text-[8px] font-bold leading-none">{percent}%</span>
@@ -79,6 +81,7 @@ export function GameLanguageCell({
             onClick={() => onAdd(language)}
             className="inline-flex h-7 min-w-7 items-center justify-center rounded-lg border border-dashed border-border px-1.5 text-[10px] font-extrabold tracking-wide text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-40"
           >
+            {localeFlag(language)}
             {short}
           </button>
         );

@@ -1,5 +1,6 @@
 import type { TeamGameState } from "@/lib/grid/game-state";
 import type { LevelDefinition } from "@/lib/grid/level-types";
+import { playUi } from "@/lib/grid/play-ui";
 
 export const WALLET_UNLOCK_COST = 250;
 
@@ -198,13 +199,12 @@ export function visibleWalletNotes(
   });
 }
 
-export function walletMenuHint(notes: WalletNote[]): string {
+export function walletMenuHint(notes: WalletNote[], language?: string | null): string {
+  const t = playUi(language).walletHint;
   const locked = notes.filter((note) => note.locked).length;
   const open = notes.length - locked;
-  if (notes.length === 0) return "Gesammelte Hinweise aus den Leveln";
-  if (locked && open) return `${open} gesammelt · ${locked} kaufbar`;
-  if (locked) {
-    return `${locked} ${locked === 1 ? "Hinweis" : "Hinweise"} kaufbar`;
-  }
-  return `${open} ${open === 1 ? "Hinweis" : "Hinweise"} gesammelt`;
+  if (notes.length === 0) return t.empty;
+  if (locked && open) return t.mixed(open, locked);
+  if (locked) return locked === 1 ? t.lockedOne : t.lockedMany(locked);
+  return open === 1 ? t.openOne : t.openMany(open);
 }

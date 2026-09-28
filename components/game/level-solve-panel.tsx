@@ -28,6 +28,7 @@ import type { LevelRevealState } from "@/lib/grid/game-state";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
 import { MediaCapturePanel } from "@/components/game/media-capture-panel";
 import type { CaptureBrandStamp } from "@/lib/grid/capture-stamp";
+import { playUi } from "@/lib/grid/play-ui";
 
 type LevelSolvePanelProps = {
   level: LevelDefinition;
@@ -55,6 +56,7 @@ type LevelSolvePanelProps = {
     sessionId: string;
   };
   brandStamp?: CaptureBrandStamp;
+  language?: string | null;
 };
 
 export function LevelSolvePanel({
@@ -76,7 +78,9 @@ export function LevelSolvePanel({
   onReveal,
   captureContext,
   brandStamp,
+  language,
 }: LevelSolvePanelProps) {
+  const t = playUi(language);
   const [answer, setAnswer] = useState("");
   const [numberParts, setNumberParts] = useState<string[]>(() =>
     Array.from({ length: level.number_fields ?? 1 }, () => ""),
@@ -538,7 +542,7 @@ export function LevelSolvePanel({
                     })
                   }
                 >
-                  Wir sind am Punkt
+                  {t.menu.atPointCta}
                 </BigButton>
                 <p className="text-center text-xs text-[var(--cg-muted)]">
                   Wenn GPS hängt — Alpha öffnet fürs Team.
@@ -687,7 +691,7 @@ export function LevelSolvePanel({
                 })
               }
             >
-              Wir sind am Punkt
+              {t.menu.atPointCta}
             </GridButton>
           ) : null}
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { BigButton } from "@/components/game/city/ui";
 import { hapticWalkProgress } from "@/lib/grid/haptics";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { playUi } from "@/lib/grid/play-ui";
 
 type Props = {
   title: string;
@@ -20,6 +21,7 @@ type Props = {
   gpsError?: string | null;
   /** Dev-only: add meters without walking. */
   onSimulateWalk?: () => void;
+  language?: string | null;
 };
 
 const RING_SIZE = 220;
@@ -38,7 +40,9 @@ export function OutdoorWalkRing({
   showForceOpen = false,
   gpsError = null,
   onSimulateWalk,
+  language,
 }: Props) {
+  const t = playUi(language);
   const progress = Math.min(1, walkedMeters / Math.max(1, targetMeters));
   const targetShown = Math.max(0, Math.round(targetMeters));
   const walkedShown = Math.min(targetShown, Math.max(0, Math.round(walkedMeters)));
@@ -157,7 +161,7 @@ export function OutdoorWalkRing({
       {complete ? (
         <div className="cg-animate-pop-in mt-6 w-full max-w-sm">
           <BigButton variant="accent" disabled={disabled || isPending} onClick={onOpen}>
-            Aufgabe öffnen
+            {t.menu.openTask}
           </BigButton>
         </div>
       ) : (
@@ -169,7 +173,7 @@ export function OutdoorWalkRing({
           ) : null}
           {showForceOpen && onForceOpen ? (
             <BigButton variant="outline" disabled={disabled || isPending} onClick={onForceOpen}>
-              Aufgabe trotzdem öffnen
+              {t.menu.openAnywayShort}
             </BigButton>
           ) : null}
           {showForceOpen ? (

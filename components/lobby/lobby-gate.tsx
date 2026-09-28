@@ -20,6 +20,7 @@ import {
 } from "@/lib/grid/session-recovery";
 import { isMissionStarting } from "@/lib/grid/mission-start-signal";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
+import { playUi } from "@/lib/grid/play-ui";
 
 type LobbyGateProps = {
   inviteCode: string;
@@ -33,6 +34,7 @@ type LobbyGateProps = {
   /** Studio „Testen“ — invite up to 3, even when currently alone. */
   studioPlaytest?: boolean;
   eventContent?: ResolvedEventContent | null;
+  language?: string | null;
 };
 
 const SNAPSHOT_TIMEOUT_MS = 12000;
@@ -63,6 +65,7 @@ export function LobbyGate({
   studioTest = false,
   studioPlaytest = false,
   eventContent = null,
+  language,
 }: LobbyGateProps) {
   const router = useRouter();
   const routerRef = useRef(router);
@@ -175,7 +178,7 @@ export function LobbyGate({
         setError(
           bootError instanceof Error
             ? bootError.message
-            : "Wartebereich konnte nicht geladen werden.",
+            : playUi(language ?? eventContent?.language).lobby.loadError,
         );
       }
     }
@@ -192,7 +195,7 @@ export function LobbyGate({
       <div className="flex flex-col gap-3">
         <GridError message={error} />
         <GridLink href={eventTeamJoinPath(inviteCode, joinCode)}>
-          Zurück zur Namenseingabe
+          {playUi(language ?? eventContent?.language).lobby.backToName}
         </GridLink>
       </div>
     );
@@ -200,7 +203,9 @@ export function LobbyGate({
 
   if (!session || !snapshot) {
     return (
-      <p className="py-8 text-center text-sm text-slate-500">Wartebereich wird geladen…</p>
+      <p className="py-8 text-center text-sm text-slate-500">
+        {playUi(language ?? eventContent?.language).lobby.loading}
+      </p>
     );
   }
 
@@ -216,6 +221,7 @@ export function LobbyGate({
       roleLabels={roleLabels}
       studioTest={isStudio}
       studioPlaytest={studioPlaytest || Boolean(eventContent?.isStudioTest)}
+      language={language ?? eventContent?.language}
     />
   );
 }

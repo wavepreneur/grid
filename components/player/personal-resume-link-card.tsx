@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ClipboardCopy, Smartphone, StickyNote } from "lucide-react";
 import { copyGoReturnSnippet } from "@/lib/grid/play-url";
+import { playUi } from "@/lib/grid/play-ui";
 
 type Props = {
   inviteCode: string;
@@ -10,6 +11,7 @@ type Props = {
   sessionId?: string;
   /** Compact row for sheets; default is a lobby callout card. */
   compact?: boolean;
+  language?: string | null;
 };
 
 /**
@@ -19,9 +21,11 @@ type Props = {
 export function PersonalResumeLinkCard({
   joinCode,
   compact = false,
+  language,
 }: Props) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const code = joinCode.trim().toUpperCase();
+  const t = playUi(language);
 
   async function handleCopy() {
     try {
@@ -35,17 +39,17 @@ export function PersonalResumeLinkCard({
 
   const label =
     copyState === "copied"
-      ? "Kopiert — in Notizen einfügen"
+      ? t.resume.copyDone
       : copyState === "error"
-        ? "Kopieren fehlgeschlagen"
-        : "Aufs Handy kopieren";
+        ? t.resume.copyFail
+        : t.resume.copyIdle;
 
   if (compact) {
     return (
       <div className="rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3.5">
         <p className="flex items-center gap-2 text-sm font-bold text-[var(--cg-fg)]">
           <Smartphone className="h-4 w-4 shrink-0" aria-hidden />
-          Team-Code für ein neues Handy
+          {t.resume.compactTitle}
         </p>
         <p className="mt-2 font-mono text-2xl font-bold tracking-[0.18em] text-[var(--cg-fg)]">
           {code}
@@ -59,7 +63,7 @@ export function PersonalResumeLinkCard({
           {label}
         </button>
         <p className="mt-2 text-sm leading-snug text-[var(--cg-muted)]">
-          Danach in Notizen speichern oder an dich selbst schicken.
+          {t.resume.compactHint}
         </p>
       </div>
     );
@@ -72,10 +76,9 @@ export function PersonalResumeLinkCard({
           <Smartphone className="h-5 w-5" aria-hidden />
         </span>
         <div>
-          <p className="text-sm font-bold text-teal-950">Code aufs Handy legen</p>
+          <p className="text-sm font-bold text-teal-950">{t.resume.lobbyTitle}</p>
           <p className="mt-0.5 text-xs leading-snug text-teal-900/80">
-            Speichere ihn irgendwo auf dem Smartphone — Notizen, Foto oder
-            Nachricht an dich selbst.
+            {t.resume.lobbyHint}
           </p>
         </div>
       </div>
@@ -84,19 +87,19 @@ export function PersonalResumeLinkCard({
         <li className="rounded-xl bg-white/80 px-1.5 py-2">
           <ClipboardCopy className="mx-auto h-4 w-4 text-teal-700" aria-hidden />
           <span className="mt-1 block text-[10px] font-semibold leading-tight text-teal-950">
-            1. Tippen
+            {t.resume.stepTap}
           </span>
         </li>
         <li className="rounded-xl bg-white/80 px-1.5 py-2">
           <StickyNote className="mx-auto h-4 w-4 text-teal-700" aria-hidden />
           <span className="mt-1 block text-[10px] font-semibold leading-tight text-teal-950">
-            2. Speichern
+            {t.resume.stepSave}
           </span>
         </li>
         <li className="rounded-xl bg-white/80 px-1.5 py-2">
           <Smartphone className="mx-auto h-4 w-4 text-teal-700" aria-hidden />
           <span className="mt-1 block text-[10px] font-semibold leading-tight text-teal-950">
-            3. Fertig
+            {t.resume.stepDone}
           </span>
         </li>
       </ol>

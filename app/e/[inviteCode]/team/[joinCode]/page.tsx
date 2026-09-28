@@ -5,6 +5,7 @@ import { GridLink, GridShell } from "@/components/grid/grid-shell";
 import { TeamEntryGate } from "@/components/lobby/team-entry-gate";
 import { needsBriefingBeforePlay } from "@/lib/cms/studio-test-session";
 import { eventPath } from "@/lib/grid/event-routes";
+import { playUi } from "@/lib/grid/play-ui";
 
 type EventTeamPageProps = {
   params: Promise<{ inviteCode: string; joinCode: string }>;
@@ -28,15 +29,16 @@ export default async function EventTeamPage({ params, searchParams }: EventTeamP
   const contentResult = await getEventContent(normalizedInvite);
   const content = contentResult.success ? contentResult.data : null;
   const gameTitle = content?.templateName?.trim() || eventResult.data.title;
+  const t = playUi(content?.language);
 
   if (!teamResult.success) {
     return (
       <GridShell
         variant="welcome"
-        title="Team nicht gefunden"
-        description="Der Code passt nicht — frag dein Team nach dem richtigen Link."
+        title={t.joinPage.notFoundTitle}
+        description={t.joinPage.notFoundBody}
       >
-        <GridLink href={eventPath(normalizedInvite)}>Zurück zum Event</GridLink>
+        <GridLink href={eventPath(normalizedInvite)}>{t.joinPage.backToEvent}</GridLink>
       </GridShell>
     );
   }
@@ -46,15 +48,15 @@ export default async function EventTeamPage({ params, searchParams }: EventTeamP
   const midGame = teamResult.data.teamStatus === "playing";
   const captainName = teamResult.data.captainDisplayName;
   const shellDescription = midGame
-    ? `Team ${teamResult.data.teamName}`
+    ? t.lobbyPage.teamPrefix(teamResult.data.teamName)
     : captainName
-      ? `${captainName} lädt dich zu „${teamResult.data.teamName}“ ein.`
-      : `Tritt Team „${teamResult.data.teamName}“ bei.`;
+      ? t.joinPage.inviteFrom(captainName, teamResult.data.teamName)
+      : t.joinPage.joinTeam(teamResult.data.teamName);
 
   return (
     <GridShell
       variant="welcome"
-      eyebrow={midGame ? "Weiterspielen" : "Einladung"}
+      eyebrow={midGame ? t.joinPage.playingEyebrow : t.joinPage.inviteEyebrow}
       title={gameTitle}
       description={shellDescription}
       logoUrl={content?.logoUrl}
@@ -69,6 +71,7 @@ export default async function EventTeamPage({ params, searchParams }: EventTeamP
         studioTest={studioTest}
         skipStoredSession={rejoin === "1"}
         eventContent={content}
+        language={content?.language}
       />
     </GridShell>
   );

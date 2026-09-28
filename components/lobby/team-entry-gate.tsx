@@ -21,6 +21,7 @@ import { eventLobbyPath } from "@/lib/grid/event-routes";
 import { teamEntryPath } from "@/lib/grid/team-routes";
 import { cacheEventContent } from "@/lib/grid/offline-content";
 import { savePlayerSession } from "@/lib/grid/player-session";
+import { playUi } from "@/lib/grid/play-ui";
 import type { ResolvedEventContent } from "@/lib/grid/level-types";
 import type { GridTeamStatus } from "@/lib/grid/types";
 
@@ -34,6 +35,7 @@ type TeamEntryGateProps = {
   studioTest?: boolean;
   skipStoredSession?: boolean;
   eventContent?: ResolvedEventContent | null;
+  language?: string | null;
 };
 
 export function TeamEntryGate({
@@ -46,6 +48,7 @@ export function TeamEntryGate({
   studioTest = false,
   skipStoredSession = false,
   eventContent = null,
+  language,
 }: TeamEntryGateProps) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(defaultDisplayName);
@@ -56,6 +59,7 @@ export function TeamEntryGate({
   const [checkingSession, setCheckingSession] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const t = playUi(language ?? eventContent?.language);
 
   const isMidGame = teamStatus === "playing" || teamStatus === "finished";
 
@@ -153,7 +157,7 @@ export function TeamEntryGate({
 
   if (checkingSession) {
     return (
-      <p className="py-6 text-center text-sm text-slate-500">Einen Moment…</p>
+      <p className="py-6 text-center text-sm text-slate-500">{t.join.checking}</p>
     );
   }
 
@@ -162,29 +166,29 @@ export function TeamEntryGate({
       <div className="rounded-2xl bg-teal-50/80 px-4 py-4 text-center">
         {captainDisplayName ? (
           <p className="text-sm font-semibold text-teal-900">
-            {captainDisplayName} lädt dich zum Spiel ein
+            {t.join.inviteFrom(captainDisplayName)}
           </p>
         ) : (
-          <p className="text-sm font-semibold text-teal-900">Dein Team</p>
+          <p className="text-sm font-semibold text-teal-900">{t.join.yourTeam}</p>
         )}
         <p className="mt-1 text-base font-bold text-slate-900">{teamName}</p>
         {rosterLoaded && maxSize > 0 ? (
           <p className="mt-1 text-sm font-semibold text-teal-800">
-            {roster.length} von {maxSize} Plätzen
+            {t.join.seats(roster.length, maxSize)}
           </p>
         ) : null}
         <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
           {roster.length > 0
-            ? "Wähl deinen Namen — oder trag einen neuen ein, wenn noch Platz ist."
+            ? t.join.pickName
             : isMidGame
-              ? "Das Spiel läuft. Trag deinen Namen ein."
-              : "Trag deinen Namen ein. Danach landest du bei den anderen."}
+              ? t.join.midGame
+              : t.join.enterName}
         </p>
       </div>
 
       {rosterLoaded && roster.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-sm font-semibold text-slate-700">Schon im Team</p>
+          <p className="text-sm font-semibold text-slate-700">{t.join.alreadyIn}</p>
           <ul className="flex flex-col gap-2">
             {roster.map((name) => (
               <li key={name}>
@@ -195,13 +199,13 @@ export function TeamEntryGate({
                   className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-left font-semibold text-slate-900 shadow-sm transition hover:border-teal-300 hover:bg-teal-50/50 disabled:opacity-50"
                 >
                   <span className="truncate">{name}</span>
-                  <span className="shrink-0 text-xs font-bold text-teal-700">Das bin ich</span>
+                  <span className="shrink-0 text-xs font-bold text-teal-700">{t.join.thatsMe}</span>
                 </button>
               </li>
             ))}
           </ul>
           <p className="text-xs leading-5 text-slate-500">
-            Warst du schon drin, nimm deinen Namen. Das andere Gerät wird abgemeldet.
+            {t.join.alreadyHint}
           </p>
         </div>
       ) : null}
@@ -210,19 +214,19 @@ export function TeamEntryGate({
 
       {rosterLoaded && seatsLeft <= 0 && roster.length > 0 ? (
         <GridHint tone="warn">
-          Das Team ist voll. Nur bestehende Namen können sich wieder verbinden.
+          {t.join.teamFull}
         </GridHint>
       ) : (
         <>
           <IdentityField
-            label={roster.length > 0 ? "Neuer Name" : "Dein Name"}
-            hint="So siehst du im Team aus"
-            previewHint="Dein Anzeigename"
+            label={roster.length > 0 ? t.join.newName : t.join.yourName}
+            hint={t.join.nameHint}
+            previewHint={t.join.namePreview}
             tone="player"
             icon={<User size={20} strokeWidth={2.25} />}
             value={displayName}
             onChange={(event) => setDisplayName(event.target.value)}
-            placeholder="z. B. Alex"
+            placeholder={t.join.namePlaceholder}
             required
             minLength={2}
             maxLength={32}
@@ -237,7 +241,7 @@ export function TeamEntryGate({
             disabled={displayName.trim().length < 2}
             onClick={submitNewName}
           >
-            {isPending ? "Einen Moment…" : roster.length > 0 ? "Neu dazukommen" : "Loslegen"}
+            {isPending ? t.join.pending : roster.length > 0 ? t.join.joinNew : t.join.start}
             {isPending ? null : <ArrowRight size={20} strokeWidth={2.5} />}
           </LobbyPrimaryButton>
         </>

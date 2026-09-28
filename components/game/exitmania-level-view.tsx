@@ -43,6 +43,7 @@ type ExitmaniaLevelViewProps = {
     sessionId: string;
   };
   brandStamp?: CaptureBrandStamp;
+  language?: string | null;
 };
 
 export function ExitmaniaLevelView({
@@ -71,6 +72,7 @@ export function ExitmaniaLevelView({
   onBroadcastGpsFix: _onBroadcastGpsFix,
   captureContext,
   brandStamp,
+  language,
 }: ExitmaniaLevelViewProps) {
   void _allLevels;
   void _levelStatuses;
@@ -136,6 +138,7 @@ export function ExitmaniaLevelView({
           onReveal={onReveal}
           captureContext={captureContext}
           brandStamp={brandStamp}
+          language={language}
         />
       </div>
 

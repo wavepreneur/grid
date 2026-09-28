@@ -10,6 +10,7 @@ import {
 import { distanceMeters, formatDistance, isWithinGeofenceForPlay } from "@/lib/grid/geofence";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
 import type { LevelDefinition } from "@/lib/grid/level-types";
+import { playUi } from "@/lib/grid/play-ui";
 
 type LevelPanelProps = {
   level: LevelDefinition;
@@ -22,6 +23,7 @@ type LevelPanelProps = {
     geolocation?: { lat: number; lng: number; accuracy?: number };
     forceUnlock?: "geofence" | "distance";
   }) => void;
+  language?: string | null;
 };
 
 export function LevelPanel({
@@ -30,7 +32,9 @@ export function LevelPanel({
   isPending,
   isNavigator,
   onSubmit,
+  language,
 }: LevelPanelProps) {
+  const t = playUi(language);
   const [answer, setAnswer] = useState("");
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const gpsEnabled = level.type === "gps" && Boolean(level.location) && isNavigator;
@@ -170,7 +174,7 @@ export function LevelPanel({
                 })
               }
             >
-              Wir sind am Punkt
+              {t.menu.atPointCta}
             </GridButton>
           ) : null}
         </div>

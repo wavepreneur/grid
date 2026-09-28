@@ -331,6 +331,8 @@ export type ResolvedEventContent = {
   isStudioTest?: boolean;
   /** Briefing + Start first (Studio test or Exitmania GRID pilot). */
   holdForBriefing?: boolean;
+  /** Booked play language — player chrome follows this, not the device locale. */
+  language?: string;
 };
 
 export type GeolocationSample = {

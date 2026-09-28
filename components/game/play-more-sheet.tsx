@@ -25,14 +25,11 @@ import { walletMenuHint, type WalletNote } from "@/lib/grid/wallet";
 import { PersonalResumeLinkCard } from "@/components/player/personal-resume-link-card";
 import type { ContentMode } from "@/lib/cms/layer-model";
 import {
-  GPS_SETTINGS_TIP,
-  INDOOR_STATION_TIP,
-  ONLINE_SYNC_TIP,
-  PLAY_RELOAD_TIP,
   playHelpMenuHint,
   playHowToPlayHint,
   playRulesSteps,
 } from "@/lib/grid/play-help";
+import { playUi } from "@/lib/grid/play-ui";
 
 export type PlayMorePanel =
   | "menu"
@@ -81,6 +78,7 @@ type Props = {
   walletScore?: number;
   onPurchaseWallet?: (level: number) => void;
   walletPurchasePending?: boolean;
+  language?: string | null;
 };
 
 /**
@@ -116,7 +114,9 @@ export function PlayMoreSheet({
   walletScore = 0,
   onPurchaseWallet,
   walletPurchasePending = false,
+  language,
 }: Props) {
+  const t = playUi(language);
   const view: PlayMorePanel =
     open === "gps" && mode === "indoor"
       ? "station"
@@ -172,16 +172,16 @@ export function PlayMoreSheet({
     <>
       <PlayDocSheet
         open={showBriefingDoc}
-        title="Spielregeln"
+        title={t.lobby.rules}
         url={briefingIframeUrl}
-        emptyHint="Für dieses Spiel sind noch keine Spielregeln hinterlegt."
+        emptyHint={t.intro.rulesEmpty}
         onClose={() => setBriefingDocOpen(false)}
       />
       <PlayDocSheet
         open={showFaqDoc}
-        title="FAQ"
+        title={t.faq}
         url={faqIframeUrl}
-        emptyHint="Für dieses Spiel ist noch kein FAQ-Link hinterlegt."
+        emptyHint={t.menu.faqEmpty}
         onClose={onClose}
       />
 
@@ -199,14 +199,14 @@ export function PlayMoreSheet({
           >
             <div className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--cg-border)] px-5">
               <h2 className="m-0 text-lg font-bold leading-none text-[var(--cg-fg)]">
-                {view ? panelTitle(view) : ""}
+                {view ? panelTitle(view, t) : ""}
               </h2>
               <button
                 type="button"
                 onClick={onClose}
                 className="tap-lift inline-flex h-9 items-center rounded-full bg-[var(--cg-secondary)] px-3 text-sm font-semibold leading-none"
               >
-                Schließen
+                {t.close}
               </button>
             </div>
 
@@ -225,41 +225,41 @@ export function PlayMoreSheet({
                       <Wallet className="h-6 w-6" strokeWidth={2.4} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-base font-extrabold">Wallet</span>
+                      <span className="block text-base font-extrabold">{t.wallet}</span>
                       <span className="mt-0.5 block text-sm opacity-80">
-                        {walletMenuHint(walletNotes)}
+                        {walletMenuHint(walletNotes, language)}
                       </span>
                     </span>
                     <ChevronRight className="h-5 w-5 shrink-0 opacity-80" />
                   </button>
                   <MenuRow
                     icon={<BookOpen className="h-5 w-5" />}
-                    title="Spielregeln"
-                    hint="Ablauf nachlesen"
+                    title={t.lobby.rules}
+                    hint={t.menu.rulesHint}
                     onClick={() => onOpen("briefing")}
                   />
                   <MenuRow
                     icon={<CircleHelp className="h-5 w-5" />}
-                    title="Steckt ihr fest?"
-                    hint={playHelpMenuHint(mode)}
+                    title={t.menu.stuck}
+                    hint={playHelpMenuHint(mode, language)}
                     onClick={() => onOpen("help")}
                   />
                   <MenuRow
                     icon={<MessagesSquare className="h-5 w-5" />}
-                    title="FAQ"
-                    hint="Antworten zu Spiel und Technik"
+                    title={t.faq}
+                    hint={t.menu.faqHint}
                     onClick={() => onOpen("faq")}
                   />
                   <MenuRow
                     icon={<MessageCircle className="h-5 w-5" />}
-                    title="Support-Chat"
-                    hint="Mit dem Team sprechen"
+                    title={t.menu.supportTitle}
+                    hint={t.menu.supportHint}
                     onClick={() => onOpen("support")}
                   />
                   <MenuRow
                     icon={paused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
-                    title={paused ? "Weiterspielen" : "Pause"}
-                    hint={paused ? "Countdown läuft wieder" : "Zeit anhalten"}
+                    title={paused ? t.menu.resume : t.pause}
+                    hint={paused ? t.menu.resumeHint : t.menu.pauseHint}
                     onClick={() => {
                       onTogglePause();
                       if (!paused) onOpen("pause");
@@ -268,8 +268,8 @@ export function PlayMoreSheet({
                   />
                   <MenuRow
                     icon={<Users className="h-5 w-5" />}
-                    title="Team"
-                    hint="Namen, Code, Leitung"
+                    title={t.team}
+                    hint={t.menu.teamHint}
                     onClick={() => onOpen("team")}
                   />
                 </div>
@@ -284,7 +284,7 @@ export function PlayMoreSheet({
                     purchasePending={walletPurchasePending}
                   />
                   <BigButton variant="ghost" onClick={() => onOpen("menu")}>
-                    Zurück
+                    {t.back}
                   </BigButton>
                 </div>
               ) : null}
@@ -298,10 +298,10 @@ export function PlayMoreSheet({
                   ) : null}
                   <div>
                     <h3 className="text-base font-extrabold text-[var(--cg-fg)]">
-                      So funktioniert&apos;s
+                      {t.menu.howItWorks}
                     </h3>
                     <ol className="mt-3 space-y-3">
-                      {playRulesSteps(mode ?? "outdoor").map((step, index) => (
+                      {playRulesSteps(mode ?? "outdoor", language).map((step, index) => (
                         <li key={step.title} className="flex gap-3">
                           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--cg-secondary)] text-sm font-bold text-[var(--cg-fg)]">
                             {index + 1}
@@ -318,11 +318,11 @@ export function PlayMoreSheet({
                   </div>
                   {briefingIframeUrl?.trim() ? (
                     <BigButton variant="outline" onClick={() => setBriefingDocOpen(true)}>
-                      Ausführliche Regeln öffnen
+                      {t.menu.openFullRules}
                     </BigButton>
                   ) : null}
                   <BigButton variant="ghost" onClick={onClose}>
-                    Verstanden
+                    {t.menu.understood}
                   </BigButton>
                 </div>
               ) : null}
@@ -330,54 +330,54 @@ export function PlayMoreSheet({
               {view === "help" ? (
                 <div className="space-y-2">
                   <p className="mb-3 text-sm font-medium text-[var(--cg-fg)]">
-                    Tippe, was gerade nicht klappt.
+                    {t.menu.helpPrompt}
                   </p>
                   {mode === "outdoor" ? (
                     <MenuRow
                       icon={<MapPin className="h-5 w-5" />}
-                      title="Wir stehen am Punkt"
-                      hint="GPS öffnet die Aufgabe nicht"
+                      title={t.menu.atPoint}
+                      hint={t.menu.atPointHint}
                       onClick={() => onOpen("gps")}
                     />
                   ) : null}
                   {mode === "indoor" ? (
                     <MenuRow
                       icon={<MapPin className="h-5 w-5" />}
-                      title="Station oder Code"
-                      hint="Zettel fehlt, oder der Code geht nicht"
+                      title={t.menu.stationCode}
+                      hint={t.menu.stationCodeHint}
                       onClick={() => onOpen("station")}
                     />
                   ) : null}
                   {mode === "online" ? (
                     <MenuRow
                       icon={<Smartphone className="h-5 w-5" />}
-                      title="Nicht alle sehen dasselbe"
-                      hint="Seite neu laden oder Team-Code holen"
+                      title={t.menu.notInSync}
+                      hint={t.menu.notInSyncHint}
                       onClick={() => onOpen("sync")}
                     />
                   ) : null}
                   <MenuRow
                     icon={<Lightbulb className="h-5 w-5" />}
-                    title="Das Rätsel hängt"
-                    hint="Zurück zur Aufgabe — Tipp oder Lösung holen"
+                    title={t.menu.puzzleStuck}
+                    hint={t.menu.puzzleStuckHint}
                     onClick={onClose}
                   />
                   <MenuRow
                     icon={<RotateCcw className="h-5 w-5" />}
-                    title="Bildschirm steht still"
-                    hint="Seite neu laden — nichts geht verloren"
+                    title={t.menu.screenFrozen}
+                    hint={t.menu.screenFrozenHint}
                     onClick={() => onOpen("reload")}
                   />
                   <MenuRow
                     icon={<Smartphone className="h-5 w-5" />}
-                    title="Anderes Handy"
-                    hint="Team-Code holen und Namen tippen"
+                    title={t.menu.otherPhone}
+                    hint={t.menu.otherPhoneHint}
                     onClick={() => onOpen("team")}
                   />
                   <MenuRow
                     icon={<CircleHelp className="h-5 w-5" />}
-                    title="So geht das Spiel"
-                    hint={playHowToPlayHint(mode)}
+                    title={t.menu.howToPlay}
+                    hint={playHowToPlayHint(mode, language)}
                     onClick={() => onOpen("faq")}
                   />
                 </div>
@@ -386,12 +386,12 @@ export function PlayMoreSheet({
               {view === "gps" ? (
                 <div className="space-y-3">
                   <p className="text-sm font-medium text-[var(--cg-fg)]">
-                    Was soll jetzt passieren?
+                    {t.menu.gpsPrompt}
                   </p>
                   <HelpCard
                     icon={<MapPin className="h-5 w-5" />}
-                    title="Wir stehen am Punkt"
-                    hint="Die Aufgabe soll jetzt starten."
+                    title={t.menu.gpsAtPoint}
+                    hint={t.menu.gpsAtPointHint}
                   >
                     {canUnlockGps && onForceUnlockGps ? (
                       <BigButton
@@ -401,18 +401,18 @@ export function PlayMoreSheet({
                           onClose();
                         }}
                       >
-                        Aufgabe jetzt öffnen
+                        {t.menu.openTaskNow}
                       </BigButton>
                     ) : (
                       <p className="text-sm font-semibold leading-snug text-[var(--cg-fg)]">
-                        Die Team-Leitung tippt auf der Karte „Wir sind am Punkt“.
+                        {t.menu.leadOpens}
                       </p>
                     )}
                   </HelpCard>
                   <HelpCard
                     icon={<Settings className="h-5 w-5" />}
-                    title="Standort am Handy prüfen"
-                    hint={GPS_SETTINGS_TIP}
+                    title={t.menu.checkLocation}
+                    hint={playUi(language).menu.gpsSettings}
                   >
                     {canUnlockGps && onForceUnlockGps ? (
                       <BigButton
@@ -423,73 +423,72 @@ export function PlayMoreSheet({
                           onClose();
                         }}
                       >
-                        Trotzdem öffnen
+                        {t.menu.openAnyway}
                       </BigButton>
                     ) : null}
                   </HelpCard>
                   <BigButton variant="ghost" onClick={() => onOpen("help")}>
-                    Zurück
+                    {t.back}
                   </BigButton>
                 </div>
               ) : null}
 
               {view === "station" ? (
                 <div className="space-y-3">
-                  <p className="text-sm font-medium text-[var(--cg-fg)]">{INDOOR_STATION_TIP}</p>
+                  <p className="text-sm font-medium text-[var(--cg-fg)]">{t.menu.indoorTip}</p>
                   <HelpCard
                     icon={<MapPin className="h-5 w-5" />}
-                    title="Wir finden den Zettel nicht"
-                    hint="Der Code hängt im Raum — Schilder, Tische, Wände. Danach Station antippen und Code eingeben."
+                    title={t.menu.noNote}
+                    hint={t.menu.noNoteHint}
                   />
                   <HelpCard
                     icon={<CircleHelp className="h-5 w-5" />}
-                    title="Code wird nicht angenommen"
-                    hint="Genau den Code von diesem Zettel. Groß/klein ist egal. Anderer Zettel = andere Station."
+                    title={t.menu.codeRejected}
+                    hint={t.menu.codeRejectedHint}
                   />
                   <BigButton variant="ghost" onClick={() => onOpen("help")}>
-                    Zurück
+                    {t.back}
                   </BigButton>
                 </div>
               ) : null}
 
               {view === "sync" ? (
                 <div className="space-y-3">
-                  <p className="text-sm font-medium text-[var(--cg-fg)]">{ONLINE_SYNC_TIP}</p>
+                  <p className="text-sm font-medium text-[var(--cg-fg)]">{t.menu.onlineTip}</p>
                   <HelpCard
                     icon={<Smartphone className="h-5 w-5" />}
-                    title="Nicht alle sehen dasselbe"
-                    hint="Kurz warten oder die Seite neu laden. Eine Antwort gilt für alle."
+                    title={t.menu.notInSync}
+                    hint={t.menu.someoneLeftHint}
                   />
                   <HelpCard
                     icon={<Users className="h-5 w-5" />}
-                    title="Jemand ist raus oder wechselt Handy"
-                    hint="Team-Code holen und denselben Namen tippen."
+                    title={t.menu.someoneLeft}
+                    hint={t.menu.someoneLeftHint}
                   >
                     <BigButton variant="outline" onClick={() => onOpen("team")}>
-                      Team-Code holen
+                      {t.menu.getTeamCode}
                     </BigButton>
                   </HelpCard>
                   <BigButton variant="ghost" onClick={() => onOpen("help")}>
-                    Zurück
+                    {t.back}
                   </BigButton>
                 </div>
               ) : null}
 
               {view === "reload" ? (
                 <div className="space-y-4">
-                  <p className="text-base leading-relaxed text-[var(--cg-fg)]">{PLAY_RELOAD_TIP}</p>
+                  <p className="text-base leading-relaxed text-[var(--cg-fg)]">{t.menu.reloadTip}</p>
                   <p className="text-sm text-[var(--cg-muted)]">
-                    Keine Angst — das ist dasselbe wie einmal aktualisieren. Danach einfach
-                    weiterspielen.
+                    {t.menu.reloadReassure}
                   </p>
                   <BigButton
                     icon={<RotateCcw className="h-5 w-5" />}
                     onClick={() => window.location.reload()}
                   >
-                    Seite neu laden
+                    {t.menu.reloadPage}
                   </BigButton>
                   <BigButton variant="ghost" onClick={() => onOpen("help")}>
-                    Zurück
+                    {t.back}
                   </BigButton>
                 </div>
               ) : null}
@@ -497,24 +496,22 @@ export function PlayMoreSheet({
               {view === "faq" ? (
                 <div className="space-y-4">
                   <p className="text-base leading-relaxed text-[var(--cg-muted)]">
-                    Für dieses Spiel ist noch kein FAQ-Link hinterlegt. Bei Problemen nutzt den
-                    Support-Chat oder meldet euch beim Spielleiter.
+                    {t.menu.faqEmpty}
                   </p>
                   <BigButton variant="ghost" onClick={onClose}>
-                    Zurück
+                    {t.back}
                   </BigButton>
                 </div>
               ) : null}
 
               {view === "support" ? (
-                <CrispEmbed websiteId={crispWebsiteId} />
+                <CrispEmbed websiteId={crispWebsiteId} language={language} />
               ) : null}
 
               {view === "pause" ? (
                 <div className="space-y-4">
                   <p className="text-base text-[var(--cg-muted)]">
-                    Das Spiel ist pausiert. Die Zeit steht — nichts läuft weiter. Schließt die App
-                    ruhig. Weiterspielen geht jederzeit, auch Tage später.
+                    {t.menu.pauseBody}
                   </p>
                   <BigButton
                     onClick={() => {
@@ -522,7 +519,7 @@ export function PlayMoreSheet({
                       onClose();
                     }}
                   >
-                    Weiterspielen
+                    {t.menu.resume}
                   </BigButton>
                 </div>
               ) : null}
@@ -531,9 +528,9 @@ export function PlayMoreSheet({
                 <div className="space-y-5">
                   {nameRoster.length > 0 ? (
                     <div className="space-y-2">
-                      <p className="text-sm font-bold text-[var(--cg-fg)]">Wer spielt</p>
+                      <p className="text-sm font-bold text-[var(--cg-fg)]">{t.menu.whoPlays}</p>
                       <p className="text-sm text-[var(--cg-muted)]">
-                        Neues Handy? Denselben Namen tippen.
+                        {t.menu.sameName}
                       </p>
                       <ul className="space-y-1.5">
                         {nameRoster.map((m) => (
@@ -548,7 +545,7 @@ export function PlayMoreSheet({
                               {m.name}
                               {"isMe" in m && m.isMe ? (
                                 <span className="ml-1.5 text-xs font-medium text-[var(--cg-muted)]">
-                                  du
+                                  {t.you}
                                 </span>
                               ) : null}
                             </span>
@@ -567,15 +564,16 @@ export function PlayMoreSheet({
                       joinCode={joinCode}
                       sessionId={sessionId}
                       compact
+                      language={language}
                     />
                   ) : null}
 
                   {isAlpha ? (
                     teammates.length > 0 ? (
                       <div className="space-y-2">
-                        <p className="text-sm font-bold text-[var(--cg-fg)]">Leitung abgeben</p>
+                        <p className="text-sm font-bold text-[var(--cg-fg)]">{t.menu.giveLeadTitle}</p>
                         <p className="text-sm text-[var(--cg-muted)]">
-                          Du führst das Team. Tippe, wer als Nächstes führen soll.
+                          {t.menu.giveLeadHint}
                         </p>
                         <ul className="space-y-2">
                           {teammates.map((m) => (
@@ -596,7 +594,7 @@ export function PlayMoreSheet({
                                   onClick={() => onTransferAlpha?.(m.id)}
                                   className="tap-lift rounded-full bg-[var(--cg-primary)] px-3 py-1.5 text-xs font-bold text-[var(--cg-primary-fg)] disabled:opacity-40"
                                 >
-                                  {transferPending ? "Übertrage…" : "Leitung geben"}
+                                  {transferPending ? t.menu.transferring : t.lobby.giveLead}
                                 </button>
                                 {onReleasePlayerSeat ? (
                                   <button
@@ -605,7 +603,7 @@ export function PlayMoreSheet({
                                     onClick={() => onReleasePlayerSeat(m.id)}
                                     className="tap-lift rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-600 disabled:opacity-40"
                                   >
-                                    Platz freigeben
+                                    {t.lobby.releaseSeat}
                                   </button>
                                 ) : null}
                               </div>
@@ -615,12 +613,12 @@ export function PlayMoreSheet({
                       </div>
                     ) : (
                       <p className="text-sm text-[var(--cg-muted)]">
-                        Du spielst allein — die Leitung bleibt bei dir.
+                        {t.menu.playingAlone}
                       </p>
                     )
                   ) : (
                     <p className="text-sm text-[var(--cg-muted)]">
-                      Die Team-Leitung startet die Aufgaben.
+                      {t.menu.leadStarts}
                     </p>
                   )}
                   {onReclaimSession ? (
@@ -634,10 +632,10 @@ export function PlayMoreSheet({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-base font-bold text-[var(--cg-fg)]">
-                          Sitzung zurückholen
+                          {t.menu.reclaimTitle}
                         </span>
                         <span className="mt-0.5 block text-sm text-[var(--cg-muted)]">
-                          Wenn du rausgeflogen bist
+                          {t.menu.reclaimHint}
                         </span>
                       </span>
                     </button>
@@ -648,11 +646,11 @@ export function PlayMoreSheet({
                       disabled={busy}
                       onClick={onReleaseMySeat}
                     >
-                      {releasePending ? "Einen Moment…" : "Meinen Platz freigeben"}
+                      {releasePending ? t.menu.waitMoment : t.menu.releaseMine}
                     </BigButton>
                   ) : null}
                   <BigButton variant="ghost" onClick={onClose}>
-                    Zurück
+                    {t.back}
                   </BigButton>
                 </div>
               ) : null}
@@ -664,11 +662,17 @@ export function PlayMoreSheet({
   );
 }
 
-export function PlayMoreTrigger({ onClick }: { onClick: () => void }) {
+export function PlayMoreTrigger({
+  onClick,
+  language,
+}: {
+  onClick: () => void;
+  language?: string | null;
+}) {
   return (
     <button
       type="button"
-      aria-label="Mehr Optionen"
+      aria-label={playUi(language).menu.moreAria}
       onClick={onClick}
       className="tap-lift flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--cg-primary)] text-[var(--cg-primary-fg)] shadow-[var(--cg-shadow-lift)] ring-2 ring-[var(--cg-bg)]"
     >
@@ -735,37 +739,47 @@ function HelpCard({
   );
 }
 
-function panelTitle(panel: Exclude<PlayMorePanel, null>): string {
+function panelTitle(
+  panel: Exclude<PlayMorePanel, null>,
+  t: ReturnType<typeof playUi>,
+): string {
   switch (panel) {
     case "menu":
-      return "Spiel-Menü";
+      return t.menu.title;
     case "wallet":
-      return "Wallet";
+      return t.wallet;
     case "briefing":
-      return "Spielregeln";
+      return t.lobby.rules;
     case "help":
-      return "Steckt ihr fest?";
+      return t.menu.stuck;
     case "gps":
-      return "Standort / GPS";
+      return t.menu.gpsTitle;
     case "station":
-      return "Station / Code";
+      return t.menu.stationTitle;
     case "sync":
-      return "Geräte";
+      return t.menu.devicesTitle;
     case "reload":
-      return "Bildschirm steht still";
+      return t.menu.reloadTitle;
     case "faq":
-      return "FAQ";
+      return t.faq;
     case "support":
-      return "Support";
+      return t.support;
     case "pause":
-      return "Pause";
+      return t.pause;
     case "team":
-      return "Team";
+      return t.team;
   }
 }
 
-function CrispEmbed({ websiteId }: { websiteId?: string | null }) {
+function CrispEmbed({
+  websiteId,
+  language,
+}: {
+  websiteId?: string | null;
+  language?: string | null;
+}) {
   const [ready, setReady] = useState(false);
+  const t = playUi(language);
   useEffect(() => {
     setReady(true);
   }, []);
@@ -773,7 +787,7 @@ function CrispEmbed({ websiteId }: { websiteId?: string | null }) {
   if (!websiteId) {
     return (
       <p className="text-sm text-[var(--cg-muted)]">
-        Support-Chat ist noch nicht konfiguriert.
+        {t.menu.supportEmpty}
       </p>
     );
   }
@@ -783,7 +797,7 @@ function CrispEmbed({ websiteId }: { websiteId?: string | null }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)]">
       <iframe
-        title="Support-Chat"
+        title={t.menu.supportTitle}
         src={`https://go.crisp.chat/chat/embed/?website_id=${encodeURIComponent(websiteId)}`}
         className="h-[min(60vh,520px)] w-full border-0"
         allow="microphone; camera"
@@ -794,14 +808,17 @@ function CrispEmbed({ websiteId }: { websiteId?: string | null }) {
 
 export function PauseBanner({
   onResume,
+  language,
 }: {
   onResume: () => void;
+  language?: string | null;
 }): ReactNode {
+  const t = playUi(language);
   return (
     <div className="fixed inset-x-0 top-0 z-[2000] bg-[var(--cg-primary)] px-4 py-3 text-center text-[var(--cg-primary-fg)] shadow-[var(--cg-shadow-lift)]">
-      <p className="text-sm font-bold">Spiel pausiert</p>
+      <p className="text-sm font-bold">{t.menu.pausedBanner}</p>
       <button type="button" onClick={onResume} className="mt-1 text-xs font-semibold underline">
-        Tippen zum Weiterspielen
+        {t.menu.tapToResume}
       </button>
     </div>
   );

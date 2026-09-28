@@ -55,6 +55,7 @@ import { STUDIO_TEST_MAX_PLAYERS } from "@/lib/cms/studio-test-session";
 import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
 import { abandonTeamSession } from "@/lib/grid/session-recovery";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
+import { playUi } from "@/lib/grid/play-ui";
 
 type LobbyRoomProps = {
   inviteCode: string;
@@ -69,6 +70,7 @@ type LobbyRoomProps = {
   studioTest?: boolean;
   /** Studio „Testen“ — seats stay at 3 so extra devices can join. */
   studioPlaytest?: boolean;
+  language?: string | null;
 };
 
 function playerIsTeamLead(snapshot: LobbySnapshot, session: PlayerSession): boolean {
@@ -100,9 +102,11 @@ export function LobbyRoom({
   roleLabels = null,
   studioTest = false,
   studioPlaytest = false,
+  language,
 }: LobbyRoomProps) {
   const router = useRouter();
   const labels = roleLabels ?? DEFAULT_ROLE_LABELS;
+  const t = playUi(language);
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [session, setSession] = useState(playerSession);
   const [sessionSuperseded, setSessionSuperseded] = useState(false);
@@ -174,11 +178,11 @@ export function LobbyRoom({
     if (manageMode) return;
     markMissionStarting(inviteCode, joinCode, snapshot.players.length);
     setBusy({
-      ...startOverlayCopy(snapshot.players.length),
+      ...startOverlayCopy(snapshot.players.length, language),
       variant: "start",
     });
     router.replace(eventPlayPath(inviteCode, joinCode));
-  }, [inviteCode, joinCode, manageMode, router, snapshot.players.length]);
+  }, [inviteCode, joinCode, language, manageMode, router, snapshot.players.length]);
 
   useEffect(() => {
     if (busy?.variant !== "start") return;
@@ -341,7 +345,7 @@ export function LobbyRoom({
       if (action === "show") {
         markMissionStarting(inviteCode, joinCode, snapshot.players.length);
         setBusy({
-          ...startOverlayCopy(snapshot.players.length),
+          ...startOverlayCopy(snapshot.players.length, language),
           variant: "start",
         });
         return;
@@ -383,7 +387,7 @@ export function LobbyRoom({
     setError(null);
     markMissionStarting(inviteCode, joinCode, snapshot.players.length);
     setBusy({
-      ...startOverlayCopy(snapshot.players.length),
+      ...startOverlayCopy(snapshot.players.length, language),
       variant: "start",
     });
     void broadcast({
@@ -430,8 +434,8 @@ export function LobbyRoom({
   function handleHandover() {
     setError(null);
     setBusy({
-      title: "Platz wird freigegeben…",
-      subtitle: "Du kannst dich danach erneut anmelden.",
+      title: t.lobby.handoverBusy,
+      subtitle: t.lobby.handoverBusyHint,
     });
 
     void handoverSession({
@@ -580,8 +584,8 @@ export function LobbyRoom({
       {busy?.variant === "start" ? (
         <div className="fixed inset-0 z-[200] bg-[var(--cg-bg,#f7f4ee)]">
           <GameGateSkeleton
-            title={startOverlayCopy(snapshot.players.length).title}
-            subtitle={startOverlayCopy(snapshot.players.length).subtitle}
+            title={startOverlayCopy(snapshot.players.length, language).title}
+            subtitle={startOverlayCopy(snapshot.players.length, language).subtitle}
             progress={startProgress}
           />
         </div>
@@ -590,9 +594,9 @@ export function LobbyRoom({
       ) : null}
       <PlayDocSheet
         open={briefingOpen}
-        title="Spielregeln"
+        title={t.lobby.rules}
         url={briefingIframeUrl}
-        emptyHint="Für dieses Spiel sind noch keine Spielregeln hinterlegt. Du findest sie später auch im Spielmenü."
+        emptyHint={t.lobby.rulesEmpty}
         onClose={() => setBriefingOpen(false)}
       />
 
@@ -607,13 +611,13 @@ export function LobbyRoom({
         <>
           <div className="rounded-2xl bg-teal-50/80 px-4 py-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">
-              {eventTitle ?? (aloneNow ? "Bereit machen" : "Wartebereich")}
+              {eventTitle ?? (aloneNow ? t.lobby.ready : t.lobby.waiting)}
             </p>
             <p className="mt-1 text-xl font-bold text-slate-900">{snapshot.team_name}</p>
             <p className="mt-1 text-sm text-slate-600">
               {aloneNow && !teamAllowsMore
-                ? `Hallo ${session.displayName} — lies kurz die Infos, dann kannst du starten.`
-                : `Hallo ${session.displayName} · ${playerCount}/${seatCap} im Team`}
+                ? t.lobby.helloSolo(session.displayName)
+                : t.lobby.helloTeam(session.displayName, playerCount, seatCap)}
             </p>
           </div>
 
@@ -628,17 +632,17 @@ export function LobbyRoom({
               </span>
               <span>
                 <span className="block text-xl font-extrabold leading-tight">
-                  Spielregeln
+                  {t.lobby.rules}
                 </span>
                 <span className="mt-0.5 block text-sm text-teal-50">
                   {showAutoStartCountdown
-                    ? `Bitte jetzt lesen — Start in ${countdown}`
-                    : "Bitte vor dem Start lesen"}
+                    ? t.lobby.rulesHintCountdown(countdown)
+                    : t.lobby.rulesHint}
                 </span>
               </span>
             </span>
             <span className="mt-4 block w-full rounded-xl bg-white py-2.5 text-center text-sm font-bold text-teal-800">
-              Jetzt lesen
+              {t.lobby.readNow}
             </span>
           </button>
 
@@ -646,16 +650,17 @@ export function LobbyRoom({
             inviteCode={inviteCode}
             joinCode={joinCode}
             sessionId={session.sessionId}
+            language={language}
           />
 
           {manageMode && isPlaying ? (
             <GridHint tone="success">
-              Spiel läuft.{" "}
+              {t.lobby.playingHint}{" "}
               <a
                 href={eventPlayPath(inviteCode, joinCode)}
                 className="font-medium text-emerald-700 underline underline-offset-2"
               >
-                Zurück zum Spiel
+                {t.lobby.backToPlay}
               </a>
             </GridHint>
           ) : null}
@@ -675,7 +680,7 @@ export function LobbyRoom({
                   rosterFull || autoStartSoon ? "text-teal-100" : "text-teal-700"
                 }`}
               >
-                {rosterFull ? "Team voll — Automatischer Start" : "Automatischer Start"}
+                {rosterFull ? t.lobby.autoStartFull : t.lobby.autoStart}
               </p>
               <p className="mt-1 text-3xl font-extrabold tabular-nums tracking-tight">
                 {countdown}
@@ -685,9 +690,7 @@ export function LobbyRoom({
                   rosterFull || autoStartSoon ? "text-teal-50" : "text-teal-800/80"
                 }`}
               >
-                {isAlpha
-                  ? "Du kannst auch früher starten."
-                  : "Die Team-Leitung kann auch früher starten."}
+                {isAlpha ? t.lobby.autoStartAlpha : t.lobby.autoStartWait}
               </p>
             </div>
           ) : null}
@@ -695,7 +698,7 @@ export function LobbyRoom({
           {/* Team roster + roles only when more than one player is present */}
           {!aloneNow ? (
             <div>
-              <p className="mb-2 text-sm font-semibold text-slate-700">Euer Team</p>
+              <p className="mb-2 text-sm font-semibold text-slate-700">{t.lobby.yourTeam}</p>
               <ul className="flex flex-col gap-2">
                 {snapshot.players.map((player) => {
                   const role = displayRoleLabel(
@@ -717,7 +720,7 @@ export function LobbyRoom({
                           {player.display_name}
                           {player.id === session.playerId ? (
                             <span className="ml-1.5 text-xs font-medium text-slate-400">
-                              du
+                              {t.you}
                             </span>
                           ) : null}
                         </p>
@@ -733,15 +736,15 @@ export function LobbyRoom({
           {showTeamInvite ? (
             <div className="space-y-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5">
               <p className="text-center text-sm font-semibold text-slate-800">
-                {studioPlaytest ? "Weitere Testgeräte einladen" : "Freunde einladen"}
+                {studioPlaytest ? t.lobby.inviteTestDevices : t.lobby.inviteFriends}
               </p>
               <p className="text-center text-xs text-slate-500">
-                Noch {seatCap - playerCount} von {seatCap} Plätzen frei
+                {t.lobby.seatsFree(seatCap - playerCount, seatCap)}
               </p>
               {teammateUrl ? (
                 <>
-                  <QrInviteImage url={teammateUrl} />
-                  <CopyInviteLink url={teammateUrl} label="Einladungslink kopieren" />
+                  <QrInviteImage url={teammateUrl} language={language} />
+                  <CopyInviteLink url={teammateUrl} label={t.lobby.copyInvite} language={language} />
                 </>
               ) : null}
             </div>
@@ -754,14 +757,13 @@ export function LobbyRoom({
               disabled={Boolean(busy) || isPending || !canStart}
               onClick={handleStartGame}
             >
-              {busy?.variant === "start" ? "Startet…" : aloneNow ? "Spiel starten" : "Spiel starten"}
+              {busy?.variant === "start" ? t.lobby.starting : t.lobby.start}
             </GridButton>
           ) : null}
 
           {!isAlpha && isLobby ? (
             <p className="rounded-2xl bg-slate-50 px-4 py-4 text-center text-sm text-slate-600">
-              Warte auf den Start durch die Team-Leitung — nutze die Zeit für die
-              Spielregeln.
+              {t.lobby.waitForLead}
             </p>
           ) : null}
 
@@ -772,12 +774,12 @@ export function LobbyRoom({
                 onClick={() => setManageOpen(true)}
                 className="text-center text-sm font-medium text-slate-500 underline-offset-2 hover:underline"
               >
-                Rollen verwalten
+                {t.lobby.manageRoles}
               </button>
             ) : null}
             {showHandover ? (
               <GridButton type="button" variant="ghost" disabled={Boolean(busy) || isPending} onClick={handleHandover}>
-                Platz freigeben
+                {t.lobby.releaseSeat}
               </GridButton>
             ) : null}
           </div>
@@ -796,15 +798,15 @@ export function LobbyRoom({
               <div
                 role="dialog"
                 aria-modal="true"
-                aria-label="Rollen verwalten"
+                aria-label={t.lobby.manageRoles}
                 className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white pb-[env(safe-area-inset-bottom)] shadow-xl sm:rounded-3xl sm:pb-0"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                   <div>
-                    <h2 className="text-lg font-bold text-slate-900">Rollen verwalten</h2>
+                    <h2 className="text-lg font-bold text-slate-900">{t.lobby.manageRoles}</h2>
                     <p className="mt-0.5 text-sm text-slate-500">
-                      Wer führt, wer Hinweise sieht, wer Bonus macht
+                      {t.lobby.manageRolesHint}
                     </p>
                   </div>
                   <button
@@ -812,22 +814,20 @@ export function LobbyRoom({
                     onClick={() => setManageOpen(false)}
                     className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700"
                   >
-                    Schließen
+                    {t.close}
                   </button>
                 </div>
 
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-5">
                   <p className="rounded-2xl bg-teal-50 px-4 py-3 text-sm text-teal-900">
-                    <strong>{labels.alpha}</strong> startet &amp; GPS ·{" "}
-                    <strong>{labels.beta}</strong> Hinweise ·{" "}
-                    <strong>{labels.gamma}</strong> Bonusaufgaben
+                    {t.lobby.roleLegend(labels.alpha, labels.beta, labels.gamma)}
                   </p>
 
                   {snapshot.players.filter((p) => p.id !== session.playerId).length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
-                      <p className="font-semibold text-slate-800">Noch keine Mitspieler</p>
+                      <p className="font-semibold text-slate-800">{t.lobby.noTeammates}</p>
                       <p className="mt-2 text-sm text-slate-500">
-                        Sobald jemand beitritt, kannst du hier Rollen zuweisen.
+                        {t.lobby.noTeammatesHint}
                       </p>
                     </div>
                   ) : (
@@ -857,7 +857,7 @@ export function LobbyRoom({
                                   {player.display_name}
                                   {isMe ? (
                                     <span className="ml-1.5 text-xs font-medium text-slate-400">
-                                      du
+                                      {t.you}
                                     </span>
                                   ) : null}
                                 </p>
@@ -872,7 +872,7 @@ export function LobbyRoom({
                                   onClick={() => handleTransferCaptain(player.id)}
                                   className="rounded-xl bg-teal-600 px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50"
                                 >
-                                  Leitung geben
+                                  {t.lobby.giveLead}
                                 </button>
                                 {!player.is_beta && snapshot.active_player_count >= 2 ? (
                                   <button
@@ -900,12 +900,12 @@ export function LobbyRoom({
                                   onClick={() => handleRemovePlayer(player.id)}
                                   className="rounded-xl border border-red-200 bg-white px-3 py-2.5 text-xs font-bold text-red-600 disabled:opacity-50"
                                 >
-                                  Platz freigeben
+                                  {t.lobby.releaseSeat}
                                 </button>
                               </div>
                             ) : isMe ? (
                               <p className="mt-2 text-xs text-slate-500">
-                                Du bist die Team-Leitung.
+                                {t.lobby.youAreLead}
                               </p>
                             ) : null}
                           </li>

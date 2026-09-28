@@ -27,7 +27,7 @@ import type { GameLevelStatus } from "@/lib/grid/game-state";
 import type { LevelDefinition, GeolocationSample } from "@/lib/grid/level-types";
 import type { GpsFixPayload } from "@/lib/hooks/use-team-sync";
 import { hubMeta } from "@/lib/grid/play-slots";
-import { GPS_SETTINGS_TIP } from "@/lib/grid/play-help";
+import { playUi } from "@/lib/grid/play-ui";
 
 export type OutdoorArriveInput = {
   geolocation?: GeolocationSample;
@@ -66,6 +66,7 @@ type Props = {
   onBroadcastGpsFix?: (fix: GpsFixPayload) => void;
   /** Studio playtest — GPS waypoints can be opened without being on site. */
   isStudioTest?: boolean;
+  language?: string | null;
 };
 
 export function PlayHubView({
@@ -91,6 +92,7 @@ export function PlayHubView({
   mirroredGps = null,
   onBroadcastGpsFix,
   isStudioTest = false,
+  language,
 }: Props) {
   const meta = hubMeta(mode);
   const current = levels.find((l) => l.level === activeLevel) ?? levels[0];
@@ -146,6 +148,7 @@ export function PlayHubView({
             : (input) => onArriveOutdoor(input)
         }
         isStudioTest={isStudioTest}
+        language={language}
       />
     );
   }
@@ -411,6 +414,7 @@ function OutdoorHub({
   onBroadcastWalkProgress,
   onBroadcastGpsFix,
   isStudioTest = false,
+  language,
 }: {
   levels: LevelDefinition[];
   levelStatuses: Record<string, { status: GameLevelStatus }>;
@@ -429,6 +433,7 @@ function OutdoorHub({
   onBroadcastWalkProgress?: (level: number, walkedMeters: number) => void;
   onBroadcastGpsFix?: (fix: GpsFixPayload) => void;
   isStudioTest?: boolean;
+  language?: string | null;
 }) {
   const isWalkMode =
     current.triggers?.type === "distance" &&
@@ -678,6 +683,7 @@ function OutdoorHub({
               ? () => setSimBonus((m) => m + 25)
               : undefined
           }
+          language={language}
         />
         <p className="px-5 pb-6 text-center text-sm text-[var(--cg-muted)]">
           {isWalkTracker
@@ -698,6 +704,7 @@ function OutdoorHub({
         disabled={disabled}
         isPending={isPending}
         onOpen={() => openWithSample(sample, current.level)}
+        language={language}
       />
     );
   }
@@ -784,6 +791,7 @@ function OutdoorHub({
                   "geofence",
                 )
               }
+              language={language}
             />
             {isStudioTest && targetLevel.location ? (
               <div className="space-y-2 rounded-2xl border border-[var(--cg-primary)]/30 bg-[var(--cg-primary)]/10 px-4 py-3">
@@ -841,6 +849,7 @@ function OutdoorTimeWait({
   disabled,
   isPending,
   onOpen,
+  language,
 }: {
   title: string;
   levelIndex: number;
@@ -849,7 +858,9 @@ function OutdoorTimeWait({
   disabled: boolean;
   isPending: boolean;
   onOpen: () => void;
+  language?: string | null;
 }) {
+  const t = playUi(language);
   const totalMs = Math.max(1, minutes) * 60_000;
   const started = useRef(Date.now());
   const [elapsed, setElapsed] = useState(0);
@@ -899,7 +910,7 @@ function OutdoorTimeWait({
       {ready ? (
         <div className="cg-animate-pop-in mt-8">
           <BigButton variant="accent" disabled={disabled || isPending} onClick={onOpen}>
-            Aufgabe öffnen
+            {t.menu.openTask}
           </BigButton>
         </div>
       ) : null}
@@ -912,12 +923,15 @@ function GpsTroubleBlock({
   disabled,
   gpsError,
   onUnlock,
+  language,
 }: {
   canUnlock: boolean;
   disabled: boolean;
   gpsError: string | null;
   onUnlock: () => void;
+  language?: string | null;
 }) {
+  const t = playUi(language);
   const [userOpen, setUserOpen] = useState<boolean | null>(null);
   const [choice, setChoice] = useState<"here" | "broken" | null>(null);
   const open = userOpen ?? Boolean(gpsError);
@@ -984,7 +998,7 @@ function GpsTroubleBlock({
                 <p className="text-center text-xs font-semibold text-[var(--cg-fg)]">{gpsError}</p>
               ) : null}
               <p className="text-center text-xs leading-snug text-[var(--cg-muted)]">
-                {GPS_SETTINGS_TIP}
+                {t.menu.gpsSettings}
               </p>
               {canUnlock ? (
                 <BigButton variant="outline" disabled={disabled} onClick={onUnlock}>

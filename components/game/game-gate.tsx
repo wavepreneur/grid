@@ -113,7 +113,10 @@ export function GameGate({
     ReturnType<typeof getGameState>
   > | null>(null);
   const contentRevisionRef = useRef(1);
-  const overlay = startOverlayCopy(missionStartPlayerCount(inviteCode, joinCode));
+  const overlay = startOverlayCopy(
+    missionStartPlayerCount(inviteCode, joinCode),
+    eventContent?.language,
+  );
 
   useEffect(() => {
     contentRevisionRef.current = contentRevision;

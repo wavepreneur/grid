@@ -37,6 +37,7 @@ import {
 } from "@/lib/grid/role-labels";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 import { visibleWalletNotes } from "@/lib/grid/wallet";
+import { playUi } from "@/lib/grid/play-ui";
 import {
   resolveCaptureBrandStamp,
   type CaptureBrandStamp,
@@ -243,27 +244,27 @@ export function PlayPhaseFlow({
         <div className="min-w-0 flex-1">
           <CityTeamBar teamName={teamName} meName={myName} meRoleLabel={myRoleLabel} compact />
         </div>
-        <PlayMoreTrigger onClick={() => onMorePanel("menu")} />
+        <PlayMoreTrigger onClick={() => onMorePanel("menu")} language={eventContent.language} />
       </div>
       <CityStatusHud
         mode={mode}
         completed={completed}
         total={total}
-        timeLabel={paused ? "Pause" : timeLabel}
+        timeLabel={paused ? playUi(eventContent.language).pause : timeLabel}
         score={score}
       />
     </div>
   ) : (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-end px-4 pt-[max(0.5rem,env(safe-area-inset-top))]">
       <span className="pointer-events-auto">
-        <PlayMoreTrigger onClick={() => onMorePanel("menu")} />
+        <PlayMoreTrigger onClick={() => onMorePanel("menu")} language={eventContent.language} />
       </span>
     </div>
   );
 
   const sheets = (
     <>
-      {paused ? <PauseBanner onResume={onTogglePause} /> : null}
+      {paused ? <PauseBanner onResume={onTogglePause} language={eventContent.language} /> : null}
       <PlayMoreSheet
         open={morePanel}
         onOpen={onMorePanel}
@@ -291,6 +292,7 @@ export function PlayPhaseFlow({
         walletScore={score}
         onPurchaseWallet={onPurchaseWallet}
         walletPurchasePending={walletPurchasePending}
+        language={eventContent.language}
         canUnlockGps={phase === "hub" && canUnlockGps}
         onForceUnlockGps={
           phase === "hub" && canUnlockGps
@@ -535,6 +537,7 @@ export function PlayPhaseFlow({
           onOpenStation={onOpenStation}
           onSubmitStationCode={onSubmitStationCode}
           onStartMission={onStartMission}
+          language={eventContent.language}
           isStudioTest={Boolean(eventContent.isStudioTest)}
         />
       </>
@@ -624,6 +627,7 @@ export function PlayPhaseFlow({
             : undefined
         }
         brandStamp={brandStamp}
+        language={eventContent.language}
       />
     </>
   );
