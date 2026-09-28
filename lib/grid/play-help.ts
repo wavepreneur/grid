@@ -25,22 +25,66 @@ export const SKIPPED_LEVEL_WALLET_HINT =
 
 export const PLAY_RULES_STEPS: ReadonlyArray<{ title: string; body: string }> = [
   {
-    title: "Kacheln lösen",
-    body: "Tippt die Rätselkacheln an und löst die Aufgaben dort.",
+    title: "Zum Pin laufen",
+    body: "Die Karte zeigt den nächsten Punkt. Lauft dorthin.",
   },
   {
-    title: "Code eintragen",
-    body: "Manche Aufgaben zeigen danach einen Code. Den tragt ihr in der App ein — erst dann ist das Level fertig.",
+    title: "Team-Leitung öffnet",
+    body: "Nur sie aktiviert die Aufgabe, wenn ihr nah genug seid.",
   },
   {
-    title: "Hinweis in der Wallet",
-    body: "Nach einer richtigen Lösung erscheint ein Hinweis. Den findet ihr jederzeit im Menü unter Wallet.",
+    title: "Zusammen rätseln",
+    body: "Sobald die Aufgabe offen ist, darf jede Person tippen.",
   },
   {
-    title: "Nicht gelöst?",
-    body: "Ohne richtige Lösung gibt es keinen Hinweis. Den könnt ihr in der Wallet nachkaufen.",
+    title: "Wenn ihr hängt",
+    body: "Drei Punkte oben rechts: Tipp, Lösung oder Leitung wechseln (Menü → Team).",
   },
 ];
+
+export function playRulesSteps(mode: ContentMode = "outdoor"): ReadonlyArray<{ title: string; body: string }> {
+  if (mode === "indoor") {
+    return [
+      {
+        title: "Zur Station",
+        body: "Sucht den Zettel an der Station.",
+      },
+      {
+        title: "Code eingeben",
+        body: "Die Team-Leitung gibt den Code ein — so öffnet sich die Aufgabe.",
+      },
+      {
+        title: "Zusammen rätseln",
+        body: "Sobald die Aufgabe offen ist, darf jede Person tippen.",
+      },
+      {
+        title: "Wenn ihr hängt",
+        body: "Drei Punkte oben rechts: Tipp, Lösung oder Leitung wechseln (Menü → Team).",
+      },
+    ];
+  }
+  if (mode === "online") {
+    return [
+      {
+        title: "Mission starten",
+        body: "Die Team-Leitung startet. Alle Geräte sehen dieselbe Aufgabe.",
+      },
+      {
+        title: "Zusammen rätseln",
+        body: "Jede Person darf tippen, sobald die Aufgabe offen ist.",
+      },
+      {
+        title: "Hinweise merken",
+        body: "Was ihr löst, braucht ihr oft später. Schaut bei Bedarf in die Wallet.",
+      },
+      {
+        title: "Wenn ihr hängt",
+        body: "Drei Punkte oben rechts: Tipp, Lösung oder Leitung wechseln.",
+      },
+    ];
+  }
+  return PLAY_RULES_STEPS;
+}
 
 export function playHelpMenuHint(mode: ContentMode): string {
   switch (mode) {

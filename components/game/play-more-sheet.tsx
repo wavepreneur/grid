@@ -29,9 +29,9 @@ import {
   INDOOR_STATION_TIP,
   ONLINE_SYNC_TIP,
   PLAY_RELOAD_TIP,
-  PLAY_RULES_STEPS,
   playHelpMenuHint,
   playHowToPlayHint,
+  playRulesSteps,
 } from "@/lib/grid/play-help";
 
 export type PlayMorePanel =
@@ -301,7 +301,7 @@ export function PlayMoreSheet({
                       So funktioniert&apos;s
                     </h3>
                     <ol className="mt-3 space-y-3">
-                      {PLAY_RULES_STEPS.map((step, index) => (
+                      {playRulesSteps(mode ?? "outdoor").map((step, index) => (
                         <li key={step.title} className="flex gap-3">
                           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--cg-secondary)] text-sm font-bold text-[var(--cg-fg)]">
                             {index + 1}
@@ -513,8 +513,8 @@ export function PlayMoreSheet({
               {view === "pause" ? (
                 <div className="space-y-4">
                   <p className="text-base text-[var(--cg-muted)]">
-                    Das Spiel ist pausiert. Der Countdown läuft lokal nicht weiter. Schließt die App
-                    ruhig — danach hier weiterspielen.
+                    Das Spiel ist pausiert. Die Zeit steht — nichts läuft weiter. Schließt die App
+                    ruhig. Weiterspielen geht jederzeit, auch Tage später.
                   </p>
                   <BigButton
                     onClick={() => {

@@ -67,7 +67,7 @@ export function ContentMediaSheet({
           <X className="h-5 w-5" strokeWidth={2.5} />
         </button>
 
-        <div className="relative min-h-0 flex-1 bg-black">
+        <div className={`relative min-h-0 flex-1 ${isImage ? "bg-black" : "bg-[#f7f6f0]"}`}>
           {mediaUrl?.trim() ? (
             isImage ? (
               // eslint-disable-next-line @next/next/no-img-element

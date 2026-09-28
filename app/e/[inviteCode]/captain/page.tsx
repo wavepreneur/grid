@@ -1,16 +1,20 @@
 import { notFound, redirect } from "next/navigation";
 import { getEventContent } from "@/app/actions/content";
 import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
-import { GridShell } from "@/components/grid/grid-shell";
-import { CaptainSetupForm } from "@/components/lobby/captain-setup-form";
+import { CaptainStartFlow } from "@/components/lobby/captain-start-flow";
 import { isStudioTestEvent, needsBriefingBeforePlay } from "@/lib/cms/studio-test-session";
-import { eventLobbyPath, eventPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
-import Link from "next/link";
+import { eventLobbyPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
 
 type EventCaptainPageProps = {
   params: Promise<{ inviteCode: string }>;
   searchParams: Promise<{ team?: string }>;
 };
+
+function eventLanguage(contentConfig: unknown): string | null {
+  if (!contentConfig || typeof contentConfig !== "object") return null;
+  const value = (contentConfig as { language?: unknown }).language;
+  return typeof value === "string" ? value : null;
+}
 
 export default async function EventCaptainPage({ params, searchParams }: EventCaptainPageProps) {
   const { inviteCode } = await params;
@@ -48,27 +52,14 @@ export default async function EventCaptainPage({ params, searchParams }: EventCa
   const gameTitle = content?.templateName?.trim() || eventResult.data.title;
 
   return (
-    <GridShell
-      variant="welcome"
-      eyebrow={studioTest ? "Testspiel" : "Willkommen"}
-      title={gameTitle}
-      description="Legt euren Teamnamen und deinen Namen fest — dann geht’s in den Wartebereich."
-      logoUrl={content?.logoUrl}
-    >
-      <CaptainSetupForm
-        inviteCode={normalizedInvite}
-        joinCode={normalizedJoin}
-        studioTest={studioTest}
-        maxPlayersPerTeam={eventResult.data.max_players_per_team}
-        eventContent={content}
-      />
-      {!studioTest ? (
-        <p className="mt-5 text-center text-xs text-slate-400">
-          <Link href={eventPath(normalizedInvite)} className="text-teal-700 hover:underline">
-            ← Zurück
-          </Link>
-        </p>
-      ) : null}
-    </GridShell>
+    <CaptainStartFlow
+      inviteCode={normalizedInvite}
+      joinCode={normalizedJoin}
+      studioTest={studioTest}
+      maxPlayersPerTeam={eventResult.data.max_players_per_team}
+      eventContent={content}
+      gameTitle={gameTitle}
+      language={eventLanguage(eventResult.data.content_config)}
+    />
   );
 }
