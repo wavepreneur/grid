@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { saveGameLocale } from "@/app/actions/cms/games";
 import { StudioPanel } from "@/components/cms/admin-shell";
-import { IconSave } from "@/components/cms/studio-icons";
+import { IconCheck, IconSave } from "@/components/cms/studio-icons";
 import {
   StudioButton,
   StudioError,
@@ -16,8 +16,12 @@ import {
 } from "@/components/cms/studio-ui";
 import { buildGameSlots } from "@/lib/cms/game-slots";
 import {
+  collectTranslationUnits,
+  coverageForConfirmed,
+  coveragePercent,
   localesFromOverrides,
   mergeSlotCopy,
+  remainingPercent,
   resolveGameCopy,
   seedSlotCopyFromStudio,
   type BonusLocaleCopy,
@@ -36,112 +40,195 @@ type Props = {
   taskLinks: StudioGameTaskLink[];
 };
 
-function Field({
+function sameText(value: string | undefined, source: string | undefined) {
+  return (value ?? "").trim() === (source ?? "").trim();
+}
+
+function TranslatableField({
+  unitKey,
   label,
   hint,
   value,
-  placeholder,
+  source,
+  confirmed,
   onChange,
+  onConfirm,
   multiline,
   type = "text",
 }: {
+  unitKey: string;
   label: string;
   hint?: string;
   value: string;
-  placeholder?: string;
+  source?: string;
+  confirmed: boolean;
   onChange: (value: string) => void;
+  onConfirm: (key: string, next: boolean) => void;
   multiline?: boolean;
   type?: string;
 }) {
+  const hasSource = Boolean(source?.trim());
+  const pending = hasSource && !confirmed;
+  const sourceHint = pending && sameText(value, source) ? "Ausgangstext — Haken setzen oder übersetzen" : hint;
+
   return (
-    <div>
-      <StudioLabel hint={hint}>{label}</StudioLabel>
-      {multiline ? (
-        <StudioTextarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          rows={3}
-        />
-      ) : (
-        <StudioInput
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-        />
-      )}
+    <div className="flex items-start gap-2">
+      <div className="min-w-0 flex-1">
+        <StudioLabel hint={sourceHint}>{label}</StudioLabel>
+        {multiline ? (
+          <StudioTextarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={source}
+            rows={3}
+            className={pending ? "border-amber-400/70" : undefined}
+          />
+        ) : (
+          <StudioInput
+            type={type}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={source}
+            className={pending ? "border-amber-400/70" : undefined}
+          />
+        )}
+      </div>
+      {hasSource ? (
+        <button
+          type="button"
+          aria-pressed={confirmed}
+          aria-label={confirmed ? `${label} bestätigt` : `${label} als übersetzt markieren`}
+          title={confirmed ? "Bestätigt — erneut klicken zum Öffnen" : "Als übersetzt markieren"}
+          onClick={() => onConfirm(unitKey, !confirmed)}
+          className={`mt-6 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition ${
+            confirmed
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-dashed border-border bg-card text-muted-foreground hover:border-primary hover:text-primary"
+          }`}
+        >
+          <IconCheck size={16} />
+        </button>
+      ) : null}
     </div>
   );
 }
 
 function TileFields({
   tiles,
+  sourceTiles,
+  keyPrefix,
+  confirmed,
   onChange,
+  onConfirm,
+  onValue,
 }: {
   tiles: TileLocaleCopy[];
+  sourceTiles: TileLocaleCopy[];
+  keyPrefix: string;
+  confirmed: Set<string>;
   onChange: (tiles: TileLocaleCopy[]) => void;
+  onConfirm: (key: string, next: boolean) => void;
+  onValue: (key: string, source: string, next: string) => void;
 }) {
   if (tiles.length === 0) return null;
+  const sourceById = new Map(sourceTiles.map((tile) => [tile.id, tile]));
   return (
     <div className="space-y-3">
-      {tiles.map((tile, index) => (
-        <div key={tile.id} className="rounded-xl border border-border bg-card p-3">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-            Kachel {index + 1}
-          </p>
-          <div className="mt-2 grid gap-3">
-            <Field
-              label="Kurz-Label"
-              value={tile.label ?? ""}
-              onChange={(label) =>
-                onChange(tiles.map((item) => (item.id === tile.id ? { ...item, label } : item)))
-              }
-            />
-            <Field
-              label="URL für diese Sprache"
-              hint="Anderen Link einsetzen, z. B. englisches Minigame oder Medien"
-              type="url"
-              value={tile.url ?? ""}
-              onChange={(url) =>
-                onChange(tiles.map((item) => (item.id === tile.id ? { ...item, url } : item)))
-              }
-            />
-            <Field
-              label="Hinweis / Tipp"
-              multiline
-              value={tile.hint_text ?? ""}
-              onChange={(hint_text) =>
-                onChange(tiles.map((item) => (item.id === tile.id ? { ...item, hint_text } : item)))
-              }
-            />
+      {tiles.map((tile, index) => {
+        const source = sourceById.get(tile.id);
+        return (
+          <div key={tile.id} className="rounded-xl border border-border bg-card p-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Kachel {index + 1}
+            </p>
+            <div className="mt-2 grid gap-3">
+              <TranslatableField
+                unitKey={`${keyPrefix}:tile:${tile.id}:label`}
+                label="Kurz-Label"
+                value={tile.label ?? ""}
+                source={source?.label}
+                confirmed={confirmed.has(`${keyPrefix}:tile:${tile.id}:label`)}
+                onConfirm={onConfirm}
+                onChange={(label) => {
+                  onValue(`${keyPrefix}:tile:${tile.id}:label`, source?.label ?? "", label);
+                  onChange(tiles.map((item) => (item.id === tile.id ? { ...item, label } : item)));
+                }}
+              />
+              <TranslatableField
+                unitKey={`${keyPrefix}:tile:${tile.id}:url`}
+                label="URL für diese Sprache"
+                hint="Anderen Link einsetzen, z. B. englisches Minigame oder Medien"
+                type="url"
+                value={tile.url ?? ""}
+                source={source?.url}
+                confirmed={confirmed.has(`${keyPrefix}:tile:${tile.id}:url`)}
+                onConfirm={onConfirm}
+                onChange={(url) => {
+                  onValue(`${keyPrefix}:tile:${tile.id}:url`, source?.url ?? "", url);
+                  onChange(tiles.map((item) => (item.id === tile.id ? { ...item, url } : item)));
+                }}
+              />
+              <TranslatableField
+                unitKey={`${keyPrefix}:tile:${tile.id}:hint`}
+                label="Hinweis / Tipp"
+                multiline
+                value={tile.hint_text ?? ""}
+                source={source?.hint_text}
+                confirmed={confirmed.has(`${keyPrefix}:tile:${tile.id}:hint`)}
+                onConfirm={onConfirm}
+                onChange={(hint_text) => {
+                  onValue(`${keyPrefix}:tile:${tile.id}:hint`, source?.hint_text ?? "", hint_text);
+                  onChange(tiles.map((item) => (item.id === tile.id ? { ...item, hint_text } : item)));
+                }}
+              />
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
 function OptionFields({
   options,
+  sourceOptions,
+  keyPrefix,
+  confirmed,
   onChange,
+  onConfirm,
+  onValue,
 }: {
   options: Array<{ id: string; label: string }>;
+  sourceOptions: Array<{ id: string; label: string }>;
+  keyPrefix: string;
+  confirmed: Set<string>;
   onChange: (options: Array<{ id: string; label: string }>) => void;
+  onConfirm: (key: string, next: boolean) => void;
+  onValue: (key: string, source: string, next: string) => void;
 }) {
   if (options.length === 0) return null;
+  const sourceById = new Map(sourceOptions.map((option) => [option.id, option.label]));
   return (
     <div className="grid gap-3">
-      {options.map((option, index) => (
-        <Field
-          key={option.id}
-          label={`Antwort ${index + 1}`}
-          value={option.label}
-          onChange={(label) =>
-            onChange(options.map((item) => (item.id === option.id ? { ...item, label } : item)))
-          }
-        />
-      ))}
+      {options.map((option, index) => {
+        const key = `${keyPrefix}:option:${option.id}`;
+        const source = sourceById.get(option.id) ?? "";
+        return (
+          <TranslatableField
+            key={option.id}
+            unitKey={key}
+            label={`Antwort ${index + 1}`}
+            value={option.label}
+            source={source}
+            confirmed={confirmed.has(key)}
+            onConfirm={onConfirm}
+            onChange={(label) => {
+              onValue(key, source, label);
+              onChange(options.map((item) => (item.id === option.id ? { ...item, label } : item)));
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -153,8 +240,11 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const sourceCopy = resolveGameCopy(game, game.language);
   const [copy, setCopy] = useState<GameLocaleCopy>(() => resolveGameCopy(game, locale));
+  const [confirmed, setConfirmed] = useState<Set<string>>(
+    () => new Set(game.translations[locale]?.confirmed ?? []),
+  );
   const slots = useMemo(() => buildGameSlots(taskLinks), [taskLinks]);
-  const seededSlots = useMemo(() => {
+  const sourceSlots = useMemo(() => {
     const next: Record<string, SlotLocaleCopy> = {};
     for (const slot of slots) {
       const quiz: QuizLocaleCopy | null = slot.quiz
@@ -166,7 +256,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
             options: slot.quiz.options.map((option) => ({ id: option.id, label: option.label })),
           }
         : null;
-      const source = seedSlotCopyFromStudio({
+      next[slot.levelLink.id] = seedSlotCopyFromStudio({
         title: slot.levelLink.task.title,
         description: slot.levelLink.task.description,
         content: slot.levelLink.task.content,
@@ -179,17 +269,42 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
           content: link.task.content,
         })),
       });
-      next[slot.levelLink.id] = mergeSlotCopy(
-        source,
+    }
+    return next;
+  }, [slots]);
+  const seededSlots = useMemo(() => {
+    const next: Record<string, SlotLocaleCopy> = {};
+    for (const slot of slots) {
+      const linkId = slot.levelLink.id;
+      next[linkId] = mergeSlotCopy(
+        sourceSlots[linkId] ?? {},
         localesFromOverrides(slot.levelLink.overrides)[locale] ?? {},
       );
     }
     return next;
-  }, [locale, slots]);
+  }, [locale, slots, sourceSlots]);
   const [slotCopies, setSlotCopies] = useState<Record<string, SlotLocaleCopy>>(seededSlots);
   useEffect(() => {
     setSlotCopies(seededSlots);
   }, [seededSlots]);
+
+  const units = useMemo(
+    () =>
+      collectTranslationUnits({
+        game,
+        slots: slots.map((slot) => ({
+          linkId: slot.levelLink.id,
+          source: sourceSlots[slot.levelLink.id] ?? {},
+        })),
+      }),
+    [game, slots, sourceSlots],
+  );
+  const coverage = useMemo(
+    () => coverageForConfirmed(units, confirmed),
+    [units, confirmed],
+  );
+  const donePercent = coveragePercent(coverage);
+  const openPercent = remainingPercent(coverage);
 
   function patchSlot(linkId: string, patch: Partial<SlotLocaleCopy>) {
     setSlotCopies((prev) => ({ ...prev, [linkId]: { ...prev[linkId], ...patch } }));
@@ -210,6 +325,21 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
     });
   }
 
+  function handleConfirm(key: string, next: boolean) {
+    setConfirmed((prev) => {
+      const copySet = new Set(prev);
+      if (next) copySet.add(key);
+      else copySet.delete(key);
+      return copySet;
+    });
+  }
+
+  function handleValue(key: string, source: string, next: string) {
+    if (next.trim() && next.trim() !== source.trim()) {
+      handleConfirm(key, true);
+    }
+  }
+
   function handleSave(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -218,7 +348,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
       const result = await saveGameLocale({
         gameId: game.id,
         language: locale,
-        copy,
+        copy: { ...copy, confirmed: [...confirmed] },
         slots: Object.entries(slotCopies).map(([linkId, slotCopy]) => ({
           linkId,
           copy: slotCopy,
@@ -244,42 +374,89 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
           description={`Ausgangssprache bleibt ${localeLabel(game.language)}. GPS, Codes und Logik gelten für alle Sprachen.`}
         />
         <StudioHint>
-          Alles, was Spieler sehen: Spieltexte, Einstieg, Kacheln, Tipps, Bonus und Hilfe-Links.
+          Der Ausgangstext bleibt in den Feldern. Haken setzen, sobald die Zeile für diese Sprache stimmt —
+          auch wenn der Text gleich bleibt.
         </StudioHint>
+        <div className="mt-4 rounded-2xl border border-border bg-secondary/50 px-4 py-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-sm font-semibold text-foreground">
+              {coverage.confirmed} von {coverage.total} bestätigt
+            </p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {openPercent > 0 ? `noch ${openPercent}% offen` : "vollständig"}
+            </p>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-border">
+            <div
+              className={`h-full rounded-full ${donePercent === 100 ? "bg-primary" : "bg-amber-500"}`}
+              style={{ width: `${donePercent}%` }}
+            />
+          </div>
+        </div>
         <div className="mt-4 grid gap-4">
-          <Field
+          <TranslatableField
+            unitKey="game:name"
             label="Titel"
             value={copy.name ?? ""}
-            placeholder={sourceCopy.name}
-            onChange={(name) => setCopy({ ...copy, name })}
+            source={sourceCopy.name}
+            confirmed={confirmed.has("game:name")}
+            onConfirm={handleConfirm}
+            onChange={(name) => {
+              handleValue("game:name", sourceCopy.name, name);
+              setCopy({ ...copy, name });
+            }}
           />
-          <Field
+          <TranslatableField
+            unitKey="game:description"
             label="Briefing"
             multiline
             value={copy.description ?? ""}
-            placeholder={sourceCopy.description}
-            onChange={(description) => setCopy({ ...copy, description })}
+            source={sourceCopy.description}
+            confirmed={confirmed.has("game:description")}
+            onConfirm={handleConfirm}
+            onChange={(description) => {
+              handleValue("game:description", sourceCopy.description, description);
+              setCopy({ ...copy, description });
+            }}
           />
-          <Field
+          <TranslatableField
+            unitKey="game:farewell_text"
             label="Abschiedstext"
             multiline
             value={copy.farewell_text ?? ""}
-            placeholder={sourceCopy.farewell_text}
-            onChange={(farewell_text) => setCopy({ ...copy, farewell_text })}
+            source={sourceCopy.farewell_text}
+            confirmed={confirmed.has("game:farewell_text")}
+            onConfirm={handleConfirm}
+            onChange={(farewell_text) => {
+              handleValue("game:farewell_text", sourceCopy.farewell_text, farewell_text);
+              setCopy({ ...copy, farewell_text });
+            }}
           />
-          <Field
+          <TranslatableField
+            unitKey="game:briefing_iframe_url"
             label="Spielregeln (URL)"
             type="url"
             value={copy.briefing_iframe_url ?? ""}
-            placeholder={sourceCopy.briefing_iframe_url}
-            onChange={(briefing_iframe_url) => setCopy({ ...copy, briefing_iframe_url })}
+            source={sourceCopy.briefing_iframe_url}
+            confirmed={confirmed.has("game:briefing_iframe_url")}
+            onConfirm={handleConfirm}
+            onChange={(briefing_iframe_url) => {
+              handleValue("game:briefing_iframe_url", sourceCopy.briefing_iframe_url, briefing_iframe_url);
+              setCopy({ ...copy, briefing_iframe_url });
+            }}
           />
-          <Field
+          <TranslatableField
+            unitKey="game:faq_iframe_url"
             label="FAQ (URL)"
             type="url"
             value={copy.faq_iframe_url ?? ""}
-            placeholder={sourceCopy.faq_iframe_url}
-            onChange={(faq_iframe_url) => setCopy({ ...copy, faq_iframe_url })}
+            source={sourceCopy.faq_iframe_url}
+            confirmed={confirmed.has("game:faq_iframe_url")}
+            onConfirm={handleConfirm}
+            onChange={(faq_iframe_url) => {
+              handleValue("game:faq_iframe_url", sourceCopy.faq_iframe_url, faq_iframe_url);
+              setCopy({ ...copy, faq_iframe_url });
+            }}
           />
         </div>
       </StudioPanel>
@@ -292,7 +469,9 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
         <div className="space-y-6">
           {slots.map((slot) => {
             const linkId = slot.levelLink.id;
+            const prefix = `slot:${linkId}`;
             const row = slotCopies[linkId] ?? {};
+            const source = sourceSlots[linkId] ?? {};
             const sourceTitle = slot.levelLink.task.title;
             return (
               <div key={linkId} className="space-y-4 rounded-2xl border border-border bg-secondary/40 p-4">
@@ -304,18 +483,30 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                 </div>
 
                 <div className="grid gap-3">
-                  <Field
+                  <TranslatableField
+                    unitKey={`${prefix}:title`}
                     label="Mission · Titel"
                     value={row.title ?? ""}
-                    placeholder={sourceTitle}
-                    onChange={(title) => patchSlot(linkId, { title })}
+                    source={source.title}
+                    confirmed={confirmed.has(`${prefix}:title`)}
+                    onConfirm={handleConfirm}
+                    onChange={(title) => {
+                      handleValue(`${prefix}:title`, source.title ?? "", title);
+                      patchSlot(linkId, { title });
+                    }}
                   />
-                  <Field
+                  <TranslatableField
+                    unitKey={`${prefix}:description`}
                     label="Mission · Beschreibung"
                     multiline
                     value={row.description ?? ""}
-                    placeholder={slot.levelLink.task.description ?? ""}
-                    onChange={(description) => patchSlot(linkId, { description })}
+                    source={source.description}
+                    confirmed={confirmed.has(`${prefix}:description`)}
+                    onConfirm={handleConfirm}
+                    onChange={(description) => {
+                      handleValue(`${prefix}:description`, source.description ?? "", description);
+                      patchSlot(linkId, { description });
+                    }}
                   />
                 </div>
 
@@ -329,48 +520,89 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                     </p>
                     <TileFields
                       tiles={row.tiles ?? []}
+                      sourceTiles={source.tiles ?? []}
+                      keyPrefix={prefix}
+                      confirmed={confirmed}
+                      onConfirm={handleConfirm}
+                      onValue={handleValue}
                       onChange={(tiles) => patchSlot(linkId, { tiles })}
                     />
                   </div>
                 ) : null}
 
                 <div className="grid gap-3">
-                  <Field
+                  <TranslatableField
+                    unitKey={`${prefix}:question`}
                     label="Mission · Frage"
                     multiline
                     value={row.question ?? ""}
-                    onChange={(question) => patchSlot(linkId, { question })}
+                    source={source.question}
+                    confirmed={confirmed.has(`${prefix}:question`)}
+                    onConfirm={handleConfirm}
+                    onChange={(question) => {
+                      handleValue(`${prefix}:question`, source.question ?? "", question);
+                      patchSlot(linkId, { question });
+                    }}
                   />
-                  <Field
+                  <TranslatableField
+                    unitKey={`${prefix}:success_title`}
                     label="Erfolg · Titel"
                     value={row.success_title ?? ""}
-                    onChange={(success_title) => patchSlot(linkId, { success_title })}
+                    source={source.success_title}
+                    confirmed={confirmed.has(`${prefix}:success_title`)}
+                    onConfirm={handleConfirm}
+                    onChange={(success_title) => {
+                      handleValue(`${prefix}:success_title`, source.success_title ?? "", success_title);
+                      patchSlot(linkId, { success_title });
+                    }}
                   />
-                  <Field
+                  <TranslatableField
+                    unitKey={`${prefix}:success_info`}
                     label="Erfolg · Text"
                     multiline
                     value={row.success_info ?? ""}
-                    onChange={(success_info) => patchSlot(linkId, { success_info })}
+                    source={source.success_info}
+                    confirmed={confirmed.has(`${prefix}:success_info`)}
+                    onConfirm={handleConfirm}
+                    onChange={(success_info) => {
+                      handleValue(`${prefix}:success_info`, source.success_info ?? "", success_info);
+                      patchSlot(linkId, { success_info });
+                    }}
                   />
                   <OptionFields
                     options={row.options ?? []}
+                    sourceOptions={source.options ?? []}
+                    keyPrefix={prefix}
+                    confirmed={confirmed}
+                    onConfirm={handleConfirm}
+                    onValue={handleValue}
                     onChange={(options) => patchSlot(linkId, { options })}
                   />
                   {row.station ? (
                     <>
-                      <Field
+                      <TranslatableField
+                        unitKey={`${prefix}:station:name`}
                         label="Station · Name"
                         value={row.station.name ?? ""}
-                        onChange={(name) =>
-                          patchSlot(linkId, { station: { ...row.station, name } })
-                        }
+                        source={source.station?.name}
+                        confirmed={confirmed.has(`${prefix}:station:name`)}
+                        onConfirm={handleConfirm}
+                        onChange={(name) => {
+                          handleValue(`${prefix}:station:name`, source.station?.name ?? "", name);
+                          patchSlot(linkId, { station: { ...row.station, name } });
+                        }}
                       />
-                      <Field
+                      <TranslatableField
+                        unitKey={`${prefix}:station:place`}
                         label="Station · Ort"
                         value={row.station.place ?? ""}
-                        onChange={(place) =>
-                          patchSlot(linkId, { station: { ...row.station, place } })
-                        }
+                        source={source.station?.place}
+                        confirmed={confirmed.has(`${prefix}:station:place`)}
+                        onConfirm={handleConfirm}
+                        onChange={(place) => {
+                          handleValue(`${prefix}:station:place`, source.station?.place ?? "", place);
+                          patchSlot(linkId, { station: { ...row.station, place } });
+                        }}
                       />
                     </>
                   ) : null}
@@ -381,35 +613,64 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                     <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                       Einstiegsaufgabe
                     </p>
-                    <Field
+                    <TranslatableField
+                      unitKey={`${prefix}:quiz:title`}
                       label="Titel"
                       value={row.quiz?.title ?? ""}
-                      placeholder={slot.quiz?.title}
-                      onChange={(title) => patchQuiz(linkId, { title })}
+                      source={source.quiz?.title}
+                      confirmed={confirmed.has(`${prefix}:quiz:title`)}
+                      onConfirm={handleConfirm}
+                      onChange={(title) => {
+                        handleValue(`${prefix}:quiz:title`, source.quiz?.title ?? "", title);
+                        patchQuiz(linkId, { title });
+                      }}
                     />
-                    <Field
+                    <TranslatableField
+                      unitKey={`${prefix}:quiz:description`}
                       label="Beschreibung"
                       multiline
                       value={row.quiz?.description ?? ""}
-                      placeholder={slot.quiz?.description}
-                      onChange={(description) => patchQuiz(linkId, { description })}
+                      source={source.quiz?.description}
+                      confirmed={confirmed.has(`${prefix}:quiz:description`)}
+                      onConfirm={handleConfirm}
+                      onChange={(description) => {
+                        handleValue(`${prefix}:quiz:description`, source.quiz?.description ?? "", description);
+                        patchQuiz(linkId, { description });
+                      }}
                     />
-                    <Field
+                    <TranslatableField
+                      unitKey={`${prefix}:quiz:question`}
                       label="Frage"
                       multiline
                       value={row.quiz?.question ?? ""}
-                      placeholder={slot.quiz?.question}
-                      onChange={(question) => patchQuiz(linkId, { question })}
+                      source={source.quiz?.question}
+                      confirmed={confirmed.has(`${prefix}:quiz:question`)}
+                      onConfirm={handleConfirm}
+                      onChange={(question) => {
+                        handleValue(`${prefix}:quiz:question`, source.quiz?.question ?? "", question);
+                        patchQuiz(linkId, { question });
+                      }}
                     />
-                    <Field
+                    <TranslatableField
+                      unitKey={`${prefix}:quiz:side_fact`}
                       label="Side-Fact"
                       multiline
                       value={row.quiz?.side_fact ?? ""}
-                      placeholder={slot.quiz?.side_fact}
-                      onChange={(side_fact) => patchQuiz(linkId, { side_fact })}
+                      source={source.quiz?.side_fact}
+                      confirmed={confirmed.has(`${prefix}:quiz:side_fact`)}
+                      onConfirm={handleConfirm}
+                      onChange={(side_fact) => {
+                        handleValue(`${prefix}:quiz:side_fact`, source.quiz?.side_fact ?? "", side_fact);
+                        patchQuiz(linkId, { side_fact });
+                      }}
                     />
                     <OptionFields
                       options={row.quiz?.options ?? slot.quiz?.options ?? []}
+                      sourceOptions={source.quiz?.options ?? []}
+                      keyPrefix={`${prefix}:quiz`}
+                      confirmed={confirmed}
+                      onConfirm={handleConfirm}
+                      onValue={handleValue}
                       onChange={(options) => patchQuiz(linkId, { options })}
                     />
                   </div>
@@ -417,6 +678,8 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
 
                 {slot.bonusLinks.map((link, index) => {
                   const bonus = row.bonuses?.[link.task_id] ?? {};
+                  const sourceBonus = source.bonuses?.[link.task_id] ?? {};
+                  const bonusPrefix = `${prefix}:bonus:${link.task_id}`;
                   return (
                     <div
                       key={link.id}
@@ -426,41 +689,77 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                         Bonusaufgabe {index + 1}
                       </p>
                       <p className="text-sm font-semibold text-foreground">{link.task.title}</p>
-                      <Field
+                      <TranslatableField
+                        unitKey={`${bonusPrefix}:title`}
                         label="Titel"
                         value={bonus.title ?? ""}
-                        placeholder={link.task.title}
-                        onChange={(title) => patchBonus(linkId, link.task_id, { title })}
+                        source={sourceBonus.title}
+                        confirmed={confirmed.has(`${bonusPrefix}:title`)}
+                        onConfirm={handleConfirm}
+                        onChange={(title) => {
+                          handleValue(`${bonusPrefix}:title`, sourceBonus.title ?? "", title);
+                          patchBonus(linkId, link.task_id, { title });
+                        }}
                       />
-                      <Field
+                      <TranslatableField
+                        unitKey={`${bonusPrefix}:description`}
                         label="Beschreibung"
                         multiline
                         value={bonus.description ?? ""}
-                        placeholder={link.task.description ?? ""}
-                        onChange={(description) =>
-                          patchBonus(linkId, link.task_id, { description })
-                        }
+                        source={sourceBonus.description}
+                        confirmed={confirmed.has(`${bonusPrefix}:description`)}
+                        onConfirm={handleConfirm}
+                        onChange={(description) => {
+                          handleValue(`${bonusPrefix}:description`, sourceBonus.description ?? "", description);
+                          patchBonus(linkId, link.task_id, { description });
+                        }}
                       />
-                      <Field
+                      <TranslatableField
+                        unitKey={`${bonusPrefix}:question`}
                         label="Frage"
                         multiline
                         value={bonus.question ?? ""}
-                        onChange={(question) => patchBonus(linkId, link.task_id, { question })}
+                        source={sourceBonus.question}
+                        confirmed={confirmed.has(`${bonusPrefix}:question`)}
+                        onConfirm={handleConfirm}
+                        onChange={(question) => {
+                          handleValue(`${bonusPrefix}:question`, sourceBonus.question ?? "", question);
+                          patchBonus(linkId, link.task_id, { question });
+                        }}
                       />
-                      <Field
+                      <TranslatableField
+                        unitKey={`${bonusPrefix}:success_info`}
                         label="Erfolg · Text"
                         multiline
                         value={bonus.success_info ?? ""}
-                        onChange={(success_info) =>
-                          patchBonus(linkId, link.task_id, { success_info })
-                        }
+                        source={sourceBonus.success_info}
+                        confirmed={confirmed.has(`${bonusPrefix}:success_info`)}
+                        onConfirm={handleConfirm}
+                        onChange={(success_info) => {
+                          handleValue(
+                            `${bonusPrefix}:success_info`,
+                            sourceBonus.success_info ?? "",
+                            success_info,
+                          );
+                          patchBonus(linkId, link.task_id, { success_info });
+                        }}
                       />
                       <OptionFields
                         options={bonus.options ?? []}
+                        sourceOptions={sourceBonus.options ?? []}
+                        keyPrefix={bonusPrefix}
+                        confirmed={confirmed}
+                        onConfirm={handleConfirm}
+                        onValue={handleValue}
                         onChange={(options) => patchBonus(linkId, link.task_id, { options })}
                       />
                       <TileFields
                         tiles={bonus.tiles ?? []}
+                        sourceTiles={sourceBonus.tiles ?? []}
+                        keyPrefix={bonusPrefix}
+                        confirmed={confirmed}
+                        onConfirm={handleConfirm}
+                        onValue={handleValue}
                         onChange={(tiles) => patchBonus(linkId, link.task_id, { tiles })}
                       />
                     </div>

@@ -13,8 +13,11 @@ import {
 import { isStudioLanguage, parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
 import {
   buildSnapshotLocales,
+  collectTranslationUnits,
+  localeCopyWithCoverage,
   parseTranslations,
   seedLocaleCopy,
+  seedSlotCopyFromStudio,
   type GameLocaleCopy,
   type SlotLocaleCopy,
   withLinkLocale,
@@ -56,6 +59,40 @@ function normalizeGameRow(row: StudioGame): StudioGame {
     runtime_profiles: parseRuntimeProfiles((row as StudioGame).runtime_profiles),
     logic_rules: (row as StudioGame).logic_rules ?? [],
   };
+}
+
+function translationUnitsForGame(game: StudioGame, links: StudioGameTaskLink[]) {
+  const slots = buildGameSlots(links);
+  return collectTranslationUnits({
+    game,
+    slots: slots.map((slot) => {
+      const quiz = slot.quiz
+        ? {
+            title: slot.quiz.title ?? "",
+            description: slot.quiz.description ?? "",
+            question: slot.quiz.question,
+            side_fact: slot.quiz.side_fact ?? "",
+            options: slot.quiz.options.map((option) => ({ id: option.id, label: option.label })),
+          }
+        : null;
+      return {
+        linkId: slot.levelLink.id,
+        source: seedSlotCopyFromStudio({
+          title: slot.levelLink.task.title,
+          description: slot.levelLink.task.description,
+          content: slot.levelLink.task.content,
+          overrides: slot.levelLink.overrides,
+          quiz,
+          bonuses: slot.bonusLinks.map((link) => ({
+            taskId: link.task_id,
+            title: link.task.title,
+            description: link.task.description,
+            content: link.task.content,
+          })),
+        }),
+      };
+    }),
+  });
 }
 
 export async function listGames(): Promise<ActionResult<StudioGame[]>> {
@@ -1418,7 +1455,12 @@ export async function addGameLocale(
     }
     const translations = { ...game.translations };
     if (!translations[language]) {
-      translations[language] = seedLocaleCopy(game);
+      const linksResult = await listGameTasks(gameId);
+      const units = translationUnitsForGame(
+        game,
+        linksResult.success ? linksResult.data ?? [] : [],
+      );
+      translations[language] = localeCopyWithCoverage(undefined, seedLocaleCopy(game), units);
     }
 
     const { data, error: updateError } = await supabase
@@ -1468,12 +1510,18 @@ export async function saveGameLocale(input: {
       if (input.copy.description !== undefined) payload.description = input.copy.description;
       if (input.copy.farewell_text !== undefined) payload.farewell_text = input.copy.farewell_text;
     } else {
+      const linksResult = await listGameTasks(input.gameId);
+      const units = translationUnitsForGame(
+        game,
+        linksResult.success ? linksResult.data ?? [] : [],
+      );
       payload.translations = {
         ...game.translations,
-        [input.language]: {
-          ...game.translations[input.language],
-          ...input.copy,
-        },
+        [input.language]: localeCopyWithCoverage(
+          game.translations[input.language],
+          input.copy,
+          units,
+        ),
       };
     }
 

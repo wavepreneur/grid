@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import {
+  coveragePercent,
+  type TranslationCoverage,
+} from "@/lib/cms/game-i18n";
+import {
   LAUNCH_LOCALES,
   localeLabel,
   localeShort,
@@ -13,6 +17,7 @@ type Props = {
   locales: StudioLanguage[];
   sourceLocale: StudioLanguage;
   activeLocale?: StudioLanguage;
+  coverageByLocale?: Partial<Record<StudioLanguage, TranslationCoverage>>;
   onAdd: (language: StudioLanguage) => void;
   adding?: boolean;
 };
@@ -22,6 +27,7 @@ export function GameLanguageCell({
   locales,
   sourceLocale,
   activeLocale,
+  coverageByLocale,
   onAdd,
   adding,
 }: Props) {
@@ -35,19 +41,32 @@ export function GameLanguageCell({
         const short = localeShort(language);
         const label = localeLabel(language);
         const current = (activeLocale ?? sourceLocale) === language;
+        const isSource = language === sourceLocale;
         if (have.has(language) || current) {
+          const coverage = !isSource ? coverageByLocale?.[language] : undefined;
+          const percent = coverage ? coveragePercent(coverage) : !isSource ? 0 : null;
+          const complete = percent === 100;
           return (
             <Link
               key={language}
               href={`/admin/games/${gameId}?lang=${language}`}
-              title={`${label}${language === sourceLocale ? " · Ausgangssprache" : ""}`}
-              className={`inline-flex h-7 min-w-7 items-center justify-center rounded-lg px-1.5 text-[10px] font-extrabold tracking-wide ${
+              title={
+                isSource
+                  ? `${label} · Ausgangssprache`
+                  : `${label} · ${percent ?? 0}% bestätigt`
+              }
+              className={`inline-flex min-h-7 min-w-7 flex-col items-center justify-center rounded-lg px-1.5 py-0.5 text-[10px] font-extrabold tracking-wide ${
                 current
                   ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-foreground hover:bg-secondary/80"
+                  : complete || isSource
+                    ? "bg-secondary text-foreground hover:bg-secondary/80"
+                    : "bg-amber-100 text-amber-900 hover:bg-amber-200"
               }`}
             >
               {short}
+              {percent !== null ? (
+                <span className="text-[8px] font-bold leading-none">{percent}%</span>
+              ) : null}
             </Link>
           );
         }

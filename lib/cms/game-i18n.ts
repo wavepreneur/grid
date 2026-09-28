@@ -17,12 +17,26 @@ import type {
   QuizOption,
 } from "@/lib/grid/level-types";
 
+export type TranslationCoverage = {
+  confirmed: number;
+  total: number;
+};
+
+export type TranslationUnit = {
+  key: string;
+  source: string;
+};
+
 export type GameLocaleCopy = {
   name?: string;
   description?: string;
   farewell_text?: string;
   briefing_iframe_url?: string;
   faq_iframe_url?: string;
+  /** Field keys the author marked as done for this locale. */
+  confirmed?: string[];
+  /** Cached list progress, including slot fields. */
+  coverage?: TranslationCoverage;
 };
 
 export type TileLocaleCopy = {
@@ -65,6 +79,23 @@ export type SlotLocaleCopy = {
 
 export type GameTranslations = Record<string, GameLocaleCopy>;
 
+export function parseConfirmed(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((item): item is string => typeof item === "string" && item.length > 0))];
+}
+
+export function parseCoverage(value: unknown): TranslationCoverage | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const row = value as Record<string, unknown>;
+  const confirmed = Number(row.confirmed);
+  const total = Number(row.total);
+  if (!Number.isFinite(confirmed) || !Number.isFinite(total) || total < 0) return undefined;
+  return {
+    confirmed: Math.max(0, Math.round(confirmed)),
+    total: Math.max(0, Math.round(total)),
+  };
+}
+
 export function parseTranslations(value: unknown): GameTranslations {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const next: GameTranslations = {};
@@ -78,6 +109,8 @@ export function parseTranslations(value: unknown): GameTranslations {
       briefing_iframe_url:
         typeof row.briefing_iframe_url === "string" ? row.briefing_iframe_url : undefined,
       faq_iframe_url: typeof row.faq_iframe_url === "string" ? row.faq_iframe_url : undefined,
+      confirmed: parseConfirmed(row.confirmed),
+      coverage: parseCoverage(row.coverage),
     };
   }
   return next;
@@ -197,20 +230,71 @@ export function gameLocales(game: Pick<StudioGame, "language" | "translations">)
   return [...new Set([source, ...extras])] as StudioLanguage[];
 }
 
+export function localeCoverageMap(
+  game: Pick<StudioGame, "language" | "translations">,
+): Partial<Record<StudioLanguage, TranslationCoverage>> {
+  const map: Partial<Record<StudioLanguage, TranslationCoverage>> = {};
+  for (const locale of gameLocales(game)) {
+    if (locale === parseStudioLanguage(game.language)) continue;
+    map[locale] = localeCoverage(game, locale);
+  }
+  return map;
+}
+
 function isReadyLocaleKey(key: string): key is StudioLanguage {
   return isStudioLanguage(key);
+}
+
+export function coveragePercent(coverage: TranslationCoverage): number {
+  if (coverage.total <= 0) return 100;
+  return Math.min(100, Math.round((coverage.confirmed / coverage.total) * 100));
+}
+
+export function remainingPercent(coverage: TranslationCoverage): number {
+  return Math.max(0, 100 - coveragePercent(coverage));
+}
+
+export function localeCoverage(
+  game: Pick<StudioGame, "language" | "translations">,
+  locale: string,
+): TranslationCoverage {
+  const source = parseStudioLanguage(game.language);
+  if (locale === source) return { confirmed: 1, total: 1 };
+  const copy = parseTranslations(game.translations)[locale];
+  if (!copy) return { confirmed: 0, total: 1 };
+  if (copy.coverage) return copy.coverage;
+  return { confirmed: 0, total: 1 };
+}
+
+export function isLocaleComplete(
+  game: Pick<StudioGame, "language" | "translations">,
+  locale: string,
+): boolean {
+  const coverage = localeCoverage(game, locale);
+  return coverage.total === 0 || coverage.confirmed >= coverage.total;
 }
 
 export function missingLaunchLocales(
   game: Pick<StudioGame, "language" | "translations">,
 ): StudioLanguage[] {
-  const locales = new Set(gameLocales(game));
-  return LAUNCH_LOCALES.filter((locale) => !locales.has(locale));
+  const source = parseStudioLanguage(game.language);
+  return LAUNCH_LOCALES.filter((locale) => locale !== source && !isLocaleComplete(game, locale));
 }
 
 export function hasLaunchCoverage(game: Pick<StudioGame, "language" | "translations">): boolean {
-  const locales = new Set(gameLocales(game));
-  return LAUNCH_LOCALES.every((locale) => locales.has(locale));
+  return missingLaunchLocales(game).length === 0;
+}
+
+export function coverageForConfirmed(
+  units: TranslationUnit[],
+  confirmed: Iterable<string>,
+): TranslationCoverage {
+  const valid = new Set(units.map((unit) => unit.key));
+  let count = 0;
+  for (const key of confirmed) {
+    if (valid.has(key)) count += 1;
+  }
+  return { confirmed: count, total: units.length };
 }
 
 function helpUrlFromFlags(featureFlags: unknown, key: "briefing_iframe_url" | "faq_iframe_url"): string {
@@ -471,6 +555,104 @@ export function seedSlotCopyFromStudio(input: {
           input.bonuses.map((bonus) => [bonus.taskId, seedBonusFromTask(bonus)]),
         )
       : undefined,
+  };
+}
+
+function addTranslationUnit(units: TranslationUnit[], key: string, source: unknown) {
+  if (typeof source !== "string") return;
+  const text = source.trim();
+  if (!text) return;
+  units.push({ key, source: text });
+}
+
+export function collectGameTranslationUnits(
+  game: Pick<StudioGame, "name" | "description" | "farewell_text" | "feature_flags">,
+): TranslationUnit[] {
+  const units: TranslationUnit[] = [];
+  addTranslationUnit(units, "game:name", game.name);
+  addTranslationUnit(units, "game:description", game.description);
+  addTranslationUnit(units, "game:farewell_text", game.farewell_text);
+  addTranslationUnit(units, "game:briefing_iframe_url", helpUrlFromFlags(game.feature_flags, "briefing_iframe_url"));
+  addTranslationUnit(units, "game:faq_iframe_url", helpUrlFromFlags(game.feature_flags, "faq_iframe_url"));
+  return units;
+}
+
+function collectSlotTranslationUnits(linkId: string, source: SlotLocaleCopy): TranslationUnit[] {
+  const prefix = `slot:${linkId}`;
+  const units: TranslationUnit[] = [];
+  addTranslationUnit(units, `${prefix}:title`, source.title);
+  addTranslationUnit(units, `${prefix}:description`, source.description);
+  addTranslationUnit(units, `${prefix}:question`, source.question);
+  addTranslationUnit(units, `${prefix}:success_title`, source.success_title);
+  addTranslationUnit(units, `${prefix}:success_info`, source.success_info);
+  for (const option of source.options ?? []) {
+    addTranslationUnit(units, `${prefix}:option:${option.id}`, option.label);
+  }
+  for (const tile of source.tiles ?? []) {
+    addTranslationUnit(units, `${prefix}:tile:${tile.id}:label`, tile.label);
+    addTranslationUnit(units, `${prefix}:tile:${tile.id}:url`, tile.url);
+    addTranslationUnit(units, `${prefix}:tile:${tile.id}:hint`, tile.hint_text);
+  }
+  for (const hint of source.hints ?? []) {
+    addTranslationUnit(units, `${prefix}:hint:${hint.id}`, hint.text);
+  }
+  if (source.quiz) {
+    addTranslationUnit(units, `${prefix}:quiz:title`, source.quiz.title);
+    addTranslationUnit(units, `${prefix}:quiz:description`, source.quiz.description);
+    addTranslationUnit(units, `${prefix}:quiz:question`, source.quiz.question);
+    addTranslationUnit(units, `${prefix}:quiz:side_fact`, source.quiz.side_fact);
+    for (const option of source.quiz.options ?? []) {
+      addTranslationUnit(units, `${prefix}:quiz:option:${option.id}`, option.label);
+    }
+  }
+  if (source.station) {
+    addTranslationUnit(units, `${prefix}:station:name`, source.station.name);
+    addTranslationUnit(units, `${prefix}:station:place`, source.station.place);
+  }
+  for (const [taskId, bonus] of Object.entries(source.bonuses ?? {})) {
+    const bonusPrefix = `${prefix}:bonus:${taskId}`;
+    addTranslationUnit(units, `${bonusPrefix}:title`, bonus.title);
+    addTranslationUnit(units, `${bonusPrefix}:description`, bonus.description);
+    addTranslationUnit(units, `${bonusPrefix}:question`, bonus.question);
+    addTranslationUnit(units, `${bonusPrefix}:success_info`, bonus.success_info);
+    for (const option of bonus.options ?? []) {
+      addTranslationUnit(units, `${bonusPrefix}:option:${option.id}`, option.label);
+    }
+    for (const tile of bonus.tiles ?? []) {
+      addTranslationUnit(units, `${bonusPrefix}:tile:${tile.id}:label`, tile.label);
+      addTranslationUnit(units, `${bonusPrefix}:tile:${tile.id}:url`, tile.url);
+      addTranslationUnit(units, `${bonusPrefix}:tile:${tile.id}:hint`, tile.hint_text);
+    }
+  }
+  return units;
+}
+
+export function collectTranslationUnits(input: {
+  game: Pick<StudioGame, "name" | "description" | "farewell_text" | "feature_flags">;
+  slots: Array<{ linkId: string; source: SlotLocaleCopy }>;
+}): TranslationUnit[] {
+  return [
+    ...collectGameTranslationUnits(input.game),
+    ...input.slots.flatMap((slot) => collectSlotTranslationUnits(slot.linkId, slot.source)),
+  ];
+}
+
+export function localeCopyWithCoverage(
+  current: GameLocaleCopy | undefined,
+  next: GameLocaleCopy,
+  units: TranslationUnit[],
+): GameLocaleCopy {
+  const confirmed = parseConfirmed(next.confirmed ?? current?.confirmed);
+  const coverage = coverageForConfirmed(units, confirmed);
+  return {
+    ...current,
+    name: next.name,
+    description: next.description,
+    farewell_text: next.farewell_text,
+    briefing_iframe_url: next.briefing_iframe_url,
+    faq_iframe_url: next.faq_iframe_url,
+    confirmed: confirmed.filter((key) => units.some((unit) => unit.key === key)),
+    coverage,
   };
 }
 

@@ -16,7 +16,7 @@ import {
   duplicateGames,
 } from "@/app/actions/cms/games";
 import { LAUNCH_LOCALES, localeLabel, parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
-import { gameLocales, hasLaunchCoverage } from "@/lib/cms/game-i18n";
+import { gameLocales, hasLaunchCoverage, localeCoverageMap } from "@/lib/cms/game-i18n";
 import { GameLanguageCell } from "@/components/cms/games/game-language-cell";
 import type { GameDeleteStatus } from "@/lib/cms/delete-status";
 import {
@@ -76,7 +76,7 @@ type GameWithLive = StudioGame & { liveEventCount: number };
 
 /** Checkbox · Spiel (flex) · Sprache · Fläche · Status · Ver. · Code (≈ hew9geeus2) · Datum · Aktionen */
 const GAME_LIST_GRID =
-  "lg:grid lg:grid-cols-[2rem_minmax(0,1fr)_7.5rem_5.5rem_9.5rem_2.25rem_6.75rem_4.75rem_13rem] lg:items-center lg:gap-x-3";
+  "lg:grid lg:grid-cols-[2rem_minmax(0,1fr)_8.25rem_5.5rem_9.5rem_2.25rem_6.75rem_4.75rem_13rem] lg:items-center lg:gap-x-3";
 
 type GameSort = "updated" | "created" | "status" | "name" | "language";
 type LanguageFilter = "alle" | StudioLanguage | "missing";
@@ -895,6 +895,7 @@ function GameLanguageBadges({ game }: { game: StudioGame }) {
       gameId={game.id}
       locales={gameLocales(game)}
       sourceLocale={parseStudioLanguage(game.language)}
+      coverageByLocale={localeCoverageMap(game)}
       adding={adding}
       onAdd={(language) => {
         setAdding(true);
@@ -1109,6 +1110,8 @@ function GameRow({
           gameId={game.id}
           gameName={game.name}
           publishedVersionNumber={game.published_version_number}
+          locales={gameLocales(game)}
+          defaultLanguage={parseStudioLanguage(game.language)}
         />
       ) : null}
       {codesOpen && isIndoor ? (

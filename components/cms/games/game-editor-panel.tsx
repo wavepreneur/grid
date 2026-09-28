@@ -11,8 +11,9 @@ import {
 } from "@/app/actions/cms/games";
 import { GameLanguageCell } from "@/components/cms/games/game-language-cell";
 import { GameTranslationPanel } from "@/components/cms/games/game-translation-panel";
-import { gameLocales } from "@/lib/cms/game-i18n";
-import { parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
+import { GameTestPlayModal } from "@/components/cms/games/game-test-play-modal";
+import { gameLocales, localeCoverageMap } from "@/lib/cms/game-i18n";
+import { localeLabel, parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
 import { StudioBadge, StudioPanel } from "@/components/cms/admin-shell";
 import { GameLayerProfilePanel } from "@/components/cms/games/game-layer-profile-panel";
 import { GameLogicPanel } from "@/components/cms/games/game-logic-panel";
@@ -28,6 +29,7 @@ import {
   IconGamepad,
   IconKeyRound,
   IconMapPin,
+  IconPlay,
   IconSave,
   IconTemplate,
 } from "@/components/cms/studio-icons";
@@ -126,6 +128,7 @@ export function GameEditorPanel({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [testOpen, setTestOpen] = useState(false);
 
   const locale = parseStudioLanguage(localeParam ?? initialGame.language);
   const isSourceLocale = locale === parseStudioLanguage(initialGame.language);
@@ -290,14 +293,28 @@ export function GameEditorPanel({
           title="Sprache"
           description="Ein Spiel, mehrere Texte. Die Buchung sperrt die Sprache — Spieler wechseln sie nicht."
         />
-        <GameLanguageCell
-          gameId={game.id}
-          locales={gameLocales(initialGame)}
-          sourceLocale={initialGame.language}
-          activeLocale={locale}
-          adding={pending}
-          onAdd={handleAddLocale}
-        />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <GameLanguageCell
+            gameId={game.id}
+            locales={gameLocales(initialGame)}
+            sourceLocale={initialGame.language}
+            activeLocale={locale}
+            coverageByLocale={localeCoverageMap(initialGame)}
+            adding={pending}
+            onAdd={handleAddLocale}
+          />
+          {!game.is_template && game.status !== "archived" ? (
+            <StudioButton
+              type="button"
+              variant="secondary"
+              size="sm"
+              icon={<IconPlay size={16} />}
+              onClick={() => setTestOpen(true)}
+            >
+              {localeLabel(locale)} testen
+            </StudioButton>
+          ) : null}
+        </div>
       </StudioPanel>
 
       {!isSourceLocale ? (
@@ -748,6 +765,18 @@ export function GameEditorPanel({
         initialLinks={taskLinks}
       />
       </div>
+      ) : null}
+
+      {testOpen && !game.is_template && game.status !== "archived" ? (
+        <GameTestPlayModal
+          open={testOpen}
+          onClose={() => setTestOpen(false)}
+          gameId={game.id}
+          gameName={game.name}
+          publishedVersionNumber={game.published_version_number}
+          locales={gameLocales(initialGame)}
+          defaultLanguage={locale}
+        />
       ) : null}
 
       {isSourceLocale ? (

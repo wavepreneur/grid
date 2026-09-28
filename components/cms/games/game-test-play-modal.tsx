@@ -9,6 +9,7 @@ import {
 import { StudioModal } from "@/components/cms/shared/studio-modal";
 import { IconCopy, IconInfo, IconRefresh } from "@/components/cms/studio-icons";
 import { StudioButton, StudioError } from "@/components/cms/studio-ui";
+import { localeLabel, localeShort, type StudioLanguage } from "@/lib/cms/languages";
 
 type Props = {
   open: boolean;
@@ -16,6 +17,8 @@ type Props = {
   gameId: string;
   gameName: string;
   publishedVersionNumber: number;
+  locales: StudioLanguage[];
+  defaultLanguage: StudioLanguage;
 };
 
 const REGENERATE_INFO =
@@ -27,11 +30,14 @@ export function GameTestPlayModal({
   gameId,
   gameName,
   publishedVersionNumber,
+  locales,
+  defaultLanguage,
 }: Props) {
   const [pending, startTransition] = useTransition();
   const [session, setSession] = useState<StudioTestSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [language, setLanguage] = useState<StudioLanguage>(defaultLanguage);
 
   function absoluteUrl(path: string) {
     if (typeof window === "undefined") return path;
@@ -39,25 +45,29 @@ export function GameTestPlayModal({
   }
 
   useEffect(() => {
+    if (open) setLanguage(defaultLanguage);
+  }, [open, defaultLanguage]);
+
+  useEffect(() => {
     if (!open) return;
     setError(null);
     setCopied(false);
     setSession(null);
     startTransition(async () => {
-      const result = await getOrCreateStudioTestSession(gameId);
+      const result = await getOrCreateStudioTestSession(gameId, language);
       if (!result.success) {
         setError(result.error);
         return;
       }
       setSession(result.data!);
     });
-  }, [open, gameId]);
+  }, [open, gameId, language]);
 
   function handleRegenerate() {
     setError(null);
     setCopied(false);
     startTransition(async () => {
-      const result = await regenerateStudioTestSession(gameId);
+      const result = await regenerateStudioTestSession(gameId, language);
       if (!result.success) {
         setError(result.error);
         return;
@@ -79,13 +89,14 @@ export function GameTestPlayModal({
   }
 
   const playUrl = session ? absoluteUrl(session.playPath) : null;
+  const languageOptions = locales.length > 0 ? locales : [defaultLanguage];
 
   return (
     <StudioModal
       open={open}
       onClose={onClose}
       title="Spiel testen"
-      subtitle={`${gameName} · Version ${publishedVersionNumber} · bis ${session?.maxPlayers ?? 3} Spieler (Alpha, Beta, Gamma)`}
+      subtitle={`${gameName} · ${localeShort(language)} · Version ${publishedVersionNumber} · bis ${session?.maxPlayers ?? 3} Spieler (Alpha, Beta, Gamma)`}
       size="lg"
       footer={
         <div className="flex flex-wrap gap-2">
@@ -135,6 +146,37 @@ export function GameTestPlayModal({
         </div>
       ) : null}
 
+      {languageOptions.length > 1 ? (
+        <div className="mb-4">
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            Sprache
+          </p>
+          <div className="inline-flex flex-wrap rounded-2xl bg-secondary p-1">
+            {languageOptions.map((item) => {
+              const active = item === language;
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => setLanguage(item)}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-bold ${
+                    active
+                      ? "bg-card text-foreground shadow-soft"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {localeLabel(item)}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Bereits geöffnete Test-Tabs nach dem Sprachwechsel neu laden.
+          </p>
+        </div>
+      ) : null}
+
       <p className="text-sm leading-relaxed text-muted-foreground">
         Als Team Lead zuerst <strong>Teamnamen</strong> und deinen Namen festlegen. Danach denselben
         Link an Mitspieler schicken — sie sehen die Einladung, tragen nur ihren Namen ein und landen
@@ -150,7 +192,7 @@ export function GameTestPlayModal({
         <div className="mt-4 rounded-2xl border border-border bg-secondary/50 px-4 py-3">
           <div className="flex items-center gap-1.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Testlink
+              Testlink · {localeShort(language)}
             </p>
             <span className="group relative inline-flex">
               <button
