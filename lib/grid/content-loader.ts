@@ -35,7 +35,7 @@ import {
 import { resolveContentMode } from "@/lib/grid/play-slots";
 import { buildDefaultStation, normalizeStationCode } from "@/lib/grid/stations";
 import { parseBonusTask } from "@/lib/grid/bonus";
-import { parseGameHelpLinks } from "@/lib/grid/game-help-links";
+import { parseGameHelpLinks, resolveIntroYoutubeUrl } from "@/lib/grid/game-help-links";
 import { parseFollowUpTrigger } from "@/lib/grid/follow-up-trigger";
 import { resolvePlayGrowthOffer } from "@/lib/grid/growth-pack";
 import { parseStudioLanguage } from "@/lib/cms/languages";
@@ -359,6 +359,7 @@ function withSurfaceFields(
 ): ResolvedEventContent {
   const { contentMode, allowedFallbacks, routeOrder } = resolveModeAndFallbacks(contentConfig);
   const profiles = parseRuntimeProfiles(contentConfig.runtime_profiles);
+  const language = parseStudioLanguage(contentConfig.language);
   return {
     ...base,
     contentMode,
@@ -366,7 +367,12 @@ function withSurfaceFields(
     routeOrder,
     roleLabels: profiles.role_labels,
     isStudioTest: Boolean(contentConfig.is_studio_test),
-    language: parseStudioLanguage(contentConfig.language),
+    language,
+    introYoutubeUrl: resolveIntroYoutubeUrl({
+      stored: base.introYoutubeUrl,
+      language,
+      contentMode,
+    }),
     growthOffer: resolvePlayGrowthOffer(
       contentConfig,
       Boolean(contentConfig.is_studio_test),

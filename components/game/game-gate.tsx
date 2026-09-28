@@ -7,6 +7,7 @@ import { getGameState, prepareTeamGame } from "@/app/actions/game";
 import { resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GameRoom } from "@/components/game/game-room";
 import { GameGateSkeleton } from "@/components/game/game-gate-skeleton";
+import { PlayIntroVideo } from "@/components/game/play-intro-video";
 import { GridError } from "@/components/grid/grid-shell";
 import {
   cacheEventContent,
@@ -40,7 +41,7 @@ type GameGateProps = {
 };
 
 const PLAY_READY_TIMEOUT_MS = 12_000;
-const CONTENT_TIMEOUT_MS = 12_000;
+const CONTENT_TIMEOUT_MS = 10_000;
 
 function isPlayReady(result: Awaited<ReturnType<typeof getGameState>>): boolean {
   return (
@@ -78,7 +79,7 @@ async function waitForPlayReady(
   let last = await getGameState(input);
   while (!isCancelled() && !isPlayReady(last)) {
     if (Date.now() - started >= PLAY_READY_TIMEOUT_MS) break;
-    await new Promise((resolve) => window.setTimeout(resolve, 200));
+    await new Promise((resolve) => window.setTimeout(resolve, 80));
     last = await getGameState(input);
   }
   return last;
@@ -90,6 +91,20 @@ function unwrapContent(
   if (!result.success) return null;
   const { eventId: _eventId, contentRevision: _revision, ...content } = result.data;
   return content;
+}
+
+function introSeenKey(inviteCode: string, joinCode: string, sessionId: string): string {
+  return `grid:intro-video:${inviteCode.toUpperCase()}:${joinCode.toUpperCase()}:${sessionId}`;
+}
+
+function hasSeenIntro(inviteCode: string, joinCode: string, sessionId: string): boolean {
+  if (typeof window === "undefined") return true;
+  return sessionStorage.getItem(introSeenKey(inviteCode, joinCode, sessionId)) === "1";
+}
+
+function markIntroSeen(inviteCode: string, joinCode: string, sessionId: string): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(introSeenKey(inviteCode, joinCode, sessionId), "1");
 }
 
 export function GameGate({
@@ -107,11 +122,14 @@ export function GameGate({
   );
   const [session, setSession] = useState<PlayerSession | null>(null);
   const [resolvedTeamName, setResolvedTeamName] = useState(teamName);
-  const [eventContent, setEventContent] = useState<ResolvedEventContent | null>(null);
+  const [eventContent, setEventContent] = useState<ResolvedEventContent | null>(() =>
+    typeof window === "undefined" ? null : loadCachedEventContent(inviteCode),
+  );
   const [contentRevision, setContentRevision] = useState(1);
   const [initialState, setInitialState] = useState<Awaited<
     ReturnType<typeof getGameState>
   > | null>(null);
+  const [introDismissed, setIntroDismissed] = useState(false);
   const contentRevisionRef = useRef(1);
   const overlay = startOverlayCopy(
     missionStartPlayerCount(inviteCode, joinCode),
@@ -158,6 +176,29 @@ export function GameGate({
 
     async function boot() {
       bump(missionStartProgress(inviteCode, joinCode));
+      const cached = loadCachedEventContent(inviteCode);
+      if (cached) {
+        setEventContent(cached);
+        bump(42);
+      }
+
+      const contentFetch = cached
+        ? null
+        : getEventContent(inviteCode)
+            .then((result) => {
+              const content = unwrapContent(result);
+              return {
+                content,
+                revision: result.success ? result.data.contentRevision : 1,
+                error: content ? null : result.success ? null : result.error,
+              };
+            })
+            .catch(() => ({
+              content: loadCachedEventContent(inviteCode),
+              revision: contentRevisionRef.current,
+              error: "Inhalt dauert zu lange. Bitte Start erneut tippen.",
+            }));
+
       const resolved = await resolveTeamSession(inviteCode, joinCode);
       if (cancelled) return;
       if (!resolved) {
@@ -166,7 +207,7 @@ export function GameGate({
         return;
       }
 
-      bump(28);
+      bump(cached ? 58 : 28);
 
       const peek = await getGameState({
         inviteCode,
@@ -182,40 +223,43 @@ export function GameGate({
 
       const starting = isMissionStarting(inviteCode, joinCode);
       const briefingDone = peek.data.gameState.briefing_confirmed === true;
+      const stillInLobby =
+        peek.data.status === "lobby" || peek.data.status === "setup";
       const studioNeedsBriefing =
-        holdForBriefing &&
+        (holdForBriefing || Boolean(cached?.holdForBriefing)) &&
         !starting &&
         !briefingDone &&
-        (peek.data.status === "lobby" || peek.data.status === "setup");
+        stillInLobby;
 
-      if (studioNeedsBriefing) {
+      if (studioNeedsBriefing || (stillInLobby && !starting && !isPlayReady(peek))) {
         router.replace(eventLobbyPath(inviteCode, joinCode));
         return;
       }
 
-      bump(48);
+      bump(isPlayReady(peek) ? 78 : 48);
 
-      const cached = loadCachedEventContent(inviteCode);
       const contentPromise = cached
         ? Promise.resolve({
             content: cached,
             revision: contentRevisionRef.current,
             error: null as string | null,
           })
-        : withTimeout(getEventContent(inviteCode), CONTENT_TIMEOUT_MS)
-            .then((result) => {
-              const content = unwrapContent(result);
-              return {
-                content,
-                revision: result.success ? result.data.contentRevision : 1,
-                error: content ? null : (result.success ? null : result.error),
-              };
-            })
-            .catch(() => ({
-              content: loadCachedEventContent(inviteCode),
-              revision: contentRevisionRef.current,
-              error: "Inhalt dauert zu lange. Bitte Start erneut tippen.",
-            }));
+        : withTimeout(
+            contentFetch ??
+              getEventContent(inviteCode).then((result) => {
+                const content = unwrapContent(result);
+                return {
+                  content,
+                  revision: result.success ? result.data.contentRevision : 1,
+                  error: content ? null : result.success ? null : result.error,
+                };
+              }),
+            CONTENT_TIMEOUT_MS,
+          ).catch(() => ({
+            content: loadCachedEventContent(inviteCode),
+            revision: contentRevisionRef.current,
+            error: "Inhalt dauert zu lange. Bitte Start erneut tippen.",
+          }));
 
       const playPromise = isPlayReady(peek)
         ? Promise.resolve(peek)
@@ -280,13 +324,6 @@ export function GameGate({
       };
       savePlayerSession(syncedSession);
 
-      if (!teamName.trim()) {
-        const teamResult = await resolveTeamJoinCode({ inviteCode, joinCode });
-        if (!cancelled && teamResult.success && teamResult.data.teamName.trim()) {
-          setResolvedTeamName(teamResult.data.teamName.trim());
-        }
-      }
-
       bump(100);
       setSession(syncedSession);
       setEventContent(freshContent);
@@ -296,6 +333,14 @@ export function GameGate({
       if (cancelled) return;
       clearMissionStarting(inviteCode, joinCode);
       setReady(true);
+
+      if (!teamName.trim()) {
+        void resolveTeamJoinCode({ inviteCode, joinCode }).then((teamResult) => {
+          if (cancelled || !teamResult.success) return;
+          const name = teamResult.data.teamName.trim();
+          if (name) setResolvedTeamName(name);
+        });
+      }
     }
 
     void boot();
@@ -303,7 +348,7 @@ export function GameGate({
     return () => {
       cancelled = true;
     };
-  }, [holdForBriefing, inviteCode, joinCode, router]);
+  }, [holdForBriefing, inviteCode, joinCode, router, teamName]);
 
   if (error) {
     return <GridError message={error} />;
@@ -314,7 +359,29 @@ export function GameGate({
       <GameGateSkeleton
         title={overlay.title}
         subtitle={overlay.subtitle}
+        hint={overlay.hint}
         progress={progress}
+      />
+    );
+  }
+
+  const introUrl = eventContent.introYoutubeUrl?.trim() || "";
+  const showIntro =
+    eventContent.contentMode === "outdoor" &&
+    Boolean(introUrl) &&
+    initialState.data.status !== "finished" &&
+    !introDismissed &&
+    !hasSeenIntro(inviteCode, joinCode, session.sessionId);
+
+  if (showIntro) {
+    return (
+      <PlayIntroVideo
+        youtubeUrl={introUrl}
+        language={eventContent.language}
+        onContinue={() => {
+          markIntroSeen(inviteCode, joinCode, session.sessionId);
+          setIntroDismissed(true);
+        }}
       />
     );
   }

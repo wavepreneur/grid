@@ -475,6 +475,19 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
               setCopy({ ...copy, faq_iframe_url });
             }}
           />
+          <TranslatableField
+            unitKey="game:intro_youtube_url"
+            label="Intro-Video (YouTube)"
+            type="url"
+            value={copy.intro_youtube_url ?? ""}
+            source={sourceCopy.intro_youtube_url}
+            confirmed={confirmedSet.has("game:intro_youtube_url")}
+            onConfirm={handleConfirm}
+            onChange={(intro_youtube_url) => {
+              handleValue("game:intro_youtube_url", sourceCopy.intro_youtube_url, intro_youtube_url);
+              setCopy({ ...copy, intro_youtube_url });
+            }}
+          />
         </div>
       </StudioPanel>
 

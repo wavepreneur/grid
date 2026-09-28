@@ -1,6 +1,7 @@
 import {
   isStudioLanguage,
   LAUNCH_LOCALES,
+  STUDIO_TAB_LOCALES,
   parseStudioLanguage,
   type StudioLanguage,
 } from "@/lib/cms/languages";
@@ -33,6 +34,7 @@ export type GameLocaleCopy = {
   farewell_text?: string;
   briefing_iframe_url?: string;
   faq_iframe_url?: string;
+  intro_youtube_url?: string;
   /** Field keys the author marked as done for this locale. */
   confirmed?: string[];
   /** Cached list progress, including slot fields. */
@@ -109,6 +111,8 @@ export function parseTranslations(value: unknown): GameTranslations {
       briefing_iframe_url:
         typeof row.briefing_iframe_url === "string" ? row.briefing_iframe_url : undefined,
       faq_iframe_url: typeof row.faq_iframe_url === "string" ? row.faq_iframe_url : undefined,
+      intro_youtube_url:
+        typeof row.intro_youtube_url === "string" ? row.intro_youtube_url : undefined,
       confirmed: parseConfirmed(row.confirmed),
       coverage: parseCoverage(row.coverage),
     };
@@ -285,6 +289,32 @@ export function hasLaunchCoverage(game: Pick<StudioGame, "language" | "translati
   return missingLaunchLocales(game).length === 0;
 }
 
+/** Source locale is never “open”. Missing tab or <100% coverage is open. */
+export function isLocaleOpen(
+  game: Pick<StudioGame, "language" | "translations">,
+  locale: string,
+): boolean {
+  if (parseStudioLanguage(game.language) === locale) return false;
+  return !isLocaleComplete(game, locale);
+}
+
+/** Translation tab exists but is not finished. */
+export function isLocaleStartedIncomplete(
+  game: Pick<StudioGame, "language" | "translations">,
+  locale: string,
+): boolean {
+  const source = parseStudioLanguage(game.language);
+  if (locale === source) return false;
+  if (!isStudioLanguage(locale)) return false;
+  return gameLocales(game).includes(locale) && !isLocaleComplete(game, locale);
+}
+
+export function hasStartedIncompleteTranslation(
+  game: Pick<StudioGame, "language" | "translations">,
+): boolean {
+  return STUDIO_TAB_LOCALES.some((locale) => isLocaleStartedIncomplete(game, locale));
+}
+
 export function coverageForConfirmed(
   units: TranslationUnit[],
   confirmed: Iterable<string>,
@@ -395,13 +425,22 @@ export function inferredConfirmedKeys(input: {
     input.sourceGame.faq_iframe_url,
     input.currentGame.faq_iframe_url,
   );
+  considerDifferent(
+    keys,
+    "game:intro_youtube_url",
+    input.sourceGame.intro_youtube_url,
+    input.currentGame.intro_youtube_url,
+  );
   for (const slot of input.slots) {
     keys.push(...inferredSlotKeys(slot.linkId, slot.source, slot.current));
   }
   return parseConfirmed(keys);
 }
 
-function helpUrlFromFlags(featureFlags: unknown, key: "briefing_iframe_url" | "faq_iframe_url"): string {
+function helpUrlFromFlags(
+  featureFlags: unknown,
+  key: "briefing_iframe_url" | "faq_iframe_url" | "intro_youtube_url",
+): string {
   if (!featureFlags || typeof featureFlags !== "object") return "";
   const value = (featureFlags as Record<string, unknown>)[key];
   return typeof value === "string" ? value : "";
@@ -419,11 +458,13 @@ export function resolveGameCopy(
   farewell_text: string;
   briefing_iframe_url: string;
   faq_iframe_url: string;
+  intro_youtube_url: string;
 } {
   const source = parseStudioLanguage(game.language);
   const sourceHelp = {
     briefing_iframe_url: helpUrlFromFlags(game.feature_flags, "briefing_iframe_url"),
     faq_iframe_url: helpUrlFromFlags(game.feature_flags, "faq_iframe_url"),
+    intro_youtube_url: helpUrlFromFlags(game.feature_flags, "intro_youtube_url"),
   };
   if (locale === source) {
     return {
@@ -440,16 +481,19 @@ export function resolveGameCopy(
     farewell_text: copy.farewell_text ?? game.farewell_text ?? "",
     briefing_iframe_url: copy.briefing_iframe_url?.trim() || sourceHelp.briefing_iframe_url,
     faq_iframe_url: copy.faq_iframe_url?.trim() || sourceHelp.faq_iframe_url,
+    // Do not fall back to the source-language YouTube clip (DE ≠ EN).
+    intro_youtube_url: copy.intro_youtube_url?.trim() || "",
   };
 }
 
 export function localizedFeatureFlags(
   featureFlags: Record<string, unknown> | null | undefined,
-  copy: Pick<GameLocaleCopy, "briefing_iframe_url" | "faq_iframe_url">,
+  copy: Pick<GameLocaleCopy, "briefing_iframe_url" | "faq_iframe_url" | "intro_youtube_url">,
 ): Record<string, unknown> {
   return withGameHelpLinks(featureFlags, {
     briefingIframeUrl: copy.briefing_iframe_url ?? null,
     faqIframeUrl: copy.faq_iframe_url ?? null,
+    introYoutubeUrl: copy.intro_youtube_url ?? null,
   });
 }
 
@@ -589,6 +633,7 @@ export function seedLocaleCopy(
     farewell_text: game.farewell_text ?? "",
     briefing_iframe_url: helpUrlFromFlags(game.feature_flags, "briefing_iframe_url"),
     faq_iframe_url: helpUrlFromFlags(game.feature_flags, "faq_iframe_url"),
+    intro_youtube_url: helpUrlFromFlags(game.feature_flags, "intro_youtube_url"),
   };
 }
 
@@ -678,6 +723,7 @@ export function collectGameTranslationUnits(
   addTranslationUnit(units, "game:farewell_text", game.farewell_text);
   addTranslationUnit(units, "game:briefing_iframe_url", helpUrlFromFlags(game.feature_flags, "briefing_iframe_url"));
   addTranslationUnit(units, "game:faq_iframe_url", helpUrlFromFlags(game.feature_flags, "faq_iframe_url"));
+  addTranslationUnit(units, "game:intro_youtube_url", helpUrlFromFlags(game.feature_flags, "intro_youtube_url"));
   return units;
 }
 
@@ -755,6 +801,7 @@ export function localeCopyWithCoverage(
     farewell_text: next.farewell_text,
     briefing_iframe_url: next.briefing_iframe_url,
     faq_iframe_url: next.faq_iframe_url,
+    intro_youtube_url: next.intro_youtube_url,
     confirmed: confirmed.filter((key) => units.some((unit) => unit.key === key)),
     coverage,
   };
@@ -849,6 +896,7 @@ export type LocalizedStudioContent = {
   farewell_text: string;
   briefing_iframe_url: string;
   faq_iframe_url: string;
+  intro_youtube_url: string;
   levels: LevelDefinition[];
 };
 
@@ -883,6 +931,7 @@ export function parseSnapshotLocales(value: unknown): Record<string, LocalizedSt
       farewell_text: typeof row.farewell_text === "string" ? row.farewell_text : "",
       briefing_iframe_url: typeof row.briefing_iframe_url === "string" ? row.briefing_iframe_url : "",
       faq_iframe_url: typeof row.faq_iframe_url === "string" ? row.faq_iframe_url : "",
+      intro_youtube_url: typeof row.intro_youtube_url === "string" ? row.intro_youtube_url : "",
       levels,
     };
   }

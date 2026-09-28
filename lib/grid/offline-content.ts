@@ -7,6 +7,23 @@ function cacheKey(inviteCode: string): string {
   return inviteCode.trim().toUpperCase();
 }
 
+function persist(storage: Storage, key: string, json: string): boolean {
+  try {
+    storage.setItem(`${CACHE_PREFIX}${key}`, json);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function read(storage: Storage, key: string): string | null {
+  try {
+    return storage.getItem(`${CACHE_PREFIX}${key}`);
+  } catch {
+    return null;
+  }
+}
+
 export function cacheEventContent(
   inviteCode: string,
   content: ResolvedEventContent,
@@ -14,11 +31,9 @@ export function cacheEventContent(
   const key = cacheKey(inviteCode);
   memory.set(key, content);
   if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(`${CACHE_PREFIX}${key}`, JSON.stringify(content));
-  } catch {
-    /* quota / private mode */
-  }
+  const json = JSON.stringify(content);
+  persist(sessionStorage, key, json);
+  persist(localStorage, key, json);
 }
 
 export function loadCachedEventContent(
@@ -29,7 +44,7 @@ export function loadCachedEventContent(
   if (fromMemory) return fromMemory;
   if (typeof window === "undefined") return null;
 
-  const raw = localStorage.getItem(`${CACHE_PREFIX}${key}`);
+  const raw = read(sessionStorage, key) ?? read(localStorage, key);
   if (!raw) return null;
 
   try {

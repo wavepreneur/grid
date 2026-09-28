@@ -1,7 +1,4 @@
 import { GameGate } from "@/components/game/game-gate";
-import { resolveTeamJoinCode } from "@/app/actions/lobby";
-import { needsBriefingBeforePlay } from "@/lib/cms/studio-test-session";
-import { getEventByInviteCode } from "@/lib/grid/session-auth";
 
 type EventPlayPageProps = {
   params: Promise<{ inviteCode: string; joinCode: string }>;
@@ -9,22 +6,12 @@ type EventPlayPageProps = {
 
 export default async function EventPlayPage({ params }: EventPlayPageProps) {
   const { inviteCode, joinCode } = await params;
-  const invite = inviteCode.toUpperCase();
-  const join = joinCode.toUpperCase();
-  const [event, teamResult] = await Promise.all([
-    getEventByInviteCode(invite),
-    resolveTeamJoinCode({ inviteCode: invite, joinCode: join }),
-  ]);
-
-  const eventTitle = (event?.title ?? "").replace(/^\[Test\]\s*/, "").trim() || "Mission";
 
   return (
     <GameGate
-      inviteCode={invite}
-      joinCode={join}
-      teamName={teamResult.success ? teamResult.data.teamName : ""}
-      eventTitle={eventTitle}
-      holdForBriefing={event ? needsBriefingBeforePlay(event) : false}
+      inviteCode={inviteCode.toUpperCase()}
+      joinCode={joinCode.toUpperCase()}
+      teamName=""
     />
   );
 }

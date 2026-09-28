@@ -137,6 +137,13 @@ export type PlayUiCopy = {
     multiSubtitle: string;
     soloTitle: string;
     soloSubtitle: string;
+    hint: string;
+  };
+  introVideo: {
+    title: string;
+    subtitle: string;
+    continue: string;
+    fullscreenHint: string;
   };
   resume: {
     copyIdle: string;
@@ -371,6 +378,13 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       multiSubtitle: "Die Mission startet gemeinsam — niemand legt allein los.",
       soloTitle: "Spiel startet…",
       soloSubtitle: "Die Karte wird vorbereitet — einen Moment.",
+      hint: "Bitte nicht neu laden — gleich geht’s weiter.",
+    },
+    introVideo: {
+      title: "INTRO VIDEO",
+      subtitle: "Schau dir das Video an — danach geht’s auf die Karte.",
+      continue: "Weiter zur Karte",
+      fullscreenHint: "Vollbild über den YouTube-Player",
     },
     resume: {
       copyIdle: "Aufs Handy kopieren",
@@ -656,6 +670,13 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       multiSubtitle: "The mission starts together — nobody goes alone.",
       soloTitle: "Game starting…",
       soloSubtitle: "Preparing the map — just a moment.",
+      hint: "Please don’t reload — you’re almost there.",
+    },
+    introVideo: {
+      title: "INTRO VIDEO",
+      subtitle: "Watch the video — then you go to the map.",
+      continue: "Continue to the map",
+      fullscreenHint: "Use the YouTube player for fullscreen",
     },
     resume: {
       copyIdle: "Copy to phone",
@@ -844,10 +865,10 @@ export function playHowToPlayHintFor(mode: ContentMode, language?: string | null
 export function startOverlayCopyFor(
   playerCount: number,
   language?: string | null,
-): { title: string; subtitle: string } {
+): { title: string; subtitle: string; hint: string } {
   const t = playUi(language).overlay;
   if (playerCount > 1) {
-    return { title: t.multiTitle, subtitle: t.multiSubtitle };
+    return { title: t.multiTitle, subtitle: t.multiSubtitle, hint: t.hint };
   }
-  return { title: t.soloTitle, subtitle: t.soloSubtitle };
+  return { title: t.soloTitle, subtitle: t.soloSubtitle, hint: t.hint };
 }

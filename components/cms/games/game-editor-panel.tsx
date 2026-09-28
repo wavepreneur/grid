@@ -468,6 +468,28 @@ export function GameEditorPanel({
               </p>
             </div>
             <div className="md:col-span-2">
+              <StudioLabel>Intro-Video (YouTube)</StudioLabel>
+              <StudioInput
+                type="url"
+                placeholder="https://youtu.be/…"
+                value={String(
+                  (game.feature_flags as Record<string, unknown> | null)?.intro_youtube_url ?? "",
+                )}
+                onChange={(e) =>
+                  setGame({
+                    ...game,
+                    feature_flags: {
+                      ...(game.feature_flags ?? {}),
+                      intro_youtube_url: e.target.value.trim(),
+                    },
+                  })
+                }
+              />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Outdoor: nach der Lobby, direkt vor der Karte. Andere Sprachen im Tab Übersetzung.
+              </p>
+            </div>
+            <div className="md:col-span-2">
               <section className="rounded-3xl bg-secondary/60 p-4 sm:p-5">
                 <p className="text-base font-bold text-foreground">Folge-Trigger</p>
                 <p className="mt-1 text-sm text-muted-foreground">

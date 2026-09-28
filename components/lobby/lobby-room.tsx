@@ -586,6 +586,7 @@ export function LobbyRoom({
           <GameGateSkeleton
             title={startOverlayCopy(snapshot.players.length, language).title}
             subtitle={startOverlayCopy(snapshot.players.length, language).subtitle}
+            hint={startOverlayCopy(snapshot.players.length, language).hint}
             progress={startProgress}
           />
         </div>

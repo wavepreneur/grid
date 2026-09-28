@@ -15,8 +15,23 @@ import {
   createGameFromTemplate,
   duplicateGames,
 } from "@/app/actions/cms/games";
-import { LAUNCH_LOCALES, localeLabel, parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
-import { gameLocales, hasLaunchCoverage, localeCoverageMap } from "@/lib/cms/game-i18n";
+import {
+  STUDIO_TAB_LOCALES,
+  localeFlag,
+  localeLabel,
+  localeShort,
+  parseStudioLanguage,
+  type StudioLanguage,
+} from "@/lib/cms/languages";
+import {
+  gameLocales,
+  hasLaunchCoverage,
+  hasStartedIncompleteTranslation,
+  isLocaleComplete,
+  isLocaleOpen,
+  isLocaleStartedIncomplete,
+  localeCoverageMap,
+} from "@/lib/cms/game-i18n";
 import { GameLanguageCell } from "@/components/cms/games/game-language-cell";
 import type { GameDeleteStatus } from "@/lib/cms/delete-status";
 import {
@@ -79,10 +94,30 @@ const GAME_LIST_GRID =
   "lg:grid lg:grid-cols-[2rem_minmax(0,1fr)_8.25rem_5.5rem_9.5rem_2.25rem_6.75rem_4.75rem_13rem] lg:items-center lg:gap-x-3";
 
 type GameSort = "updated" | "created" | "status" | "name" | "language";
-type LanguageFilter = "alle" | StudioLanguage | "missing";
+type LanguageFilter = "alle" | StudioLanguage;
+type TranslationFilter = "alle" | "open" | "started" | "done";
 type CreateMode = "blank" | "template";
 
 const SURFACE_OPTIONS: ContentMode[] = ["outdoor", "indoor", "online"];
+
+function matchesTranslationFilter(
+  game: StudioGame,
+  languageTab: LanguageFilter,
+  translationTab: TranslationFilter,
+): boolean {
+  if (languageTab === "alle") {
+    if (translationTab === "alle") return true;
+    if (translationTab === "open") return !hasLaunchCoverage(game);
+    if (translationTab === "started") return hasStartedIncompleteTranslation(game);
+    return hasLaunchCoverage(game);
+  }
+  if (translationTab === "alle") {
+    return gameLocales(game).includes(languageTab);
+  }
+  if (translationTab === "open") return isLocaleOpen(game, languageTab);
+  if (translationTab === "started") return isLocaleStartedIncomplete(game, languageTab);
+  return isLocaleComplete(game, languageTab);
+}
 
 function gameDefaultSurface(game: StudioGame): ContentMode {
   return parseRuntimeProfiles(game.runtime_profiles).default_mode;
@@ -201,9 +236,10 @@ export function GameList({ initialGames, initialTemplates }: Props) {
   const [statusTab, setStatusTab] = useState<"alle" | "draft" | "published" | "archived">("alle");
   const [surfaceTab, setSurfaceTab] = useState<"alle" | ContentMode>("alle");
   const [languageTab, setLanguageTab] = useState<LanguageFilter>("alle");
+  const [translationTab, setTranslationTab] = useState<TranslationFilter>("alle");
   const [query, setQuery] = useState("");
 
-  const filteredGames = useMemo(() => {
+  const scopedGames = useMemo(() => {
     const q = query.trim().toLowerCase();
     return gamesWithLive.filter((g) => {
       if (statusTab === "alle") {
@@ -214,11 +250,6 @@ export function GameList({ initialGames, initialTemplates }: Props) {
       if (surfaceTab !== "alle" && gameDefaultSurface(g) !== surfaceTab) {
         return false;
       }
-      if (languageTab === "missing") {
-        if (hasLaunchCoverage(g)) return false;
-      } else if (languageTab !== "alle") {
-        if (!gameLocales(g).includes(languageTab)) return false;
-      }
       if (!q) return true;
       return (
         g.name.toLowerCase().includes(q) ||
@@ -226,7 +257,33 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         (g.city_slug ?? "").toLowerCase().includes(q)
       );
     });
-  }, [gamesWithLive, statusTab, surfaceTab, languageTab, query]);
+  }, [gamesWithLive, statusTab, surfaceTab, query]);
+
+  const filteredGames = useMemo(
+    () =>
+      scopedGames.filter((g) => matchesTranslationFilter(g, languageTab, translationTab)),
+    [scopedGames, languageTab, translationTab],
+  );
+
+  const languageCounts = useMemo(() => {
+    const counts: Partial<Record<StudioLanguage, number>> = {};
+    for (const locale of STUDIO_TAB_LOCALES) {
+      counts[locale] = scopedGames.filter((g) =>
+        matchesTranslationFilter(g, locale, translationTab),
+      ).length;
+    }
+    return counts;
+  }, [scopedGames, translationTab]);
+
+  const translationCounts = useMemo(() => {
+    return {
+      open: scopedGames.filter((g) => matchesTranslationFilter(g, languageTab, "open")).length,
+      started: scopedGames.filter((g) =>
+        matchesTranslationFilter(g, languageTab, "started"),
+      ).length,
+      done: scopedGames.filter((g) => matchesTranslationFilter(g, languageTab, "done")).length,
+    };
+  }, [scopedGames, languageTab]);
 
   const sortedGames = useMemo(() => sortGames(filteredGames, sort), [filteredGames, sort]);
   const sortedTemplates = useMemo(
@@ -672,11 +729,48 @@ export function GameList({ initialGames, initialTemplates }: Props) {
             onChange={setLanguageTab}
             options={[
               { id: "alle", label: "Alle Sprachen" },
-              ...LAUNCH_LOCALES.map((locale) => ({
+              ...STUDIO_TAB_LOCALES.map((locale) => ({
                 id: locale,
-                label: localeLabel(locale),
+                label: localeShort(locale),
+                prefix: localeFlag(locale),
+                count: translationTab === "alle" ? undefined : languageCounts[locale] ?? 0,
+                title: localeLabel(locale),
               })),
-              { id: "missing", label: "Übersetzung fehlt" },
+            ]}
+          />
+          <FilterTrack
+            aria-label="Übersetzung"
+            value={translationTab}
+            onChange={setTranslationTab}
+            options={[
+              { id: "alle", label: "Alle" },
+              {
+                id: "open",
+                label: languageTab === "alle" ? "Launch fehlt" : "Offen",
+                count: translationCounts.open,
+                title:
+                  languageTab === "alle"
+                    ? "Deutsch und Englisch noch nicht vollständig"
+                    : `${localeLabel(languageTab)} fehlt oder ist unter 100%`,
+              },
+              {
+                id: "started",
+                label: "Angefangen",
+                count: translationCounts.started,
+                title:
+                  languageTab === "alle"
+                    ? "Übersetzung begonnen, aber noch nicht fertig"
+                    : `${localeLabel(languageTab)} angelegt, aber noch nicht fertig`,
+              },
+              {
+                id: "done",
+                label: "Fertig",
+                count: translationCounts.done,
+                title:
+                  languageTab === "alle"
+                    ? "Deutsch und Englisch vollständig"
+                    : `${localeLabel(languageTab)} vollständig`,
+              },
             ]}
           />
         </div>
@@ -852,7 +946,13 @@ function FilterTrack<T extends string>({
   "aria-label": ariaLabel,
 }: {
   value: T;
-  options: ReadonlyArray<{ id: T; label: string }>;
+  options: ReadonlyArray<{
+    id: T;
+    label: string;
+    prefix?: string;
+    count?: number;
+    title?: string;
+  }>;
   onChange: (id: T) => void;
   "aria-label": string;
 }) {
@@ -869,15 +969,30 @@ function FilterTrack<T extends string>({
             key={opt.id}
             type="button"
             role="tab"
+            title={opt.title}
             aria-selected={active}
             onClick={() => onChange(opt.id)}
-            className={`tap-lift rounded-xl px-3 py-1.5 text-xs font-bold sm:px-3.5 ${
+            className={`tap-lift inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold sm:px-3.5 ${
               active
                 ? "bg-card text-foreground shadow-soft"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
+            {opt.prefix ? (
+              <span className="text-[0.95rem] leading-none" aria-hidden>
+                {opt.prefix}
+              </span>
+            ) : null}
             {opt.label}
+            {typeof opt.count === "number" ? (
+              <span
+                className={`tabular-nums ${
+                  active ? "text-muted-foreground" : "text-muted-foreground/80"
+                }`}
+              >
+                {opt.count}
+              </span>
+            ) : null}
           </button>
         );
       })}

@@ -3,6 +3,7 @@
 type GameGateSkeletonProps = {
   title?: string;
   subtitle?: string;
+  hint?: string;
   /** 0–100. When set, the bar fills instead of sliding endlessly. */
   progress?: number;
 };
@@ -10,6 +11,7 @@ type GameGateSkeletonProps = {
 export function GameGateSkeleton({
   title = "Mission wird aufgebaut…",
   subtitle = "Inhalt und Team-Stand werden geladen. Bitte einen Moment Geduld.",
+  hint = "Bitte nicht neu laden — gleich geht’s weiter.",
   progress,
 }: GameGateSkeletonProps) {
   const hasProgress = typeof progress === "number" && Number.isFinite(progress);
@@ -51,7 +53,7 @@ export function GameGateSkeleton({
         </p>
       ) : null}
       <p className="mt-4 text-xs font-medium text-slate-400">
-        Draußen dauert das manchmal ein paar Sekunden — bitte nicht neu laden.
+        {hint}
       </p>
     </div>
   );

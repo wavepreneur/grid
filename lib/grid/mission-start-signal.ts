@@ -3,7 +3,8 @@
 import { startOverlayCopyFor } from "@/lib/grid/play-ui";
 
 const WINDOW_MS = 15 * 60 * 1000;
-const CREEP_MS = 12_000;
+/** Reach the 88 % cap in a few seconds so the bar never looks frozen. */
+const CREEP_MS = 3_500;
 
 type MissionStartMeta = {
   at: number;
@@ -93,7 +94,7 @@ export function missionStartPlayerCount(inviteCode: string, joinCode: string): n
 export function startOverlayCopy(
   playerCount: number,
   language?: string | null,
-): { title: string; subtitle: string } {
+): { title: string; subtitle: string; hint: string } {
   return startOverlayCopyFor(playerCount, language);
 }
 

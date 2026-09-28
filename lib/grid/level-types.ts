@@ -319,6 +319,8 @@ export type ResolvedEventContent = {
   briefingIframeUrl?: string | null;
   /** Fullscreen iframe URL for FAQ / troubleshooting. */
   faqIframeUrl?: string | null;
+  /** Outdoor intro YouTube URL, shown once per device before the map. */
+  introYoutubeUrl?: string | null;
   /** Post-game follow-up from Studio snapshot (no billing in GRID). */
   followUpTrigger?: import("@/lib/grid/follow-up-trigger").FollowUpTrigger | null;
   /** Public recap card at Game Over — copy from booking growth pack, no secrets. */
