@@ -19,8 +19,10 @@ import {
   collectTranslationUnits,
   coverageForConfirmed,
   coveragePercent,
+  inferredConfirmedKeys,
   localesFromOverrides,
   mergeSlotCopy,
+  parseConfirmed,
   remainingPercent,
   resolveGameCopy,
   seedSlotCopyFromStudio,
@@ -147,7 +149,7 @@ function TileFields({
                 label="Kurz-Label"
                 value={tile.label ?? ""}
                 source={source?.label}
-                confirmed={confirmed.has(`${keyPrefix}:tile:${tile.id}:label`)}
+                confirmed={confirmedSet.has(`${keyPrefix}:tile:${tile.id}:label`)}
                 onConfirm={onConfirm}
                 onChange={(label) => {
                   onValue(`${keyPrefix}:tile:${tile.id}:label`, source?.label ?? "", label);
@@ -161,7 +163,7 @@ function TileFields({
                 type="url"
                 value={tile.url ?? ""}
                 source={source?.url}
-                confirmed={confirmed.has(`${keyPrefix}:tile:${tile.id}:url`)}
+                confirmed={confirmedSet.has(`${keyPrefix}:tile:${tile.id}:url`)}
                 onConfirm={onConfirm}
                 onChange={(url) => {
                   onValue(`${keyPrefix}:tile:${tile.id}:url`, source?.url ?? "", url);
@@ -174,7 +176,7 @@ function TileFields({
                 multiline
                 value={tile.hint_text ?? ""}
                 source={source?.hint_text}
-                confirmed={confirmed.has(`${keyPrefix}:tile:${tile.id}:hint`)}
+                confirmed={confirmedSet.has(`${keyPrefix}:tile:${tile.id}:hint`)}
                 onConfirm={onConfirm}
                 onChange={(hint_text) => {
                   onValue(`${keyPrefix}:tile:${tile.id}:hint`, source?.hint_text ?? "", hint_text);
@@ -220,7 +222,7 @@ function OptionFields({
             label={`Antwort ${index + 1}`}
             value={option.label}
             source={source}
-            confirmed={confirmed.has(key)}
+            confirmed={confirmedSet.has(key)}
             onConfirm={onConfirm}
             onChange={(label) => {
               onValue(key, source, label);
@@ -240,8 +242,8 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const sourceCopy = resolveGameCopy(game, game.language);
   const [copy, setCopy] = useState<GameLocaleCopy>(() => resolveGameCopy(game, locale));
-  const [confirmed, setConfirmed] = useState<Set<string>>(
-    () => new Set(game.translations[locale]?.confirmed ?? []),
+  const [checked, setChecked] = useState<string[]>(
+    () => parseConfirmed(game.translations[locale]?.confirmed),
   );
   const slots = useMemo(() => buildGameSlots(taskLinks), [taskLinks]);
   const sourceSlots = useMemo(() => {
@@ -299,10 +301,25 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
       }),
     [game, slots, sourceSlots],
   );
-  const coverage = useMemo(
-    () => coverageForConfirmed(units, confirmed),
-    [units, confirmed],
+  const inferred = useMemo(
+    () =>
+      inferredConfirmedKeys({
+        sourceGame: sourceCopy,
+        currentGame: copy,
+        slots: slots.map((slot) => ({
+          linkId: slot.levelLink.id,
+          source: sourceSlots[slot.levelLink.id] ?? {},
+          current: slotCopies[slot.levelLink.id] ?? {},
+        })),
+      }),
+    [copy, slotCopies, slots, sourceCopy, sourceSlots],
   );
+  const confirmed = useMemo(
+    () => parseConfirmed([...checked, ...inferred]),
+    [checked, inferred],
+  );
+  const confirmedSet = useMemo(() => new Set(confirmed), [confirmed]);
+  const coverage = coverageForConfirmed(units, confirmed);
   const donePercent = coveragePercent(coverage);
   const openPercent = remainingPercent(coverage);
 
@@ -326,11 +343,9 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
   }
 
   function handleConfirm(key: string, next: boolean) {
-    setConfirmed((prev) => {
-      const copySet = new Set(prev);
-      if (next) copySet.add(key);
-      else copySet.delete(key);
-      return copySet;
+    setChecked((prev) => {
+      if (next) return prev.includes(key) ? prev : [...prev, key];
+      return prev.filter((item) => item !== key);
     });
   }
 
@@ -348,7 +363,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
       const result = await saveGameLocale({
         gameId: game.id,
         language: locale,
-        copy: { ...copy, confirmed: [...confirmed] },
+        copy: { ...copy, confirmed },
         slots: Object.entries(slotCopies).map(([linkId, slotCopy]) => ({
           linkId,
           copy: slotCopy,
@@ -359,6 +374,8 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
         return;
       }
       cache.setGame(result.data!);
+      const saved = result.data!.translations[locale]?.confirmed;
+      if (saved) setChecked(parseConfirmed(saved));
       setMessage(`${localeLabel(locale)} gespeichert.`);
     });
   }
@@ -374,8 +391,8 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
           description={`Ausgangssprache bleibt ${localeLabel(game.language)}. GPS, Codes und Logik gelten für alle Sprachen.`}
         />
         <StudioHint>
-          Der Ausgangstext bleibt in den Feldern. Haken setzen, sobald die Zeile für diese Sprache stimmt —
-          auch wenn der Text gleich bleibt.
+          Der Ausgangstext bleibt in den Feldern. Abweichender Text zählt sofort. Haken setzen,
+          wenn die Zeile auch ohne Änderung für diese Sprache stimmt.
         </StudioHint>
         <div className="mt-4 rounded-2xl border border-border bg-secondary/50 px-4 py-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -399,7 +416,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
             label="Titel"
             value={copy.name ?? ""}
             source={sourceCopy.name}
-            confirmed={confirmed.has("game:name")}
+            confirmed={confirmedSet.has("game:name")}
             onConfirm={handleConfirm}
             onChange={(name) => {
               handleValue("game:name", sourceCopy.name, name);
@@ -412,7 +429,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
             multiline
             value={copy.description ?? ""}
             source={sourceCopy.description}
-            confirmed={confirmed.has("game:description")}
+            confirmed={confirmedSet.has("game:description")}
             onConfirm={handleConfirm}
             onChange={(description) => {
               handleValue("game:description", sourceCopy.description, description);
@@ -425,7 +442,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
             multiline
             value={copy.farewell_text ?? ""}
             source={sourceCopy.farewell_text}
-            confirmed={confirmed.has("game:farewell_text")}
+            confirmed={confirmedSet.has("game:farewell_text")}
             onConfirm={handleConfirm}
             onChange={(farewell_text) => {
               handleValue("game:farewell_text", sourceCopy.farewell_text, farewell_text);
@@ -438,7 +455,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
             type="url"
             value={copy.briefing_iframe_url ?? ""}
             source={sourceCopy.briefing_iframe_url}
-            confirmed={confirmed.has("game:briefing_iframe_url")}
+            confirmed={confirmedSet.has("game:briefing_iframe_url")}
             onConfirm={handleConfirm}
             onChange={(briefing_iframe_url) => {
               handleValue("game:briefing_iframe_url", sourceCopy.briefing_iframe_url, briefing_iframe_url);
@@ -451,7 +468,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
             type="url"
             value={copy.faq_iframe_url ?? ""}
             source={sourceCopy.faq_iframe_url}
-            confirmed={confirmed.has("game:faq_iframe_url")}
+            confirmed={confirmedSet.has("game:faq_iframe_url")}
             onConfirm={handleConfirm}
             onChange={(faq_iframe_url) => {
               handleValue("game:faq_iframe_url", sourceCopy.faq_iframe_url, faq_iframe_url);
@@ -488,7 +505,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                     label="Mission · Titel"
                     value={row.title ?? ""}
                     source={source.title}
-                    confirmed={confirmed.has(`${prefix}:title`)}
+                    confirmed={confirmedSet.has(`${prefix}:title`)}
                     onConfirm={handleConfirm}
                     onChange={(title) => {
                       handleValue(`${prefix}:title`, source.title ?? "", title);
@@ -501,7 +518,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                     multiline
                     value={row.description ?? ""}
                     source={source.description}
-                    confirmed={confirmed.has(`${prefix}:description`)}
+                    confirmed={confirmedSet.has(`${prefix}:description`)}
                     onConfirm={handleConfirm}
                     onChange={(description) => {
                       handleValue(`${prefix}:description`, source.description ?? "", description);
@@ -522,7 +539,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                       tiles={row.tiles ?? []}
                       sourceTiles={source.tiles ?? []}
                       keyPrefix={prefix}
-                      confirmed={confirmed}
+                      confirmed={confirmedSet}
                       onConfirm={handleConfirm}
                       onValue={handleValue}
                       onChange={(tiles) => patchSlot(linkId, { tiles })}
@@ -537,7 +554,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                     multiline
                     value={row.question ?? ""}
                     source={source.question}
-                    confirmed={confirmed.has(`${prefix}:question`)}
+                    confirmed={confirmedSet.has(`${prefix}:question`)}
                     onConfirm={handleConfirm}
                     onChange={(question) => {
                       handleValue(`${prefix}:question`, source.question ?? "", question);
@@ -549,7 +566,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                     label="Erfolg · Titel"
                     value={row.success_title ?? ""}
                     source={source.success_title}
-                    confirmed={confirmed.has(`${prefix}:success_title`)}
+                    confirmed={confirmedSet.has(`${prefix}:success_title`)}
                     onConfirm={handleConfirm}
                     onChange={(success_title) => {
                       handleValue(`${prefix}:success_title`, source.success_title ?? "", success_title);
@@ -562,7 +579,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                     multiline
                     value={row.success_info ?? ""}
                     source={source.success_info}
-                    confirmed={confirmed.has(`${prefix}:success_info`)}
+                    confirmed={confirmedSet.has(`${prefix}:success_info`)}
                     onConfirm={handleConfirm}
                     onChange={(success_info) => {
                       handleValue(`${prefix}:success_info`, source.success_info ?? "", success_info);
@@ -573,7 +590,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                     options={row.options ?? []}
                     sourceOptions={source.options ?? []}
                     keyPrefix={prefix}
-                    confirmed={confirmed}
+                    confirmed={confirmedSet}
                     onConfirm={handleConfirm}
                     onValue={handleValue}
                     onChange={(options) => patchSlot(linkId, { options })}
@@ -585,7 +602,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                         label="Station · Name"
                         value={row.station.name ?? ""}
                         source={source.station?.name}
-                        confirmed={confirmed.has(`${prefix}:station:name`)}
+                        confirmed={confirmedSet.has(`${prefix}:station:name`)}
                         onConfirm={handleConfirm}
                         onChange={(name) => {
                           handleValue(`${prefix}:station:name`, source.station?.name ?? "", name);
@@ -597,7 +614,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                         label="Station · Ort"
                         value={row.station.place ?? ""}
                         source={source.station?.place}
-                        confirmed={confirmed.has(`${prefix}:station:place`)}
+                        confirmed={confirmedSet.has(`${prefix}:station:place`)}
                         onConfirm={handleConfirm}
                         onChange={(place) => {
                           handleValue(`${prefix}:station:place`, source.station?.place ?? "", place);
@@ -618,7 +635,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                       label="Titel"
                       value={row.quiz?.title ?? ""}
                       source={source.quiz?.title}
-                      confirmed={confirmed.has(`${prefix}:quiz:title`)}
+                      confirmed={confirmedSet.has(`${prefix}:quiz:title`)}
                       onConfirm={handleConfirm}
                       onChange={(title) => {
                         handleValue(`${prefix}:quiz:title`, source.quiz?.title ?? "", title);
@@ -631,7 +648,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                       multiline
                       value={row.quiz?.description ?? ""}
                       source={source.quiz?.description}
-                      confirmed={confirmed.has(`${prefix}:quiz:description`)}
+                      confirmed={confirmedSet.has(`${prefix}:quiz:description`)}
                       onConfirm={handleConfirm}
                       onChange={(description) => {
                         handleValue(`${prefix}:quiz:description`, source.quiz?.description ?? "", description);
@@ -644,7 +661,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                       multiline
                       value={row.quiz?.question ?? ""}
                       source={source.quiz?.question}
-                      confirmed={confirmed.has(`${prefix}:quiz:question`)}
+                      confirmed={confirmedSet.has(`${prefix}:quiz:question`)}
                       onConfirm={handleConfirm}
                       onChange={(question) => {
                         handleValue(`${prefix}:quiz:question`, source.quiz?.question ?? "", question);
@@ -657,7 +674,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                       multiline
                       value={row.quiz?.side_fact ?? ""}
                       source={source.quiz?.side_fact}
-                      confirmed={confirmed.has(`${prefix}:quiz:side_fact`)}
+                      confirmed={confirmedSet.has(`${prefix}:quiz:side_fact`)}
                       onConfirm={handleConfirm}
                       onChange={(side_fact) => {
                         handleValue(`${prefix}:quiz:side_fact`, source.quiz?.side_fact ?? "", side_fact);
@@ -668,7 +685,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                       options={row.quiz?.options ?? slot.quiz?.options ?? []}
                       sourceOptions={source.quiz?.options ?? []}
                       keyPrefix={`${prefix}:quiz`}
-                      confirmed={confirmed}
+                      confirmed={confirmedSet}
                       onConfirm={handleConfirm}
                       onValue={handleValue}
                       onChange={(options) => patchQuiz(linkId, { options })}
@@ -694,7 +711,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                         label="Titel"
                         value={bonus.title ?? ""}
                         source={sourceBonus.title}
-                        confirmed={confirmed.has(`${bonusPrefix}:title`)}
+                        confirmed={confirmedSet.has(`${bonusPrefix}:title`)}
                         onConfirm={handleConfirm}
                         onChange={(title) => {
                           handleValue(`${bonusPrefix}:title`, sourceBonus.title ?? "", title);
@@ -707,7 +724,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                         multiline
                         value={bonus.description ?? ""}
                         source={sourceBonus.description}
-                        confirmed={confirmed.has(`${bonusPrefix}:description`)}
+                        confirmed={confirmedSet.has(`${bonusPrefix}:description`)}
                         onConfirm={handleConfirm}
                         onChange={(description) => {
                           handleValue(`${bonusPrefix}:description`, sourceBonus.description ?? "", description);
@@ -720,7 +737,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                         multiline
                         value={bonus.question ?? ""}
                         source={sourceBonus.question}
-                        confirmed={confirmed.has(`${bonusPrefix}:question`)}
+                        confirmed={confirmedSet.has(`${bonusPrefix}:question`)}
                         onConfirm={handleConfirm}
                         onChange={(question) => {
                           handleValue(`${bonusPrefix}:question`, sourceBonus.question ?? "", question);
@@ -733,7 +750,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                         multiline
                         value={bonus.success_info ?? ""}
                         source={sourceBonus.success_info}
-                        confirmed={confirmed.has(`${bonusPrefix}:success_info`)}
+                        confirmed={confirmedSet.has(`${bonusPrefix}:success_info`)}
                         onConfirm={handleConfirm}
                         onChange={(success_info) => {
                           handleValue(
@@ -748,7 +765,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                         options={bonus.options ?? []}
                         sourceOptions={sourceBonus.options ?? []}
                         keyPrefix={bonusPrefix}
-                        confirmed={confirmed}
+                        confirmed={confirmedSet}
                         onConfirm={handleConfirm}
                         onValue={handleValue}
                         onChange={(options) => patchBonus(linkId, link.task_id, { options })}
@@ -757,7 +774,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                         tiles={bonus.tiles ?? []}
                         sourceTiles={sourceBonus.tiles ?? []}
                         keyPrefix={bonusPrefix}
-                        confirmed={confirmed}
+                        confirmed={confirmedSet}
                         onConfirm={handleConfirm}
                         onValue={handleValue}
                         onChange={(tiles) => patchBonus(linkId, link.task_id, { tiles })}

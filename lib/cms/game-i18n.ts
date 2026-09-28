@@ -297,6 +297,110 @@ export function coverageForConfirmed(
   return { confirmed: count, total: units.length };
 }
 
+function considerDifferent(
+  keys: string[],
+  key: string,
+  source: unknown,
+  current: unknown,
+) {
+  if (typeof source !== "string" || !source.trim()) return;
+  if (typeof current !== "string") return;
+  const next = current.trim();
+  if (next && next !== source.trim()) keys.push(key);
+}
+
+function inferredSlotKeys(linkId: string, source: SlotLocaleCopy, current: SlotLocaleCopy): string[] {
+  const prefix = `slot:${linkId}`;
+  const keys: string[] = [];
+  considerDifferent(keys, `${prefix}:title`, source.title, current.title);
+  considerDifferent(keys, `${prefix}:description`, source.description, current.description);
+  considerDifferent(keys, `${prefix}:question`, source.question, current.question);
+  considerDifferent(keys, `${prefix}:success_title`, source.success_title, current.success_title);
+  considerDifferent(keys, `${prefix}:success_info`, source.success_info, current.success_info);
+  const currentOptions = new Map((current.options ?? []).map((option) => [option.id, option.label]));
+  for (const option of source.options ?? []) {
+    considerDifferent(keys, `${prefix}:option:${option.id}`, option.label, currentOptions.get(option.id));
+  }
+  const currentTiles = new Map((current.tiles ?? []).map((tile) => [tile.id, tile]));
+  for (const tile of source.tiles ?? []) {
+    const row = currentTiles.get(tile.id);
+    considerDifferent(keys, `${prefix}:tile:${tile.id}:label`, tile.label, row?.label);
+    considerDifferent(keys, `${prefix}:tile:${tile.id}:url`, tile.url, row?.url);
+    considerDifferent(keys, `${prefix}:tile:${tile.id}:hint`, tile.hint_text, row?.hint_text);
+  }
+  const currentHints = new Map((current.hints ?? []).map((hint) => [hint.id, hint.text]));
+  for (const hint of source.hints ?? []) {
+    considerDifferent(keys, `${prefix}:hint:${hint.id}`, hint.text, currentHints.get(hint.id));
+  }
+  if (source.quiz) {
+    considerDifferent(keys, `${prefix}:quiz:title`, source.quiz.title, current.quiz?.title);
+    considerDifferent(keys, `${prefix}:quiz:description`, source.quiz.description, current.quiz?.description);
+    considerDifferent(keys, `${prefix}:quiz:question`, source.quiz.question, current.quiz?.question);
+    considerDifferent(keys, `${prefix}:quiz:side_fact`, source.quiz.side_fact, current.quiz?.side_fact);
+    const quizOptions = new Map((current.quiz?.options ?? []).map((option) => [option.id, option.label]));
+    for (const option of source.quiz.options ?? []) {
+      considerDifferent(keys, `${prefix}:quiz:option:${option.id}`, option.label, quizOptions.get(option.id));
+    }
+  }
+  if (source.station) {
+    considerDifferent(keys, `${prefix}:station:name`, source.station.name, current.station?.name);
+    considerDifferent(keys, `${prefix}:station:place`, source.station.place, current.station?.place);
+  }
+  for (const [taskId, bonus] of Object.entries(source.bonuses ?? {})) {
+    const bonusPrefix = `${prefix}:bonus:${taskId}`;
+    const row = current.bonuses?.[taskId];
+    considerDifferent(keys, `${bonusPrefix}:title`, bonus.title, row?.title);
+    considerDifferent(keys, `${bonusPrefix}:description`, bonus.description, row?.description);
+    considerDifferent(keys, `${bonusPrefix}:question`, bonus.question, row?.question);
+    considerDifferent(keys, `${bonusPrefix}:success_info`, bonus.success_info, row?.success_info);
+    const bonusOptions = new Map((row?.options ?? []).map((option) => [option.id, option.label]));
+    for (const option of bonus.options ?? []) {
+      considerDifferent(keys, `${bonusPrefix}:option:${option.id}`, option.label, bonusOptions.get(option.id));
+    }
+    const bonusTiles = new Map((row?.tiles ?? []).map((tile) => [tile.id, tile]));
+    for (const tile of bonus.tiles ?? []) {
+      const tileRow = bonusTiles.get(tile.id);
+      considerDifferent(keys, `${bonusPrefix}:tile:${tile.id}:label`, tile.label, tileRow?.label);
+      considerDifferent(keys, `${bonusPrefix}:tile:${tile.id}:url`, tile.url, tileRow?.url);
+      considerDifferent(keys, `${bonusPrefix}:tile:${tile.id}:hint`, tile.hint_text, tileRow?.hint_text);
+    }
+  }
+  return keys;
+}
+
+/** Locale values that already differ from source count as confirmed, even before a checkmark. */
+export function inferredConfirmedKeys(input: {
+  sourceGame: GameLocaleCopy;
+  currentGame: GameLocaleCopy;
+  slots: Array<{ linkId: string; source: SlotLocaleCopy; current: SlotLocaleCopy }>;
+}): string[] {
+  const keys: string[] = [];
+  considerDifferent(keys, "game:name", input.sourceGame.name, input.currentGame.name);
+  considerDifferent(keys, "game:description", input.sourceGame.description, input.currentGame.description);
+  considerDifferent(
+    keys,
+    "game:farewell_text",
+    input.sourceGame.farewell_text,
+    input.currentGame.farewell_text,
+  );
+  considerDifferent(
+    keys,
+    "game:briefing_iframe_url",
+    input.sourceGame.briefing_iframe_url,
+    input.currentGame.briefing_iframe_url,
+  );
+  considerDifferent(
+    keys,
+    "game:faq_iframe_url",
+    input.sourceGame.faq_iframe_url,
+    input.currentGame.faq_iframe_url,
+  );
+  for (const slot of input.slots) {
+    keys.push(...inferredSlotKeys(slot.linkId, slot.source, slot.current));
+  }
+  return parseConfirmed(keys);
+}
+
 function helpUrlFromFlags(featureFlags: unknown, key: "briefing_iframe_url" | "faq_iframe_url"): string {
   if (!featureFlags || typeof featureFlags !== "object") return "";
   const value = (featureFlags as Record<string, unknown>)[key];

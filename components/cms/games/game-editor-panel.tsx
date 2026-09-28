@@ -318,11 +318,7 @@ export function GameEditorPanel({
       </StudioPanel>
 
       {!isSourceLocale ? (
-        taskLinks.length > 0 ? (
-          <GameTranslationPanel game={initialGame} locale={locale} taskLinks={taskLinks} />
-        ) : (
-          <p className="text-sm text-muted-foreground">Aufgaben werden geladen…</p>
-        )
+        <GameTranslationPanel game={initialGame} locale={locale} taskLinks={taskLinks} />
       ) : null}
 
       {isSourceLocale ? (
