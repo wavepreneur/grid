@@ -32,6 +32,7 @@ import {
   stampCapturePhoto,
   type CaptureBrandStamp,
 } from "@/lib/grid/capture-stamp";
+import { playUi } from "@/lib/grid/play-ui";
 
 type CaptureContext = {
   inviteCode: string;
@@ -53,6 +54,7 @@ type Props = {
   leadLabel?: string;
   /** Level skip / pace hint. Bonus capture hides both. */
   allowSkip?: boolean;
+  language?: string | null;
   onSubmit: (payload: SolveLevelPayload) => void;
 };
 
@@ -139,8 +141,10 @@ export function MediaCapturePanel({
   canPaceTeam = false,
   leadLabel = "Team Lead",
   allowSkip = true,
+  language,
   onSubmit,
 }: Props) {
+  const t = playUi(language);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const overlayRef = useRef<HTMLImageElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -200,7 +204,7 @@ export function MediaCapturePanel({
     }
     setCameraError(null);
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError("Kamera nicht verfügbar. Datei aus der Galerie wählen.");
+      setCameraError(t.capture.camMissing);
       return;
     }
     startingRef.current = true;
@@ -217,13 +221,11 @@ export function MediaCapturePanel({
       streamRef.current = stream;
       attachStream(stream);
     } catch {
-      setCameraError(
-        "Kamera-Zugriff abgelehnt oder nicht möglich. Ihr könnt eine Datei wählen.",
-      );
+      setCameraError(t.capture.camDenied);
     } finally {
       startingRef.current = false;
     }
-  }, [attachStream, isVideo]);
+  }, [attachStream, isVideo, t.capture.camDenied, t.capture.camMissing]);
 
   function openLiveCamera() {
     if (disabled || isPending) return;
@@ -343,7 +345,7 @@ export function MediaCapturePanel({
     if (Date.now() - openedAtRef.current < 450) return;
     const stream = streamRef.current;
     if (!stream || typeof MediaRecorder === "undefined") {
-      setCameraError("Video-Aufnahme in diesem Browser nicht möglich. Datei wählen.");
+      setCameraError(t.capture.videoUnsupported);
       return;
     }
     chunksRef.current = [];
@@ -364,7 +366,7 @@ export function MediaCapturePanel({
       try {
         recorder.start();
       } catch {
-        setCameraError("Video-Aufnahme in diesem Browser nicht möglich. Datei wählen.");
+        setCameraError(t.capture.videoUnsupported);
         setRecording(false);
         return;
       }
@@ -425,11 +427,11 @@ export function MediaCapturePanel({
   async function sendCapture() {
     if (busy) return;
     if (!previewBlob) {
-      setUploadError("Keine Aufnahme. Bitte nochmal aufnehmen.");
+      setUploadError(t.capture.noTake);
       return;
     }
     if (!captureContext) {
-      setUploadError("Session fehlt. Bitte Seite neu laden und nochmal senden.");
+      setUploadError(t.capture.noSession);
       return;
     }
     setSending(true);
@@ -437,7 +439,7 @@ export function MediaCapturePanel({
     try {
       const payload = previewBlob;
       if (payload.size > EVENT_CAPTURE_MAX_BYTES) {
-        setUploadError("Datei zu groß (max. 25 MB). Kürzer aufnehmen.");
+        setUploadError(t.capture.tooBig);
         return;
       }
       const mime = normalizeCaptureMime(
@@ -445,7 +447,7 @@ export function MediaCapturePanel({
         kind,
       );
       if (!mime) {
-        setUploadError("Dieses Dateiformat wird nicht unterstützt.");
+        setUploadError(t.capture.badFormat);
         return;
       }
       const prepared = await prepareEventCaptureUpload({
@@ -469,7 +471,7 @@ export function MediaCapturePanel({
           contentType: mime,
         });
       if (putError) {
-        setUploadError(putError.message || "Upload fehlgeschlagen. Bitte nochmal senden.");
+        setUploadError(putError.message || t.capture.uploadFail);
         return;
       }
       const done = await finalizeEventCapture({
@@ -492,7 +494,7 @@ export function MediaCapturePanel({
       setUploadError(
         error instanceof Error
           ? error.message
-          : "Senden fehlgeschlagen. Bitte nochmal versuchen.",
+          : t.capture.sendFail,
       );
     } finally {
       setSending(false);
@@ -525,7 +527,7 @@ export function MediaCapturePanel({
       probe.onloadedmetadata = () => {
         URL.revokeObjectURL(url);
         if (probe.duration > EVENT_CAPTURE_VIDEO_MAX_SECONDS + 0.4) {
-          setUploadError(`Video darf höchstens ${EVENT_CAPTURE_VIDEO_MAX_SECONDS} Sekunden lang sein.`);
+          setUploadError(t.capture.videoMax(EVENT_CAPTURE_VIDEO_MAX_SECONDS));
           return;
         }
         setPreview(file);
@@ -582,14 +584,14 @@ export function MediaCapturePanel({
 
   const shootLabel =
     kind === "video"
-      ? "Video aufnehmen"
+      ? t.capture.takeVideo
       : hasFrame
-        ? "Foto mit Rahmen"
-        : "Foto machen";
+        ? t.capture.photoFrame
+        : t.capture.takePhoto;
   const hint =
     kind === "video"
-      ? `Maximal ${EVENT_CAPTURE_VIDEO_MAX_SECONDS} Sekunden. Danach senden — oder neu versuchen.`
-      : "Öffnet die Handy-Kamera — Selfie umdrehen geht dort. Danach prüft ihr das Foto hier und sendet.";
+      ? t.capture.videoMax(EVENT_CAPTURE_VIDEO_MAX_SECONDS)
+      : t.capture.nativeHint;
   const remainingSeconds = Math.max(0, EVENT_CAPTURE_VIDEO_MAX_SECONDS - elapsed);
   const recordProgress = Math.min(1, elapsed / EVENT_CAPTURE_VIDEO_MAX_SECONDS);
 
@@ -654,7 +656,7 @@ export function MediaCapturePanel({
       >
         <span className="inline-flex items-center justify-center gap-2">
           <Camera className="h-5 w-5" strokeWidth={2.4} />
-          Kamera öffnen
+          {t.capture.openCam}
         </span>
       </PrimaryButton>
       {cameraError ? (
@@ -692,7 +694,7 @@ export function MediaCapturePanel({
               : "w-full text-center text-sm text-slate-500"
           }
         >
-          Überspringen · 0 Punkte
+          {t.capture.skipZero}
         </button>
       ) : null}
 
@@ -778,8 +780,8 @@ export function MediaCapturePanel({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold leading-none">
                       {recording
-                        ? `${remainingSeconds} s übrig`
-                        : `Maximal ${EVENT_CAPTURE_VIDEO_MAX_SECONDS} Sekunden`}
+                        ? t.capture.secLeft(remainingSeconds)
+                        : t.capture.videoMax(EVENT_CAPTURE_VIDEO_MAX_SECONDS)}
                     </p>
                     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/25">
                       <div
@@ -805,7 +807,7 @@ export function MediaCapturePanel({
               disabled={busy}
               onClick={() => closeCamera()}
               className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white disabled:opacity-40"
-              aria-label="Kamera schließen"
+              aria-label={t.capture.closeCam}
             >
               <X className="h-5 w-5" strokeWidth={2.4} />
             </button>
@@ -830,7 +832,7 @@ export function MediaCapturePanel({
             {phase === "preview" ? (
               <>
                 <PrimaryButton disabled={busy || !previewBlob} onClick={() => void sendCapture()}>
-                  {sending || isPending ? "Sende…" : "Senden"}
+                  {sending || isPending ? t.solve.sending : t.capture.send}
                 </PrimaryButton>
                 <SecondaryButton disabled={busy} onClick={retake}>
                   Neu versuchen
@@ -841,7 +843,7 @@ export function MediaCapturePanel({
                   onClick={() => void handleSaveToDevice()}
                   className="w-full text-center text-sm font-semibold text-[var(--cg-muted)] disabled:opacity-40"
                 >
-                  {saving ? "Speichern…" : "Aufs Handy speichern"}
+                  {saving ? t.capture.saving : t.capture.savePhone}
                 </button>
               </>
             ) : (

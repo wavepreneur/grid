@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { IconGift, IconKey, IconUser, IconUsers } from "@/components/game/city/icons";
 import { SectionLabel } from "@/components/game/city/ui";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { playUi } from "@/lib/grid/play-ui";
 
 type Kind = "unlock" | "bonus";
 
@@ -17,6 +18,7 @@ type Props = {
   audienceIcons?: 1 | 2 | 3;
   /** Auto-continue after ms (unlock). Omit for manual-only. */
   autoMs?: number;
+  language?: string | null;
   onDone: () => void;
 };
 
@@ -31,8 +33,10 @@ export function PlayTransitionScreen({
   highlight,
   audienceIcons = 1,
   autoMs,
+  language,
   onDone,
 }: Props) {
+  const t = playUi(language);
   const doneRef = useRef(false);
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
@@ -75,7 +79,7 @@ export function PlayTransitionScreen({
         {kind === "unlock" ? <IconKey size={44} /> : <IconGift size={44} />}
       </span>
 
-      <SectionLabel>{kind === "unlock" ? "Schlüssel passt" : "Bonus steht bereit"}</SectionLabel>
+      <SectionLabel>{kind === "unlock" ? t.transition.keyFits : t.transition.bonusReady}</SectionLabel>
       <h1 className="cg-animate-rise-in mt-2 max-w-sm text-2xl font-bold text-[var(--cg-fg)]">
         {title}
       </h1>
@@ -100,8 +104,8 @@ export function PlayTransitionScreen({
         <div className="mt-10 w-full max-w-sm space-y-3">
           <p className="text-sm font-medium text-[var(--cg-muted)]">
             {kind === "unlock"
-              ? "Hauptaufgabe wird geladen…"
-              : "Bonusaufgabe wird geladen…"}
+              ? t.transition.loadingLevel
+              : t.transition.loadingBonus}
           </p>
           <div
             className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--cg-secondary)]"
@@ -109,7 +113,7 @@ export function PlayTransitionScreen({
             aria-valuemin={0}
             aria-valuemax={100}
             aria-label={
-              kind === "unlock" ? "Lädt die Hauptaufgabe" : "Lädt die Bonusaufgabe"
+              kind === "unlock" ? t.transition.loadLevelAria : t.transition.loadBonusAria
             }
           >
             <div
@@ -124,7 +128,7 @@ export function PlayTransitionScreen({
           onClick={finish}
           className="cg-tap-lift mt-10 w-full max-w-sm rounded-2xl bg-[var(--cg-primary)] px-5 py-4 text-base font-bold text-[var(--cg-primary-fg)] shadow-[var(--cg-shadow-lift)]"
         >
-          {kind === "unlock" ? "Zur Aufgabe" : "Bereit — Bonus starten"}
+          {kind === "unlock" ? t.transition.toTask : t.transition.startBonus}
         </button>
       )}
     </section>

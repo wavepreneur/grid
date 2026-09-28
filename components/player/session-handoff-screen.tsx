@@ -6,11 +6,14 @@ import { GridButton } from "@/components/grid/grid-shell";
 import { IconPlay } from "@/components/cms/studio-icons";
 import { savePlayerSession } from "@/lib/grid/player-session";
 
+import { playUi } from "@/lib/grid/play-ui";
+
 type SessionHandoffScreenProps = {
   inviteCode: string;
   joinCode: string;
   playerId: string;
   displayName: string;
+  language?: string | null;
 };
 
 export function SessionHandoffScreen({
@@ -18,7 +21,9 @@ export function SessionHandoffScreen({
   joinCode,
   playerId,
   displayName,
+  language,
 }: SessionHandoffScreenProps) {
+  const t = playUi(language).lobby;
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -44,14 +49,13 @@ export function SessionHandoffScreen({
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-6 py-10 text-center">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-        Nicht mehr im Spiel
+        {t.handoffEyebrow}
       </p>
       <h2 className="mt-3 text-2xl font-semibold text-slate-900">
-        Jemand anderes nutzt diesen Zugang
+        {t.handoffTitle}
       </h2>
       <p className="mt-4 max-w-md text-sm leading-7 text-slate-500">
-        {displayName}, dein Platz läuft jetzt auf einem anderen Gerät. Wenn das versehentlich
-        war, hol dir die Rolle hier zurück — das andere Gerät wird automatisch abgemeldet.
+        {t.handoffBody(displayName)}
       </p>
 
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
@@ -63,7 +67,7 @@ export function SessionHandoffScreen({
         icon={<IconPlay size={16} />}
         onClick={handleReclaim}
       >
-        {isPending ? "Wird übernommen…" : "Spiel hier fortsetzen"}
+        {isPending ? t.handoffPending : t.handoffCta}
       </GridButton>
     </div>
   );

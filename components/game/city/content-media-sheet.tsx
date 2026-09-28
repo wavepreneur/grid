@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { playUi } from "@/lib/grid/play-ui";
 
 type ContentMediaSheetProps = {
   open: boolean;
@@ -13,6 +14,7 @@ type ContentMediaSheetProps = {
   tipSlot?: ReactNode;
   /** Override empty-state copy when no mediaUrl. */
   emptyMessage?: string;
+  language?: string | null;
 };
 
 /**
@@ -27,7 +29,9 @@ export function ContentMediaSheet({
   onClose,
   tipSlot,
   emptyMessage,
+  language,
 }: ContentMediaSheetProps) {
+  const t = playUi(language);
   useEffect(() => {
     if (!open) return;
     function onKeyDown(event: KeyboardEvent) {
@@ -61,7 +65,7 @@ export function ContentMediaSheet({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Schließen"
+          aria-label={t.media.close}
           className="cg-tap-lift absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-20 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--cg-ink)]/70 text-white shadow-[var(--cg-shadow-lift)] backdrop-blur-sm ring-1 ring-white/25"
         >
           <X className="h-5 w-5" strokeWidth={2.5} />
@@ -88,7 +92,7 @@ export function ContentMediaSheet({
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-3 bg-[var(--cg-card)] px-6 text-center">
               <p className="text-sm font-semibold text-[var(--cg-muted)]">
-                {emptyMessage ?? "Noch keine Medien-URL hinterlegt."}
+                {emptyMessage ?? t.media.noUrl}
               </p>
               {!emptyMessage ? (
                 <p className="text-xs text-[var(--cg-muted)]">

@@ -222,6 +222,7 @@ export function TeamEntryGate({
             label={roster.length > 0 ? t.join.newName : t.join.yourName}
             hint={t.join.nameHint}
             previewHint={t.join.namePreview}
+            language={language ?? eventContent?.language}
             tone="player"
             icon={<User size={20} strokeWidth={2.25} />}
             value={displayName}

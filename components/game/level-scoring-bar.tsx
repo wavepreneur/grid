@@ -4,6 +4,7 @@ import { Timer } from "lucide-react";
 import { formatCountdown, type LevelScoringSnapshot } from "@/lib/grid/level-scoring";
 import { useLevelScoringTimer } from "@/lib/hooks/use-level-scoring-timer";
 import type { LevelScoring } from "@/lib/grid/level-types";
+import { playUi } from "@/lib/grid/play-ui";
 import { LevelScoreHud, ScorePill } from "@/components/game/city/level-screen-blocks";
 
 type Props = {
@@ -12,6 +13,7 @@ type Props = {
   fallbackStartedAt?: string | null;
   compact?: boolean;
   snapshot?: LevelScoringSnapshot | null;
+  language?: string | null;
 };
 
 /**
@@ -23,7 +25,9 @@ export function LevelScoringBar({
   fallbackStartedAt,
   compact = false,
   snapshot: snapshotProp,
+  language,
 }: Props) {
+  const t = playUi(language);
   const liveSnapshot = useLevelScoringTimer(
     snapshotProp ? undefined : scoring,
     snapshotProp ? null : startedAt,
@@ -39,7 +43,7 @@ export function LevelScoringBar({
           {scoring.points >= 0 ? "+" : ""}
           {scoring.points} P
         </ScorePill>
-        <ScorePill>Kein Countdown</ScorePill>
+        <ScorePill>{t.scoring.noCountdown}</ScorePill>
       </LevelScoreHud>
     );
   }
@@ -57,7 +61,7 @@ export function LevelScoringBar({
     <div className={compact ? "space-y-2" : "space-y-3"}>
       <LevelScoreHud>
         <ScorePill tone={showDecay && !snapshot.isExpired ? "accent" : "default"}>
-          {showDecay ? "Noch " : null}
+          {showDecay ? t.scoring.stillPrefix : null}
           {snapshot.currentPoints >= 0 ? "+" : ""}
           {snapshot.currentPoints} P
           {showDecay && snapshot.currentPoints !== snapshot.maxPoints ? (
@@ -74,7 +78,7 @@ export function LevelScoringBar({
             {formatCountdown(snapshot.remainingSeconds ?? 0)}
           </ScorePill>
         ) : (
-          <ScorePill>Kein Countdown</ScorePill>
+          <ScorePill>{t.scoring.noCountdown}</ScorePill>
         )}
       </LevelScoreHud>
 
@@ -93,10 +97,11 @@ export function LevelScoringBar({
           </div>
           <p className="mt-1.5 text-center text-[11px] font-medium text-[var(--cg-muted)]">
             {snapshot.isExpired
-              ? "Zeit abgelaufen — 0 Punkte erreichbar"
-              : `Noch ${snapshot.currentPoints} ${
-                  snapshot.currentPoints === 1 ? "Punkt" : "Punkte"
-                } erreichbar, wenn du jetzt abschließt`}
+              ? t.scoring.timesUp
+              : t.scoring.pointsNow(
+                  snapshot.currentPoints,
+                  snapshot.currentPoints === 1 ? t.scoring.point : t.scoring.points,
+                )}
           </p>
         </div>
       ) : null}

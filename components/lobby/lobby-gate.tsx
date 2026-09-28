@@ -94,7 +94,7 @@ export function LobbyGate({
         const resolved = await withTimeout(
           resolveTeamSession(inviteCode, joinCode),
           SNAPSHOT_TIMEOUT_MS,
-          "Wartebereich antwortet nicht.",
+          playUi(language ?? eventContent?.language).lobby.waitTimeout,
         );
         if (cancelled) return;
 
@@ -140,7 +140,7 @@ export function LobbyGate({
             sessionId: resolved.session.sessionId,
           }),
           SNAPSHOT_TIMEOUT_MS,
-          "Wartebereich antwortet nicht.",
+          playUi(language ?? eventContent?.language).lobby.waitTimeout,
         );
         if (cancelled) return;
 

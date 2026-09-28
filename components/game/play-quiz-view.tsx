@@ -6,6 +6,7 @@ import { IconCheck, IconKey, IconX } from "@/components/game/city/icons";
 import type { ArrivalQuiz } from "@/lib/grid/level-types";
 import type { QuizRevealState } from "@/lib/grid/game-state";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { playUi } from "@/lib/grid/play-ui";
 import { FormattedTaskText } from "@/components/game/formatted-task-text";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
 
@@ -23,6 +24,7 @@ type Props = {
   onAdvanceToLevel: () => void;
   canPaceTeam?: boolean;
   leadLabel?: string;
+  language?: string | null;
 };
 
 export function PlayQuizView({
@@ -37,7 +39,9 @@ export function PlayQuizView({
   onAdvanceToLevel,
   canPaceTeam = false,
   leadLabel = "Team Lead",
+  language,
 }: Props) {
+  const t = playUi(language);
   const multi = Boolean(quiz.correct_option_ids?.length);
   const [picked, setPicked] = useState<string | null>(null);
   const [pickedMulti, setPickedMulti] = useState<string[]>([]);
@@ -53,11 +57,12 @@ export function PlayQuizView({
   const displayTitle = quiz.title?.trim() || title;
 
   const heading =
-    mode === "online" ? "Einstiegsfrage" : mode === "indoor" ? "Frage vor Ort" : "Umgebungsquiz";
-  const intro =
     mode === "online"
-      ? "Eine Antwort genügt — sie öffnet das Rätsel für alle."
-      : "Eine Antwort vom Team öffnet das Rätsel für alle.";
+      ? t.quiz.headingOnline
+      : mode === "indoor"
+        ? t.quiz.headingIndoor
+        : t.quiz.headingOutdoor;
+  const intro = mode === "online" ? t.quiz.introOnline : t.quiz.introTeam;
 
   function isRightOption(id: string) {
     return multi
@@ -114,8 +119,7 @@ export function PlayQuizView({
     onAdvanceToLevel();
   }
 
-  const openLabel =
-    mode === "online" ? "Level für alle aufschließen" : "Level aufschließen";
+  const openLabel = mode === "online" ? t.quiz.unlockAll : t.quiz.unlock;
 
   return (
     <section className="mx-auto flex w-full max-w-md flex-col px-4 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-4 sm:px-5">
@@ -134,7 +138,7 @@ export function PlayQuizView({
           </div>
           <p className="mt-3 flex items-start gap-2.5 rounded-2xl bg-[var(--cg-card)] px-3 py-2.5 text-[13px] leading-snug text-[var(--cg-fg)]/80 sm:text-sm">
             <span className="mt-px shrink-0 rounded-full bg-[var(--cg-accent)]/22 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--cg-fg)]">
-              Schlüssel
+              {t.quiz.key}
             </span>
             <span>{intro}</span>
           </p>
@@ -222,7 +226,7 @@ export function PlayQuizView({
                 disabled={disabled || submitting || pickedMulti.length === 0}
                 onClick={submitMulti}
               >
-                {submitting ? "Wird geprüft…" : "Antwort fürs Team senden"}
+                {submitting ? t.quiz.checking : t.quiz.sendTeam}
               </BigButton>
             </div>
           ) : null}
@@ -232,11 +236,11 @@ export function PlayQuizView({
               className={`mt-6 space-y-4 ${correct ? "cg-animate-rise-in" : "cg-animate-shake"}`}
             >
           <p className="text-center text-sm font-semibold text-[var(--cg-muted)]">
-            Antwort von <span className="text-[var(--cg-fg)]">{teamReveal.answered_by}</span>
+            {t.quiz.answeredBy(teamReveal.answered_by)}
           </p>
           {!correct && selectedIds.length > 0 ? (
             <p className="flex flex-wrap items-center justify-center gap-2 text-sm font-semibold text-[var(--cg-fg)]">
-              <span className="text-[var(--cg-muted)]">Gewählt</span>
+              <span className="text-[var(--cg-muted)]">{t.quiz.chosen}</span>
               {quiz.options.map((opt, i) => {
                 if (!selectedIds.includes(opt.id)) return null;
                 const right = isRightOption(opt.id);
@@ -262,15 +266,15 @@ export function PlayQuizView({
           >
             {correct
               ? points > 0
-                ? `Richtig! +${points} Punkte — der Schlüssel passt.`
-                : "Richtig! Der Schlüssel passt."
-              : "Leider falsch — der Schlüssel passt trotzdem, aber ohne Bonuspunkte."}
+                ? t.quiz.rightPoints(points)
+                : t.quiz.right
+              : t.quiz.wrongKey}
           </p>
 
           {quiz.side_fact?.trim() ? (
             <div className="rounded-2xl bg-[var(--cg-secondary)] px-4 py-4 text-left">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--cg-muted)]">
-                Wusstet ihr?
+                {t.quiz.didYouKnow}
               </p>
               <p className="mt-1 text-base text-[var(--cg-fg)]">{quiz.side_fact.trim()}</p>
             </div>
@@ -283,7 +287,7 @@ export function PlayQuizView({
               disabled={disabled || isPending || advancing}
               onClick={handleAdvance}
             >
-              {advancing || isPending ? "Schließt auf…" : openLabel}
+              {advancing || isPending ? t.quiz.unlocking : openLabel}
             </BigButton>
           ) : (
             <TeamPaceHint canPaceTeam={false} leadLabel={leadLabel} />

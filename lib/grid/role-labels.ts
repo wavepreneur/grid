@@ -4,6 +4,7 @@
 
 import type { ArchetypeRole } from "@/lib/grid/archetype-roles";
 import type { BonusTask } from "@/lib/grid/level-types";
+import { playUi } from "@/lib/grid/play-ui";
 
 export type RoleDisplayLabels = {
   alpha: string;
@@ -105,9 +106,10 @@ export function bonusAudienceHeadline(
   options?: {
     players?: BonusAudiencePlayer[];
     fallbackName?: string | null;
+    language?: string | null;
   },
 ): string {
-  if (bonus.for_team) return "Ganzes Team";
+  if (bonus.for_team) return playUi(options?.language).bonus.wholeTeam;
   const names = bonusAudiencePlayerNames(bonus, options?.players ?? []);
   if (names.length > 0) return formatBonusAudienceNames(names);
   const fallback = options?.fallbackName?.trim();

@@ -28,6 +28,7 @@ import {
   startOverlayCopy,
 } from "@/lib/grid/mission-start-signal";
 import { savePlayerSession } from "@/lib/grid/player-session";
+import { playUi } from "@/lib/grid/play-ui";
 import type { ResolvedEventContent } from "@/lib/grid/level-types";
 import type { PlayerSession } from "@/lib/grid/types";
 
@@ -177,6 +178,7 @@ export function GameGate({
     async function boot() {
       bump(missionStartProgress(inviteCode, joinCode));
       const cached = loadCachedEventContent(inviteCode);
+      const gateCopy = playUi(cached?.language).gate;
       if (cached) {
         setEventContent(cached);
         bump(42);
@@ -196,7 +198,7 @@ export function GameGate({
             .catch(() => ({
               content: loadCachedEventContent(inviteCode),
               revision: contentRevisionRef.current,
-              error: "Inhalt dauert zu lange. Bitte Start erneut tippen.",
+              error: gateCopy.contentSlow,
             }));
 
       const resolved = await resolveTeamSession(inviteCode, joinCode);
@@ -258,7 +260,7 @@ export function GameGate({
           ).catch(() => ({
             content: loadCachedEventContent(inviteCode),
             revision: contentRevisionRef.current,
-            error: "Inhalt dauert zu lange. Bitte Start erneut tippen.",
+            error: gateCopy.contentSlow,
           }));
 
       const playPromise = isPlayReady(peek)
@@ -285,7 +287,7 @@ export function GameGate({
           router.replace(eventLobbyPath(inviteCode, joinCode));
           return;
         }
-        setError("Start dauert zu lange. Bitte Start noch einmal tippen.");
+        setError(gateCopy.startSlow);
         clearMissionStarting(inviteCode, joinCode);
         return;
       }
@@ -300,7 +302,7 @@ export function GameGate({
 
       let freshContent = contentResult.content;
       if (!freshContent) {
-        setError(contentResult.error ?? "Inhalt konnte nicht geladen werden.");
+        setError(contentResult.error ?? gateCopy.contentFail);
         return;
       }
 

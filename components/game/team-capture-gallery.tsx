@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { listTeamEventCaptures } from "@/app/actions/captures";
 import type { EventCaptureItem } from "@/lib/grid/event-captures";
+import { playUi } from "@/lib/grid/play-ui";
 
 type Props = {
   inviteCode: string;
   joinCode: string;
   sessionId: string;
+  language?: string | null;
 };
 
 async function saveUrlToDevice(item: EventCaptureItem) {
@@ -34,7 +36,8 @@ async function saveUrlToDevice(item: EventCaptureItem) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-export function TeamCaptureGallery({ inviteCode, joinCode, sessionId }: Props) {
+export function TeamCaptureGallery({ inviteCode, joinCode, sessionId, language }: Props) {
+  const t = playUi(language);
   const [items, setItems] = useState<EventCaptureItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,17 +59,19 @@ export function TeamCaptureGallery({ inviteCode, joinCode, sessionId }: Props) {
 
   const hint =
     items === null
-      ? "Wird geladen…"
+      ? t.gallery.loading
       : items.length === 0
-        ? "Noch keine Aufnahme"
-        : `${items.length} ${items.length === 1 ? "Aufnahme" : "Aufnahmen"}`;
+        ? t.gallery.empty
+        : items.length === 1
+          ? t.gallery.one
+          : t.gallery.many(items.length);
 
   return (
     <details className="group overflow-hidden rounded-3xl bg-[var(--cg-card)] shadow-[var(--cg-shadow-soft)]">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 marker:content-none [&::-webkit-details-marker]:hidden">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-[var(--cg-muted)]">
-            Eure Galerie
+            {t.gallery.title}
           </p>
           <p className="mt-0.5 text-sm text-[var(--cg-muted)]">{hint}</p>
         </div>
@@ -79,15 +84,15 @@ export function TeamCaptureGallery({ inviteCode, joinCode, sessionId }: Props) {
       </summary>
       <div className="px-5 pb-5">
         <p className="text-sm text-[var(--cg-muted)]">
-          Fotos und Videos dieses Teams — speichert sie aufs Handy, solange ihr wollt.
+          {t.gallery.body}
         </p>
         {error ? (
           <p className="mt-3 text-sm text-[var(--cg-destructive)]">{error}</p>
         ) : items === null ? (
-          <p className="mt-3 text-sm text-[var(--cg-muted)]">Galerie wird geladen…</p>
+          <p className="mt-3 text-sm text-[var(--cg-muted)]">{t.gallery.loadingBody}</p>
         ) : items.length === 0 ? (
           <p className="mt-3 text-sm text-[var(--cg-muted)]">
-            Noch keine Aufnahme. Sobald ihr sendet, liegt sie hier.
+            {t.gallery.emptyBody}
           </p>
         ) : (
           <ul className="mt-4 grid gap-3">
@@ -110,15 +115,15 @@ export function TeamCaptureGallery({ inviteCode, joinCode, sessionId }: Props) {
                 )}
                 <div className="flex items-center justify-between gap-2 px-3 py-2.5">
                   <p className="text-xs font-semibold text-[var(--cg-muted)]">
-                    {item.kind === "video" ? "Video" : "Foto"}
-                    {item.levelNumber > 0 ? ` · Aufgabe ${item.levelNumber}` : ""}
+                    {item.kind === "video" ? t.gallery.video : t.gallery.photo}
+                    {item.levelNumber > 0 ? t.gallery.taskN(item.levelNumber) : ""}
                   </p>
                   <button
                     type="button"
                     onClick={() => void saveUrlToDevice(item)}
                     className="text-xs font-bold text-[var(--cg-primary)]"
                   >
-                    Speichern
+                    {t.gallery.save}
                   </button>
                 </div>
               </li>

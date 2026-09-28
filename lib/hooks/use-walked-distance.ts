@@ -3,13 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import type { GeolocationSample } from "@/lib/grid/level-types";
 import { distanceMeters } from "@/lib/grid/geofence";
+import {
+  geoErrorKindFromCode,
+  type GeoErrorKind,
+} from "@/lib/grid/play-ui";
 
 type WalkedDistanceState = {
   sample: GeolocationSample | null;
   meters: number;
   /** Display meters eased toward `meters` for a smooth ring. */
   displayMeters: number;
-  error: string | null;
+  errorKind: GeoErrorKind | null;
   isLoading: boolean;
   denied: boolean;
 };
@@ -56,7 +60,7 @@ export function useWalkedDistance(
   const [sample, setSample] = useState<GeolocationSample | null>(null);
   const [meters, setMeters] = useState(() => readStoredMeters(storageKey));
   const [displayMeters, setDisplayMeters] = useState(() => readStoredMeters(storageKey));
-  const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<GeoErrorKind | null>(null);
   const [denied, setDenied] = useState(false);
   const [isLoading, setIsLoading] = useState(enabled);
   const lastRef = useRef<GeolocationSample | null>(null);
@@ -78,14 +82,14 @@ export function useWalkedDistance(
     }
 
     if (!navigator.geolocation) {
-      setError("GPS wird von diesem Gerät nicht unterstützt.");
+      setErrorKind("unsupported");
       setDenied(true);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
-    setError(null);
+    setErrorKind(null);
     setDenied(false);
 
     const watchId = navigator.geolocation.watchPosition(
@@ -97,7 +101,7 @@ export function useWalkedDistance(
         };
         setSample(next);
         setIsLoading(false);
-        setError(null);
+        setErrorKind(null);
         setDenied(false);
 
         const prev = lastRef.current;
@@ -117,8 +121,9 @@ export function useWalkedDistance(
         });
       },
       (geoError) => {
-        setError(geoError.message || "GPS-Zugriff verweigert.");
-        setDenied(geoError.code === geoError.PERMISSION_DENIED);
+        const kind = geoErrorKindFromCode(geoError.code);
+        setErrorKind(kind);
+        setDenied(kind === "denied" || kind === "unsupported");
         setIsLoading(false);
       },
       {
@@ -149,7 +154,7 @@ export function useWalkedDistance(
     return () => window.cancelAnimationFrame(frame);
   }, [enabled]);
 
-  return { sample, meters, displayMeters, error, isLoading, denied };
+  return { sample, meters, displayMeters, errorKind, isLoading, denied };
 }
 
 export function clearWalkedDistanceStorage(storageKey: string) {

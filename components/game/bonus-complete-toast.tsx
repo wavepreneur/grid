@@ -5,9 +5,11 @@ import { BonusResultBanner } from "@/components/game/bonus-result-banner";
 import { hasSeenBonusResult } from "@/components/game/bonus-spectator-view";
 import type { BonusNoticeState } from "@/lib/grid/game-state";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { playUi } from "@/lib/grid/play-ui";
 
 type Props = {
   notice: BonusNoticeState | null | undefined;
+  language?: string | null;
   /** Persist dismiss so remounts / phase changes do not re-show the same toast. */
   onDismiss?: (noticeId: string) => void;
 };
@@ -35,7 +37,8 @@ function markNoticeSeen(id: string) {
 /**
  * Solid top card after a bonus is finished — same look as the in-task result.
  */
-export function BonusCompleteToast({ notice, onDismiss }: Props) {
+export function BonusCompleteToast({ notice, language, onDismiss }: Props) {
+  const t = playUi(language);
   const seenRef = useRef<string | null>(null);
   const [visible, setVisible] = useState<BonusNoticeState | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -79,15 +82,15 @@ export function BonusCompleteToast({ notice, onDismiss }: Props) {
       correct={visible.correct}
       headline={
         visible.skipped
-          ? `${visible.by} hat die Bonusaufgabe übersprungen`
+          ? t.bonus.skippedBy(visible.by)
           : visible.correct
-            ? `${visible.by} hat ${visible.reward} Punkte gerade geholt`
-            : `${visible.by} konnte die Aufgabe nicht beantworten`
+            ? t.bonus.scoredBy(visible.by, visible.reward)
+            : t.bonus.failedBy(visible.by)
       }
       detail={
         visible.correct
-          ? `+${visible.reward} Punkte für das Team.`
-          : "0 Extra-Punkte."
+          ? t.bonus.pointsTeam(visible.reward)
+          : t.bonus.extraZero
       }
     />
   );

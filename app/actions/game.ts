@@ -43,10 +43,6 @@ import {
   upsertWalletNote,
   WALLET_UNLOCK_COST,
 } from "@/lib/grid/wallet";
-import {
-  SKIPPED_LEVEL_HEADLINE,
-  SKIPPED_LEVEL_WALLET_HINT,
-} from "@/lib/grid/play-help";
 import type { PlayerRole, SolveLevelPayload } from "@/lib/grid/level-types";
 import { resolveArchetypeRoleFlags } from "@/lib/grid/archetype-roles";
 import { resolveBlueprint } from "@/lib/grid/blueprints";
@@ -79,6 +75,7 @@ import {
   resolveBonusDefinitions,
   resolveBonusForPlay,
 } from "@/lib/grid/bonus";
+import { playActionError, playUi, type PlayUiCopy } from "@/lib/grid/play-ui";
 import {
   bonusQueueItemMatchesPlayer,
   markBonusActive,
@@ -88,6 +85,16 @@ import {
   promoteArmedBonuses,
 } from "@/lib/grid/bonus-queue";
 import { queueGrowthTeamFinished } from "@/lib/grid/growth-dispatch";
+
+function actionErr(
+  event: { content_config?: unknown } | null | undefined,
+  key: keyof PlayUiCopy["action"],
+): string {
+  return playActionError(
+    event ? parseContentConfig(event.content_config).language : undefined,
+    key,
+  );
+}
 
 function buildRealtimeState(
   team: {
@@ -149,10 +156,10 @@ export async function getGameState(input: {
       data: buildRealtimeState(team, player),
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unbekannter Fehler";
+    const message = error instanceof Error ? error.message : playActionError(undefined, "unknown");
     return {
       success: false,
-      code: /Session ist abgelaufen/i.test(message) ? SESSION_SUPERSEDED : undefined,
+      code: /session (ist abgelaufen|expired)/i.test(message) ? SESSION_SUPERSEDED : undefined,
       error: message,
     };
   }
@@ -168,7 +175,7 @@ export async function solveCurrentLevel(input: {
     const { event, team, player } = await assertPlayerSession(input);
 
     if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft noch nicht." };
+      return { success: false, error: actionErr(event, "notPlaying") };
     }
 
     const gameState = parseTeamGameState(team.game_state);
@@ -177,11 +184,11 @@ export async function solveCurrentLevel(input: {
     const levelState = gameState.levels[levelKey];
 
     if (!levelState || levelState.status !== "active") {
-      return { success: false, error: "Dieses Level ist gerade nicht aktiv." };
+      return { success: false, error: actionErr(event, "levelInactive") };
     }
 
     if (gameState.modal) {
-      return { success: false, error: "Bitte zuerst die Synchronisations-Meldung schließen." };
+      return { success: false, error: actionErr(event, "closeSyncFirst") };
     }
 
     const giveUpReveal =
@@ -191,7 +198,7 @@ export async function solveCurrentLevel(input: {
     if (giveUpReveal && !input.payload?.revealSolution) {
       return {
         success: false,
-        error: "Die Lösung liegt schon offen. Die Team-Leitung geht weiter.",
+        error: actionErr(event, "solutionOpen"),
       };
     }
     const content = await loadResolvedEventContent({
@@ -205,7 +212,7 @@ export async function solveCurrentLevel(input: {
     const levelDefinition = getLevelDefinition(content, currentLevel);
 
     if (!levelDefinition) {
-      return { success: false, error: "Level-Inhalt nicht gefunden." };
+      return { success: false, error: actionErr(event, "levelMissing") };
     }
 
     if (
@@ -213,7 +220,7 @@ export async function solveCurrentLevel(input: {
       !isMediaInputMode(levelDefinition.input_mode) &&
       !(await playerCanPaceTeam(team.id, player))
     ) {
-      return { success: false, error: "Nur die Team-Leitung kann weitergehen." };
+      return { success: false, error: actionErr(event, "onlyLead") };
     }
 
     const playerRole = (player.role ?? "gamma") as PlayerRole;
@@ -236,7 +243,7 @@ export async function solveCurrentLevel(input: {
     if (forceUnlock && !archetype.canUnlockGps && !isStudioTest) {
       return {
         success: false,
-        error: "Nur Alpha / GPS-Leiter kann den Standort manuell freigeben.",
+        error: actionErr(event, "onlyGpsLead"),
       };
     }
 
@@ -596,10 +603,10 @@ export async function solveCurrentLevel(input: {
         solvedBy,
         pointsEarned,
         successTitle: input.payload?.revealSolution
-          ? SKIPPED_LEVEL_HEADLINE
+          ? playUi(content.language).sync.skippedHeadline
           : levelDefinition.success_title,
         successInfo: input.payload?.revealSolution
-          ? SKIPPED_LEVEL_WALLET_HINT
+          ? playUi(content.language).sync.skippedWallet
           : levelDefinition.success_info,
         revealed: Boolean(input.payload?.revealSolution),
       }),
@@ -635,7 +642,7 @@ export async function solveCurrentLevel(input: {
       .single();
 
     if (error || !updatedTeam) {
-      return { success: false, error: error?.message ?? "Level-Update fehlgeschlagen." };
+      return { success: false, error: error?.message ?? playActionError(undefined, "unknown") };
     }
 
     const durations = computeAttemptDurations({
@@ -738,7 +745,7 @@ export async function solveCurrentLevel(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -762,7 +769,7 @@ export async function purchaseHint(input: {
     const { event, team, player } = await assertPlayerSession(input);
 
     if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft noch nicht." };
+      return { success: false, error: actionErr(event, "notPlaying") };
     }
 
     const gameState = parseTeamGameState(team.game_state);
@@ -781,12 +788,12 @@ export async function purchaseHint(input: {
 
     const tile = levelDefinition?.tiles?.find((item) => item.id === input.tileId);
     if (!tile?.hint) {
-      return { success: false, error: "Für diese Kachel gibt es keinen Tipp." };
+      return { success: false, error: actionErr(event, "noTileHint") };
     }
 
     const levelHints = gameState.purchased_tile_hints[levelKey] ?? {};
     if (levelHints[input.tileId]) {
-      return { success: false, error: "Dieser Tipp wurde bereits freigeschaltet." };
+      return { success: false, error: actionErr(event, "hintAlready") };
     }
 
     const pointCost = tile.hint.point_cost ?? HINT_POINT_COST;
@@ -863,7 +870,7 @@ export async function purchaseHint(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -878,16 +885,16 @@ export async function purchaseWalletNote(input: {
   try {
     const { event, team, player } = await assertPlayerSession(input);
     if (team.status === "finished") {
-      return { success: false, error: "Nach Game Over könnt ihr keine Hinweise mehr kaufen." };
+      return { success: false, error: actionErr(event, "noWalletAfterOver") };
     }
     if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft noch nicht." };
+      return { success: false, error: actionErr(event, "notPlaying") };
     }
 
     const gameState = parseTeamGameState(team.game_state);
     const levelNumber = Number(input.level);
     if (!Number.isFinite(levelNumber) || levelNumber < 1) {
-      return { success: false, error: "Level nicht gefunden." };
+      return { success: false, error: actionErr(event, "levelNotFound") };
     }
 
     const content = await loadResolvedEventContent({
@@ -901,7 +908,7 @@ export async function purchaseWalletNote(input: {
     const levelDefinition = getLevelDefinition(content, levelNumber);
     const info = levelDefinition?.success_info?.trim() ?? "";
     if (!levelDefinition || !info) {
-      return { success: false, error: "Für dieses Level gibt es keinen Hinweis." };
+      return { success: false, error: actionErr(event, "noLevelHint") };
     }
 
     const existing = (gameState.wallet ?? []).find((note) => note.level === levelNumber);
@@ -914,7 +921,7 @@ export async function purchaseWalletNote(input: {
       existing?.locked === true ||
       (levelEntry?.status === "completed" && Boolean(levelEntry.revealed));
     if (!canBuy) {
-      return { success: false, error: "Diesen Hinweis könnt ihr erst nach Skip kaufen." };
+      return { success: false, error: actionErr(event, "hintAfterSkip") };
     }
 
     if (gameState.score < WALLET_UNLOCK_COST) {
@@ -949,7 +956,7 @@ export async function purchaseWalletNote(input: {
       .single();
 
     if (error || !updatedTeam) {
-      return { success: false, error: error?.message ?? "Kauf fehlgeschlagen." };
+      return { success: false, error: error?.message ?? playActionError(undefined, "unknown") };
     }
 
     await insertSyncEvent({
@@ -982,7 +989,7 @@ export async function purchaseWalletNote(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Kauf fehlgeschlagen.",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -996,13 +1003,13 @@ export async function revealLevelSolution(input: {
   try {
     const { event, team, player } = await assertPlayerSession(input);
     if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft noch nicht." };
+      return { success: false, error: actionErr(event, "notPlaying") };
     }
 
     const gameState = parseTeamGameState(team.game_state);
     const currentLevel = team.current_level || 1;
     if (gameState.modal) {
-      return { success: false, error: "Bitte zuerst die Synchronisations-Meldung schließen." };
+      return { success: false, error: actionErr(event, "closeSyncFirst") };
     }
     if (gameState.level_reveal?.level === currentLevel) {
       return { success: true, data: buildRealtimeState(team, player) };
@@ -1018,7 +1025,7 @@ export async function revealLevelSolution(input: {
     });
     const levelDefinition = getLevelDefinition(content, currentLevel);
     if (!levelDefinition?.scoring?.allow_reveal_solution) {
-      return { success: false, error: "Lösung anzeigen ist hier nicht erlaubt." };
+      return { success: false, error: actionErr(event, "revealForbidden") };
     }
 
     const nextGameState: TeamGameState = {
@@ -1065,7 +1072,7 @@ export async function dismissSyncModal(input: {
     }
 
     if (!(await playerCanPaceTeam(team.id, player))) {
-      return { success: false, error: "Nur die Team-Leitung kann weitergehen." };
+      return { success: false, error: actionErr(event, "onlyLead") };
     }
 
     const content = await loadResolvedEventContent({
@@ -1173,7 +1180,7 @@ export async function dismissSyncModal(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -1291,7 +1298,7 @@ export async function ensureTeamGameReady(input: {
   try {
     const { event, team, player } = await assertPlayerSession(input);
     if (team.status !== "playing" && team.status !== "finished") {
-      return { success: false, error: "Das Spiel läuft noch nicht." };
+      return { success: false, error: actionErr(event, "notPlaying") };
     }
 
     const gameState = parseTeamGameState(team.game_state);
@@ -1314,7 +1321,7 @@ export async function ensureTeamGameReady(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -1335,7 +1342,7 @@ export async function prepareTeamGame(input: {
       team.status !== "setup" &&
       team.status !== "playing"
     ) {
-      return { success: false, error: "Team ist nicht in der Lobby." };
+      return { success: false, error: actionErr(event, "teamNotLobby") };
     }
 
     const inLobby = team.status === "lobby" || team.status === "setup";
@@ -1362,7 +1369,7 @@ export async function prepareTeamGame(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -1385,7 +1392,7 @@ async function persistPhaseState(input: {
     .single();
 
   if (error || !updatedTeam) {
-    return { success: false, error: error?.message ?? "Phasen-Update fehlgeschlagen." };
+    return { success: false, error: error?.message ?? actionErr(undefined, "phaseUpdate") };
   }
 
   return { success: true, data: buildRealtimeState(updatedTeam, input.player) };
@@ -1456,7 +1463,7 @@ async function persistPlayingGameState(input: {
     .eq("id", input.teamId)
     .single();
   if (!latest) {
-    return { success: false, error: "Team nicht gefunden." };
+    return { success: false, error: actionErr(undefined, "teamMissing") };
   }
   return { success: true, data: buildRealtimeState(latest, input.player) };
 }
@@ -1488,7 +1495,7 @@ export async function advanceFromHub(input: {
   try {
     const { event, team, player } = await assertPlayerSession(input);
     if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft noch nicht." };
+      return { success: false, error: actionErr(event, "notPlaying") };
     }
 
     const gameState = parseTeamGameState(team.game_state);
@@ -1502,7 +1509,7 @@ export async function advanceFromHub(input: {
     });
 
     if (!usesPhasedPlay(content)) {
-      return { success: false, error: "Phasen-Flow ist für dieses Event nicht aktiv." };
+      return { success: false, error: actionErr(event, "phaseInactive") };
     }
 
     let currentLevel = team.current_level || 1;
@@ -1513,27 +1520,27 @@ export async function advanceFromHub(input: {
     if (input.stationCode) {
       const byCode = findLevelByStationCode(content.levels, input.stationCode);
       if (!byCode) {
-        return { success: false, error: "Diesen Code gibt es hier nicht." };
+        return { success: false, error: actionErr(event, "badCode") };
       }
       const codeLevelState = gameState.levels[String(byCode.level)];
       if (codeLevelState?.status === "completed") {
-        return { success: false, error: "Diese Station ist schon gelöst." };
+        return { success: false, error: actionErr(event, "stationDone") };
       }
       currentLevel = byCode.level;
     }
 
     const levelDefinition = getLevelDefinition(content, currentLevel);
     if (!levelDefinition) {
-      return { success: false, error: "Level-Inhalt nicht gefunden." };
+      return { success: false, error: actionErr(event, "levelMissing") };
     }
 
     const levelKey = String(currentLevel);
     const levelState = gameState.levels[levelKey];
     if (!levelState || levelState.status === "locked") {
-      return { success: false, error: "Dieses Level ist noch gesperrt." };
+      return { success: false, error: actionErr(event, "levelLocked") };
     }
     if (levelState.status === "completed") {
-      return { success: false, error: "Dieses Level ist schon gelöst." };
+      return { success: false, error: actionErr(event, "levelDone") };
     }
 
     const playerRole = (player.role ?? "gamma") as PlayerRole;
@@ -1561,14 +1568,14 @@ export async function advanceFromHub(input: {
       if (!archetype.canUnlockGps && !isStudioTest) {
         return {
           success: false,
-          error: "Nur Alpha / GPS-Leiter kann den Standort manuell freigeben.",
+          error: actionErr(event, "onlyGpsLead"),
         };
       }
       if (
         (input.forceUnlock === "geofence" && unlockMode !== "geofence") ||
         (input.forceUnlock === "distance" && unlockMode !== "distance")
       ) {
-        return { success: false, error: "Dieser Override passt nicht zum aktuellen Unlock." };
+        return { success: false, error: actionErr(event, "badOverride") };
       }
     }
 
@@ -1623,7 +1630,7 @@ export async function advanceFromHub(input: {
       if (!input.stationCode?.trim()) {
         return {
           success: false,
-          error: "Stationscode eingeben — der Code hängt an der Station im Raum.",
+          error: actionErr(event, "enterStation"),
         };
       }
       const codeCheck = validateStationCode(levelDefinition, input.stationCode);
@@ -1670,7 +1677,7 @@ export async function advanceFromHub(input: {
       .single();
 
     if (error || !updatedTeam) {
-      return { success: false, error: error?.message ?? "Hub-Update fehlgeschlagen." };
+      return { success: false, error: error?.message ?? playActionError(undefined, "unknown") };
     }
 
     if (input.forceUnlock) {
@@ -1710,7 +1717,7 @@ export async function advanceFromHub(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Hub-Fortschritt fehlgeschlagen.",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -1729,7 +1736,7 @@ export async function syncOutdoorWalkProgress(input: {
   try {
     const { event, team, player } = await assertPlayerSession(input);
     if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft noch nicht." };
+      return { success: false, error: actionErr(event, "notPlaying") };
     }
 
     const playerRole = (player.role ?? "gamma") as PlayerRole;
@@ -1749,7 +1756,7 @@ export async function syncOutdoorWalkProgress(input: {
     });
 
     if (!archetype.canUnlockGps) {
-      return { success: false, error: "Nur Alpha / GPS-Leiter trackt die Strecke." };
+      return { success: false, error: actionErr(event, "onlyGpsTrack") };
     }
 
     const gameState = parseTeamGameState(team.game_state);
@@ -1788,14 +1795,14 @@ export async function syncOutdoorWalkProgress(input: {
       .single();
 
     if (error || !updatedTeam) {
-      return { success: false, error: error?.message ?? "Meter-Sync fehlgeschlagen." };
+      return { success: false, error: error?.message ?? playActionError(undefined, "unknown") };
     }
 
     return { success: true, data: buildRealtimeState(updatedTeam, player) };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Meter-Sync fehlgeschlagen.",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -1811,12 +1818,12 @@ export async function submitArrivalQuiz(input: {
   try {
     const { event, team, player } = await assertPlayerSession(input);
     if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft noch nicht." };
+      return { success: false, error: actionErr(event, "notPlaying") };
     }
 
     const gameState = parseTeamGameState(team.game_state);
     if (gameState.current_phase && gameState.current_phase !== "quiz") {
-      return { success: false, error: "Gerade ist kein Quiz aktiv." };
+      return { success: false, error: actionErr(event, "noQuiz") };
     }
 
     // Someone already answered — advance the whole team to the puzzle.
@@ -1840,12 +1847,12 @@ export async function submitArrivalQuiz(input: {
     const currentLevel = team.current_level || 1;
     const levelDefinition = getLevelDefinition(content, currentLevel);
     if (!levelDefinition) {
-      return { success: false, error: "Level-Inhalt nicht gefunden." };
+      return { success: false, error: actionErr(event, "levelMissing") };
     }
 
     const slot = buildPlaySlot(levelDefinition, content.contentMode);
     if (!slot.quiz) {
-      return { success: false, error: "Kein Freischalt-Quiz für dieses Level." };
+      return { success: false, error: actionErr(event, "noUnlockQuiz") };
     }
 
     const validation = validateArrivalQuiz(
@@ -1915,7 +1922,7 @@ export async function submitArrivalQuiz(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Quiz fehlgeschlagen.",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -1927,21 +1934,21 @@ export async function advanceQuizToLevel(input: {
   sessionId: string;
 }): Promise<ActionResult<TeamRealtimeState>> {
   try {
-    const { team, player } = await assertPlayerSession(input);
+    const { event, team, player } = await assertPlayerSession(input);
     if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft noch nicht." };
+      return { success: false, error: actionErr(event, "notPlaying") };
     }
 
     const gameState = parseTeamGameState(team.game_state);
     if (gameState.current_phase !== "quiz") {
       const current = await getGameState(input);
-      return current.success ? current : { success: false, error: "Kein Quiz aktiv." };
+      return current.success ? current : { success: false, error: actionErr(event, "noQuiz") };
     }
     if (!gameState.quiz_reveal) {
-      return { success: false, error: "Quiz noch nicht beantwortet." };
+      return { success: false, error: actionErr(event, "quizUnanswered") };
     }
     if (!(await playerCanPaceTeam(team.id, player))) {
-      return { success: false, error: "Nur die Team-Leitung kann weitergehen." };
+      return { success: false, error: actionErr(event, "onlyLead") };
     }
 
     const nextGameState: TeamGameState = {
@@ -1960,7 +1967,7 @@ export async function advanceQuizToLevel(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Weiter zur Aufgabe fehlgeschlagen.",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -1997,7 +2004,7 @@ async function finishRevealedBonus(input: {
     Object.keys(sessions).find((id) => Boolean(sessions[id]?.reveal)) ??
     null;
   if (!bonusId) {
-    return { success: false, error: "Bonus noch nicht beantwortet." };
+    return { success: false, error: actionErr(event, "bonusUnanswered") };
   }
   const reveal = sessions[bonusId]?.reveal;
   if (!reveal) {
@@ -2005,7 +2012,7 @@ async function finishRevealedBonus(input: {
     if (!sessions[bonusId] && !(gameState.bonus_queue ?? []).some((item) => item.bonus_id === bonusId && item.status === "active")) {
       return { success: true, data: buildRealtimeState(team, player) };
     }
-    return { success: false, error: "Bonus noch nicht beantwortet." };
+    return { success: false, error: actionErr(event, "bonusUnanswered") };
   }
 
   const fromQueue = (gameState.bonus_queue ?? []).find((item) => item.bonus_id === bonusId);
@@ -2183,7 +2190,7 @@ async function completeActiveBonus(input: {
       : gameState.active_bonus;
 
   if (!active) {
-    return { success: false, error: "Kein aktiver Bonus." };
+    return { success: false, error: actionErr(event, "noActiveBonus") };
   }
 
   const content = await loadResolvedEventContent({
@@ -2231,10 +2238,10 @@ async function completeActiveBonus(input: {
   const playerRoleCheck = (player.role ?? "gamma") as PlayerRole;
   const assignedToPlayer = Boolean(fromQueue?.for_player_id);
   if (assignedToPlayer && fromQueue?.for_player_id !== player.id) {
-    return { success: false, error: "Diese Bonusaufgabe ist für jemand anderen." };
+    return { success: false, error: actionErr(event, "bonusOtherPlayer") };
   }
   if (!assignedToPlayer && !canPresentBonus(bonus, playerRoleCheck, { claimUnassigned })) {
-    return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
+    return { success: false, error: actionErr(event, "bonusOtherRole") };
   }
 
   let correct = false;
@@ -2249,7 +2256,7 @@ async function completeActiveBonus(input: {
     reward = 0;
   } else if (!input.skip) {
     if (!input.selectedOptionId) {
-      return { success: false, error: "Bitte eine Antwort auswählen." };
+      return { success: false, error: actionErr(event, "pickAnswer") };
     }
     correct = isBonusAnswerCorrect(bonus, input.selectedOptionId);
     reward = correct
@@ -2307,8 +2314,8 @@ async function completeActiveBonus(input: {
           reward,
           selected_option_id: input.selectedOptionId ?? "",
           attempt_label: input.timedOut
-            ? "Zeit abgelaufen"
-            : formatBonusAttemptLabel(bonus, input.selectedOptionId ?? ""),
+            ? playUi(content.language).bonus.attemptTimeout
+            : formatBonusAttemptLabel(bonus, input.selectedOptionId ?? "", content.language),
           revealed_at: nowIso,
           timed_out: Boolean(input.timedOut),
         },
@@ -2428,7 +2435,7 @@ async function completeActiveBonus(input: {
     .single();
 
   if (error || !updatedTeam) {
-    return { success: false, error: error?.message ?? "Bonus-Update fehlgeschlagen." };
+    return { success: false, error: error?.message ?? playActionError(undefined, "unknown") };
   }
 
   if (finished || allDoneLevels) {
@@ -2454,7 +2461,7 @@ export async function activateReadyBonuses(input: {
   try {
     const { team, player, event } = await assertPlayerSession(input);
     if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft noch nicht." };
+      return { success: false, error: actionErr(event, "notPlaying") };
     }
     const isStudioTest = Boolean(parseContentConfig(event.content_config).is_studio_test);
 
@@ -2611,7 +2618,7 @@ export async function activateReadyBonuses(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Bonus-Activate fehlgeschlagen.",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -2625,12 +2632,12 @@ async function leaveBonusPhase(input: {
 }): Promise<ActionResult<TeamRealtimeState>> {
   const { event, team, player } = await assertPlayerSession(input);
   if (team.status !== "playing") {
-    return { success: false, error: "Das Spiel läuft noch nicht." };
+    return { success: false, error: actionErr(event, "notPlaying") };
   }
 
   const gameState = parseTeamGameState(team.game_state);
   if (gameState.current_phase !== "bonus") {
-    return { success: false, error: "Keine Bonusphase aktiv." };
+    return { success: false, error: actionErr(event, "noBonusPhase") };
   }
 
   const bonusLevel = team.current_level || 1;
@@ -2745,7 +2752,7 @@ export async function submitBonusAnswer(input: {
   try {
     const { event, team, player } = await assertPlayerSession(input);
     if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft noch nicht." };
+      return { success: false, error: actionErr(event, "notPlaying") };
     }
 
     const gameState = parseTeamGameState(team.game_state);
@@ -2754,7 +2761,7 @@ export async function submitBonusAnswer(input: {
       gameState.current_phase === "bonus" ||
       (gameState.bonus_queue ?? []).some((item) => item.status === "active");
     if (!hasLiveBonus) {
-      return { success: false, error: "Keine Bonusphase aktiv." };
+      return { success: false, error: actionErr(event, "noBonusPhase") };
     }
 
     return completeActiveBonus({
@@ -2770,7 +2777,7 @@ export async function submitBonusAnswer(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Bonus fehlgeschlagen.",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -2785,7 +2792,7 @@ export async function beginBonusPresentation(input: {
   try {
     const { event, team, player } = await assertPlayerSession(input);
     if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft noch nicht." };
+      return { success: false, error: actionErr(event, "notPlaying") };
     }
 
     const gameState = parseTeamGameState(team.game_state);
@@ -2810,7 +2817,7 @@ export async function beginBonusPresentation(input: {
       : gameState.active_bonus;
 
     if (!active) {
-      return { success: false, error: "Kein aktiver Bonus." };
+      return { success: false, error: actionErr(event, "noActiveBonus") };
     }
 
     const bonusId = fromQueue?.bonus_id ?? bonusSessionId(active);
@@ -2838,7 +2845,7 @@ export async function beginBonusPresentation(input: {
       fromQueue?.for_player_id !== player.id &&
       !canPresentBonus(bonus, player.role as PlayerRole, { claimUnassigned })
     ) {
-      return { success: false, error: "Diese Bonusaufgabe ist für eine andere Rolle." };
+      return { success: false, error: actionErr(event, "bonusOtherRole") };
     }
 
     const nextGameState: TeamGameState = {
@@ -2861,7 +2868,7 @@ export async function beginBonusPresentation(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Bonus-Start fehlgeschlagen.",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -2877,28 +2884,28 @@ export async function handOffBonus(input: {
   try {
     const { event, team, player } = await assertPlayerSession(input);
     if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft noch nicht." };
+      return { success: false, error: actionErr(event, "notPlaying") };
     }
     if (!input.toPlayerId || input.toPlayerId === player.id) {
-      return { success: false, error: "Bitte jemand anderen auswählen." };
+      return { success: false, error: actionErr(event, "pickSomeoneElse") };
     }
 
     const gameState = parseTeamGameState(team.game_state);
     const claimUnassigned = (await countActivePlayers(team.id)) <= 1;
     const item = (gameState.bonus_queue ?? []).find((entry) => entry.bonus_id === input.bonusId);
     if (!item || (item.status !== "active" && item.status !== "ready")) {
-      return { success: false, error: "Kein aktiver Bonus." };
+      return { success: false, error: actionErr(event, "noActiveBonus") };
     }
     if (item.for_team) {
-      return { success: false, error: "Diese Aufgabe sehen schon alle." };
+      return { success: false, error: actionErr(event, "alreadyTeamBonus") };
     }
     if (gameState.bonus_sessions?.[item.bonus_id]?.reveal) {
-      return { success: false, error: "Die Aufgabe ist schon beantwortet." };
+      return { success: false, error: actionErr(event, "alreadyAnswered") };
     }
     if (
       !bonusQueueItemMatchesPlayer(item, player.role, player.id, { claimUnassigned })
     ) {
-      return { success: false, error: "Nur wer die Aufgabe hat, kann sie weitergeben." };
+      return { success: false, error: actionErr(event, "onlyHolderHandsOff") };
     }
 
     const supabase = createAdminClient();
@@ -2912,7 +2919,7 @@ export async function handOffBonus(input: {
 
     if (targetError) throw new Error(targetError.message);
     if (!target) {
-      return { success: false, error: "Mitspieler nicht gefunden." };
+      return { success: false, error: actionErr(event, "teammateMissing") };
     }
 
     const nowIso = new Date().toISOString();
@@ -3001,7 +3008,7 @@ export async function handOffBonus(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Weitergeben fehlgeschlagen.",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -3016,7 +3023,7 @@ export async function advanceBonusAfterReveal(input: {
   try {
     const { event, team, player } = await assertPlayerSession(input);
     if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft noch nicht." };
+      return { success: false, error: actionErr(event, "notPlaying") };
     }
     const gameState = parseTeamGameState(team.game_state);
     const bonusId =
@@ -3033,7 +3040,7 @@ export async function advanceBonusAfterReveal(input: {
       Boolean(gameState.active_bonus?.for_team) ||
       gameState.current_phase === "bonus";
     if (isTeamBonus && !(await playerCanPaceTeam(team.id, player))) {
-      return { success: false, error: "Nur die Team-Leitung kann weitergehen." };
+      return { success: false, error: actionErr(event, "onlyLead") };
     }
     return finishRevealedBonus({
       event,
@@ -3084,7 +3091,7 @@ export async function skipBonusPhase(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Bonus überspringen fehlgeschlagen.",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }
@@ -3101,7 +3108,7 @@ export async function expireMissionClock(input: {
       return { success: true, data: buildRealtimeState(team, player) };
     }
     if (team.status !== "playing") {
-      return { success: false, error: "Das Spiel läuft gerade nicht." };
+      return { success: false, error: actionErr(event, "notPlayingNow") };
     }
     if (!team.started_at) {
       return { success: true, data: buildRealtimeState(team, player) };
@@ -3140,7 +3147,7 @@ export async function expireMissionClock(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Zeitablauf fehlgeschlagen.",
+      error: error instanceof Error ? error.message : playActionError(undefined, "unknown"),
     };
   }
 }

@@ -28,7 +28,7 @@ import type { LevelRevealState } from "@/lib/grid/game-state";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
 import { MediaCapturePanel } from "@/components/game/media-capture-panel";
 import type { CaptureBrandStamp } from "@/lib/grid/capture-stamp";
-import { playUi } from "@/lib/grid/play-ui";
+import { playGeoError, playUi } from "@/lib/grid/play-ui";
 
 type LevelSolvePanelProps = {
   level: LevelDefinition;
@@ -105,7 +105,8 @@ export function LevelSolvePanel({
   );
 
   const gpsEnabled = level.type === "gps" && Boolean(level.location) && isNavigator;
-  const { sample, error: gpsError, isLoading: gpsLoading } = useGeolocation(gpsEnabled);
+  const { sample, errorKind, isLoading: gpsLoading } = useGeolocation(gpsEnabled);
+  const gpsError = playGeoError(language, errorKind);
 
   const distance =
     sample && level.location ? distanceMeters(sample, level.location) : null;
@@ -246,7 +247,7 @@ export function LevelSolvePanel({
         }
       >
         <Check className="h-5 w-5 text-[var(--cg-success)]" />
-        {isMedia ? "Übersprungen" : `Lösung: ${solutionText}`}
+        {isMedia ? t.solve.skipped : t.solve.solution(solutionText)}
       </p>
       <p
         className={
@@ -255,12 +256,12 @@ export function LevelSolvePanel({
             : "text-center text-sm text-slate-500"
         }
       >
-        Aufgabe abgeschlossen · 0 Punkte
+        {t.solve.doneZero}
       </p>
       {canPaceTeam ? (
         cityStyle ? (
           <BigButton disabled={disabled || isPending} onClick={submitRevealSolution}>
-            {isPending ? "Sende…" : "Weiter"}
+            {isPending ? t.solve.sending : t.solve.continue}
           </BigButton>
         ) : (
           <GridButton
@@ -268,7 +269,7 @@ export function LevelSolvePanel({
             disabled={disabled || isPending}
             onClick={submitRevealSolution}
           >
-            {isPending ? "Sende…" : "Weiter"}
+            {isPending ? t.solve.sending : t.solve.continue}
           </GridButton>
         )
       ) : (
@@ -282,6 +283,7 @@ export function LevelSolvePanel({
       <RevealSolutionControl
         disabled={disabled || isPending}
         onConfirmReveal={revealAndSkip}
+        language={language}
       />
     ) : null;
 
@@ -324,16 +326,14 @@ export function LevelSolvePanel({
         <LevelTaskCard>
           <SectionLabel>Wegpunkt</SectionLabel>
           <p className="text-sm text-[var(--cg-muted)]">
-            Der Team-Leiter bestätigt diesen Wegpunkt vor Ort. Ihr könnt parallel Hinweise nutzen und
-            Rätsel lösen.
+            {t.solve.leadConfirms}
           </p>
         </LevelTaskCard>
       );
     }
     return (
       <GridHint tone="info">
-        Der Team-Leiter bestätigt diesen Wegpunkt vor Ort. Ihr könnt parallel Hinweise nutzen und
-        Rätsel lösen.
+        {t.solve.leadConfirms}
       </GridHint>
     );
   }
@@ -347,6 +347,7 @@ export function LevelSolvePanel({
         startedAt={levelStartedAt}
         fallbackStartedAt={fallbackStartedAt}
         compact={cityStyle}
+        language={language}
       />
     ) : level.scoring ? (
       <div className="flex flex-wrap gap-2 text-xs">
@@ -358,7 +359,7 @@ export function LevelSolvePanel({
           }
         >
           {level.scoring.points >= 0 ? "+" : ""}
-          {level.scoring.points} Punkte
+          {level.scoring.points} {t.scoring.points}
         </span>
       </div>
     ) : null;
@@ -372,13 +373,13 @@ export function LevelSolvePanel({
             : "rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600"
         }
       >
-        {gpsLoading ? <p>Standort wird ermittelt…</p> : null}
+        {gpsLoading ? <p>{t.solve.locating}</p> : null}
         {gpsError ? <p className="text-[var(--cg-destructive)]">{gpsError}</p> : null}
         {sample ? (
           <>
             <p className="inline-flex items-center gap-1.5">
               <IconMapPin size={14} className="text-[var(--cg-primary)]" />
-              Entfernung:{" "}
+              {t.solve.distance}{" "}
               <span className="font-semibold text-[var(--cg-fg)]">
                 {distance !== null ? formatDistance(distance) : "—"}
               </span>
@@ -388,13 +389,13 @@ export function LevelSolvePanel({
                 <span className="inline-flex items-center gap-1 font-medium text-[var(--cg-success)]">
                   <IconCheck size={14} />
                   {autoSubmitGps && autoTriggered
-                    ? "Wegpunkt wird bestätigt…"
+                    ? t.solve.confirming
                     : autoSubmitGps
-                      ? "Am Ziel — wird automatisch aktiviert"
-                      : "Am Ziel"}
+                      ? t.solve.atTargetAuto
+                      : t.solve.atTarget}
                 </span>
               ) : (
-                <span className="text-amber-700">Unterwegs zum Ziel</span>
+                <span className="text-amber-700">{t.solve.stillWalking}</span>
               )}
             </p>
           </>
@@ -437,6 +438,7 @@ export function LevelSolvePanel({
                 cityStyle
                 canPaceTeam={canPaceTeam}
                 leadLabel={leadLabel}
+                language={language}
                 onSubmit={onSubmit}
               />
             ) : null}
@@ -446,7 +448,7 @@ export function LevelSolvePanel({
                 ref={textInputRef}
                 value={answer}
                 onChange={(event) => setAnswer(event.target.value)}
-                placeholder="Antwort eintragen…"
+                placeholder={t.solve.placeholderAnswer}
                 disabled={disabled || isPending}
                 className={`w-full rounded-2xl border-2 bg-[var(--cg-bg)] px-4 py-5 text-center text-2xl font-bold tracking-widest text-[var(--cg-fg)] outline-none placeholder:text-[var(--cg-muted)] focus:border-[var(--cg-primary)] disabled:opacity-50 ${
                   feedback?.kind === "wrong"
@@ -512,8 +514,8 @@ export function LevelSolvePanel({
             {level.type === "gps" && autoSubmitGps && !hideGpsStatus ? (
               <p className="text-center text-sm text-[var(--cg-muted)]">
                 {withinRadius
-                  ? "Kein Tippen nötig — der Wegpunkt wird automatisch bestätigt."
-                  : "Zum Zielpunkt laufen — die Aufgabe startet automatisch in der Nähe."}
+                  ? t.solve.autoConfirm
+                  : t.solve.walkToStart}
               </p>
             ) : isMedia ? null : (
               <BigButton
@@ -521,12 +523,12 @@ export function LevelSolvePanel({
                 onClick={handleSubmit}
               >
                 {isPending
-                  ? "Sende…"
+                  ? t.solve.sending
                   : level.type === "gps"
-                    ? "Wegpunkt bestätigen"
+                    ? t.solve.confirmWaypoint
                     : inputMode === "confirm"
                       ? "OK"
-                      : "Antwort prüfen"}
+                      : t.solve.checkAnswer}
               </BigButton>
             )}
 
@@ -545,12 +547,12 @@ export function LevelSolvePanel({
                   {t.menu.atPointCta}
                 </BigButton>
                 <p className="text-center text-xs text-[var(--cg-muted)]">
-                  Wenn GPS hängt — Alpha öffnet fürs Team.
+                  {t.solve.gpsHang}
                 </p>
               </div>
             ) : null}
 
-            <SolveFeedbackBanner feedback={visibleFeedback} />
+            <SolveFeedbackBanner feedback={visibleFeedback} language={language} />
             {revealButton}
           </div>
         )}
@@ -588,6 +590,7 @@ export function LevelSolvePanel({
               cityStyle={false}
               canPaceTeam={canPaceTeam}
               leadLabel={leadLabel}
+              language={language}
               onSubmit={onSubmit}
             />
           ) : null}
@@ -598,7 +601,7 @@ export function LevelSolvePanel({
               <GridInput
                 value={answer}
                 onChange={(event) => setAnswer(event.target.value)}
-                placeholder="Lösung eingeben"
+                placeholder={t.solve.placeholder}
                 disabled={disabled || isPending}
               />
             </div>
@@ -655,11 +658,11 @@ export function LevelSolvePanel({
             </div>
           ) : null}
 
-          {level.type === "gps" && autoSubmitGps && !hideGpsStatus ? (
+            {level.type === "gps" && autoSubmitGps && !hideGpsStatus ? (
             <p className="mt-4 text-sm text-slate-500">
               {withinRadius
-                ? "Kein Tippen nötig — der Wegpunkt wird automatisch bestätigt."
-                : "Zum Zielpunkt laufen — die Aufgabe startet automatisch in der Nähe."}
+                ? t.solve.autoConfirm
+                : t.solve.walkToStart}
             </p>
           ) : isMedia ? null : (
             <GridButton
@@ -669,12 +672,12 @@ export function LevelSolvePanel({
               onClick={handleSubmit}
             >
               {isPending
-                ? "Sende…"
+                ? t.solve.sending
                 : level.type === "gps"
-                  ? "Wegpunkt bestätigen"
+                  ? t.solve.confirmWaypoint
                   : inputMode === "confirm"
                     ? "OK"
-                    : "Antwort senden"}
+                    : t.solve.sendAnswer}
             </GridButton>
           )}
 
@@ -697,7 +700,7 @@ export function LevelSolvePanel({
 
           {revealButton}
           <div className="mt-3">
-            <SolveFeedbackBanner feedback={visibleFeedback} />
+            <SolveFeedbackBanner feedback={visibleFeedback} language={language} />
           </div>
         </>
       )}

@@ -25,8 +25,9 @@ import {
   type RoleDisplayLabels,
 } from "@/lib/grid/role-labels";
 import type { ContentMode } from "@/lib/cms/layer-model";
-import { hubMeta } from "@/lib/grid/play-slots";
+import { hubLabel } from "@/lib/grid/play-slots";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { playUi } from "@/lib/grid/play-ui";
 import { CityTeamBar } from "@/components/game/city/team-bar";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
 import type { CaptureBrandStamp } from "@/lib/grid/capture-stamp";
@@ -75,6 +76,7 @@ type Props = {
   teamSession?: BonusSessionState | null;
   canPaceTeam?: boolean;
   leadLabel?: string;
+  language?: string | null;
   teammates?: TeammateOption[];
   /** Full team including me — used to address bonuses by player name. */
   audiencePlayers?: BonusAudiencePlayer[];
@@ -112,6 +114,7 @@ export function PlayBonusView({
   teamSession = null,
   canPaceTeam = false,
   leadLabel = "Team Lead",
+  language,
   onBegin,
   onSubmit,
   onContinue,
@@ -125,6 +128,7 @@ export function PlayBonusView({
   brandStamp,
   onHandOff,
 }: Props) {
+  const t = playUi(language);
   const answerMode = bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");
   const mediaKind = bonusMediaKind(bonus);
   const { taskText, successText } = resolveBonusPlayerCopy(bonus);
@@ -164,7 +168,7 @@ export function PlayBonusView({
           correct: false,
           reward: 0,
           selected_option_id: "",
-          attempt_label: "Zeit abgelaufen",
+          attempt_label: t.bonus.attemptTimeout,
           revealed_at: localTimeoutAt ?? scoringStartedAt ?? "",
           timed_out: true,
         }
@@ -188,7 +192,7 @@ export function PlayBonusView({
       ? numberParts.map((p) => p.trim()).join("")
       : textAnswer.trim();
 
-  const hub = hubMeta(mode);
+  const hubName = hubLabel(mode, language);
   const audienceTarget = { ...bonus, for_player_id: assignedPlayerId };
   const resolvedPlayers: BonusAudiencePlayer[] =
     audiencePlayers.length > 0
@@ -201,6 +205,7 @@ export function PlayBonusView({
   const audienceLabel = bonusAudienceHeadline(audienceTarget, roleLabels, {
     players: resolvedPlayers,
     fallbackName: isMine ? myName : null,
+    language,
   });
   const audience = bonusAudienceIconCount(bonus, audienceNames.length || (isMine ? 1 : 0));
   const audiencePlural = audienceNames.length > 1 || (bonus.for_team && !isMine);
@@ -309,18 +314,18 @@ export function PlayBonusView({
           <span className="cg-animate-pop-in flex h-20 w-20 items-center justify-center rounded-3xl bg-[var(--cg-accent)] text-[var(--cg-accent-fg)] shadow-[var(--cg-shadow-lift)]">
             <IconGift size={40} />
           </span>
-          <SectionLabel>Bonusaufgabe läuft</SectionLabel>
+          <SectionLabel>{t.bonus.running}</SectionLabel>
           <h2 className="mt-2 text-2xl font-bold text-[var(--cg-fg)]">
-            {audiencePlural ? `${audienceLabel} sind dran` : `${audienceLabel} ist dran`}
+            {audiencePlural ? t.bonus.theyAreUpPlural(audienceLabel) : t.bonus.theyAreUp(audienceLabel)}
           </h2>
           <p className="mt-3 max-w-sm text-base text-[var(--cg-muted)]">
-            Nur {audienceLabel} {audiencePlural ? "sehen" : "sieht"} die Aufgabe. Danach geht
-            es für alle weiter zur {hub.hubLabelDe}.
+            {audiencePlural ? t.bonus.onlySee(audienceLabel) : t.bonus.onlySees(audienceLabel)}{" "}
+            {t.bonus.thenHub(hubName)}
           </p>
         </div>
         <div className="mt-auto pt-8">
           <BigButton variant="ghost" disabled={disabled || isPending} onClick={onSkipWaiting}>
-            Weiter ohne Bonus (Team)
+            {t.bonus.skipTeam}
           </BigButton>
         </div>
       </section>
@@ -333,20 +338,21 @@ export function PlayBonusView({
         kind="bonus"
         title={
           bonus.for_team
-            ? "Nächste Aufgabe für alle"
+            ? t.bonus.nextForAll
             : audienceNames.length > 1
-              ? "Folgende Aufgabe ist für euch"
-              : "Folgende Aufgabe ist für dich"
+              ? t.bonus.nextForYouPlural
+              : t.bonus.nextForYou
         }
         highlight={audienceLabel}
         subtitle={
           bonus.for_team
-            ? "Macht euch bereit — die Bonusaufgabe erscheint gleich auf jedem Gerät."
+            ? t.bonus.readyAll
             : audienceNames.length > 1
-              ? "Nur auf euren Handys. Danach seid ihr wieder beim Team."
-              : "Nur auf deinem Handy. Danach bist du wieder bei deinem Team."
+              ? t.bonus.readyPlural
+              : t.bonus.readySolo
         }
         audienceIcons={audience}
+        language={language}
         onDone={beginIntro}
       />
     );
@@ -370,8 +376,8 @@ export function PlayBonusView({
         </span>
         <SectionLabel>
           {bonus.scoring?.countdown_seconds
-            ? "Bonusaufgabe"
-            : `Bonusaufgabe · +${bonus.reward} Punkte`}
+            ? t.bonus.title
+            : `${t.bonus.title} · +${bonus.reward} ${t.scoring.points}`}
         </SectionLabel>
         <h1 className="mt-1 text-2xl font-bold text-[var(--cg-fg)]">{bonus.title}</h1>
       </div>
@@ -383,6 +389,7 @@ export function PlayBonusView({
             startedAt={scoringStartedAt}
             snapshot={scoringSnapshot}
             compact
+            language={language}
           />
         </div>
       ) : null}
@@ -400,9 +407,7 @@ export function PlayBonusView({
         }`}
       >
         <p className="rounded-2xl bg-[var(--cg-accent)]/15 px-4 py-3 text-center text-base font-semibold text-[var(--cg-fg)]">
-          {bonus.for_team
-            ? "Diese Bonusaufgabe sehen alle im Team. Eine Antwort gilt für alle."
-            : `Nur du siehst diese Aufgabe, ${myName}.`}
+          {bonus.for_team ? t.bonus.teamSees : t.bonus.onlySees(myName)}
         </p>
 
         {bonus.hero_image_url ? (
@@ -432,6 +437,7 @@ export function PlayBonusView({
             onPurchaseHint={() => {}}
             cityStyle
             soloAlpha
+            language={language}
           />
         ) : null}
 
@@ -451,6 +457,7 @@ export function PlayBonusView({
             isPending={isPending || submitting}
             captureContext={captureContext}
             brandStamp={brandStamp}
+            language={language}
             allowSkip
             onSubmit={(payload) => {
               if (show || submitting) return;
@@ -499,7 +506,7 @@ export function PlayBonusView({
           <input
             value={show ? attemptLabel : textAnswer}
             onChange={(e) => setTextAnswer(e.target.value)}
-            placeholder="Antwort eintragen…"
+            placeholder={t.bonus.placeholder}
             disabled={locked}
             className={`w-full rounded-2xl border-2 bg-[var(--cg-bg)] px-4 py-4 text-center text-xl font-bold text-[var(--cg-fg)] outline-none focus:border-[var(--cg-primary)] disabled:opacity-70 ${inputTone}`}
           />
@@ -535,7 +542,7 @@ export function PlayBonusView({
             {!mediaKind ? (
               <>
                 <BigButton disabled={locked || !canCheck} onClick={checkAnswer}>
-                  Antwort prüfen
+                  {t.bonus.checkAnswer}
                 </BigButton>
                 <button
                   type="button"
@@ -547,7 +554,7 @@ export function PlayBonusView({
                   }}
                   className="w-full pt-1 text-center text-sm font-semibold text-[var(--cg-muted)] disabled:opacity-40"
                 >
-                  Überspringen · 0 Punkte
+                  {t.bonus.skipZero}
                 </button>
               </>
             ) : null}
@@ -556,7 +563,7 @@ export function PlayBonusView({
                 {pickOpen ? (
                   <div className="space-y-2 rounded-2xl bg-[var(--cg-secondary)] px-3 py-3">
                     <p className="px-1 text-center text-sm font-semibold text-[var(--cg-fg)]">
-                      Wer übernimmt?
+                      {t.bonus.whoTakes}
                     </p>
                     {teammates.map((mate) => (
                       <button
@@ -578,7 +585,7 @@ export function PlayBonusView({
                       onClick={() => setPickOpen(false)}
                       className="w-full pt-1 text-center text-sm font-semibold text-[var(--cg-muted)]"
                     >
-                      Zurück
+                      {t.back}
                     </button>
                   </div>
                 ) : (
@@ -589,7 +596,7 @@ export function PlayBonusView({
                     className="flex w-full items-center justify-center gap-2 rounded-2xl px-3 py-3 text-center text-sm font-semibold text-[var(--cg-muted)] disabled:opacity-40"
                   >
                     <IconUsers size={16} />
-                    Geht bei mir nicht — wer übernimmt?
+                    {t.bonus.cantDo}
                   </button>
                 )}
               </div>
@@ -609,21 +616,19 @@ export function PlayBonusView({
                 </span>
                 <div className="min-w-0 pt-0.5">
                   <p className="text-sm font-bold text-[var(--cg-fg)]">
-                    {answerer} hat {reveal?.reward ?? bonus.reward} Punkte gerade geholt
+                    {t.bonus.scoredBy(answerer, reveal?.reward ?? bonus.reward)}
                   </p>
                   <p className="mt-0.5 text-sm text-[var(--cg-muted)]">
-                    +{reveal?.reward ?? bonus.reward} Punkte für das Team.
+                    {t.bonus.pointsTeam(reveal?.reward ?? bonus.reward)}
                   </p>
                   {mediaKind ? (
                     <>
                       <p className="mt-2 text-sm leading-snug text-[var(--cg-fg)]">
                         {successText ||
-                          (mediaKind === "video"
-                            ? "Das Video liegt in der Team-Galerie. Ihr könnt es später herunterladen."
-                            : "Das Bild liegt in der Team-Galerie. Ihr könnt es später herunterladen.")}
+                          (mediaKind === "video" ? t.bonus.videoGallery : t.bonus.photoGallery)}
                       </p>
                       <p className="mt-1 text-sm font-semibold text-[var(--cg-fg)]">
-                        Macht weiter mit eurer Mission.
+                        {t.solve.continue}
                       </p>
                     </>
                   ) : null}
@@ -641,23 +646,23 @@ export function PlayBonusView({
                   <div className="min-w-0 pt-0.5">
                     <p className="text-sm font-bold text-[var(--cg-destructive)]">
                       {reveal?.timed_out
-                        ? "Zeit abgelaufen — die Bonusaufgabe gilt als nicht gelöst"
-                        : `${answerer} konnte die Aufgabe nicht beantworten`}
+                        ? t.bonus.timedOut
+                        : t.bonus.notAnswered(answerer)}
                     </p>
                     {reveal?.timed_out ? (
                       <p className="mt-1 text-sm leading-snug text-[var(--cg-fg)]">
-                        0 Extra-Punkte — {leadLabel} geht weiter, wenn ihr soweit seid.
+                        {t.bonus.zeroExtraLead(leadLabel)}
                       </p>
                     ) : (
                       <>
                         {attemptLabel ? (
                           <p className="mt-1 text-sm leading-snug text-[var(--cg-fg)]">
-                            Eingabe von {answerer}:{" "}
+                            {t.feedback.yourInput}{" "}
                             <span className="font-bold tracking-wide">{attemptLabel}</span>
                           </p>
                         ) : null}
                         <p className="mt-0.5 text-sm leading-snug text-[var(--cg-muted)]">
-                          Keine Extra-Punkte — {leadLabel} geht weiter, wenn ihr soweit seid.
+                          {t.bonus.zeroExtraLead(leadLabel)}
                         </p>
                       </>
                     )}
@@ -666,7 +671,7 @@ export function PlayBonusView({
 
                 {solutionLabel ? (
                   <div className="rounded-2xl border border-[var(--cg-success)]/40 bg-[var(--cg-success)]/10 px-4 py-3 text-left text-sm text-[var(--cg-fg)]">
-                    <p className="font-semibold text-[var(--cg-success)]">Richtige Antwort</p>
+                    <p className="font-semibold text-[var(--cg-success)]">{t.bonus.rightAnswer}</p>
                     <p className="mt-1 text-base font-bold tracking-wide">{solutionLabel}</p>
                   </div>
                 ) : null}
@@ -675,7 +680,7 @@ export function PlayBonusView({
 
             {canPaceTeam ? (
               <BigButton disabled={isPending || continuing} onClick={handleContinue}>
-                {asymmetricOverlay ? "Zurück zum Team" : `Weiter zur ${hub.hubLabelDe}`}
+                {asymmetricOverlay ? t.bonus.backToTeam : t.bonus.continueTo(hubName)}
               </BigButton>
             ) : (
               <TeamPaceHint canPaceTeam={false} leadLabel={leadLabel} />
@@ -684,7 +689,7 @@ export function PlayBonusView({
         )}
       </div>
 
-      <MediaModal tile={activeTile} onClose={() => setActiveTile(null)} />
+      <MediaModal tile={activeTile} onClose={() => setActiveTile(null)} language={language} />
     </section>
   );
 }

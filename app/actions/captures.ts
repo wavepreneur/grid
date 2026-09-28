@@ -3,7 +3,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertPlayerSession } from "@/lib/grid/session-auth";
 import { loadResolvedEventContent } from "@/lib/grid/content-loader";
-import { getLevelDefinition } from "@/lib/grid/content-engine";
+import { getLevelDefinition, parseContentConfig } from "@/lib/grid/content-engine";
+import { playActionError, playUi } from "@/lib/grid/play-ui";
 import { bonusMediaKind, findBonusInContent } from "@/lib/grid/bonus";
 import { isMediaInputMode } from "@/lib/grid/level-types";
 import type { ActionResult } from "@/lib/grid/types";
@@ -53,8 +54,10 @@ async function assertCaptureAllowed(input: {
   bonusId?: string;
 }) {
   const { event, team, player } = await assertPlayerSession(input);
+  const lang = parseContentConfig(event.content_config).language;
+  const t = playUi(lang);
   if (team.status !== "playing") {
-    throw new Error("Das Spiel läuft gerade nicht.");
+    throw new Error(playActionError(lang, "notPlayingNow"));
   }
 
   const content = await loadResolvedEventContent({
@@ -69,20 +72,16 @@ async function assertCaptureAllowed(input: {
     const bonus = findBonusInContent(content.levels, input.bonusId, input.levelNumber);
     const media = bonus ? bonusMediaKind(bonus) : null;
     if (media && media !== input.kind) {
-      throw new Error(
-        media === "video"
-          ? "Diese Aufgabe erwartet ein Video."
-          : "Diese Aufgabe erwartet ein Foto.",
-      );
+      throw new Error(media === "video" ? t.capture.expectVideo : t.capture.expectPhoto);
     }
   } else {
     const level = getLevelDefinition(content, input.levelNumber);
     if (!level || !isMediaInputMode(level.input_mode) || level.input_mode !== input.kind) {
-      throw new Error("Diese Aufgabe nimmt keine Aufnahme entgegen.");
+      throw new Error(t.capture.noCapture);
     }
   }
 
-  return { event, team, player };
+  return { event, team, player, lang };
 }
 
 export async function prepareEventCaptureUpload(input: {
@@ -96,31 +95,33 @@ export async function prepareEventCaptureUpload(input: {
   byteSize: number;
 }): Promise<ActionResult<{ path: string; token: string; signedUrl: string }>> {
   try {
+    const { event } = await assertPlayerSession(input);
+    const t = playUi(parseContentConfig(event.content_config).language);
     const kind = parseCaptureKind(input.kind);
     if (!kind) {
-      return { success: false, error: "Unbekannter Aufnahme-Typ." };
+      return { success: false, error: t.capture.unknownKind };
     }
     if (!Number.isFinite(input.levelNumber)) {
-      return { success: false, error: "Session ungültig." };
+      return { success: false, error: playActionError(parseContentConfig(event.content_config).language, "sessionInvalid") };
     }
     if (!Number.isFinite(input.byteSize) || input.byteSize <= 0) {
-      return { success: false, error: "Keine Datei ausgewählt." };
+      return { success: false, error: t.capture.noFile };
     }
     if (input.byteSize > EVENT_CAPTURE_MAX_BYTES) {
-      return { success: false, error: "Datei zu groß (max. 25 MB)." };
+      return { success: false, error: t.capture.tooBig };
     }
     const mimeType = normalizeCaptureMime(input.mimeType, kind);
     if (!mimeType) {
-      return { success: false, error: "Dieses Dateiformat wird nicht unterstützt." };
+      return { success: false, error: t.capture.badFormat };
     }
     if (kind === "video" && !mimeType.startsWith("video/")) {
-      return { success: false, error: "Bitte ein Video senden." };
+      return { success: false, error: t.capture.sendVideo };
     }
     if (kind !== "video" && !mimeType.startsWith("image/")) {
-      return { success: false, error: "Bitte ein Foto senden." };
+      return { success: false, error: t.capture.sendPhoto };
     }
 
-    const { event } = await assertCaptureAllowed({
+    await assertCaptureAllowed({
       inviteCode: input.inviteCode,
       joinCode: input.joinCode,
       sessionId: input.sessionId,
@@ -135,7 +136,7 @@ export async function prepareEventCaptureUpload(input: {
       .from(EVENT_CAPTURES_BUCKET)
       .createSignedUploadUrl(path);
     if (error || !data?.token || !data.signedUrl) {
-      throw new Error(error?.message || "Upload-Link fehlgeschlagen.");
+      throw new Error(error?.message || t.capture.uploadLinkFail);
     }
 
     return {
@@ -149,7 +150,7 @@ export async function prepareEventCaptureUpload(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Upload fehlgeschlagen.",
+      error: error instanceof Error ? error.message : playUi(undefined).capture.uploadFail,
     };
   }
 }
@@ -165,16 +166,18 @@ export async function finalizeEventCapture(input: {
   mimeType: string;
 }): Promise<ActionResult<{ id: string; publicUrl: string }>> {
   try {
+    const { event } = await assertPlayerSession(input);
+    const t = playUi(parseContentConfig(event.content_config).language);
     const kind = parseCaptureKind(input.kind);
     if (!kind) {
-      return { success: false, error: "Unbekannter Aufnahme-Typ." };
+      return { success: false, error: t.capture.unknownKind };
     }
     const mimeType = normalizeCaptureMime(input.mimeType, kind);
     if (!mimeType) {
-      return { success: false, error: "Dieses Dateiformat wird nicht unterstützt." };
+      return { success: false, error: t.capture.badFormat };
     }
 
-    const { event, team, player } = await assertCaptureAllowed({
+    const allowed = await assertCaptureAllowed({
       inviteCode: input.inviteCode,
       joinCode: input.joinCode,
       sessionId: input.sessionId,
@@ -184,8 +187,8 @@ export async function finalizeEventCapture(input: {
     });
 
     const path = input.path.trim();
-    if (!path.startsWith(`${event.id}/`) || path.includes("..")) {
-      return { success: false, error: "Upload ungültig." };
+    if (!path.startsWith(`${allowed.event.id}/`) || path.includes("..")) {
+      return { success: false, error: t.capture.invalidUpload };
     }
 
     const supabase = createAdminClient();
@@ -196,9 +199,9 @@ export async function finalizeEventCapture(input: {
     const { data, error } = await supabase
       .from("event_captures")
       .insert({
-        event_id: event.id,
-        team_id: team.id,
-        player_id: player.id,
+        event_id: allowed.event.id,
+        team_id: allowed.team.id,
+        player_id: allowed.player.id,
         level_number: input.levelNumber,
         kind,
         storage_path: path,
@@ -217,7 +220,7 @@ export async function finalizeEventCapture(input: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Upload fehlgeschlagen.",
+      error: error instanceof Error ? error.message : playUi(undefined).capture.uploadFail,
     };
   }
 }
@@ -229,15 +232,16 @@ export async function listTeamEventCaptures(input: {
 }): Promise<ActionResult<{ items: EventCaptureItem[] }>> {
   try {
     const { event, team } = await assertPlayerSession(input);
+    const t = playUi(parseContentConfig(event.content_config).language);
     if (team.status !== "playing" && team.status !== "finished") {
-      return { success: false, error: "Galerie ist jetzt nicht verfügbar." };
+      return { success: false, error: t.capture.galleryClosed };
     }
     const items = await listEventCapturesByEventId(event.id, team.id);
     return { success: true, data: { items } };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Galerie nicht geladen.",
+      error: error instanceof Error ? error.message : playUi(undefined).capture.galleryFail,
     };
   }
 }

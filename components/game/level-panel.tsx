@@ -10,7 +10,7 @@ import {
 import { distanceMeters, formatDistance, isWithinGeofenceForPlay } from "@/lib/grid/geofence";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
 import type { LevelDefinition } from "@/lib/grid/level-types";
-import { playUi } from "@/lib/grid/play-ui";
+import { playGeoError, playUi } from "@/lib/grid/play-ui";
 
 type LevelPanelProps = {
   level: LevelDefinition;
@@ -38,7 +38,8 @@ export function LevelPanel({
   const [answer, setAnswer] = useState("");
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const gpsEnabled = level.type === "gps" && Boolean(level.location) && isNavigator;
-  const { sample, error: gpsError, isLoading: gpsLoading } = useGeolocation(gpsEnabled);
+  const { sample, errorKind, isLoading: gpsLoading } = useGeolocation(gpsEnabled);
+  const gpsError = playGeoError(language, errorKind);
 
   const distance =
     sample && level.location
@@ -69,11 +70,11 @@ export function LevelPanel({
     <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-medium text-slate-500">
-          Aufgabe {level.level}
+          {t.sync.taskN(level.level)}
         </p>
         {level.type === "gps" ? (
           <span className="text-xs font-medium text-teal-600">
-            {isNavigator ? "GPS · Team-Leiter" : "Team-Leiter vor Ort"}
+            {isNavigator ? t.solve.gpsLead : t.solve.gpsOnSite}
           </span>
         ) : null}
       </div>
@@ -83,26 +84,26 @@ export function LevelPanel({
 
       {level.type === "gps" && level.location && isNavigator ? (
         <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          {gpsLoading ? <p>Standort wird ermittelt…</p> : null}
+          {gpsLoading ? <p>{t.solve.locating}</p> : null}
           {gpsError ? <p className="text-red-600">{gpsError}</p> : null}
           {sample ? (
             <>
               <p>
-                Entfernung:{" "}
+                {t.solve.distance}{" "}
                 <span className="font-semibold text-slate-900">
                   {distance !== null ? formatDistance(distance) : "—"}
                 </span>
               </p>
               <p className="mt-1">
                 {withinRadius ? (
-                  <span className="font-medium text-emerald-700">Am Ziel</span>
+                  <span className="font-medium text-emerald-700">{t.solve.atTarget}</span>
                 ) : (
-                  <span className="text-amber-700">Noch unterwegs</span>
+                  <span className="text-amber-700">{t.solve.stillWalking}</span>
                 )}
               </p>
             </>
           ) : !gpsLoading && !gpsError ? (
-            <p>Standortfreigabe im Browser erlauben.</p>
+            <p>{t.solve.allowLocation}</p>
           ) : null}
         </div>
       ) : null}
@@ -110,18 +111,18 @@ export function LevelPanel({
       {level.type === "gps" && !isNavigator ? (
         <div className="mt-4">
           <GridHint tone="info">
-            Der Team-Leiter bestätigt diesen Wegpunkt vor Ort. Ihr könnt parallel Rätsel lösen.
+            {t.solve.leadConfirms}
           </GridHint>
         </div>
       ) : null}
 
       {level.type === "digital" ? (
         <div className="mt-4">
-          <GridLabel>Antwort</GridLabel>
+          <GridLabel>{t.solve.answerLabel}</GridLabel>
           <GridInput
             value={answer}
             onChange={(event) => setAnswer(event.target.value)}
-            placeholder="Lösung eingeben"
+            placeholder={t.solve.placeholder}
             disabled={disabled || isPending}
           />
         </div>
@@ -160,7 +161,7 @@ export function LevelPanel({
             }
             onClick={handleSubmit}
           >
-            {isPending ? "Sende…" : "Aufgabe abschließen"}
+            {isPending ? t.solve.sending : t.solve.completeTask}
           </GridButton>
           {level.type === "gps" && isNavigator ? (
             <GridButton

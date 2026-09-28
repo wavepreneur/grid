@@ -1,5 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeCode } from "@/lib/grid/codes";
+import { parseContentConfig } from "@/lib/grid/content-engine";
+import { playActionError } from "@/lib/grid/play-ui";
 
 export async function getEventByInviteCode(inviteCode: string) {
   const supabase = createAdminClient();
@@ -48,19 +50,18 @@ export async function assertPlayerSession(input: {
 }) {
   const event = await getEventByInviteCode(input.inviteCode);
   if (!event) {
-    throw new Error("Event nicht gefunden.");
+    throw new Error(playActionError(undefined, "eventMissing"));
   }
 
+  const lang = parseContentConfig(event.content_config).language;
   const team = await getTeamByJoinCode(input.joinCode, event.id);
   if (!team) {
-    throw new Error("Team nicht gefunden.");
+    throw new Error(playActionError(lang, "teamMissing"));
   }
 
   const player = await getPlayerBySessionId(input.sessionId);
   if (!player || player.team_id !== team.id) {
-    throw new Error(
-      "Deine Session ist abgelaufen. Tritt mit deinem Spielernamen erneut bei.",
-    );
+    throw new Error(playActionError(lang, "sessionExpired"));
   }
 
   return { event, team, player };

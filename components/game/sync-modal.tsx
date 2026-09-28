@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { Flag, PartyPopper } from "lucide-react";
 import { BigButton } from "@/components/game/city/ui";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { playUi } from "@/lib/grid/play-ui";
 import type { GameModalState } from "@/lib/grid/game-state";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
 
@@ -13,6 +14,7 @@ type SyncModalProps = {
   isPending?: boolean;
   canPaceTeam?: boolean;
   leadLabel?: string;
+  language?: string | null;
 };
 
 export function SyncModal({
@@ -21,11 +23,11 @@ export function SyncModal({
   isPending,
   canPaceTeam = false,
   leadLabel = "Team Lead",
+  language,
 }: SyncModalProps) {
+  const t = playUi(language);
   const points =
-    modal.points_earned !== undefined
-      ? `${modal.points_earned >= 0 ? "+" : ""}${modal.points_earned} Punkte`
-      : null;
+    modal.points_earned !== undefined ? t.sync.points(modal.points_earned) : null;
   const hasNote = Boolean(modal.body?.trim());
   const revealed = modal.outcome === "revealed";
 
@@ -69,14 +71,14 @@ export function SyncModal({
             revealed ? "text-[var(--cg-muted)]" : "text-[var(--cg-success)]"
           }`}
         >
-          {revealed ? "0 Punkte" : "Aufgabe geschafft"}
+          {revealed ? t.sync.zeroPoints : t.sync.taskDone}
         </p>
         <h2
           id="sync-modal-title"
           className="cg-animate-pop-in relative mt-2 text-3xl font-bold text-[var(--cg-fg)]"
           style={{ animationDelay: "60ms" }}
         >
-          {revealed ? modal.message : hasNote ? "Gelöst!" : modal.message}
+          {revealed ? modal.message : hasNote ? t.sync.solved : modal.message}
         </h2>
 
         {points ? (
@@ -89,7 +91,7 @@ export function SyncModal({
         ) : null}
 
         <p className="relative mt-1 text-sm text-[var(--cg-muted)]">
-          Aufgabe {modal.level}
+          {t.sync.taskN(modal.level)}
           {modal.solved_by.length > 0 ? <> · {modal.solved_by.join(", ")}</> : null}
         </p>
 
@@ -99,7 +101,7 @@ export function SyncModal({
             style={{ animationDelay: "140ms" }}
           >
             <p className="font-[var(--font-cg-sans)] text-xs font-bold uppercase leading-snug tracking-[0.14em] text-[var(--cg-muted)]">
-              {revealed ? "Wallet" : modal.message}
+              {revealed ? t.wallet : modal.message}
             </p>
             <p className="mt-2.5 font-[var(--font-cg-display)] text-lg font-semibold leading-snug text-[var(--cg-fg)]">
               {revealed ? modal.body : `„${modal.body}“`}
@@ -110,7 +112,7 @@ export function SyncModal({
         <div className="relative mt-8">
           {canPaceTeam ? (
             <BigButton variant="accent" disabled={isPending} onClick={onDismiss}>
-              Weiter
+              {t.solve.continue}
             </BigButton>
           ) : (
             <TeamPaceHint canPaceTeam={false} leadLabel={leadLabel} />

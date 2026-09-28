@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { Check, X } from "lucide-react";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { playUi } from "@/lib/grid/play-ui";
 
 export type SolveFeedbackState = {
   id: number;
@@ -16,10 +17,12 @@ export type SolveFeedbackState = {
 
 type Props = {
   feedback: SolveFeedbackState | null;
+  language?: string | null;
 };
 
 /** Inline banner under the answer form — shake/pop + optional SFX. */
-export function SolveFeedbackBanner({ feedback }: Props) {
+export function SolveFeedbackBanner({ feedback, language }: Props) {
+  const t = playUi(language);
   useEffect(() => {
     if (!feedback) return;
     if (feedback.kind === "wrong") playPlaySfx("wrong");
@@ -39,17 +42,17 @@ export function SolveFeedbackBanner({ feedback }: Props) {
           <X className="h-4 w-4" strokeWidth={2.5} />
         </span>
         <div className="min-w-0 pt-0.5">
-          <p className="text-sm font-bold text-[var(--cg-destructive)]">Noch nicht richtig</p>
+          <p className="text-sm font-bold text-[var(--cg-destructive)]">{t.feedback.notYet}</p>
           {feedback.attemptedAnswer?.trim() ? (
             <p className="mt-1 text-sm leading-snug text-[var(--cg-fg)]">
-              Eure Eingabe:{" "}
+              {t.feedback.yourInput}{" "}
               <span className="font-bold tracking-wide">{feedback.attemptedAnswer.trim()}</span>
             </p>
           ) : null}
           <p className="mt-0.5 text-sm leading-snug text-[var(--cg-muted)]">
             {feedback.attemptedAnswer?.trim()
-              ? "Versucht es erneut."
-              : feedback.message?.trim() || "Probiert es weiter — ihr schafft das."}
+              ? t.feedback.tryAgain
+              : feedback.message?.trim() || t.feedback.keepGoing}
           </p>
         </div>
       </div>
@@ -65,7 +68,7 @@ export function SolveFeedbackBanner({ feedback }: Props) {
       <span className="cg-animate-key-turn flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--cg-success)] text-white">
         <Check className="h-4 w-4" strokeWidth={2.5} />
       </span>
-      <p className="text-sm font-bold text-[var(--cg-fg)]">Antwort erkannt — stark!</p>
+      <p className="text-sm font-bold text-[var(--cg-fg)]">{t.feedback.recognized}</p>
     </div>
   );
 }

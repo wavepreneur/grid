@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BigButton } from "@/components/game/city/ui";
 import { WALLET_UNLOCK_COST, type WalletNote } from "@/lib/grid/wallet";
+import { playUi } from "@/lib/grid/play-ui";
 
 type Props = {
   notes: WalletNote[];
@@ -11,6 +12,7 @@ type Props = {
   purchasePending?: boolean;
   /** Game Over — locked hints stay visible but cannot be bought. */
   purchasesClosed?: boolean;
+  language?: string | null;
 };
 
 export function TeamWalletList({
@@ -19,17 +21,15 @@ export function TeamWalletList({
   onPurchase,
   purchasePending = false,
   purchasesClosed = false,
+  language,
 }: Props) {
+  const t = playUi(language);
   const [confirmLevel, setConfirmLevel] = useState<number | null>(null);
 
   if (notes.length === 0) {
     return (
       <div className="rounded-2xl border-2 border-dashed border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-6">
-        <p className="text-base leading-relaxed text-[var(--cg-muted)]">
-          Hier landen die Hinweise, die in den Leveln gespeichert werden. Sobald nach
-          einer Aufgabe eine Info fürs Team kommt, liegt sie in diesem Ordner — für
-          alle im Team.
-        </p>
+        <p className="text-base leading-relaxed text-[var(--cg-muted)]">{t.walletUi.intro}</p>
       </div>
     );
   }
@@ -45,7 +45,7 @@ export function TeamWalletList({
                 className="rounded-2xl border-2 border-[var(--cg-accent)] bg-[var(--cg-accent)]/15 px-4 py-3.5 shadow-[var(--cg-shadow-soft)]"
               >
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--cg-accent-fg)]">
-                  Nach Level {note.level} · nicht gesammelt
+                  {t.walletUi.afterLevelSkipped(note.level)}
                 </p>
                 <p className="mt-1 text-base font-bold text-[var(--cg-fg)]">{note.title}</p>
                 {note.body ? (
@@ -54,7 +54,7 @@ export function TeamWalletList({
                   </p>
                 ) : null}
                 <p className="mt-2 text-xs font-semibold text-[var(--cg-accent-fg)]">
-                  Lösung zum Level, das ihr direkt gelöst habt.
+                  {t.walletUi.skippedSolution}
                 </p>
               </li>
             );
@@ -68,19 +68,17 @@ export function TeamWalletList({
               className="rounded-2xl bg-[var(--cg-bg)] px-4 py-3.5 shadow-[var(--cg-shadow-soft)]"
             >
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--cg-muted)]">
-                Nach Level {note.level}
+                {t.walletUi.afterLevel(note.level)}
               </p>
               <p className="mt-1 text-base font-bold text-[var(--cg-fg)]">{note.title}</p>
               {confirming && canBuy ? (
                 <div className="mt-3 space-y-3">
                   <p className="text-sm leading-relaxed text-[var(--cg-fg)]">
-                    Hinweis für{" "}
-                    <span className="font-bold">{WALLET_UNLOCK_COST} Punkte</span>{" "}
-                    freischalten? Alle im Team sehen ihn danach.
+                    {t.walletUi.buyQ(WALLET_UNLOCK_COST)}
                   </p>
                   {!canAfford ? (
                     <p className="text-sm font-semibold text-[var(--cg-destructive)]">
-                      Nicht genug Punkte (habt {score}, braucht {WALLET_UNLOCK_COST}).
+                      {t.walletUi.notEnough(score, WALLET_UNLOCK_COST)}
                     </p>
                   ) : null}
                   <BigButton
@@ -88,20 +86,20 @@ export function TeamWalletList({
                     disabled={purchasePending || !canAfford}
                     onClick={() => onPurchase?.(note.level)}
                   >
-                    {purchasePending ? "Wird gekauft…" : "Ja, kaufen"}
+                    {purchasePending ? t.walletUi.buying : t.walletUi.buyYes}
                   </BigButton>
                   <BigButton
                     variant="ghost"
                     disabled={purchasePending}
                     onClick={() => setConfirmLevel(null)}
                   >
-                    Abbrechen
+                    {t.hint.cancel}
                   </BigButton>
                 </div>
               ) : (
                 <div className="mt-2 space-y-3">
                   <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
-                    Diesen Hinweis könnt ihr für {WALLET_UNLOCK_COST} Punkte anzeigen lassen.
+                    {t.walletUi.canShow(WALLET_UNLOCK_COST)}
                   </p>
                   {canBuy ? (
                     <BigButton
@@ -109,7 +107,7 @@ export function TeamWalletList({
                       disabled={purchasePending}
                       onClick={() => setConfirmLevel(note.level)}
                     >
-                      Für {WALLET_UNLOCK_COST} Punkte anzeigen
+                      {t.walletUi.showFor(WALLET_UNLOCK_COST)}
                     </BigButton>
                   ) : null}
                 </div>
@@ -124,7 +122,7 @@ export function TeamWalletList({
             className="rounded-2xl bg-[var(--cg-bg)] px-4 py-3.5 shadow-[var(--cg-shadow-soft)]"
           >
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--cg-muted)]">
-              Nach Level {note.level}
+              {t.walletUi.afterLevel(note.level)}
             </p>
             <p className="mt-1 text-base font-bold text-[var(--cg-fg)]">{note.title}</p>
             <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-[var(--cg-fg)]">
@@ -132,7 +130,7 @@ export function TeamWalletList({
             </p>
             {note.purchased_by ? (
               <p className="mt-2 text-xs font-semibold text-[var(--cg-muted)]">
-                Gekauft von {note.purchased_by}
+                {t.walletUi.boughtBy(note.purchased_by)}
               </p>
             ) : null}
           </li>

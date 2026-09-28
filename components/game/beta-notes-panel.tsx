@@ -4,6 +4,7 @@ import { ContentTileGrid } from "@/components/game/content-tile-grid";
 import { SectionLabel } from "@/components/game/city/ui";
 import type { PurchasedTileHint } from "@/lib/grid/game-state";
 import type { LevelContentTile } from "@/lib/grid/level-types";
+import { playUi } from "@/lib/grid/play-ui";
 
 type BetaNotesPanelProps = {
   tiles: LevelContentTile[];
@@ -17,6 +18,7 @@ type BetaNotesPanelProps = {
   soloAlpha?: boolean;
   /** City-Game Look — gleiche Kacheln wie Studio-Vorschau / frontend_idee. */
   cityStyle?: boolean;
+  language?: string | null;
 };
 
 export function BetaNotesPanel({
@@ -30,16 +32,16 @@ export function BetaNotesPanel({
   layout = "inline",
   soloAlpha = false,
   cityStyle = false,
+  language,
 }: BetaNotesPanelProps) {
+  const t = playUi(language);
   if (tiles.length === 0) {
     if (cityStyle) {
       return (
         <div className="rounded-3xl bg-[var(--cg-card)] px-4 py-4 text-sm text-[var(--cg-muted)] shadow-[var(--cg-shadow-soft)]">
-          <SectionLabel>Hinweise & Dokumente</SectionLabel>
+          <SectionLabel>{t.notes.heading}</SectionLabel>
           <p className="mt-2">
-            {soloAlpha
-              ? "Solo-Modus: Für diese Aufgabe liegen keine extra Dokumente vor."
-              : "Für diese Aufgabe liegen keine extra Dokumente vor."}
+            {soloAlpha ? t.notes.noneSolo : t.notes.none}
           </p>
         </div>
       );
@@ -47,12 +49,10 @@ export function BetaNotesPanel({
     return (
       <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4 text-sm text-slate-600">
         <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
-          Hinweise & Dokumente
+          {t.notes.heading}
         </p>
         <p className="mt-2">
-          {soloAlpha
-            ? "Solo-Modus: Für diese Aufgabe liegen keine extra Dokumente vor."
-            : "Für diese Aufgabe liegen keine extra Dokumente vor."}
+          {soloAlpha ? t.notes.noneSolo : t.notes.none}
         </p>
       </div>
     );
@@ -70,6 +70,7 @@ export function BetaNotesPanel({
       layout={layout}
       cityStyle={cityStyle}
       soloAlpha={soloAlpha}
+      language={language}
     />
   );
 }

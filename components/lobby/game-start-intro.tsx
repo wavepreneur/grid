@@ -67,12 +67,10 @@ export function GameStartIntro({
       </div>
 
       <main className="relative z-[1] mx-auto flex w-full max-w-lg flex-1 flex-col px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2">
-        <div className="-mt-6 flex items-center justify-center gap-2">
-          <h1 className="text-center text-[1.35rem] font-extrabold leading-snug tracking-tight text-slate-900 sm:text-2xl">
-            {gameTitle}
-          </h1>
-          <LanguageBadge language={language} />
-        </div>
+        <h1 className="-mt-6 text-center text-[1.35rem] font-extrabold leading-snug tracking-tight text-slate-900 sm:text-2xl">
+          {gameTitle}
+          <LanguageBadge className="ml-2 align-middle" language={language} />
+        </h1>
         {text ? (
           <p className="mt-3 whitespace-pre-wrap text-center text-[1.05rem] leading-relaxed text-slate-600">
             {text}
@@ -100,6 +98,7 @@ export function GameStartIntro({
         title={t.intro.rules}
         url={briefingUrlWithLang(briefingIframeUrl, language ?? "de")}
         emptyHint={t.intro.rulesEmpty}
+        language={language}
         onClose={() => setRulesOpen(false)}
       />
 

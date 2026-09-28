@@ -110,13 +110,14 @@ export function ExitmaniaLevelView({
               startedAt={levelStartedAt}
               fallbackStartedAt={teamStartedAt}
               compact
+              language={language}
             />
           </div>
         ) : null}
       </div>
 
       <div className="flex min-h-[10rem] flex-1 flex-col justify-center px-4 py-8 sm:px-5 sm:py-10">
-        <BetaNotesPanel {...betaPanelProps} layout="inline" cityStyle />
+        <BetaNotesPanel {...betaPanelProps} layout="inline" cityStyle language={language} />
       </div>
 
       <div className="mt-auto shrink-0 px-4 pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom)))] pt-2 sm:px-5">
@@ -149,8 +150,9 @@ export function ExitmaniaLevelView({
         score={score}
         isPending={isPending}
         onPurchaseHint={onPurchaseHint}
+        language={language}
       />
-      <HintUnlockToast purchasedHints={purchasedHints} myPlayerId={myPlayerId} />
+      <HintUnlockToast purchasedHints={purchasedHints} myPlayerId={myPlayerId} language={language} />
     </div>
   );
 }

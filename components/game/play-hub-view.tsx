@@ -26,8 +26,8 @@ import { FormattedTaskText } from "@/components/game/formatted-task-text";
 import type { GameLevelStatus } from "@/lib/grid/game-state";
 import type { LevelDefinition, GeolocationSample } from "@/lib/grid/level-types";
 import type { GpsFixPayload } from "@/lib/hooks/use-team-sync";
-import { hubMeta } from "@/lib/grid/play-slots";
-import { playUi } from "@/lib/grid/play-ui";
+import { hubLabel } from "@/lib/grid/play-slots";
+import { playGeoError, playUi } from "@/lib/grid/play-ui";
 import { useGeoAccess } from "@/lib/hooks/use-geo-access";
 import { PlayGpsBlockedModal } from "@/components/game/play-gps-blocked-modal";
 
@@ -101,7 +101,8 @@ export function PlayHubView({
   onGiveLead,
   hideGpsLeadModal = false,
 }: Props) {
-  const meta = hubMeta(mode);
+  const t = playUi(language);
+  const metaLabel = hubLabel(mode, language);
   const current = levels.find((l) => l.level === activeLevel) ?? levels[0];
   const [code, setCode] = useState("");
   const [codeFor, setCodeFor] = useState<number | null>(null);
@@ -171,14 +172,12 @@ export function PlayHubView({
     return (
       <section className="flex flex-col gap-4 px-4 pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom)))] pt-2">
         <header>
-          <SectionLabel>{meta.hubLabelDe}</SectionLabel>
+          <SectionLabel>{metaLabel}</SectionLabel>
           <h1 className="mt-1 text-xl font-bold text-[var(--cg-fg)]">
-            {done.length} von {levels.length} Stationen gelöst
+            {t.hub.indoorDone(done.length, levels.length)}
           </h1>
           <p className="mt-2 text-sm text-[var(--cg-muted)]">
-            {free
-              ? "Sucht den Zettel im Raum, tippt die Station an und gebt den Code ein."
-              : "Der nächste Punkt ist frei. Sucht den Zettel, tippt die Station an, Code eingeben."}
+            {free ? t.hub.indoorFree : t.hub.indoorNext}
           </p>
         </header>
 
@@ -268,12 +267,12 @@ export function PlayHubView({
                         }`}
                       >
                         {isDone
-                          ? "Gelöst"
+                          ? t.hub.solved
                           : flashWrong
-                            ? "Falsch"
+                            ? t.hub.wrong
                             : locked
-                              ? "Noch gesperrt — erst die Station davor"
-                              : s.station?.place?.trim() || "Zettel suchen, dann Code"}
+                              ? t.hub.lockedPrev
+                              : s.station?.place?.trim() || t.hub.findNote}
                       </span>
                     </span>
                   </button>
@@ -292,12 +291,12 @@ export function PlayHubView({
                     >
                       {flashWrong ? (
                         <p className="py-2 text-center text-lg font-extrabold uppercase tracking-wide text-[var(--cg-destructive)]">
-                          Falsch
+                          {t.hub.wrong}
                         </p>
                       ) : (
                         <>
                           <p className="text-sm text-[var(--cg-muted)]">
-                            Code vom Zettel dieser Station — 4 Zeichen, Zahlen und Buchstaben.
+                            {t.hub.codeHint}
                           </p>
                           <input
                             ref={codeInputRef}
@@ -329,7 +328,7 @@ export function PlayHubView({
                               }, 850);
                             }}
                           >
-                            Code prüfen
+                            {t.hub.checkCode}
                           </BigButton>
                         </>
                       )}
@@ -343,11 +342,11 @@ export function PlayHubView({
 
         {allDone ? (
           <p className="rounded-2xl bg-[var(--cg-success)]/20 px-4 py-4 text-center text-base font-bold">
-            Alle Stationen gelöst — auf zur Auswertung!
+            {t.hub.allStationsDone}
           </p>
         ) : next && !free ? (
           <p className="text-center text-sm text-[var(--cg-muted)]">
-            Als Nächstes: {next.station?.name ?? next.title}
+            {t.hub.nextUp(next.station?.name ?? next.title)}
           </p>
         ) : null}
       </section>
@@ -364,19 +363,19 @@ export function PlayHubView({
   return (
     <section className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pb-[max(2.5rem,calc(1.25rem+env(safe-area-inset-bottom)))] pt-2">
       <header>
-        <SectionLabel>{meta.hubLabelDe}</SectionLabel>
+        <SectionLabel>{metaLabel}</SectionLabel>
         <h1 className="mt-1 text-xl font-bold text-[var(--cg-fg)] sm:text-2xl">
-          Mission {next?.level ?? "—"} von {levels.length}
+          {t.hub.missionOf(next?.level ?? 0, levels.length)}
         </h1>
         <p className="mt-2 text-sm text-[var(--cg-muted)]">
-          {doneCount} gelöst · Tippt auf Start, um Quiz und Level zu öffnen.
+          {t.hub.onlineHint(doneCount)}
         </p>
       </header>
 
       {next ? (
         <div className="rounded-3xl border-2 border-[var(--cg-primary)] bg-[var(--cg-card)] p-5 shadow-[var(--cg-shadow-lift)] sm:p-7">
           <SectionLabel>
-            Mission {next.level} von {levels.length}
+            {t.hub.missionOf(next.level, levels.length)}
           </SectionLabel>
           <h2 className="mt-1 text-2xl font-bold text-[var(--cg-fg)] sm:text-3xl">{next.title}</h2>
           {next.teaser ?? next.description ? (
@@ -396,7 +395,7 @@ export function PlayHubView({
               disabled={disabled || isPending}
               onClick={() => onStartMission(next.level)}
             >
-              Mission starten
+              {t.hub.startMission}
             </BigButton>
           </div>
         </div>
@@ -459,9 +458,11 @@ function OutdoorHub({
   const gpsEnabled = (isGpsMode || isWalkMode) && isWalkTracker;
   const {
     sample: leadSample,
-    error: gpsError,
+    errorKind: gpsErrorKind,
     denied: gpsDenied,
   } = useGeolocation(gpsEnabled && isGpsMode);
+  const t = playUi(language);
+  const gpsErrorText = playGeoError(language, gpsErrorKind);
   const sampleRef = useRef(leadSample);
   sampleRef.current = leadSample;
   const sample = useMemo((): GeolocationSample | null => {
@@ -484,12 +485,12 @@ function OutdoorHub({
   const walk = useWalkedDistance(Boolean(gpsEnabled && isWalkMode), {
     storageKey: levelWalkKey,
   });
-  const needsLeadGps = Boolean(
-    isWalkTracker && (isGpsMode || isWalkMode) && !isStudioTest,
-  );
-  const geoAccess = useGeoAccess(needsLeadGps);
+  const watchGps = Boolean(isWalkTracker && (isGpsMode || isWalkMode));
+  const geoAccess = useGeoAccess(watchGps);
   const gpsBlocked =
-    needsLeadGps && (geoAccess.blocked || (isWalkMode ? walk.denied : gpsDenied));
+    watchGps &&
+    !isStudioTest &&
+    (geoAccess.blocked || (isWalkMode ? walk.denied : gpsDenied));
   const gpsBlockedModal = (
     <PlayGpsBlockedModal
       open={gpsBlocked && !hideGpsLeadModal}
@@ -697,9 +698,9 @@ function OutdoorHub({
       <section className="flex min-h-[70vh] flex-col">
         {gpsBlockedModal}
         <div className="space-y-1 px-4 pb-2 pt-2">
-          <SectionLabel>Stadtjagd · Strecke</SectionLabel>
+          <SectionLabel>{t.hub.huntWalk}</SectionLabel>
           <h1 className="text-xl font-bold text-[var(--cg-fg)]">
-            Aufgabe {current.level} von {levels.length}
+            {t.hub.taskOf(current.level, levels.length)}
           </h1>
         </div>
         <OutdoorWalkRing
@@ -708,7 +709,7 @@ function OutdoorHub({
           walkedMeters={walkedMeters}
           disabled={disabled}
           isPending={isPending}
-          gpsError={walk.error}
+          gpsError={playGeoError(language, walk.errorKind)}
           showForceOpen={isWalkTracker}
           onOpen={() => openWithSample(walk.sample, current.level)}
           onForceOpen={() => openWithSample(walk.sample, current.level, "distance")}
@@ -720,9 +721,7 @@ function OutdoorHub({
           language={language}
         />
         <p className="px-5 pb-6 text-center text-sm text-[var(--cg-muted)]">
-          {isWalkTracker
-            ? "Dein Handy zählt die Meter fürs ganze Team. Die anderen Geräte folgen diesem Stand."
-            : "Das Handy vom Team Lead zählt die Strecke. Euer Ring zeigt denselben Stand."}
+          {isWalkTracker ? t.hub.walkLeadCounts : t.hub.walkFollowCounts}
         </p>
       </section>
     );
@@ -748,16 +747,14 @@ function OutdoorHub({
       {gpsBlockedModal}
       <div className="space-y-3 px-4 pb-3 pt-2">
         <header>
-          <SectionLabel>Stadtjagd</SectionLabel>
+          <SectionLabel>{t.hub.hunt}</SectionLabel>
           <h1 className="text-xl font-bold text-[var(--cg-fg)]">
             {routeOrder === "free"
-              ? `${openCount} von ${levels.length} Aufgaben offen`
-              : `Aufgabe ${current.level} von ${levels.length}`}
+              ? t.hub.openOf(openCount, levels.length)
+              : t.hub.taskOf(current.level, levels.length)}
           </h1>
           <p className="mt-1 text-sm text-[var(--cg-muted)]">
-            {routeOrder === "free"
-              ? "Lauft zum nächsten offenen Punkt — Pfeil und Meter kommen vom Team Lead."
-              : "Folgt dem Pfeil. Die Meter zählen auf dem Handy vom Team Lead."}
+            {routeOrder === "free" ? t.hub.followFree : t.hub.followLinear}
           </p>
         </header>
       </div>
@@ -773,20 +770,21 @@ function OutdoorHub({
             distanceToTarget={distanceToTarget}
             withinRadius={withinRadius}
             isTracker={isWalkTracker}
+            language={language}
           />
         ) : null}
       </div>
 
       <div className="mt-3 space-y-3 px-4 pb-[max(1.5rem,calc(0.75rem+env(safe-area-inset-bottom)))] pt-1">
         <div className="min-w-0">
-          <SectionLabel>Euer Ziel</SectionLabel>
+          <SectionLabel>{t.hub.yourTarget}</SectionLabel>
           <p className="truncate text-lg font-bold text-[var(--cg-fg)]">{targetLevel.title}</p>
         </div>
 
         {withinRadius ? (
           <div className="cg-animate-pop-in space-y-2">
             <p className="rounded-xl bg-[var(--cg-success)]/20 px-4 py-3 text-center text-base font-semibold">
-              Ihr seid da! Der Wegpunkt hat sich aktiviert.
+              {t.hub.arrived}
             </p>
             <BigButton
               variant="accent"
@@ -796,23 +794,23 @@ function OutdoorHub({
                 openWithSample(sample, routeOrder === "free" ? targetLevel.level : undefined);
               }}
             >
-              Wegpunkt öffnen
+              {t.hub.openWaypoint}
             </BigButton>
           </div>
         ) : (
           <>
             <p className="text-center text-sm text-[var(--cg-muted)]">
-              Lauft zum Wegpunkt. Bei ca. {playRadius} m piept es und ihr könnt öffnen.
+              {t.hub.walkToPin(playRadius)}
             </p>
             {effectiveHealthBonus > 0 ? (
               <p className="rounded-xl bg-[var(--cg-primary)]/15 px-4 py-3 text-center text-sm font-medium text-[var(--cg-fg)]">
-                GPS ungenau — Radius automatisch um {effectiveHealthBonus} m erweitert.
+                {t.hub.gpsInaccurate(effectiveHealthBonus)}
               </p>
             ) : null}
             <GpsTroubleBlock
               canUnlock={canUnlockGps || isStudioTest}
               disabled={disabled || isPending}
-              gpsError={isWalkTracker ? gpsError : null}
+              gpsError={isWalkTracker ? gpsErrorText : null}
               onUnlock={() =>
                 openWithSample(
                   sample ?? targetLevel.location
@@ -826,12 +824,13 @@ function OutdoorHub({
                   "geofence",
                 )
               }
+              onRetryGps={geoAccess.retry}
               language={language}
             />
             {isStudioTest && targetLevel.location ? (
               <div className="space-y-2 rounded-2xl border border-[var(--cg-primary)]/30 bg-[var(--cg-primary)]/10 px-4 py-3">
                 <p className="text-center text-sm font-semibold text-[var(--cg-fg)]">
-                  Studio-Test — du musst nicht in der Stadt sein
+                  {t.hub.studioTitle}
                 </p>
                 <BigButton
                   variant="accent"
@@ -848,7 +847,7 @@ function OutdoorHub({
                     )
                   }
                 >
-                  Aufgabe hier auslösen
+                  {t.hub.studioOpen}
                 </BigButton>
               </div>
             ) : process.env.NODE_ENV === "development" && targetLevel.location ? (
@@ -866,7 +865,7 @@ function OutdoorHub({
                   )
                 }
               >
-                Ankunft simulieren (Dev)
+                {t.hub.simArrive}
               </BigButton>
             ) : null}
           </>
@@ -921,14 +920,14 @@ function OutdoorTimeWait({
 
   return (
     <section className="flex min-h-[70vh] flex-col px-5 pb-[max(2rem,calc(1rem+env(safe-area-inset-bottom)))] pt-2">
-      <SectionLabel>Stadtjagd · Wartezeit</SectionLabel>
+      <SectionLabel>{t.hub.huntWait}</SectionLabel>
       <h1 className="mt-1 text-xl font-bold text-[var(--cg-fg)]">
-        Aufgabe {levelIndex} von {total}
+        {t.hub.taskOf(levelIndex, total)}
       </h1>
       <p className="mt-6 text-center text-lg font-bold text-[var(--cg-fg)]">{title}</p>
       <p className="mt-8 text-center text-4xl font-bold tabular-nums text-[var(--cg-fg)]">
         {ready
-          ? "Bereit"
+          ? t.hub.waitReady
           : `${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, "0")}`}
       </p>
       <div className="mx-auto mt-6 h-2 w-full max-w-sm overflow-hidden rounded-full bg-[var(--cg-secondary)]">
@@ -938,9 +937,7 @@ function OutdoorTimeWait({
         />
       </div>
       <p className="mt-4 text-center text-sm text-[var(--cg-muted)]">
-        {ready
-          ? "Zeit abgelaufen — öffnet die Aufgabe."
-          : `Noch ca. ${minutes} Min. nach der vorherigen Aufgabe warten.`}
+        {ready ? t.hub.waitOver : t.hub.waitLeft(minutes)}
       </p>
       {ready ? (
         <div className="cg-animate-pop-in mt-8">
@@ -958,15 +955,18 @@ function GpsTroubleBlock({
   disabled,
   gpsError,
   onUnlock,
+  onRetryGps,
   language,
 }: {
   canUnlock: boolean;
   disabled: boolean;
   gpsError: string | null;
   onUnlock: () => void;
+  onRetryGps?: () => void;
   language?: string | null;
 }) {
-  const t = playUi(language);
+  const t = playUi(language).hub;
+  const h = playUi(language);
   const [userOpen, setUserOpen] = useState<boolean | null>(null);
   const [choice, setChoice] = useState<"here" | "broken" | null>(null);
   const open = userOpen ?? Boolean(gpsError);
@@ -980,12 +980,10 @@ function GpsTroubleBlock({
           setUserOpen(!open);
           if (open) setChoice(null);
         }}
-        className="tap-lift w-full rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3 text-left"
+        className="tap-lift w-full rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3 text-center"
       >
-        <span className="block text-sm font-bold text-[var(--cg-fg)]">GPS-Problem?</span>
-        <span className="mt-0.5 block text-xs text-[var(--cg-muted)]">
-          Wir stehen davor, oder der Standort kommt nicht — kurze Auswahl.
-        </span>
+        <span className="block text-sm font-bold text-[var(--cg-fg)]">{t.gpsTrouble}</span>
+        <span className="mt-0.5 block text-xs text-[var(--cg-muted)]">{t.gpsTroubleHint}</span>
       </button>
 
       {open ? (
@@ -993,36 +991,37 @@ function GpsTroubleBlock({
           <button
             type="button"
             onClick={() => setChoice("here")}
-            className={`tap-lift w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${
+            className={`tap-lift w-full rounded-xl px-3 py-2.5 text-center text-sm font-semibold ${
               effectiveChoice === "here"
                 ? "bg-[var(--cg-card)] text-[var(--cg-fg)] ring-1 ring-[var(--cg-primary)]/40"
                 : "text-[var(--cg-fg)]"
             }`}
           >
-            Wir stehen direkt davor — GPS greift nicht
+            {t.gpsHere}
           </button>
           <button
             type="button"
-            onClick={() => setChoice("broken")}
-            className={`tap-lift w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${
+            onClick={() => {
+              setChoice("broken");
+              onRetryGps?.();
+            }}
+            className={`tap-lift w-full rounded-xl px-3 py-2.5 text-center text-sm font-semibold ${
               effectiveChoice === "broken"
                 ? "bg-[var(--cg-card)] text-[var(--cg-fg)] ring-1 ring-[var(--cg-primary)]/40"
                 : "text-[var(--cg-fg)]"
             }`}
           >
-            GPS funktioniert nicht richtig
+            {t.gpsBroken}
           </button>
 
           {effectiveChoice === "here" ? (
             <div className="space-y-2 pt-1">
               {canUnlock ? (
                 <BigButton variant="outline" disabled={disabled} onClick={onUnlock}>
-                  Aufgabe freischalten
+                  {t.gpsUnlock}
                 </BigButton>
               ) : (
-                <p className="text-center text-xs text-[var(--cg-muted)]">
-                  Alpha / GPS-Leiter schaltet den Punkt fürs Team frei.
-                </p>
+                <p className="text-center text-xs text-[var(--cg-muted)]">{t.gpsUnlockLead}</p>
               )}
             </div>
           ) : null}
@@ -1033,16 +1032,14 @@ function GpsTroubleBlock({
                 <p className="text-center text-xs font-semibold text-[var(--cg-fg)]">{gpsError}</p>
               ) : null}
               <p className="text-center text-xs leading-snug text-[var(--cg-muted)]">
-                {t.menu.gpsSettings}
+                {h.menu.gpsSettings}
               </p>
               {canUnlock ? (
                 <BigButton variant="outline" disabled={disabled} onClick={onUnlock}>
-                  Ohne GPS freischalten
+                  {t.gpsSkip}
                 </BigButton>
               ) : (
-                <p className="text-center text-xs text-[var(--cg-muted)]">
-                  Ohne GPS: Alpha tippt „Aufgabe freischalten“.
-                </p>
+                <p className="text-center text-xs text-[var(--cg-muted)]">{t.gpsSkipLead}</p>
               )}
             </div>
           ) : null}

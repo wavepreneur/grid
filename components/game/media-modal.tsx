@@ -8,7 +8,7 @@ import { TileHintModal } from "@/components/game/tile-hint-modal";
 import type { PurchasedTileHint } from "@/lib/grid/game-state";
 import type { LevelContentTile } from "@/lib/grid/level-types";
 import { HINT_POINT_COST } from "@/lib/grid/level-types";
-import { tileTypeLabel } from "@/lib/grid/level-content";
+import { playTileTypeLabel, playUi } from "@/lib/grid/play-ui";
 
 type MediaModalProps = {
   tile: LevelContentTile | null;
@@ -16,6 +16,7 @@ type MediaModalProps = {
   purchasedHints?: Record<string, PurchasedTileHint>;
   score?: number;
   isPending?: boolean;
+  language?: string | null;
   onPurchaseHint?: (tileId: string) => void;
 };
 
@@ -24,8 +25,10 @@ export function MediaModal({
   onClose,
   purchasedHints = {},
   isPending = false,
+  language,
   onPurchaseHint,
 }: MediaModalProps) {
+  const t = playUi(language);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [viewHintOpen, setViewHintOpen] = useState(false);
 
@@ -47,18 +50,18 @@ export function MediaModal({
   const purchased = purchasedHints[tile.id];
   const hasHint = Boolean(tile.hint?.text?.trim());
   const hintCost = tile.hint?.point_cost ?? HINT_POINT_COST;
-  const title = tile.label ?? tileTypeLabel(tile.type);
+  const title = tile.label ?? playTileTypeLabel(tile.type, language);
 
   const tipSlot = hasHint ? (
     <div className="space-y-2">
       {purchased || viewHintOpen ? (
         <>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--cg-success)]">
-            Tipp freigeschaltet
+            {t.hint.unlocked}
           </p>
           {purchased?.unlocked_by ? (
             <p className="text-sm font-semibold text-[var(--cg-muted)]">
-              Von <span className="text-[var(--cg-fg)]">{purchased.unlocked_by}</span> fürs Team
+              {t.hint.byForTeam(purchased.unlocked_by)}
             </p>
           ) : null}
           <p className="text-sm leading-relaxed whitespace-pre-wrap text-[var(--cg-fg)]">
@@ -72,7 +75,7 @@ export function MediaModal({
           disabled={isPending || !onPurchaseHint}
           onClick={() => setConfirmOpen(true)}
         >
-          Tipp freischalten (−{hintCost} P)
+          {t.hint.unlockPts(hintCost)}
         </BigButton>
       )}
     </div>
@@ -87,6 +90,7 @@ export function MediaModal({
         mediaUrl={tile.url}
         onClose={onClose}
         tipSlot={tipSlot}
+        language={language}
       />
 
       <TileHintModal
@@ -95,6 +99,7 @@ export function MediaModal({
         label={title}
         hintCost={hintCost}
         isPending={isPending}
+        language={language}
         onConfirm={() => {
           if (!onPurchaseHint) return;
           onPurchaseHint(tile.id);

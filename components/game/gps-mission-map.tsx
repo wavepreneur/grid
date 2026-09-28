@@ -5,6 +5,7 @@ import type { Map as LeafletMap, Layer } from "leaflet";
 import type { GameLevelStatus } from "@/lib/grid/game-state";
 import type { GeolocationSample, LevelLocation } from "@/lib/grid/level-types";
 import { bearingDegrees, distanceMeters } from "@/lib/grid/geofence";
+import { playUi } from "@/lib/grid/play-ui";
 
 export type GpsMapWaypoint = {
   level: number;
@@ -24,6 +25,7 @@ type GpsMissionMapProps = {
   withinRadius: boolean;
   /** Team-lead device owns GPS; others only mirror. */
   isTracker?: boolean;
+  language?: string | null;
 };
 
 export function GpsMissionMap({
@@ -35,7 +37,9 @@ export function GpsMissionMap({
   distanceToTarget,
   withinRadius,
   isTracker = false,
+  language,
 }: GpsMissionMapProps) {
+  const t = playUi(language).hub;
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const overlayRef = useRef<Layer[]>([]);
@@ -259,7 +263,7 @@ export function GpsMissionMap({
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
             {withinRadius ? (
-              <p className="text-[0.65rem] font-bold text-[var(--cg-success)]">Ziel</p>
+              <p className="text-[0.65rem] font-bold text-[var(--cg-success)]">{t.mapTarget}</p>
             ) : remaining !== null ? (
               <p className="text-base font-bold tabular-nums leading-none text-[var(--cg-fg)]">
                 {remaining}
@@ -271,22 +275,19 @@ export function GpsMissionMap({
         </div>
         <div className="min-w-0 flex-1 text-sm">
           {withinRadius ? (
-            <p className="font-medium text-[var(--cg-success)]">Ihr seid am Punkt.</p>
+            <p className="font-medium text-[var(--cg-success)]">{t.mapAtPoint}</p>
           ) : remaining !== null ? (
             <>
               <p className="font-semibold tabular-nums text-[var(--cg-fg)]">
-                {walked} m gelaufen
-                {startDist ? ` · Start ${Math.round(startDist)} m` : ""}
+                {t.mapWalked(walked, startDist ? Math.round(startDist) : null)}
               </p>
               <p className="mt-0.5 text-[var(--cg-muted)]">
-                {isTracker
-                  ? "Dein Handy zählt die Meter fürs Team."
-                  : "Das Handy vom Team Lead zählt die Meter."}
+                {isTracker ? t.mapLeadCounts : t.mapFollowCounts}
               </p>
             </>
           ) : (
             <p className="text-[var(--cg-muted)]">
-              {isTracker ? "GPS wird gesucht…" : "Warten auf die Position vom Team Lead."}
+              {isTracker ? t.mapSearching : t.mapWaitLead}
             </p>
           )}
         </div>

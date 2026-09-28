@@ -18,7 +18,7 @@ export function isSessionSupersededResult(result: {
 }): boolean {
   if (result.success) return false;
   if (result.code === SESSION_SUPERSEDED) return true;
-  return /Session ungültig|Session ist abgelaufen|Session abgelaufen|anderen Gerät/i.test(
+  return /Session ungültig|Session ist abgelaufen|Session abgelaufen|anderen Gerät|invalid session|session expired|another device/i.test(
     result.error ?? "",
   );
 }

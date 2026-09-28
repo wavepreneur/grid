@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
 import { eventRankingPath } from "@/lib/grid/event-routes";
+import { playUi } from "@/lib/grid/play-ui";
 import { IconCheck, IconMapPin, IconPlay } from "@/components/cms/studio-icons";
 
 type GameHudProps = {
@@ -18,6 +19,7 @@ type GameHudProps = {
   missionDurationMinutes: number;
   showLiveScore: boolean;
   isConnected: boolean;
+  language?: string | null;
 };
 
 export function GameHud({
@@ -33,7 +35,9 @@ export function GameHud({
   missionDurationMinutes,
   showLiveScore,
   isConnected,
+  language,
 }: GameHudProps) {
+  const t = playUi(language);
   const { remainingLabel, isExpired } = useMissionCountdown(
     startedAt,
     missionDurationMinutes,
@@ -69,7 +73,7 @@ export function GameHud({
               className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-700 hover:bg-emerald-100"
             >
               <IconPlay size={12} />
-              Live-Ranking
+              {t.hud.liveRanking}
             </Link>
           ) : null}
           <span
@@ -82,7 +86,7 @@ export function GameHud({
             <span
               className={`h-1.5 w-1.5 rounded-full ${isConnected ? "bg-emerald-500" : "bg-amber-400"}`}
             />
-            {isConnected ? "Verbunden" : "Verbinde…"}
+            {isConnected ? t.hud.connected : t.hud.connecting}
           </span>
         </div>
       </div>
@@ -91,11 +95,11 @@ export function GameHud({
         <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
           <span className="inline-flex items-center gap-1">
             <IconMapPin size={12} />
-            Aufgabe {Math.min(currentLevel, totalLevels)} von {totalLevels}
+            {t.hud.taskOf(Math.min(currentLevel, totalLevels), totalLevels)}
           </span>
           <span className="inline-flex items-center gap-1">
             <IconCheck size={12} />
-            {completedLevels} erledigt
+            {t.hud.doneCount(completedLevels)}
           </span>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-slate-200">

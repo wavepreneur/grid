@@ -3,7 +3,7 @@
 import { mediaTypeLucideIcon } from "@/components/game/city/level-screen-blocks";
 import type { PurchasedTileHint } from "@/lib/grid/game-state";
 import type { LevelContentTile } from "@/lib/grid/level-types";
-import { tileTypeLabel } from "@/lib/grid/level-content";
+import { playTileTypeLabel, playUi } from "@/lib/grid/play-ui";
 
 type ContentTileGridProps = {
   tiles: LevelContentTile[];
@@ -16,6 +16,7 @@ type ContentTileGridProps = {
   layout?: "inline" | "sidebar";
   cityStyle?: boolean;
   soloAlpha?: boolean;
+  language?: string | null;
 };
 
 /** Kachel-Raster — freigeschaltete Tipps sind für alle am Badge sichtbar. */
@@ -27,13 +28,15 @@ export function ContentTileGrid({
   layout = "inline",
   cityStyle = false,
   soloAlpha = false,
+  language,
 }: ContentTileGridProps) {
+  const t = playUi(language);
   const isSidebar = layout === "sidebar";
   const single = tiles.length === 1;
 
   if (tiles.length === 0) return null;
 
-  const heading = single ? "Rätselkachel" : `${tiles.length} Rätselkacheln`;
+  const heading = single ? t.tiles.one : t.tiles.many(tiles.length);
 
   return (
     <div
@@ -51,12 +54,12 @@ export function ContentTileGrid({
             {heading}
           </p>
           <p className="mt-0.5 text-sm font-semibold text-[var(--cg-fg)]/70">
-            {single ? "Antippen zum Öffnen" : "Wischen oder antippen"}
+            {single ? t.tiles.tapOpen : t.tiles.swipeOrTap}
           </p>
         </div>
       ) : (
         <div className="mb-3 flex shrink-0 items-end justify-between gap-2">
-          <p className="text-sm font-medium text-slate-700">Hinweise & Medien</p>
+          <p className="text-sm font-medium text-slate-700">{t.tiles.mediaHeading}</p>
         </div>
       )}
 
@@ -75,7 +78,7 @@ export function ContentTileGrid({
       >
         {cityStyle ? (
           tiles.map((tile) => {
-            const label = tile.label ?? tileTypeLabel(tile.type);
+            const label = tile.label ?? playTileTypeLabel(tile.type, language);
             const size = single
               ? "h-36 w-36 max-w-full sm:h-40 sm:w-40"
               : "h-32 w-32 snap-center sm:h-36 sm:w-36";
@@ -114,7 +117,8 @@ export function ContentTileGrid({
                 </button>
                 {tip ? (
                   <span className="pointer-events-none absolute left-2 top-2 z-10 rounded-full bg-[var(--cg-primary)]/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--cg-primary-fg)] shadow">
-                    Tipp{tip.unlocked_by ? ` · ${tip.unlocked_by}` : ""}
+                    {t.tiles.hintBadge}
+                    {tip.unlocked_by ? ` · ${tip.unlocked_by}` : ""}
                   </span>
                 ) : null}
               </div>
@@ -123,10 +127,10 @@ export function ContentTileGrid({
         ) : (
           <ul
             className={single ? "grid w-full max-w-[11rem]" : "tile-slider"}
-            aria-label="Hinweise und Medien"
+            aria-label={t.tiles.hintsAria}
           >
             {tiles.map((tile) => {
-              const label = tile.label ?? tileTypeLabel(tile.type);
+              const label = tile.label ?? playTileTypeLabel(tile.type, language);
               const tip = purchasedHints[tile.id];
               return (
                 <li
@@ -153,7 +157,7 @@ export function ContentTileGrid({
                     )}
                     {tip ? (
                       <span className="absolute left-2 top-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
-                        Tipp
+                        {t.tiles.hintBadge}
                       </span>
                     ) : null}
                   </button>
@@ -166,7 +170,7 @@ export function ContentTileGrid({
 
       {cityStyle && soloAlpha ? (
         <p className="mt-2 text-center text-xs text-[var(--cg-muted)]">
-          Solo-Modus: Du siehst alle Medien auf deinem Gerät.
+          {t.tiles.soloMedia}
         </p>
       ) : null}
     </div>

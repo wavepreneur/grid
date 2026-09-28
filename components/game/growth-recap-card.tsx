@@ -7,13 +7,16 @@ import {
   familyVoucherBadge,
   type GrowthOffer,
 } from "@/lib/grid/growth-pack";
+import { playUi } from "@/lib/grid/play-ui";
 
 type Props = {
   offer: GrowthOffer;
   score?: number;
+  language?: string | null;
 };
 
-export function GrowthRecapCard({ offer, score }: Props) {
+export function GrowthRecapCard({ offer, score, language }: Props) {
+  const t = playUi(language);
   const [copied, setCopied] = useState<"code" | "share" | null>(null);
 
   const shareMessage = buildVoucherShareMessage({
@@ -83,12 +86,12 @@ export function GrowthRecapCard({ offer, score }: Props) {
       <div className="mt-4 space-y-2">
         <BigButton variant="accent" onClick={() => void onShare()}>
           {copied === "share"
-            ? "Text kopiert"
-            : `📲 ${offer.shareLabel?.trim() || "An Freunde senden"}`}
+            ? t.growth.copiedText
+            : `📲 ${offer.shareLabel?.trim() || t.growth.sendFriends}`}
         </BigButton>
         {offer.discountCode ? (
           <BigButton variant="ghost" onClick={() => void copyCode()}>
-            {copied === "code" ? "Code kopiert" : "🎫 Selbst nutzen · Code kopieren"}
+            {copied === "code" ? t.growth.copiedCode : `🎫 ${t.growth.useCode}`}
           </BigButton>
         ) : null}
       </div>

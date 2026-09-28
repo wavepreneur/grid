@@ -15,6 +15,7 @@ import {
 import { parseLevelTiles } from "@/lib/grid/level-content";
 import { parseLevelScoring } from "@/lib/grid/level-scoring";
 import { normalizeAnswer } from "@/lib/grid/content-engine";
+import { playUi } from "@/lib/grid/play-ui";
 
 export function parseBonusTask(raw: unknown): BonusTask | undefined {
   if (!raw || typeof raw !== "object") return undefined;
@@ -278,10 +279,15 @@ export function isBonusAnswerCorrect(bonus: BonusTask, submission: string): bool
 }
 
 /** What the team sees as the submitted attempt (choice label or typed text). */
-export function formatBonusAttemptLabel(bonus: BonusTask, submission: string): string | null {
+export function formatBonusAttemptLabel(
+  bonus: BonusTask,
+  submission: string,
+  language?: string | null,
+): string | null {
   const media = bonusMediaKind(bonus);
   if (media) {
-    return media === "video" ? "Video gesendet" : "Foto gesendet";
+    const copy = playUi(language).bonus;
+    return media === "video" ? copy.videoSent : copy.photoSent;
   }
   const mode =
     bonus.answer_mode ?? (bonus.options.length > 0 ? "choice" : "text");

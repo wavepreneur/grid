@@ -86,6 +86,7 @@ export function CaptainSetupForm({
         label={t.setup.teamLabel}
         hint={t.setup.teamHint}
         previewHint={t.setup.teamPreview}
+        language={language ?? eventContent?.language}
         step="1 / 2"
         tone="team"
         icon={<Flag size={20} strokeWidth={2.25} />}
@@ -103,6 +104,7 @@ export function CaptainSetupForm({
         label={t.setup.nameLabel}
         hint={t.setup.nameHint}
         previewHint={t.setup.namePreview}
+        language={language ?? eventContent?.language}
         step="2 / 2"
         tone="player"
         icon={<User size={20} strokeWidth={2.25} />}

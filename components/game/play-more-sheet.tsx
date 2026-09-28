@@ -175,6 +175,7 @@ export function PlayMoreSheet({
         title={t.lobby.rules}
         url={briefingIframeUrl}
         emptyHint={t.intro.rulesEmpty}
+        language={language}
         onClose={() => setBriefingDocOpen(false)}
       />
       <PlayDocSheet
@@ -182,6 +183,7 @@ export function PlayMoreSheet({
         title={t.faq}
         url={faqIframeUrl}
         emptyHint={t.menu.faqEmpty}
+        language={language}
         onClose={onClose}
       />
 
@@ -282,6 +284,7 @@ export function PlayMoreSheet({
                     score={walletScore}
                     onPurchase={onPurchaseWallet}
                     purchasePending={walletPurchasePending}
+                    language={language}
                   />
                   <BigButton variant="ghost" onClick={() => onOpen("menu")}>
                     {t.back}

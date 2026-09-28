@@ -1,4 +1,5 @@
 import type { LevelContentTile, LevelTileType } from "@/lib/grid/level-types";
+import { playTileTypeLabel } from "@/lib/grid/play-ui";
 
 const TILE_TYPES: LevelTileType[] = [
   "image",
@@ -57,23 +58,8 @@ export function parseLevelTiles(value: unknown): LevelContentTile[] | undefined 
   return tiles.length > 0 ? tiles : undefined;
 }
 
-export function tileTypeLabel(type: LevelTileType): string {
-  switch (type) {
-    case "image":
-      return "Bild";
-    case "video":
-      return "Video";
-    case "audio":
-      return "Audio";
-    case "panorama_360":
-      return "360°";
-    case "minigame":
-      return "Mini-Spiel";
-    case "pdf":
-      return "PDF";
-    default:
-      return "Inhalt";
-  }
+export function tileTypeLabel(type: LevelTileType, language?: string | null): string {
+  return playTileTypeLabel(type, language);
 }
 
 export function tileTypeIcon(type: LevelTileType | "iframe"): string {

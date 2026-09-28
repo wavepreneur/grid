@@ -40,7 +40,7 @@ export function PlayIntroVideo({ youtubeUrl, language, onContinue }: Props) {
           ) : (
             <div className="flex aspect-video items-center justify-center bg-slate-800 px-6 text-center text-sm font-medium text-slate-300">
               <Play size={22} className="mr-2 shrink-0" />
-              Video nicht verfügbar
+              {t.gate.videoMissing}
             </div>
           )}
         </div>

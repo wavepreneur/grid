@@ -1,12 +1,14 @@
 "use client";
 
 import { ContentMediaSheet } from "@/components/game/city/content-media-sheet";
+import { playUi } from "@/lib/grid/play-ui";
 
 type Props = {
   open: boolean;
   title: string;
   url: string | null | undefined;
   emptyHint?: string;
+  language?: string | null;
   onClose: () => void;
 };
 
@@ -17,9 +19,11 @@ export function PlayDocSheet({
   open,
   title,
   url,
-  emptyHint = "Für dieses Spiel ist noch kein Link hinterlegt.",
+  emptyHint,
+  language,
   onClose,
 }: Props) {
+  const t = playUi(language);
   return (
     <ContentMediaSheet
       open={open}
@@ -27,7 +31,8 @@ export function PlayDocSheet({
       mediaType="iframe"
       mediaUrl={url?.trim() || null}
       onClose={onClose}
-      emptyMessage={emptyHint}
+      emptyMessage={emptyHint ?? t.media.noUrl}
+      language={language}
     />
   );
 }

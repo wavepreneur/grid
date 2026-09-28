@@ -71,6 +71,7 @@ import { abandonTeamSession } from "@/lib/grid/session-recovery";
 import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
 import type { LobbyPlayer, PlayerSession } from "@/lib/grid/types";
 import { usesPhasedPlay } from "@/lib/grid/play-slots";
+import { playUi } from "@/lib/grid/play-ui";
 import { playPlaySfx, unlockPlayAudio } from "@/lib/grid/play-sfx";
 import { useRouter } from "next/navigation";
 
@@ -99,6 +100,7 @@ export function GameRoom({
   eventTitle = "Mission",
   onQuietContentUpdate,
 }: GameRoomProps) {
+  const t = playUi(eventContent.language);
   const router = useRouter();
   const [session, setSession] = useState(initialSession);
   const [teamState, setTeamState] = useState(initialState);
@@ -251,6 +253,7 @@ export function GameRoom({
       setMirroredGps(fix);
     },
     onContentUpdated: onQuietContentUpdate,
+    language: eventContent.language,
   });
 
   useEffect(() => {
@@ -301,6 +304,7 @@ export function GameRoom({
       walkedMeters={deskMeterBonus.walkedMeters}
       onAddMeters={deskMeterBonus.addDeskMeters}
       onShowNow={deskMeterBonus.showBonusNow}
+      language={eventContent.language}
     />
   ) : null;
 
@@ -490,11 +494,11 @@ export function GameRoom({
         setSessionSuperseded(true);
         return;
       }
-      setError(result.error ?? "Aktion fehlgeschlagen.");
+      setError(result.error ?? t.gate.actionFail);
       return;
     }
     if (!result.data) {
-      setError("Aktion fehlgeschlagen.");
+      setError(t.gate.actionFail);
       return;
     }
     setTeamState(result.data);
@@ -515,11 +519,11 @@ export function GameRoom({
         healthRadiusBonusMeters: input.healthRadiusBonusMeters,
       });
       if (!result.success) {
-        setError(result.error ?? "Aktion fehlgeschlagen.");
+        setError(result.error ?? t.gate.actionFail);
         return;
       }
       if (!result.data) {
-        setError("Aktion fehlgeschlagen.");
+        setError(t.gate.actionFail);
         return;
       }
       const levelKey = input.targetLevel ?? activeLevel;
@@ -927,12 +931,13 @@ export function GameRoom({
   }
 
   const playBody = sessionSuperseded ? (
-    <SessionHandoffScreen
-      inviteCode={inviteCode}
-      joinCode={joinCode}
-      playerId={session.playerId}
-      displayName={session.displayName}
-    />
+        <SessionHandoffScreen
+          inviteCode={inviteCode}
+          joinCode={joinCode}
+          playerId={session.playerId}
+          displayName={session.displayName}
+          language={eventContent.language}
+        />
   ) : isFinished ? (
     <GameOverFlywheel
       inviteCode={inviteCode}
@@ -943,16 +948,19 @@ export function GameRoom({
       levels={eventContent.levels}
       gameState={teamState.gameState}
       growthOffer={eventContent.growthOffer}
+      language={eventContent.language}
       extras={
         <>
           <details className="group overflow-hidden rounded-3xl bg-[var(--cg-accent)] shadow-[var(--cg-shadow-lift)]">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-[var(--cg-accent-fg)] marker:content-none [&::-webkit-details-marker]:hidden">
               <div>
-                <p className="text-sm font-extrabold uppercase tracking-[0.14em]">Wallet</p>
+                <p className="text-sm font-extrabold uppercase tracking-[0.14em]">{t.wallet}</p>
                 <p className="mt-0.5 text-sm opacity-80">
                   {gameOverWalletNotes.length === 0
-                    ? "Noch leer"
-                    : `${gameOverWalletNotes.length} ${gameOverWalletNotes.length === 1 ? "Hinweis" : "Hinweise"}`}
+                    ? t.over.walletEmpty
+                    : gameOverWalletNotes.length === 1
+                      ? t.over.walletOne
+                      : t.over.walletMany(gameOverWalletNotes.length)}
                 </p>
               </div>
               <span
@@ -967,6 +975,7 @@ export function GameRoom({
                 notes={gameOverWalletNotes}
                 score={teamState.gameState.score ?? 0}
                 purchasesClosed
+                language={eventContent.language}
               />
             </div>
           </details>
@@ -974,6 +983,7 @@ export function GameRoom({
             inviteCode={inviteCode}
             joinCode={joinCode}
             sessionId={session.sessionId}
+            language={eventContent.language}
           />
         </>
       }
@@ -1138,10 +1148,11 @@ export function GameRoom({
     <GridError
       message={
         eventContent.levels.length === 0
-          ? "Level-Inhalt konnte nicht geladen werden — das Spiel hat keine veröffentlichten Aufgaben."
-          : `Level ${activeLevel} fehlt im Content (verfügbar: ${eventContent.levels
-              .map((l) => l.level)
-              .join(", ")}). Bitte Spiel neu veröffentlichen und neues Live-Event starten.`
+          ? t.gate.missingPublished
+          : t.gate.missingLevel(
+              activeLevel,
+              eventContent.levels.map((l) => l.level).join(", "),
+            )
       }
     />
   );
@@ -1174,11 +1185,13 @@ export function GameRoom({
             isExpired={isExpired}
             paused={paused}
             onExpire={handleExpireMission}
+            language={eventContent.language}
           />
         ) : null}
-        <BonusSpectatorView items={foreignBonusToasts} />
+        <BonusSpectatorView items={foreignBonusToasts} language={eventContent.language} />
         <BonusCompleteToast
           notice={teamState.gameState.bonus_notice}
+          language={eventContent.language}
           onDismiss={handleDismissBonusNotice}
         />
         {modal && !sessionSuperseded ? (
@@ -1188,6 +1201,7 @@ export function GameRoom({
             isPending={isPending}
             canPaceTeam={isAlpha}
             leadLabel={leadLabel}
+            language={eventContent.language}
           />
         ) : null}
       </>
@@ -1203,6 +1217,7 @@ export function GameRoom({
           session={session}
           showCopyPlayLink
           showReleaseSeat={canReleaseOwnSeat}
+          language={eventContent.language}
         />
         {!sessionSuperseded && !isFinished ? (
           <GameHud
@@ -1218,6 +1233,7 @@ export function GameRoom({
             missionDurationMinutes={eventContent.missionDurationMinutes}
             showLiveScore={eventContent.showLiveScore}
             isConnected={isConnected}
+            language={eventContent.language}
           />
         ) : null}
         {deskTestBar}
@@ -1234,6 +1250,7 @@ export function GameRoom({
           isExpired={isExpired}
           paused={paused}
           onExpire={handleExpireMission}
+          language={eventContent.language}
         />
       ) : null}
       {modal && !sessionSuperseded ? (
@@ -1243,6 +1260,7 @@ export function GameRoom({
           isPending={isPending}
           canPaceTeam={isAlpha}
           leadLabel={leadLabel}
+          language={eventContent.language}
         />
       ) : null}
     </>

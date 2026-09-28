@@ -11,6 +11,7 @@ import {
 } from "@/lib/grid/game-state";
 import type { LobbyPlayer } from "@/lib/grid/types";
 import { getPlayRealtimeClient } from "@/lib/supabase/realtime-browser";
+import { playUi } from "@/lib/grid/play-ui";
 
 type UseTeamSyncOptions = {
   sessionId: string;
@@ -37,6 +38,7 @@ type UseTeamSyncOptions = {
    * play: live solves. Default play so a missing flag cannot mute in-game sync.
    */
   surface?: "lobby" | "play";
+  language?: string | null;
 };
 
 export type TeamBroadcastPayload = {
@@ -165,6 +167,7 @@ export function useTeamSync({
   onWalkMeters,
   onGpsFix,
   onContentUpdated,
+  language,
 }: UseTeamSyncOptions) {
   const [isConnected, setIsConnected] = useState(false);
   /** Soft status for wake/reconnect — not a hard failure. */
@@ -184,6 +187,7 @@ export function useTeamSync({
   const onWalkMetersRef = useRef(onWalkMeters);
   const onGpsFixRef = useRef(onGpsFix);
   const onContentUpdatedRef = useRef(onContentUpdated);
+  const languageRef = useRef(language);
 
   onTeamStatusChangeRef.current = onTeamStatusChange;
   onGameStateChangeRef.current = onGameStateChange;
@@ -195,6 +199,7 @@ export function useTeamSync({
   onWalkMetersRef.current = onWalkMeters;
   onGpsFixRef.current = onGpsFix;
   onContentUpdatedRef.current = onContentUpdated;
+  languageRef.current = language;
 
   useEffect(() => {
     if (!enabled) return;
@@ -234,11 +239,8 @@ export function useTeamSync({
       subscribed = false;
       const delayMs = Math.min(1000 * 2 ** Math.min(attempt - 1, 4), 12_000);
       setIsConnected(false);
-      setStatusHint(
-        attempt <= 2
-          ? "Verbindung wird wiederhergestellt…"
-          : "Team-Sync kurz unterbrochen — du kannst weiterspielen.",
-      );
+      const hud = playUi(languageRef.current).hud;
+      setStatusHint(attempt <= 2 ? hud.reconnecting : hud.reconnectPlay);
       setError(null);
       retryTimer = setTimeout(() => {
         void connect();
@@ -257,7 +259,7 @@ export function useTeamSync({
 
       setError(null);
       if (attempt > 0) {
-        setStatusHint("Verbindung wird wiederhergestellt…");
+        setStatusHint(playUi(languageRef.current).hud.reconnecting);
       }
 
       const tokenResult = await getRealtimeAccessToken(sessionId);
@@ -267,7 +269,7 @@ export function useTeamSync({
       }
 
       if (!tokenResult.success) {
-        if (/Session ungültig/i.test(tokenResult.error ?? "")) {
+        if (/Session ungültig|invalid session/i.test(tokenResult.error ?? "")) {
           onSessionSupersededRef.current?.();
           connecting = false;
           return;

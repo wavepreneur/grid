@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { Lightbulb } from "lucide-react";
 import type { PurchasedTileHint } from "@/lib/grid/game-state";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { playUi } from "@/lib/grid/play-ui";
 
 type Props = {
   purchasedHints: Record<string, PurchasedTileHint>;
   myPlayerId?: string | null;
+  language?: string | null;
 };
 
 type Toast = {
@@ -20,7 +22,8 @@ type Toast = {
  * When a teammate unlocks a tip, every device gets a short banner
  * so nobody misses the shared hint.
  */
-export function HintUnlockToast({ purchasedHints, myPlayerId }: Props) {
+export function HintUnlockToast({ purchasedHints, myPlayerId, language }: Props) {
+  const t = playUi(language);
   const seenRef = useRef<Set<string> | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
 
@@ -41,12 +44,12 @@ export function HintUnlockToast({ purchasedHints, myPlayerId }: Props) {
       playPlaySfx("ping");
       setToast({
         id: tileId,
-        unlockedBy: hint.unlocked_by?.trim() || "Teammitglied",
+        unlockedBy: hint.unlocked_by?.trim() || playUi(language).hint.teammate,
         textPreview: hint.text.trim().slice(0, 120),
       });
       break;
     }
-  }, [purchasedHints, myPlayerId]);
+  }, [purchasedHints, myPlayerId, language]);
 
   useEffect(() => {
     if (!toast) return;
@@ -67,10 +70,10 @@ export function HintUnlockToast({ purchasedHints, myPlayerId }: Props) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--cg-success)]">
-            Tipp fürs Team
+            {t.hint.toastTitle}
           </p>
           <p className="mt-0.5 text-sm font-semibold text-[var(--cg-fg)]">
-            {toast.unlockedBy} hat einen Tipp freigeschaltet
+            {t.hint.toastBy(toast.unlockedBy)}
           </p>
           {toast.textPreview ? (
             <p className="mt-1 line-clamp-2 text-sm text-[var(--cg-muted)]">{toast.textPreview}</p>

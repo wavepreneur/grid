@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PLAY_HELP_FAIL_HINT_AT, PLAY_HELP_IDLE_MS } from "@/lib/grid/play-help";
+import { playUi } from "@/lib/grid/play-ui";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 
 type Props = {
@@ -9,6 +10,7 @@ type Props = {
   hasUnusedHint: boolean;
   canSkip: boolean;
   paused?: boolean;
+  language?: string | null;
   onOpenHelp: () => void;
   onOpenFaq: () => void;
 };
@@ -30,9 +32,11 @@ export function PlayHelpNudge({
   hasUnusedHint,
   canSkip,
   paused = false,
+  language,
   onOpenHelp,
   onOpenFaq,
 }: Props) {
+  const t = playUi(language);
   const [track, setTrack] = useState<Track>({
     seenId: null,
     fails: 0,
@@ -69,12 +73,12 @@ export function PlayHelpNudge({
   const showFails = track.fails >= PLAY_HELP_FAIL_HINT_AT;
   if (track.dismissed || (!track.idle && !showFails)) return null;
 
-  const title = showFails ? "Noch nicht die Lösung" : "Lange keine Eingabe";
+  const title = showFails ? t.helpNudge.notSolution : t.helpNudge.noInput;
   const body = hasUnusedHint
-    ? "Ihr könnt einen Tipp auf einer Kachel freischalten — das kostet Punkte, bringt euch aber weiter."
+    ? t.helpNudge.buyHint
     : canSkip
-      ? "Kein Tipp hinterlegt. Die Team-Leitung kann die Aufgabe unten freischalten (Lösung anzeigen, 0 Punkte)."
-      : "Tippt, was gerade nicht klappt — oder schaut ins FAQ.";
+      ? t.helpNudge.noHintSkip
+      : t.helpNudge.openHelp;
 
   return (
     <div className="mx-4 mb-3 rounded-2xl bg-[var(--cg-primary)]/12 px-4 py-3.5 ring-1 ring-[var(--cg-primary)]/25">
@@ -86,21 +90,21 @@ export function PlayHelpNudge({
           onClick={onOpenHelp}
           className="tap-lift rounded-full bg-[var(--cg-primary)] px-3 py-1.5 text-xs font-bold text-[var(--cg-primary-fg)]"
         >
-          Was ist los?
+          {t.helpNudge.whatsWrong}
         </button>
         <button
           type="button"
           onClick={onOpenFaq}
           className="tap-lift rounded-full bg-[var(--cg-card)] px-3 py-1.5 text-xs font-bold text-[var(--cg-fg)]"
         >
-          FAQ
+          {t.faq}
         </button>
         <button
           type="button"
           onClick={() => setTrack((current) => ({ ...current, dismissed: true, idle: false }))}
           className="tap-lift rounded-full px-3 py-1.5 text-xs font-semibold text-[var(--cg-muted)]"
         >
-          Weiter rätseln
+          {t.helpNudge.keepSolving}
         </button>
       </div>
     </div>

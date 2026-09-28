@@ -193,6 +193,7 @@ export function PlayPhaseFlow({
   leadLabel = "Team Lead",
 }: Props) {
   const mode = eventContent.contentMode;
+  const copy = playUi(eventContent.language);
   const phase =
     gameState.current_phase ??
     (mode === "indoor" || usesPhasedPlay(eventContent) ? "hub" : "level");
@@ -252,6 +253,7 @@ export function PlayPhaseFlow({
         total={total}
         timeLabel={paused ? playUi(eventContent.language).pause : timeLabel}
         score={score}
+        language={eventContent.language}
       />
     </div>
   ) : (
@@ -392,6 +394,7 @@ export function PlayPhaseFlow({
             teamSession={gameState.bonus_sessions?.[bonusId] ?? null}
             canPaceTeam={presentBonusMeta.for_team ? canPaceTeam : true}
             leadLabel={leadLabel}
+            language={eventContent.language}
             teammates={teammates}
             audiencePlayers={audiencePlayers}
             assignedPlayerId={presentBonusMeta.for_player_id}
@@ -445,6 +448,7 @@ export function PlayPhaseFlow({
             teamSession={gameState.bonus_sessions?.[bonusId] ?? null}
             canPaceTeam={canPaceTeam}
             leadLabel={leadLabel}
+            language={eventContent.language}
             audiencePlayers={audiencePlayers}
             assignedPlayerId={activeItem.for_player_id ?? null}
             clockScope={teamStartedAt}
@@ -467,10 +471,11 @@ export function PlayPhaseFlow({
         {sheets}
         <PlayTransitionScreen
           kind="unlock"
-          title="Der Schlüssel öffnet das Level"
-          subtitle="Gleich kommt die eigentliche Aufgabe — kurz warten."
+          title={copy.phase.keyTitle}
+          subtitle={copy.phase.keySubtitle}
           audienceIcons={3}
           autoMs={5000}
+          language={eventContent.language}
           onDone={() => setUnlockGate(false)}
         />
       </>
@@ -508,7 +513,7 @@ export function PlayPhaseFlow({
             className="px-4 pb-2 text-center text-xs font-semibold text-[var(--cg-muted)]"
             translate="no"
           >
-            Bonus läuft bei {pendingRoleHint} — ihr könnt weiter.
+            {copy.phase.bonusElse(pendingRoleHint)}
           </p>
         ) : null}
         <PlayHubView
@@ -558,6 +563,7 @@ export function PlayPhaseFlow({
           hasUnusedHint={false}
           canSkip={false}
           paused={paused || disabled}
+          language={eventContent.language}
           onOpenHelp={() => onMorePanel("help")}
           onOpenFaq={() => onMorePanel("faq")}
         />
@@ -565,10 +571,10 @@ export function PlayPhaseFlow({
           title={level.title}
           spotLabel={
             mode === "indoor"
-              ? "Station geöffnet"
+              ? copy.phase.stationOpen
               : mode === "online"
-                ? "Mission gestartet · alle gleichzeitig"
-                : "Wegpunkt erreicht"
+                ? copy.phase.missionStarted
+                : copy.phase.waypointReached
           }
           mode={mode}
           quiz={slot.quiz}
@@ -577,6 +583,7 @@ export function PlayPhaseFlow({
           teamReveal={gameState.quiz_reveal}
           canPaceTeam={canPaceTeam}
           leadLabel={leadLabel}
+          language={eventContent.language}
           onSubmit={onSubmitQuiz}
           onAdvanceToLevel={onAdvanceQuizToLevel}
         />
@@ -596,6 +603,7 @@ export function PlayPhaseFlow({
         hasUnusedHint={levelHasUnusedTileHint(mission, purchasedHints)}
         canSkip={levelAllowsSkip(mission) && Boolean(onRevealLevel)}
         paused={paused || disabled}
+        language={eventContent.language}
         onOpenHelp={() => onMorePanel("help")}
         onOpenFaq={() => onMorePanel("faq")}
       />

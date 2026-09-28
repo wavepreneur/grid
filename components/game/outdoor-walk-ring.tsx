@@ -80,7 +80,7 @@ export function OutdoorWalkRing({
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-5 py-8">
-      <p className="text-center text-sm text-[var(--cg-muted)]">Lauft frei — kein fester Punkt nötig</p>
+      <p className="text-center text-sm text-[var(--cg-muted)]">{t.hub.walkFree}</p>
       <h2 className="mt-2 max-w-sm text-center text-xl font-bold text-[var(--cg-fg)]">{title}</h2>
 
       <div className="relative mt-8">
@@ -117,7 +117,7 @@ export function OutdoorWalkRing({
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
           {complete ? (
             <>
-              <p className="text-3xl font-bold text-[var(--cg-success)]">Fertig</p>
+              <p className="text-3xl font-bold text-[var(--cg-success)]">{t.hub.walkDone}</p>
               <p className="mt-1 text-sm text-[var(--cg-muted)]">{Math.round(targetMeters)} m</p>
             </>
           ) : (
@@ -125,9 +125,9 @@ export function OutdoorWalkRing({
               <p className="text-5xl font-bold tabular-nums leading-none text-[var(--cg-fg)]">
                 {remaining}
               </p>
-              <p className="mt-1.5 text-sm font-semibold text-[var(--cg-muted)]">Meter übrig</p>
+              <p className="mt-1.5 text-sm font-semibold text-[var(--cg-muted)]">{t.hub.metersLeft}</p>
               <p className="mt-2 text-sm tabular-nums font-medium text-[var(--cg-fg)]">
-                {walkedShown} m gelaufen
+                {t.hub.metersWalked(walkedShown)}
               </p>
             </>
           )}
@@ -149,9 +149,7 @@ export function OutdoorWalkRing({
       ) : null}
 
       <p className="mt-6 max-w-sm text-center text-sm text-[var(--cg-muted)]">
-        {complete
-          ? "Strecke geschafft — öffnet jetzt die Aufgabe."
-          : "Der Ring füllt sich, während ihr lauft. Am Ziel vibriert das Gerät und es piept."}
+        {complete ? t.hub.walkComplete : t.hub.walkFill}
       </p>
 
       {gpsError ? (
@@ -168,7 +166,7 @@ export function OutdoorWalkRing({
         <div className="mt-6 w-full max-w-sm space-y-3">
           {onSimulateWalk ? (
             <BigButton variant="outline" disabled={disabled || isPending} onClick={onSimulateWalk}>
-              +25 m am Tisch
+              {t.hub.simulateWalk}
             </BigButton>
           ) : null}
           {showForceOpen && onForceOpen ? (
@@ -178,7 +176,7 @@ export function OutdoorWalkRing({
           ) : null}
           {showForceOpen ? (
             <p className="text-center text-xs text-[var(--cg-muted)]">
-              Nur wenn GPS hängt oder die Strecke klar gelaufen ist — Alpha entscheidet fürs Team.
+              {t.hub.forceWalkHint}
             </p>
           ) : null}
         </div>

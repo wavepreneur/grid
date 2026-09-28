@@ -10,8 +10,9 @@ import type {
   PlaySlot,
   QuizOption,
 } from "@/lib/grid/level-types";
-import type { PlayPhase, PlaySurface } from "@/lib/grid/play-surface";
-import { SURFACE_PRESENTATION } from "@/lib/grid/play-surface";
+import type { PlayPhase } from "@/lib/grid/play-surface";
+import { SURFACE_PRESENTATION, type PlaySurface } from "@/lib/grid/play-surface";
+import { playUiLang } from "@/lib/grid/play-ui";
 import { resolveBonusTask } from "@/lib/grid/bonus";
 
 function asArrivalQuiz(level: LevelDefinition): ArrivalQuiz | undefined {
@@ -120,6 +121,16 @@ export function buildPlaySlots(
 
 export function hubMeta(surface: PlaySurface) {
   return SURFACE_PRESENTATION[surface];
+}
+
+export function hubLabel(surface: PlaySurface, language?: string | null): string {
+  const meta = SURFACE_PRESENTATION[surface];
+  return playUiLang(language) === "de" ? meta.hubLabelDe : meta.hubLabelEn;
+}
+
+export function unitLabel(surface: PlaySurface, language?: string | null): string {
+  const meta = SURFACE_PRESENTATION[surface];
+  return playUiLang(language) === "de" ? meta.unitLabelDe : meta.unitLabelEn;
 }
 
 export function quizOptionsForUi(quiz: ArrivalQuiz): QuizOption[] {

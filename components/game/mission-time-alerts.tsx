@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { playUi } from "@/lib/grid/play-ui";
 
 type Props = {
   remainingSeconds: number;
   isExpired: boolean;
   paused: boolean;
   onExpire: () => void;
+  language?: string | null;
 };
 
 /**
@@ -19,7 +21,9 @@ export function MissionTimeAlerts({
   isExpired,
   paused,
   onExpire,
+  language,
 }: Props) {
+  const t = playUi(language);
   const warned60Ref = useRef(false);
   const lastTickRef = useRef<number | null>(null);
   const expireSentRef = useRef(false);
@@ -58,9 +62,9 @@ export function MissionTimeAlerts({
     >
       <div className="mx-auto w-full max-w-md px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="rounded-2xl bg-[var(--cg-card)] px-4 py-3.5 text-center shadow-[var(--cg-shadow-lift)] ring-2 ring-[var(--cg-primary)]/35">
-          <p className="text-sm font-bold text-[var(--cg-fg)]">Noch 1 Minute</p>
+          <p className="text-sm font-bold text-[var(--cg-fg)]">{t.timeAlert.oneMinute}</p>
           <p className="mt-0.5 text-sm text-[var(--cg-muted)]">
-            Die Zeit läuft ab — letzte Aufgaben, dann Game Over.
+            {t.timeAlert.lastMinutes}
           </p>
         </div>
       </div>

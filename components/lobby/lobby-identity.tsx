@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { Check } from "lucide-react";
+import { playUi } from "@/lib/grid/play-ui";
 
 type Tone = "team" | "player";
 
@@ -17,6 +18,7 @@ type IdentityFieldProps = {
   tone?: Tone;
   step?: string;
   previewHint?: string;
+  language?: string | null;
 } & Omit<InputHTMLAttributes<HTMLInputElement>, "className">;
 
 const tones: Record<
@@ -58,6 +60,7 @@ export function IdentityField({
   tone = "player",
   step,
   previewHint,
+  language,
   maxLength,
   value,
   defaultValue,
@@ -144,7 +147,7 @@ export function IdentityField({
             preview ? palette.badge : "bg-white/80 text-slate-400"
           }`}
         >
-          {preview || previewHint || "Wird hier angezeigt"}
+          {preview || previewHint || playUi(language).lobby.shownHere}
         </span>
         {maxLength ? (
           <span className="text-[11px] font-bold tabular-nums text-slate-400">

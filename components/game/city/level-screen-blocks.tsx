@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { FormattedTaskText } from "@/components/game/formatted-task-text";
 import { SectionLabel } from "@/components/game/city/ui";
+import { playUi } from "@/lib/grid/play-ui";
 
 export function LevelHero({
   title,
@@ -87,14 +88,16 @@ export type LevelTilePreviewModel = {
 export function LevelTilesSection({
   tiles,
   title,
+  language,
 }: {
   tiles: LevelTilePreviewModel[];
   title?: string;
+  language?: string | null;
 }) {
   if (tiles.length === 0) return null;
+  const t = playUi(language);
   const single = tiles.length === 1;
-  const heading =
-    title ?? (single ? "Rätselkachel" : `${tiles.length} Rätselkacheln`);
+  const heading = title ?? (single ? t.tiles.one : t.tiles.many(tiles.length));
 
   return (
     <div>
@@ -103,7 +106,7 @@ export function LevelTilesSection({
           <SectionLabel>{heading}</SectionLabel>
         </div>
         <span className="shrink-0 text-xs font-semibold text-[var(--cg-muted)]">
-          Antippen zum Öffnen
+          {t.tiles.tapOpen}
         </span>
       </div>
       <div

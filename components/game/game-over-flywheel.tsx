@@ -11,6 +11,7 @@ import { EXITMANIA_TEAM_RANKING_URL } from "@/lib/grid/growth-pack";
 import { eventRankingPath, eventRecapPath } from "@/lib/grid/event-routes";
 import { levelPlayOutcome, type TeamGameState } from "@/lib/grid/game-state";
 import type { LevelDefinition } from "@/lib/grid/level-types";
+import { playUi } from "@/lib/grid/play-ui";
 
 type Props = {
   inviteCode: string;
@@ -22,11 +23,12 @@ type Props = {
   gameState: TeamGameState;
   growthOffer?: GrowthOffer | null;
   extras?: ReactNode;
+  language?: string | null;
 };
 
-function teamHeadline(name: string): string {
-  const trimmed = name.trim() || "Team";
-  return /^team\b/i.test(trimmed) ? trimmed : `Team ${trimmed}`;
+function teamHeadline(name: string, teamWord: string): string {
+  const trimmed = name.trim() || teamWord;
+  return new RegExp(`^${teamWord}\\b`, "i").test(trimmed) ? trimmed : `${teamWord} ${trimmed}`;
 }
 
 function rankingSrc(
@@ -49,7 +51,9 @@ export function GameOverFlywheel({
   gameState,
   growthOffer,
   extras,
+  language,
 }: Props) {
+  const t = playUi(language);
   const [copied, setCopied] = useState(false);
   const [rankingOpen, setRankingOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -65,7 +69,7 @@ export function GameOverFlywheel({
     (level) => levelPlayOutcome(gameState.levels[String(level.level)]) === "revealed",
   ).length;
   const missionName = eventTitle?.replace(/^\[Test\]\s*/, "").trim() || "";
-  const teamLabel = teamHeadline(teamName);
+  const teamLabel = teamHeadline(teamName, t.team);
   const teamevent = growthOffer?.surface === "exitmania_teamevent";
   const embedSrc = rankingSrc(inviteCode, joinCode, teamevent);
 
@@ -96,7 +100,7 @@ export function GameOverFlywheel({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      window.prompt("Link kopieren", url);
+      window.prompt(t.over.copyPrompt, url);
     }
   }
 
@@ -115,26 +119,26 @@ export function GameOverFlywheel({
           {won ? "✓" : timeUp ? "⏱" : "!"}
         </span>
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--cg-muted)]">
-          Game Over
+          {t.over.gameOver}
         </p>
         {missionName ? (
           <p className="text-base font-semibold text-[var(--cg-fg)]">{missionName}</p>
         ) : null}
         <p className="cg-animate-pop-in text-3xl font-bold text-[var(--cg-fg)]">
-          {won ? "Mission abgeschlossen!" : timeUp ? "Zeit ist abgelaufen." : "Game Over"}
+          {won ? t.over.won : timeUp ? t.over.timeUp : t.over.gameOver}
         </p>
         <p className="text-base text-[var(--cg-muted)]">
           {won
-            ? `${teamLabel} · ${total} Aufgaben`
+            ? `${teamLabel} · ${t.over.tasksCount(total)}`
             : timeUp
-              ? `${completed} von ${total} Aufgaben — ${teamLabel}`
-              : `${completed} von ${total} Aufgaben geschafft · ${teamLabel}`}
+              ? `${t.over.tasksOf(completed, total)} — ${teamLabel}`
+              : `${t.over.tasksDone(completed, total)} · ${teamLabel}`}
         </p>
       </div>
 
       <section className="cg-animate-pop-in rounded-3xl border-2 border-[var(--cg-success)]/35 bg-[var(--cg-card)] px-5 py-6 text-center shadow-[var(--cg-shadow-lift)]">
         <p className="text-sm font-semibold uppercase tracking-wide text-[var(--cg-muted)]">
-          Eure Punkte
+          {t.over.yourPoints}
         </p>
         <p className="cg-animate-score-pop mt-2 text-5xl font-extrabold tabular-nums text-[var(--cg-fg)]">
           {score}
@@ -153,7 +157,7 @@ export function GameOverFlywheel({
                 key={level.level}
                 title={
                   outcome === "revealed"
-                    ? `${level.title} · direkt gelöst · 0 Punkte`
+                    ? t.over.revealedLine(level.title)
                     : level.title
                 }
                 className={`flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-bold ${tone}`}
@@ -164,26 +168,20 @@ export function GameOverFlywheel({
           })}
         </ol>
         <p className="mt-3 text-xs text-[var(--cg-muted)]">
-          {revealed > 0
-            ? `${solved} gelöst · ${revealed} direkt gelöst · nur euer Team`
-            : `${completed} / ${total} Aufgaben · nur euer Team`}
+          {t.over.summary(solved, revealed)}
         </p>
       </section>
 
       <section className="rounded-3xl border border-[var(--cg-primary)]/25 bg-[var(--cg-card)] px-5 py-5 text-center">
         <p className="text-lg font-bold text-[var(--cg-fg)]">
-          {teamevent
-            ? "🏆 Live-Ranking eures Events"
-            : "🏆 Wie habt ihr im Highscore abgeschnitten?"}
+          {teamevent ? t.over.liveRankingEvent : t.over.highscoreQ}
         </p>
         <p className="mt-2 text-sm leading-relaxed text-[var(--cg-muted)]">
-          {teamevent
-            ? "Kurz bewerten — danach seht ihr das Ranking eures Events."
-            : "Kurz bewerten — danach seht ihr das All-Time-Highscore-Ranking."}
+          {teamevent ? t.over.rateEvent : t.over.rateHighscore}
         </p>
         <div className="mt-4">
           <BigButton onClick={() => setRankingOpen(true)}>
-            {teamevent ? "Event-Ranking öffnen" : "Highscore öffnen"}
+            {teamevent ? t.over.openEvent : t.over.openHighscore}
           </BigButton>
         </div>
       </section>
@@ -192,17 +190,18 @@ export function GameOverFlywheel({
         <GrowthRecapCard
           offer={growthOffer}
           score={score}
+          language={language}
         />
       ) : null}
 
       <section className="rounded-3xl bg-[var(--cg-card)] px-5 py-5 text-center">
-        <p className="text-lg font-bold text-[var(--cg-fg)]">📌 Für später</p>
+        <p className="text-lg font-bold text-[var(--cg-fg)]">📌 {t.over.later}</p>
         <p className="mt-2 text-sm leading-relaxed text-[var(--cg-muted)]">
-          Der Link wird nach 7 Tagen automatisch deaktiviert.
+          {t.over.linkExpires}
         </p>
         <div className="mt-4">
           <BigButton variant="ghost" onClick={() => void copyRecapLink()}>
-            {copied ? "Link kopiert" : "Link kopieren"}
+            {copied ? t.over.copied : t.over.copyLink}
           </BigButton>
         </div>
       </section>
@@ -213,7 +212,7 @@ export function GameOverFlywheel({
             href={eventRankingPath(inviteCode, joinCode)}
             className="font-semibold text-[var(--cg-primary)] underline-offset-2 hover:underline"
           >
-            Live-Ranking dieses Events
+            {t.over.liveRankingThis}
           </Link>
         </p>
       )}
@@ -225,20 +224,20 @@ export function GameOverFlywheel({
             <div className="fixed inset-0 z-[4000] bg-black">
               <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 bg-black/90 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
                 <p className="truncate text-sm font-semibold text-white">
-                  {teamevent ? "Event-Ranking" : "Highscore"}
+                  {teamevent ? t.over.ranking : t.over.highscore}
                 </p>
                 <button
                   type="button"
                   onClick={() => setRankingOpen(false)}
                   className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white"
-                  aria-label="Ranking schließen"
+                  aria-label={t.over.closeRanking}
                 >
                   <X className="h-5 w-5" strokeWidth={2.4} />
                 </button>
               </div>
               <iframe
                 src={embedSrc}
-                title={teamevent ? "Event-Ranking" : "Highscore"}
+                title={teamevent ? t.over.ranking : t.over.highscore}
                 className="absolute inset-0 h-full w-full border-0 bg-white pt-14"
                 allow="fullscreen"
               />

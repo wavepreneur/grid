@@ -25,7 +25,9 @@ export type SurfacePresentation = {
   surface: PlaySurface;
   hubKind: HubKind;
   hubLabelDe: string;
+  hubLabelEn: string;
   unitLabelDe: string;
+  unitLabelEn: string;
   /** Shell: phone for co-located play, stage for remote multi-device. */
   shell: "phone" | "stage";
   /** Product default for this surface. */
@@ -39,7 +41,9 @@ export const SURFACE_PRESENTATION: Record<PlaySurface, SurfacePresentation> = {
     surface: "outdoor",
     hubKind: "map",
     hubLabelDe: "Karte",
+    hubLabelEn: "Map",
     unitLabelDe: "Wegpunkt",
+    unitLabelEn: "Waypoint",
     shell: "phone",
     product: "exitmania",
     usesGps: true,
@@ -49,7 +53,9 @@ export const SURFACE_PRESENTATION: Record<PlaySurface, SurfacePresentation> = {
     surface: "indoor",
     hubKind: "stations",
     hubLabelDe: "Stationen",
+    hubLabelEn: "Stations",
     unitLabelDe: "Station",
+    unitLabelEn: "Station",
     shell: "phone",
     product: "exitmania",
     usesGps: false,
@@ -59,7 +65,9 @@ export const SURFACE_PRESENTATION: Record<PlaySurface, SurfacePresentation> = {
     surface: "online",
     hubKind: "missions",
     hubLabelDe: "Missionen",
+    hubLabelEn: "Missions",
     unitLabelDe: "Mission",
+    unitLabelEn: "Mission",
     shell: "stage",
     product: "tabbrain",
     usesGps: false,

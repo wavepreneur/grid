@@ -9,6 +9,7 @@ type PlayerShellProps = {
   joinCode: string;
   session?: PlayerSession | null;
   showManageTeam?: boolean;
+  language?: string | null;
   children: ReactNode;
 };
 
@@ -17,6 +18,7 @@ export function PlayerShell({
   joinCode,
   session,
   showManageTeam = true,
+  language,
   children,
 }: PlayerShellProps) {
   return (
@@ -27,6 +29,7 @@ export function PlayerShell({
           joinCode={joinCode}
           session={session}
           showManageTeam={showManageTeam}
+          language={language}
         />
       ) : null}
       {children}

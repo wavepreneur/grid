@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { BonusResultBanner } from "@/components/game/bonus-result-banner";
 import type { BonusRevealState } from "@/lib/grid/game-state";
 import { playPlaySfx } from "@/lib/grid/play-sfx";
+import { playUi } from "@/lib/grid/play-ui";
 
 export type BonusSpectatorItem = {
   bonusId: string;
@@ -13,6 +14,7 @@ export type BonusSpectatorItem = {
 
 type Props = {
   items: BonusSpectatorItem[];
+  language?: string | null;
 };
 
 function dismissKey(item: BonusSpectatorItem) {
@@ -43,7 +45,8 @@ function markDismissed(key: string) {
 /**
  * Role-only bonus: non-blocking toast so the rest of the team can keep playing.
  */
-export function BonusSpectatorView({ items }: Props) {
+export function BonusSpectatorView({ items, language }: Props) {
+  const t = playUi(language);
   const sfxRef = useRef<Set<string>>(new Set());
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => new Set());
 
@@ -100,15 +103,15 @@ export function BonusSpectatorView({ items }: Props) {
       headline={
         reveal
           ? reveal.correct
-            ? `${visible.solverName} hat ${reveal.reward} Punkte gerade geholt`
-            : `${visible.solverName} konnte die Aufgabe nicht beantworten`
-          : `${visible.solverName} löst gerade eine Bonusaufgabe`
+            ? t.bonus.scoredBy(visible.solverName, reveal.reward)
+            : t.bonus.failedBy(visible.solverName)
+          : t.bonus.solvingNow(visible.solverName)
       }
       detail={
         reveal
           ? reveal.correct
-            ? `+${reveal.reward} Punkte für das Team.`
-            : "Keine Extra-Punkte."
+            ? t.bonus.pointsTeam(reveal.reward)
+            : t.bonus.noExtra
           : null
       }
     />

@@ -3,18 +3,25 @@
 import { useEffect, useState } from "react";
 import { Flag } from "lucide-react";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
+import { playUi } from "@/lib/grid/play-ui";
 
 type Props = {
   disabled?: boolean;
   /** Called only after the player confirms in the modal. */
   onConfirmReveal: () => void;
+  language?: string | null;
 };
 
 /**
  * Secondary escape hatch under the solve form — quiet, not a primary CTA.
  * Requires confirmation so an accidental tap does not end the task at 0 points.
  */
-export function RevealSolutionControl({ disabled = false, onConfirmReveal }: Props) {
+export function RevealSolutionControl({
+  disabled = false,
+  onConfirmReveal,
+  language,
+}: Props) {
+  const t = playUi(language);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
@@ -37,7 +44,7 @@ export function RevealSolutionControl({ disabled = false, onConfirmReveal }: Pro
         <div className="flex items-center gap-3" aria-hidden>
           <span className="h-px flex-1 bg-[var(--cg-border)]" />
           <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-[var(--cg-muted)]">
-            oder
+            {t.reveal.or}
           </span>
           <span className="h-px flex-1 bg-[var(--cg-border)]" />
         </div>
@@ -53,13 +60,13 @@ export function RevealSolutionControl({ disabled = false, onConfirmReveal }: Pro
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-xs font-bold uppercase tracking-[0.16em] text-[var(--cg-muted)]">
-              Stecken fest
+              {t.reveal.stuck}
             </span>
             <span className="mt-0.5 block text-base font-semibold text-[var(--cg-fg)]">
-              Lösung anzeigen
+              {t.reveal.show}
             </span>
             <span className="mt-0.5 block text-sm text-[var(--cg-muted)]">
-              Aufgabe zählt mit 0 Punkten
+              {t.reveal.zeroPoints}
             </span>
           </span>
         </button>
@@ -83,18 +90,14 @@ export function RevealSolutionControl({ disabled = false, onConfirmReveal }: Pro
                 <Flag className="h-5 w-5" strokeWidth={2.25} />
               </span>
               <div>
-                <SectionLabel>Aufgeben</SectionLabel>
+                <SectionLabel>{t.reveal.giveUp}</SectionLabel>
                 <p id="reveal-solution-title" className="font-bold text-[var(--cg-fg)]">
-                  Lösung anzeigen?
+                  {t.reveal.showQ}
                 </p>
               </div>
             </div>
 
-            <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
-              Die Aufgabe gilt danach als erledigt, bringt aber{" "}
-              <span className="font-bold text-[var(--cg-fg)]">0 Punkte</span>. Das lässt sich nicht
-              rückgängig machen.
-            </p>
+            <p className="text-sm leading-relaxed text-[var(--cg-muted)]">{t.reveal.body}</p>
 
             <BigButton
               variant="accent"
@@ -103,10 +106,10 @@ export function RevealSolutionControl({ disabled = false, onConfirmReveal }: Pro
                 onConfirmReveal();
               }}
             >
-              OK — Lösung anzeigen
+              {t.reveal.ok}
             </BigButton>
             <BigButton variant="ghost" onClick={() => setConfirmOpen(false)}>
-              Zurück zum Rätsel
+              {t.reveal.back}
             </BigButton>
           </div>
         </div>

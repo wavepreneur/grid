@@ -353,6 +353,7 @@ export function LobbyRoom({
       clearMissionStarting(inviteCode, joinCode);
       setBusy(null);
     },
+    language,
   });
 
   // Belt-and-suspenders: any path that marks the snapshot as playing must leave the lobby.
@@ -598,6 +599,7 @@ export function LobbyRoom({
         title={t.lobby.rules}
         url={briefingIframeUrl}
         emptyHint={t.lobby.rulesEmpty}
+        language={language}
         onClose={() => setBriefingOpen(false)}
       />
 
@@ -607,6 +609,7 @@ export function LobbyRoom({
           joinCode={joinCode}
           playerId={session.playerId}
           displayName={session.displayName}
+          language={language}
         />
       ) : (
         <>

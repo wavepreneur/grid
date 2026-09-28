@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { Check, Lightbulb } from "lucide-react";
 import { BigButton } from "@/components/game/city/ui";
+import { playUi } from "@/lib/grid/play-ui";
 
 type TileHintModalProps = {
   open: boolean;
@@ -11,6 +12,7 @@ type TileHintModalProps = {
   hintText?: string;
   hintCost: number;
   isPending?: boolean;
+  language?: string | null;
   onConfirm?: () => void;
   onClose: () => void;
 };
@@ -22,9 +24,11 @@ export function TileHintModal({
   hintText,
   hintCost,
   isPending = false,
+  language,
   onConfirm,
   onClose,
 }: TileHintModalProps) {
+  const t = playUi(language);
   useEffect(() => {
     if (!open) return;
     function onKeyDown(event: KeyboardEvent) {
@@ -58,25 +62,21 @@ export function TileHintModal({
               </span>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--cg-muted)]">
-                  Tipp freischalten
+                  {t.hint.unlock}
                 </p>
                 <p className="font-bold text-[var(--cg-fg)]">{label}</p>
               </div>
             </div>
-            <p className="text-sm leading-relaxed text-[var(--cg-muted)]">
-              Kostet{" "}
-              <span className="font-bold text-[var(--cg-fg)]">{hintCost} Punkte</span> vom
-              Team-Score — auch ins Minus. Pro Kachel gibt es einen Tipp.
-            </p>
+            <p className="text-sm leading-relaxed text-[var(--cg-muted)]">{t.hint.cost(hintCost)}</p>
             <BigButton
               variant="accent"
               disabled={isPending}
               onClick={onConfirm}
             >
-              {isPending ? "Wird geladen…" : "Freischalten & anzeigen"}
+              {isPending ? t.hint.loading : t.hint.confirm}
             </BigButton>
             <BigButton variant="ghost" disabled={isPending} onClick={onClose}>
-              Abbrechen
+              {t.hint.cancel}
             </BigButton>
           </>
         ) : (
@@ -87,7 +87,7 @@ export function TileHintModal({
               </span>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--cg-success)]">
-                  Tipp freigeschaltet
+                  {t.hint.unlocked}
                 </p>
                 <p className="font-bold text-[var(--cg-fg)]">{label}</p>
               </div>
@@ -96,7 +96,7 @@ export function TileHintModal({
               {hintText}
             </p>
             <BigButton variant="ghost" onClick={onClose}>
-              Verstanden
+              {t.hint.understood}
             </BigButton>
           </>
         )}
