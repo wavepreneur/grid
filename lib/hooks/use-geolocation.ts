@@ -7,6 +7,8 @@ type GeolocationState = {
   sample: GeolocationSample | null;
   error: string | null;
   isLoading: boolean;
+  /** Browser blocked location (not a GPS timeout). */
+  denied: boolean;
 };
 
 export function useGeolocation(enabled: boolean): GeolocationState {
@@ -14,11 +16,12 @@ export function useGeolocation(enabled: boolean): GeolocationState {
     sample: null,
     error: null,
     isLoading: enabled,
+    denied: false,
   });
 
   useEffect(() => {
     if (!enabled) {
-      setState({ sample: null, error: null, isLoading: false });
+      setState({ sample: null, error: null, isLoading: false, denied: false });
       return;
     }
 
@@ -27,11 +30,12 @@ export function useGeolocation(enabled: boolean): GeolocationState {
         sample: null,
         error: "GPS wird von diesem Gerät nicht unterstützt.",
         isLoading: false,
+        denied: true,
       });
       return;
     }
 
-    setState((current) => ({ ...current, isLoading: true, error: null }));
+    setState((current) => ({ ...current, isLoading: true, error: null, denied: false }));
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
@@ -43,6 +47,7 @@ export function useGeolocation(enabled: boolean): GeolocationState {
           },
           error: null,
           isLoading: false,
+          denied: false,
         });
       },
       (error) => {
@@ -50,6 +55,7 @@ export function useGeolocation(enabled: boolean): GeolocationState {
           sample: null,
           error: error.message || "GPS-Zugriff verweigert.",
           isLoading: false,
+          denied: error.code === error.PERMISSION_DENIED,
         });
       },
       {

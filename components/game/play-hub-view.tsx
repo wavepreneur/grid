@@ -28,6 +28,8 @@ import type { LevelDefinition, GeolocationSample } from "@/lib/grid/level-types"
 import type { GpsFixPayload } from "@/lib/hooks/use-team-sync";
 import { hubMeta } from "@/lib/grid/play-slots";
 import { playUi } from "@/lib/grid/play-ui";
+import { useGeoAccess } from "@/lib/hooks/use-geo-access";
+import { PlayGpsBlockedModal } from "@/components/game/play-gps-blocked-modal";
 
 export type OutdoorArriveInput = {
   geolocation?: GeolocationSample;
@@ -67,6 +69,9 @@ type Props = {
   /** Studio playtest — GPS waypoints can be opened without being on site. */
   isStudioTest?: boolean;
   language?: string | null;
+  /** Team lead only: open the existing team sheet to hand over GPS. */
+  onGiveLead?: () => void;
+  hideGpsLeadModal?: boolean;
 };
 
 export function PlayHubView({
@@ -93,6 +98,8 @@ export function PlayHubView({
   onBroadcastGpsFix,
   isStudioTest = false,
   language,
+  onGiveLead,
+  hideGpsLeadModal = false,
 }: Props) {
   const meta = hubMeta(mode);
   const current = levels.find((l) => l.level === activeLevel) ?? levels[0];
@@ -149,6 +156,8 @@ export function PlayHubView({
         }
         isStudioTest={isStudioTest}
         language={language}
+        onGiveLead={onGiveLead}
+        hideGpsLeadModal={hideGpsLeadModal}
       />
     );
   }
@@ -415,6 +424,8 @@ function OutdoorHub({
   onBroadcastGpsFix,
   isStudioTest = false,
   language,
+  onGiveLead,
+  hideGpsLeadModal = false,
 }: {
   levels: LevelDefinition[];
   levelStatuses: Record<string, { status: GameLevelStatus }>;
@@ -434,6 +445,8 @@ function OutdoorHub({
   onBroadcastGpsFix?: (fix: GpsFixPayload) => void;
   isStudioTest?: boolean;
   language?: string | null;
+  onGiveLead?: () => void;
+  hideGpsLeadModal?: boolean;
 }) {
   const isWalkMode =
     current.triggers?.type === "distance" &&
@@ -444,7 +457,11 @@ function OutdoorHub({
   const isGpsMode = Boolean(current.location) && !isWalkMode;
 
   const gpsEnabled = (isGpsMode || isWalkMode) && isWalkTracker;
-  const { sample: leadSample, error: gpsError } = useGeolocation(gpsEnabled && isGpsMode);
+  const {
+    sample: leadSample,
+    error: gpsError,
+    denied: gpsDenied,
+  } = useGeolocation(gpsEnabled && isGpsMode);
   const sampleRef = useRef(leadSample);
   sampleRef.current = leadSample;
   const sample = useMemo((): GeolocationSample | null => {
@@ -467,6 +484,22 @@ function OutdoorHub({
   const walk = useWalkedDistance(Boolean(gpsEnabled && isWalkMode), {
     storageKey: levelWalkKey,
   });
+  const needsLeadGps = Boolean(
+    isWalkTracker && (isGpsMode || isWalkMode) && !isStudioTest,
+  );
+  const geoAccess = useGeoAccess(needsLeadGps);
+  const gpsBlocked =
+    needsLeadGps && (geoAccess.blocked || (isWalkMode ? walk.denied : gpsDenied));
+  const gpsBlockedModal = (
+    <PlayGpsBlockedModal
+      open={gpsBlocked && !hideGpsLeadModal}
+      language={language}
+      canGiveLead={Boolean(onGiveLead)}
+      onRetry={geoAccess.retry}
+      onReload={() => window.location.reload()}
+      onGiveLead={onGiveLead}
+    />
+  );
   const [simBonus, setSimBonus] = useState(0);
   const [healthBonus, setHealthBonus] = useState(0);
   const arrivedPingRef = useRef(false);
@@ -662,6 +695,7 @@ function OutdoorHub({
   if (isWalkMode) {
     return (
       <section className="flex min-h-[70vh] flex-col">
+        {gpsBlockedModal}
         <div className="space-y-1 px-4 pb-2 pt-2">
           <SectionLabel>Stadtjagd · Strecke</SectionLabel>
           <h1 className="text-xl font-bold text-[var(--cg-fg)]">
@@ -711,6 +745,7 @@ function OutdoorHub({
 
   return (
     <section className="flex flex-col">
+      {gpsBlockedModal}
       <div className="space-y-3 px-4 pb-3 pt-2">
         <header>
           <SectionLabel>Stadtjagd</SectionLabel>

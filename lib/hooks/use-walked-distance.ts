@@ -11,6 +11,7 @@ type WalkedDistanceState = {
   displayMeters: number;
   error: string | null;
   isLoading: boolean;
+  denied: boolean;
 };
 
 type Options = {
@@ -56,6 +57,7 @@ export function useWalkedDistance(
   const [meters, setMeters] = useState(() => readStoredMeters(storageKey));
   const [displayMeters, setDisplayMeters] = useState(() => readStoredMeters(storageKey));
   const [error, setError] = useState<string | null>(null);
+  const [denied, setDenied] = useState(false);
   const [isLoading, setIsLoading] = useState(enabled);
   const lastRef = useRef<GeolocationSample | null>(null);
   const metersRef = useRef(meters);
@@ -77,12 +79,14 @@ export function useWalkedDistance(
 
     if (!navigator.geolocation) {
       setError("GPS wird von diesem Gerät nicht unterstützt.");
+      setDenied(true);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
     setError(null);
+    setDenied(false);
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
@@ -94,6 +98,7 @@ export function useWalkedDistance(
         setSample(next);
         setIsLoading(false);
         setError(null);
+        setDenied(false);
 
         const prev = lastRef.current;
         lastRef.current = next;
@@ -113,6 +118,7 @@ export function useWalkedDistance(
       },
       (geoError) => {
         setError(geoError.message || "GPS-Zugriff verweigert.");
+        setDenied(geoError.code === geoError.PERMISSION_DENIED);
         setIsLoading(false);
       },
       {
@@ -143,7 +149,7 @@ export function useWalkedDistance(
     return () => window.cancelAnimationFrame(frame);
   }, [enabled]);
 
-  return { sample, meters, displayMeters, error, isLoading };
+  return { sample, meters, displayMeters, error, isLoading, denied };
 }
 
 export function clearWalkedDistanceStorage(storageKey: string) {

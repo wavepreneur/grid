@@ -145,6 +145,17 @@ export type PlayUiCopy = {
     continue: string;
     fullscreenHint: string;
   };
+  gpsLead: {
+    title: string;
+    body: string;
+    stepsIos: string;
+    stepsAndroid: string;
+    stepsDesktop: string;
+    settings: string;
+    reload: string;
+    giveLead: string;
+    soloHint: string;
+  };
   resume: {
     copyIdle: string;
     copyDone: string;
@@ -385,6 +396,20 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       subtitle: "Schau dir das Video an — danach geht’s auf die Karte.",
       continue: "Weiter zur Karte",
       fullscreenHint: "Vollbild über den YouTube-Player",
+    },
+    gpsLead: {
+      title: "Standort für die Karte",
+      body: "Als Team-Leitung öffnest du die Wegpunkte. Dafür braucht der Browser deinen Standort — sonst siehst du nicht, wo ihr steht.",
+      stepsIos:
+        "iPhone: Einstellungen → Safari (oder Chrome) → Standort → Erlauben. Dann hier neu laden.",
+      stepsAndroid:
+        "Android: Schloss in der Adressleiste antippen → Berechtigungen → Standort erlauben. Dann neu laden.",
+      stepsDesktop:
+        "Schloss in der Adressleiste → Standort → Zulassen. Dann die Seite neu laden.",
+      settings: "Zu den Einstellungen",
+      reload: "Seite neu laden",
+      giveLead: "Leitung an jemand anderen abgeben",
+      soloHint: "Du spielst allein — Standort hier einschalten, dann neu laden.",
     },
     resume: {
       copyIdle: "Aufs Handy kopieren",
@@ -677,6 +702,20 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       subtitle: "Watch the video — then you go to the map.",
       continue: "Continue to the map",
       fullscreenHint: "Use the YouTube player for fullscreen",
+    },
+    gpsLead: {
+      title: "Location for the map",
+      body: "As team lead you open the waypoints. The browser needs your location — otherwise you won’t see where you are.",
+      stepsIos:
+        "iPhone: Settings → Safari (or Chrome) → Location → Allow. Then reload here.",
+      stepsAndroid:
+        "Android: tap the lock in the address bar → Permissions → allow Location. Then reload.",
+      stepsDesktop:
+        "Lock icon in the address bar → Location → Allow. Then reload the page.",
+      settings: "Go to settings",
+      reload: "Reload page",
+      giveLead: "Hand the lead to someone else",
+      soloHint: "You’re playing alone — turn location on here, then reload.",
     },
     resume: {
       copyIdle: "Copy to phone",

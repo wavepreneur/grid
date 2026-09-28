@@ -537,8 +537,12 @@ export function PlayPhaseFlow({
           onOpenStation={onOpenStation}
           onSubmitStationCode={onSubmitStationCode}
           onStartMission={onStartMission}
+          isStudioTest={eventContent.isStudioTest}
           language={eventContent.language}
-          isStudioTest={Boolean(eventContent.isStudioTest)}
+          onGiveLead={
+            canPaceTeam && teammates.length > 0 ? () => onMorePanel("team") : undefined
+          }
+          hideGpsLeadModal={morePanel === "team"}
         />
       </>
     );
