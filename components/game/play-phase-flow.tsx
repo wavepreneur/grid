@@ -544,10 +544,7 @@ export function PlayPhaseFlow({
           onStartMission={onStartMission}
           isStudioTest={eventContent.isStudioTest}
           language={eventContent.language}
-          onGiveLead={
-            canPaceTeam && teammates.length > 0 ? () => onMorePanel("team") : undefined
-          }
-          hideGpsLeadModal={morePanel === "team"}
+          onOpenGpsHelp={() => onMorePanel("gps")}
         />
       </>
     );

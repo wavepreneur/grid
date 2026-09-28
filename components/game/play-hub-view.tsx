@@ -27,9 +27,8 @@ import type { GameLevelStatus } from "@/lib/grid/game-state";
 import type { LevelDefinition, GeolocationSample } from "@/lib/grid/level-types";
 import type { GpsFixPayload } from "@/lib/hooks/use-team-sync";
 import { hubLabel } from "@/lib/grid/play-slots";
-import { playGeoError, playUi } from "@/lib/grid/play-ui";
+import { playUi } from "@/lib/grid/play-ui";
 import { useGeoAccess } from "@/lib/hooks/use-geo-access";
-import { PlayGpsBlockedModal } from "@/components/game/play-gps-blocked-modal";
 
 export type OutdoorArriveInput = {
   geolocation?: GeolocationSample;
@@ -69,9 +68,8 @@ type Props = {
   /** Studio playtest — GPS waypoints can be opened without being on site. */
   isStudioTest?: boolean;
   language?: string | null;
-  /** Team lead only: open the existing team sheet to hand over GPS. */
-  onGiveLead?: () => void;
-  hideGpsLeadModal?: boolean;
+  /** Open the menu GPS help page (iOS/Android steps). */
+  onOpenGpsHelp?: () => void;
 };
 
 export function PlayHubView({
@@ -98,8 +96,7 @@ export function PlayHubView({
   onBroadcastGpsFix,
   isStudioTest = false,
   language,
-  onGiveLead,
-  hideGpsLeadModal = false,
+  onOpenGpsHelp,
 }: Props) {
   const t = playUi(language);
   const metaLabel = hubLabel(mode, language);
@@ -157,8 +154,7 @@ export function PlayHubView({
         }
         isStudioTest={isStudioTest}
         language={language}
-        onGiveLead={onGiveLead}
-        hideGpsLeadModal={hideGpsLeadModal}
+        onOpenGpsHelp={onOpenGpsHelp}
       />
     );
   }
@@ -423,8 +419,7 @@ function OutdoorHub({
   onBroadcastGpsFix,
   isStudioTest = false,
   language,
-  onGiveLead,
-  hideGpsLeadModal = false,
+  onOpenGpsHelp,
 }: {
   levels: LevelDefinition[];
   levelStatuses: Record<string, { status: GameLevelStatus }>;
@@ -444,8 +439,7 @@ function OutdoorHub({
   onBroadcastGpsFix?: (fix: GpsFixPayload) => void;
   isStudioTest?: boolean;
   language?: string | null;
-  onGiveLead?: () => void;
-  hideGpsLeadModal?: boolean;
+  onOpenGpsHelp?: () => void;
 }) {
   const isWalkMode =
     current.triggers?.type === "distance" &&
@@ -456,13 +450,8 @@ function OutdoorHub({
   const isGpsMode = Boolean(current.location) && !isWalkMode;
 
   const gpsEnabled = (isGpsMode || isWalkMode) && isWalkTracker;
-  const {
-    sample: leadSample,
-    errorKind: gpsErrorKind,
-    denied: gpsDenied,
-  } = useGeolocation(gpsEnabled && isGpsMode);
+  const { sample: leadSample } = useGeolocation(gpsEnabled && isGpsMode);
   const t = playUi(language);
-  const gpsErrorText = playGeoError(language, gpsErrorKind);
   const sampleRef = useRef(leadSample);
   sampleRef.current = leadSample;
   const sample = useMemo((): GeolocationSample | null => {
@@ -486,21 +475,7 @@ function OutdoorHub({
     storageKey: levelWalkKey,
   });
   const watchGps = Boolean(isWalkTracker && (isGpsMode || isWalkMode));
-  const geoAccess = useGeoAccess(watchGps);
-  const gpsBlocked =
-    watchGps &&
-    !isStudioTest &&
-    (geoAccess.blocked || (isWalkMode ? walk.denied : gpsDenied));
-  const gpsBlockedModal = (
-    <PlayGpsBlockedModal
-      open={gpsBlocked && !hideGpsLeadModal}
-      language={language}
-      canGiveLead={Boolean(onGiveLead)}
-      onRetry={geoAccess.retry}
-      onReload={() => window.location.reload()}
-      onGiveLead={onGiveLead}
-    />
-  );
+  useGeoAccess(watchGps);
   const [simBonus, setSimBonus] = useState(0);
   const [healthBonus, setHealthBonus] = useState(0);
   const arrivedPingRef = useRef(false);
@@ -696,7 +671,6 @@ function OutdoorHub({
   if (isWalkMode) {
     return (
       <section className="flex min-h-[70vh] flex-col">
-        {gpsBlockedModal}
         <div className="space-y-1 px-4 pb-2 pt-2">
           <SectionLabel>{t.hub.huntWalk}</SectionLabel>
           <h1 className="text-xl font-bold text-[var(--cg-fg)]">
@@ -709,7 +683,6 @@ function OutdoorHub({
           walkedMeters={walkedMeters}
           disabled={disabled}
           isPending={isPending}
-          gpsError={playGeoError(language, walk.errorKind)}
           showForceOpen={isWalkTracker}
           onOpen={() => openWithSample(walk.sample, current.level)}
           onForceOpen={() => openWithSample(walk.sample, current.level, "distance")}
@@ -720,6 +693,16 @@ function OutdoorHub({
           }
           language={language}
         />
+        {onOpenGpsHelp ? (
+          <div className="px-5 pb-2">
+            <GpsTroubleBlock
+              canUnlock={false}
+              disabled={disabled || isPending}
+              onOpenGpsHelp={onOpenGpsHelp}
+              language={language}
+            />
+          </div>
+        ) : null}
         <p className="px-5 pb-6 text-center text-sm text-[var(--cg-muted)]">
           {isWalkTracker ? t.hub.walkLeadCounts : t.hub.walkFollowCounts}
         </p>
@@ -744,7 +727,6 @@ function OutdoorHub({
 
   return (
     <section className="flex flex-col">
-      {gpsBlockedModal}
       <div className="space-y-3 px-4 pb-3 pt-2">
         <header>
           <SectionLabel>{t.hub.hunt}</SectionLabel>
@@ -810,7 +792,6 @@ function OutdoorHub({
             <GpsTroubleBlock
               canUnlock={canUnlockGps || isStudioTest}
               disabled={disabled || isPending}
-              gpsError={isWalkTracker ? gpsErrorText : null}
               onUnlock={() =>
                 openWithSample(
                   sample ?? targetLevel.location
@@ -824,7 +805,7 @@ function OutdoorHub({
                   "geofence",
                 )
               }
-              onRetryGps={geoAccess.retry}
+              onOpenGpsHelp={onOpenGpsHelp}
               language={language}
             />
             {isStudioTest && targetLevel.location ? (
@@ -953,97 +934,35 @@ function OutdoorTimeWait({
 function GpsTroubleBlock({
   canUnlock,
   disabled,
-  gpsError,
   onUnlock,
-  onRetryGps,
+  onOpenGpsHelp,
   language,
 }: {
   canUnlock: boolean;
   disabled: boolean;
-  gpsError: string | null;
-  onUnlock: () => void;
-  onRetryGps?: () => void;
+  onUnlock?: () => void;
+  onOpenGpsHelp?: () => void;
   language?: string | null;
 }) {
   const t = playUi(language).hub;
-  const h = playUi(language);
-  const [userOpen, setUserOpen] = useState<boolean | null>(null);
-  const [choice, setChoice] = useState<"here" | "broken" | null>(null);
-  const open = userOpen ?? Boolean(gpsError);
-  const effectiveChoice = choice ?? (gpsError ? "broken" : null);
+  if (!onOpenGpsHelp && !canUnlock) return null;
 
   return (
-    <div className="space-y-2">
-      <button
-        type="button"
-        onClick={() => {
-          setUserOpen(!open);
-          if (open) setChoice(null);
-        }}
-        className="tap-lift w-full rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-bg)] px-4 py-3 text-center"
-      >
-        <span className="block text-sm font-bold text-[var(--cg-fg)]">{t.gpsTrouble}</span>
-        <span className="mt-0.5 block text-xs text-[var(--cg-muted)]">{t.gpsTroubleHint}</span>
-      </button>
-
-      {open ? (
-        <div className="space-y-2 rounded-2xl bg-[var(--cg-secondary)] px-3 py-3">
-          <button
-            type="button"
-            onClick={() => setChoice("here")}
-            className={`tap-lift w-full rounded-xl px-3 py-2.5 text-center text-sm font-semibold ${
-              effectiveChoice === "here"
-                ? "bg-[var(--cg-card)] text-[var(--cg-fg)] ring-1 ring-[var(--cg-primary)]/40"
-                : "text-[var(--cg-fg)]"
-            }`}
-          >
-            {t.gpsHere}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setChoice("broken");
-              onRetryGps?.();
-            }}
-            className={`tap-lift w-full rounded-xl px-3 py-2.5 text-center text-sm font-semibold ${
-              effectiveChoice === "broken"
-                ? "bg-[var(--cg-card)] text-[var(--cg-fg)] ring-1 ring-[var(--cg-primary)]/40"
-                : "text-[var(--cg-fg)]"
-            }`}
-          >
-            {t.gpsBroken}
-          </button>
-
-          {effectiveChoice === "here" ? (
-            <div className="space-y-2 pt-1">
-              {canUnlock ? (
-                <BigButton variant="outline" disabled={disabled} onClick={onUnlock}>
-                  {t.gpsUnlock}
-                </BigButton>
-              ) : (
-                <p className="text-center text-xs text-[var(--cg-muted)]">{t.gpsUnlockLead}</p>
-              )}
-            </div>
-          ) : null}
-
-          {effectiveChoice === "broken" ? (
-            <div className="space-y-2 pt-1">
-              {gpsError ? (
-                <p className="text-center text-xs font-semibold text-[var(--cg-fg)]">{gpsError}</p>
-              ) : null}
-              <p className="text-center text-xs leading-snug text-[var(--cg-muted)]">
-                {h.menu.gpsSettings}
-              </p>
-              {canUnlock ? (
-                <BigButton variant="outline" disabled={disabled} onClick={onUnlock}>
-                  {t.gpsSkip}
-                </BigButton>
-              ) : (
-                <p className="text-center text-xs text-[var(--cg-muted)]">{t.gpsSkipLead}</p>
-              )}
-            </div>
-          ) : null}
-        </div>
+    <div className="space-y-1">
+      {onOpenGpsHelp ? (
+        <BigButton variant="outline" onClick={onOpenGpsHelp}>
+          {t.gpsBroken}
+        </BigButton>
+      ) : null}
+      {canUnlock && onUnlock ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onUnlock}
+          className="tap-lift mx-auto block w-full py-2 text-center text-xs font-medium text-[var(--cg-muted)] underline decoration-[var(--cg-border)] underline-offset-4 disabled:opacity-40"
+        >
+          {t.gpsSkip}
+        </button>
       ) : null}
     </div>
   );

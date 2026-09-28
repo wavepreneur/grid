@@ -13,7 +13,6 @@ import {
   Pause,
   Play,
   RotateCcw,
-  Settings,
   Smartphone,
   Users,
   Wallet,
@@ -30,6 +29,7 @@ import {
   playRulesSteps,
 } from "@/lib/grid/play-help";
 import { playUi } from "@/lib/grid/play-ui";
+import { PlayGpsHelp } from "@/components/game/play-gps-help";
 
 export type PlayMorePanel =
   | "menu"
@@ -240,6 +240,14 @@ export function PlayMoreSheet({
                     hint={t.menu.rulesHint}
                     onClick={() => onOpen("briefing")}
                   />
+                  {mode === "outdoor" ? (
+                    <MenuRow
+                      icon={<MapPin className="h-5 w-5" />}
+                      title={t.menu.gpsTitle}
+                      hint={t.gpsHelp.menuHint}
+                      onClick={() => onOpen("gps")}
+                    />
+                  ) : null}
                   <MenuRow
                     icon={<CircleHelp className="h-5 w-5" />}
                     title={t.menu.stuck}
@@ -387,53 +395,25 @@ export function PlayMoreSheet({
               ) : null}
 
               {view === "gps" ? (
-                <div className="space-y-3">
-                  <p className="text-sm font-medium text-[var(--cg-fg)]">
-                    {t.menu.gpsPrompt}
-                  </p>
-                  <HelpCard
-                    icon={<MapPin className="h-5 w-5" />}
-                    title={t.menu.gpsAtPoint}
-                    hint={t.menu.gpsAtPointHint}
-                  >
-                    {canUnlockGps && onForceUnlockGps ? (
-                      <BigButton
-                        disabled={busy}
-                        onClick={() => {
+                <PlayGpsHelp
+                  language={language}
+                  canUnlockGps={canUnlockGps}
+                  isAlpha={isAlpha}
+                  canGiveLead={isAlpha && teammates.length > 0}
+                  busy={busy}
+                  onForceUnlock={
+                    canUnlockGps && onForceUnlockGps
+                      ? () => {
                           onForceUnlockGps();
                           onClose();
-                        }}
-                      >
-                        {t.menu.openTaskNow}
-                      </BigButton>
-                    ) : (
-                      <p className="text-sm font-semibold leading-snug text-[var(--cg-fg)]">
-                        {t.menu.leadOpens}
-                      </p>
-                    )}
-                  </HelpCard>
-                  <HelpCard
-                    icon={<Settings className="h-5 w-5" />}
-                    title={t.menu.checkLocation}
-                    hint={playUi(language).menu.gpsSettings}
-                  >
-                    {canUnlockGps && onForceUnlockGps ? (
-                      <BigButton
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => {
-                          onForceUnlockGps();
-                          onClose();
-                        }}
-                      >
-                        {t.menu.openAnyway}
-                      </BigButton>
-                    ) : null}
-                  </HelpCard>
-                  <BigButton variant="ghost" onClick={() => onOpen("help")}>
-                    {t.back}
-                  </BigButton>
-                </div>
+                        }
+                      : undefined
+                  }
+                  onGiveLead={
+                    isAlpha && teammates.length > 0 ? () => onOpen("team") : undefined
+                  }
+                  onBack={() => onOpen("menu")}
+                />
               ) : null}
 
               {view === "station" ? (

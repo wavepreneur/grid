@@ -174,6 +174,22 @@ export type PlayUiCopy = {
     giveLead: string;
     soloHint: string;
   };
+  gpsHelp: {
+    intro: string;
+    noDialogTitle: string;
+    noDialogBody: string;
+    iosTitle: string;
+    iosSteps: string[];
+    androidTitle: string;
+    androidSteps: string[];
+    desktopTitle: string;
+    desktopSteps: string[];
+    tryAgainHint: string;
+    giveLeadHint: string;
+    lastResortTitle: string;
+    lastResortBody: string;
+    menuHint: string;
+  };
   resume: {
     copyIdle: string;
     copyDone: string;
@@ -920,6 +936,41 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       reload: "Seite neu laden",
       giveLead: "Leitung an jemand anderen abgeben",
       soloHint: "Du spielst allein — Standort hier einschalten, dann neu laden.",
+    },
+    gpsHelp: {
+      intro:
+        "GPS öffnet die Wegpunkte. Wenn der Standort fehlt, ist er fast immer im Browser oder auf dem Handy blockiert — nicht im Spiel.",
+      noDialogTitle: "Kein Standort-Fenster?",
+      noDialogBody:
+        "Erscheint kein GPS-Dialog, hat das Smartphone den Standort für diesen Browser blockiert. In den Einstellungen erlauben — oder die GPS-Rolle an jemand anderen im Team geben.",
+      iosTitle: "iPhone / iPad",
+      iosSteps: [
+        "Einstellungen öffnen",
+        "Nach unten zu Safari — oder Chrome, wenn ihr damit spielt",
+        "Standort → Erlauben (nicht Fragen oder Nie)",
+        "Zurück zum Spiel und Seite neu laden",
+      ],
+      androidTitle: "Android",
+      androidSteps: [
+        "Schloss in der Adressleiste antippen",
+        "Berechtigungen öffnen",
+        "Standort erlauben",
+        "Seite neu laden",
+      ],
+      desktopTitle: "Computer",
+      desktopSteps: [
+        "Schloss in der Adressleiste anklicken",
+        "Standort → Zulassen",
+        "Seite neu laden",
+      ],
+      tryAgainHint:
+        "Tippen, damit der Browser den Standort nochmal anfragt. Erscheint kein Fenster: Standort ist blockiert — Einstellungen oder Rolle abgeben.",
+      giveLeadHint:
+        "Jemand mit funktionierendem GPS übernimmt die Leitung. Dann muss niemand ohne Standort spielen.",
+      lastResortTitle: "Nur wenn es wirklich nicht geht",
+      lastResortBody:
+        "Ohne GPS nur freischalten, wenn niemand sonst die Rolle übernehmen kann — oder der Wegpunkt unzugänglich ist (Baustelle, Absperrung).",
+      menuHint: "Standort erlauben — iPhone und Android",
     },
     resume: {
       copyIdle: "Aufs Handy kopieren",
@@ -1684,6 +1735,41 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       reload: "Reload page",
       giveLead: "Hand the lead to someone else",
       soloHint: "You’re playing alone — turn location on here, then reload.",
+    },
+    gpsHelp: {
+      intro:
+        "GPS opens the waypoints. If location is missing, it is almost always blocked in the browser or on the phone — not in the game.",
+      noDialogTitle: "No location prompt?",
+      noDialogBody:
+        "If no GPS dialog appears, the phone has blocked location for this browser. Allow it in Settings — or give the GPS role to someone else on the team.",
+      iosTitle: "iPhone / iPad",
+      iosSteps: [
+        "Open Settings",
+        "Scroll to Safari — or Chrome, if that’s the browser you play in",
+        "Location → Allow (not Ask or Never)",
+        "Come back to the game and reload the page",
+      ],
+      androidTitle: "Android",
+      androidSteps: [
+        "Tap the lock in the address bar",
+        "Open Permissions",
+        "Allow Location",
+        "Reload the page",
+      ],
+      desktopTitle: "Computer",
+      desktopSteps: [
+        "Click the lock in the address bar",
+        "Location → Allow",
+        "Reload the page",
+      ],
+      tryAgainHint:
+        "Tap so the browser asks for location again. If no dialog appears, location is blocked — change Settings or hand over the role.",
+      giveLeadHint:
+        "Someone with working GPS takes the lead. Then nobody has to play without location.",
+      lastResortTitle: "Only if it really cannot work",
+      lastResortBody:
+        "Unlock without GPS only if nobody else can take the role — or the waypoint is unreachable (construction, a closed path).",
+      menuHint: "Allow location — iPhone and Android",
     },
     resume: {
       copyIdle: "Copy to phone",
