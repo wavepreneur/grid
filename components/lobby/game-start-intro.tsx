@@ -88,11 +88,11 @@ export function GameStartIntro({
       </div>
 
       <main className="relative z-[1] mx-auto flex w-full max-w-lg flex-1 flex-col px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2">
-        <h1 className="-mt-8 text-3xl font-extrabold tracking-tight text-slate-900 drop-shadow-sm sm:text-4xl">
+        <h1 className="-mt-6 text-center text-[1.35rem] font-extrabold leading-snug tracking-tight text-slate-900 sm:text-2xl">
           {gameTitle}
         </h1>
         {text ? (
-          <p className="mt-4 whitespace-pre-wrap text-[1.05rem] leading-relaxed text-slate-600">
+          <p className="mt-3 whitespace-pre-wrap text-center text-[1.05rem] leading-relaxed text-slate-600">
             {text}
           </p>
         ) : null}
