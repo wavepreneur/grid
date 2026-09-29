@@ -146,9 +146,10 @@ export async function searchDirectoryCities(search = ""): Promise<ActionResult<D
       .order("name")
       .limit(40);
     const query = filter ? full.or(filter) : full;
-    let { data, error } = await query;
+    const first = await query;
+    let rows: Record<string, unknown>[] = (first.data ?? []) as Record<string, unknown>[];
 
-    if (error) {
+    if (first.error) {
       const core = supabase
         .from("cities")
         .select("id, slug, name, country")
@@ -158,12 +159,11 @@ export async function searchDirectoryCities(search = ""): Promise<ActionResult<D
       const fallback = filter ? core.or(filter) : core;
       const retry = await fallback;
       if (retry.error) throw new Error(retry.error.message);
-      data = retry.data;
-      error = null;
+      rows = (retry.data ?? []) as Record<string, unknown>[];
     }
     return {
       success: true,
-      data: (data ?? []).map((row) => mapCityRow(row as Record<string, unknown>)),
+      data: rows.map(mapCityRow),
     };
   } catch (error) {
     return {
