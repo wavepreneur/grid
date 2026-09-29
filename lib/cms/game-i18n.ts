@@ -17,6 +17,7 @@ import type {
   LevelHint,
   QuizOption,
 } from "@/lib/grid/level-types";
+import { splitSideFact } from "@/lib/grid/side-fact";
 
 export type TranslationCoverage = {
   confirmed: number;
@@ -514,13 +515,17 @@ function applyOptionLabels(
 
 function applyQuizLocale(quiz: ArrivalQuiz | undefined, copy: SlotLocaleCopy["quiz"]): ArrivalQuiz | undefined {
   if (!quiz || !copy) return quiz;
+  const fact = splitSideFact(
+    copy.side_fact_title?.trim() || quiz.side_fact_title,
+    copy.side_fact?.trim() || quiz.side_fact,
+  );
   return {
     ...quiz,
     title: copy.title?.trim() || quiz.title,
     description: copy.description ?? quiz.description,
     question: copy.question?.trim() || quiz.question,
-    side_fact_title: copy.side_fact_title ?? quiz.side_fact_title,
-    side_fact: copy.side_fact ?? quiz.side_fact,
+    side_fact_title: fact.title || undefined,
+    side_fact: fact.body || undefined,
     options: applyOptionLabels(quiz.options, copy.options) ?? quiz.options,
   };
 }
@@ -569,6 +574,9 @@ function applyBonusLocale(bonus: BonusDefinition, copy: BonusLocaleCopy | undefi
   if (!copy) return bonus;
   return {
     ...bonus,
+    id: bonus.id,
+    when: bonus.when,
+    fanfare: bonus.fanfare,
     title: copy.title?.trim() || bonus.title,
     description: copy.description ?? bonus.description,
     question: copy.question?.trim() || bonus.question,
@@ -581,13 +589,17 @@ function applyBonusLocale(bonus: BonusDefinition, copy: BonusLocaleCopy | undefi
 export function applySlotLocale(level: LevelDefinition, copy: SlotLocaleCopy | undefined): LevelDefinition {
   if (!copy) return level;
   const bonuses = localizeBonuses(level.bonuses, copy.bonuses);
+  const fact = splitSideFact(
+    copy.success_title?.trim() || level.success_title,
+    copy.success_info?.trim() || level.success_info,
+  );
   return {
     ...level,
     title: copy.title?.trim() || level.title,
     description: copy.description?.trim() || level.description,
     question: copy.question?.trim() || level.question,
-    success_title: copy.success_title ?? level.success_title,
-    success_info: copy.success_info ?? level.success_info,
+    success_title: fact.title || undefined,
+    success_info: fact.body || undefined,
     options: applyOptionLabels(level.options, copy.options),
     tiles: applyTiles(level.tiles, copy.tiles),
     hints: applyHints(level.hints, copy.hints),
@@ -599,8 +611,8 @@ export function applySlotLocale(level: LevelDefinition, copy: SlotLocaleCopy | u
           place: copy.station?.place ?? level.station.place,
         }
       : level.station,
-    bonuses,
-    bonus: bonuses?.[0] ?? level.bonus,
+    bonuses: bonuses ?? level.bonuses,
+    bonus: (bonuses ?? level.bonuses)?.[0] ?? level.bonus,
   };
 }
 

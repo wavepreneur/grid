@@ -7,6 +7,7 @@ import { isTaskNumberFieldCount } from "@/lib/cms/types";
 import {
   isMediaInputMode,
   type ArrivalQuiz,
+  type BonusDefinition,
   type BonusTask,
   type LevelDefinition,
   type MediaInputMode,
@@ -16,6 +17,7 @@ import { parseLevelTiles } from "@/lib/grid/level-content";
 import { parseLevelScoring } from "@/lib/grid/level-scoring";
 import { normalizeAnswer } from "@/lib/grid/content-engine";
 import { playUi } from "@/lib/grid/play-ui";
+import { parseBonusWhen } from "@/lib/cms/bonus-bindings";
 
 export function parseBonusTask(raw: unknown): BonusTask | undefined {
   if (!raw || typeof raw !== "object") return undefined;
@@ -130,20 +132,25 @@ export function resolveBonusTask(level: LevelDefinition | null | undefined): Bon
   return null;
 }
 
+function withCompiledWhen(def: BonusDefinition): BonusDefinition {
+  return { ...def, when: parseBonusWhen(def.when) };
+}
+
 /** All bonuses for a mission (compiled list or legacy single). */
 export function resolveBonusDefinitions(
   level: LevelDefinition | null | undefined,
-): import("@/lib/grid/level-types").BonusDefinition[] {
+): BonusDefinition[] {
   if (!level) return [];
-  if (level.bonuses?.length) return level.bonuses;
+  if (level.bonuses?.length) return level.bonuses.map(withCompiledWhen);
   if (level.bonus) {
+    const raw = level.bonus as BonusDefinition;
     return [
-      {
+      withCompiledWhen({
         ...level.bonus,
-        id: `legacy-${level.level}`,
-        when: { type: "immediate" },
+        id: raw.id ?? `legacy-${level.level}`,
+        when: raw.when ?? { type: "immediate" },
         fanfare: true,
-      },
+      }),
     ];
   }
   return [];

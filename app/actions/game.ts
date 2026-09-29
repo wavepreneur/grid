@@ -85,6 +85,7 @@ import {
   promoteArmedBonuses,
 } from "@/lib/grid/bonus-queue";
 import { queueGrowthTeamFinished } from "@/lib/grid/growth-dispatch";
+import { parseBonusWhen } from "@/lib/cms/bonus-bindings";
 
 function actionErr(
   event: { content_config?: unknown } | null | undefined,
@@ -412,35 +413,23 @@ export async function solveCurrentLevel(input: {
     const armedAt = new Date();
     const bonusQueue: NonNullable<TeamGameState["bonus_queue"]> = wantBonus
       ? bonusDefs.map((def) => {
-          const when = def.when ?? { type: "immediate" as const };
+          const when = parseBonusWhen(def.when);
           let readyAt: string | null = null;
           let status: "armed" | "ready" = "armed";
 
           if (when.type === "immediate") {
             status = "ready";
             readyAt = armedAt.toISOString();
-          } else if (
-            when.type === "delay_minutes" &&
-            typeof when.minutes === "number" &&
-            when.minutes > 0
-          ) {
+          } else if (when.type === "delay_minutes" && when.minutes) {
             readyAt = new Date(
               armedAt.getTime() + when.minutes * 60_000,
             ).toISOString();
-          } else if (
-            when.type === "interval_minutes" &&
-            typeof when.minutes === "number" &&
-            when.minutes > 0
-          ) {
+          } else if (when.type === "interval_minutes" && when.minutes) {
             // First fire after N minutes from solve, then re-arm on complete.
             readyAt = new Date(
               armedAt.getTime() + when.minutes * 60_000,
             ).toISOString();
-          } else if (
-            when.type === "game_minutes" &&
-            typeof when.minutes === "number" &&
-            when.minutes > 0
-          ) {
+          } else if (when.type === "game_minutes" && when.minutes) {
             const startMs = team.started_at
               ? new Date(team.started_at).getTime()
               : armedAt.getTime();
@@ -448,18 +437,12 @@ export async function solveCurrentLevel(input: {
             if (readyAt <= armedAt.toISOString()) {
               status = "ready";
             }
-          } else if (
-            when.type === "delay_meters" &&
-            typeof when.meters === "number" &&
-            when.meters > 0
-          ) {
-            // Stays armed until walk progress promotes it.
+          } else if (when.type === "delay_meters") {
+            // Stay armed until walk progress — never surprise-fire as immediate.
             readyAt = null;
           } else {
-            // Unknown / empty delay params → treat as immediate so authored
-            // bonuses never silently vanish.
-            status = "ready";
-            readyAt = armedAt.toISOString();
+            // delay_* with a missing amount stays armed; do not pop the bonus.
+            readyAt = null;
           }
 
           return {
@@ -471,7 +454,7 @@ export async function solveCurrentLevel(input: {
             ready_at: readyAt,
             status,
             meters_required:
-              when.type === "delay_meters" && when.meters ? when.meters : undefined,
+              when.type === "delay_meters" ? when.meters : undefined,
             interval_minutes:
               when.type === "interval_minutes" && when.minutes
                 ? when.minutes

@@ -60,9 +60,14 @@ export const BONUS_WHEN_OPTIONS: Array<{
   },
 ];
 
+function positiveNumber(value: unknown): number | undefined {
+  const n = typeof value === "number" ? value : typeof value === "string" ? Number(value.trim()) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
 export function parseBonusWhen(raw: unknown): BonusWhen {
   if (!raw || typeof raw !== "object") return { type: "immediate" };
-  const o = raw as Partial<BonusWhen>;
+  const o = raw as Partial<BonusWhen> & { minutes?: unknown; meters?: unknown };
   const type = o.type;
   if (
     type !== "immediate" &&
@@ -75,8 +80,8 @@ export function parseBonusWhen(raw: unknown): BonusWhen {
   }
   return {
     type,
-    minutes: typeof o.minutes === "number" && o.minutes > 0 ? o.minutes : undefined,
-    meters: typeof o.meters === "number" && o.meters > 0 ? o.meters : undefined,
+    minutes: positiveNumber(o.minutes),
+    meters: positiveNumber(o.meters),
   };
 }
 

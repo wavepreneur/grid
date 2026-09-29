@@ -35,6 +35,7 @@ import {
 import { resolveContentMode } from "@/lib/grid/play-slots";
 import { buildDefaultStation, normalizeStationCode } from "@/lib/grid/stations";
 import { parseBonusTask } from "@/lib/grid/bonus";
+import { splitSideFact } from "@/lib/grid/side-fact";
 import { parseGameHelpLinks, resolveIntroYoutubeUrl } from "@/lib/grid/game-help-links";
 import { parseFollowUpTrigger } from "@/lib/grid/follow-up-trigger";
 import { resolvePlayGrowthOffer } from "@/lib/grid/growth-pack";
@@ -87,12 +88,16 @@ function parseArrivalQuiz(raw: unknown): ArrivalQuiz | undefined {
     ...(typeof q.description === "string" && q.description.trim()
       ? { description: q.description.trim() }
       : {}),
-    ...(typeof q.side_fact_title === "string" && q.side_fact_title.trim()
-      ? { side_fact_title: q.side_fact_title.trim() }
-      : {}),
-    ...(typeof q.side_fact === "string" && q.side_fact.trim()
-      ? { side_fact: q.side_fact.trim() }
-      : {}),
+    ...(() => {
+      const fact = splitSideFact(
+        typeof q.side_fact_title === "string" ? q.side_fact_title : undefined,
+        typeof q.side_fact === "string" ? q.side_fact : undefined,
+      );
+      return {
+        ...(fact.title ? { side_fact_title: fact.title } : {}),
+        ...(fact.body ? { side_fact: fact.body } : {}),
+      };
+    })(),
     ...(typeof q.points === "number" && q.points > 0 ? { points: Math.round(q.points) } : {}),
   };
 }

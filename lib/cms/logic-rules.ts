@@ -14,6 +14,7 @@ import {
   taskContentToBonus,
 } from "@/lib/cms/game-slots";
 import { parseRuntimeProfiles } from "@/lib/cms/layer-model";
+import { parseBonusWhen } from "@/lib/cms/bonus-bindings";
 import { effectiveDistanceUnlockMeters } from "@/lib/grid/outdoor-unlock";
 import { resolveStationAccessCode } from "@/lib/grid/stations";
 /** When → Then rule (stored on studio_games.logic_rules). */
@@ -636,12 +637,7 @@ export function compileStudioGameToLevels(input: {
           compiled.push({
             ...bonus,
             id: `${slot.index}-${link.task_id}`,
-            when: {
-              type: binding.when.type,
-              minutes:
-                "minutes" in binding.when ? binding.when.minutes : undefined,
-              meters: "meters" in binding.when ? binding.when.meters : undefined,
-            },
+            when: parseBonusWhen(binding.when),
             fanfare: true,
           });
         }

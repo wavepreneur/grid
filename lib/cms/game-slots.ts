@@ -23,6 +23,7 @@ import {
   type StudioTaskContent,
 } from "@/lib/cms/types";
 import type { ArrivalQuiz, BonusTask, LevelContentTile, QuizOption } from "@/lib/grid/level-types";
+import { splitSideFact } from "@/lib/grid/side-fact";
 import { normalizeTaskContent, studioScoringToLevelScoring, studioTilesToLevelTiles } from "@/lib/cms/task-content";
 
 export type StudioArrivalQuiz = {
@@ -124,10 +125,9 @@ function contentToArrivalQuiz(content: StudioTaskContent): StudioArrivalQuiz | n
   if (normalized.hero_image_url?.trim()) {
     quiz.image_url = normalized.hero_image_url.trim();
   }
-  const factTitle = normalized.success_title?.trim();
-  const factBody = normalized.success_info?.trim();
-  if (factTitle) quiz.side_fact_title = factTitle;
-  if (factBody) quiz.side_fact = factBody;
+  const fact = splitSideFact(normalized.success_title, normalized.success_info);
+  if (fact.title) quiz.side_fact_title = fact.title;
+  if (fact.body) quiz.side_fact = fact.body;
 
   if (normalized.answer_type === "multi_choice") {
     const ids = normalized.options.filter((o) => o.correct).map((o) => o.id);
