@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Map as LeafletMap, Layer } from "leaflet";
+import type { Circle, CircleMarker, Map as LeafletMap, Polyline } from "leaflet";
 import type { GameLevelStatus } from "@/lib/grid/game-state";
 import type { GeolocationSample, LevelLocation } from "@/lib/grid/level-types";
-import { bearingDegrees, distanceMeters } from "@/lib/grid/geofence";
+import {
+  bearingDegrees,
+  distanceMeters,
+  PLAY_LIVE_MAP_MAX_METERS,
+} from "@/lib/grid/geofence";
 import { playUi } from "@/lib/grid/play-ui";
 
 export type GpsMapWaypoint = {
@@ -28,6 +32,8 @@ type GpsMissionMapProps = {
   language?: string | null;
 };
 
+type LeafletNS = typeof import("leaflet");
+
 export function GpsMissionMap({
   waypoints,
   activeLevel,
@@ -42,30 +48,39 @@ export function GpsMissionMap({
   const t = playUi(language).hub;
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
-  const overlayRef = useRef<Layer[]>([]);
-  const viewKeyRef = useRef<string>("");
+  const leafletRef = useRef<LeafletNS | null>(null);
+  const targetKeyRef = useRef("");
+  const playerMarkerRef = useRef<CircleMarker | null>(null);
+  const routeRef = useRef<Polyline | null>(null);
+  const targetLayersRef = useRef<Array<Circle | CircleMarker>>([]);
+  const lastPanRef = useRef("");
   const startDistRef = useRef<number | null>(null);
   const startLevelRef = useRef(activeLevel);
   const [mapReady, setMapReady] = useState(false);
+
+  const isFar =
+    distanceToTarget !== null && distanceToTarget > PLAY_LIVE_MAP_MAX_METERS;
 
   if (startLevelRef.current !== activeLevel) {
     startLevelRef.current = activeLevel;
     startDistRef.current = null;
   }
-  if (distanceToTarget !== null && startDistRef.current === null) {
+  if (isFar) {
+    startDistRef.current = null;
+  } else if (distanceToTarget !== null && startDistRef.current === null) {
     startDistRef.current = Math.max(distanceToTarget, 1);
   }
 
   const bearing =
-    playerPosition && target ? bearingDegrees(playerPosition, target) : null;
+    !isFar && playerPosition && target ? bearingDegrees(playerPosition, target) : null;
   const startDist = startDistRef.current;
   const remaining = distanceToTarget !== null ? Math.max(0, Math.round(distanceToTarget)) : null;
   const walked =
-    startDist !== null && distanceToTarget !== null
+    !isFar && startDist !== null && distanceToTarget !== null
       ? Math.max(0, Math.round(startDist - distanceToTarget))
       : 0;
   const progress =
-    startDist && startDist > 0 && distanceToTarget !== null
+    !isFar && startDist && startDist > 0 && distanceToTarget !== null
       ? Math.min(1, Math.max(0, 1 - distanceToTarget / startDist))
       : 0;
 
@@ -75,7 +90,8 @@ export function GpsMissionMap({
     async function init() {
       if (!containerRef.current) return;
 
-      const L = (await import("leaflet")).default;
+      const leafletMod = await import("leaflet");
+      const L = (leafletMod as LeafletNS & { default?: LeafletNS }).default ?? leafletMod;
       await import("leaflet/dist/leaflet.css");
 
       if (cancelled || !containerRef.current || mapRef.current) return;
@@ -84,6 +100,12 @@ export function GpsMissionMap({
         zoomControl: false,
         attributionControl: true,
         zoomSnap: 0.5,
+        dragging: false,
+        touchZoom: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false,
       });
 
       L.tileLayer(
@@ -94,6 +116,7 @@ export function GpsMissionMap({
         },
       ).addTo(map);
 
+      leafletRef.current = L;
       mapRef.current = map;
       setMapReady(true);
     }
@@ -104,27 +127,30 @@ export function GpsMissionMap({
       cancelled = true;
       mapRef.current?.remove();
       mapRef.current = null;
-      overlayRef.current = [];
-      viewKeyRef.current = "";
+      leafletRef.current = null;
+      playerMarkerRef.current = null;
+      routeRef.current = null;
+      targetLayersRef.current = [];
+      targetKeyRef.current = "";
+      lastPanRef.current = "";
       setMapReady(false);
     };
   }, []);
 
   useEffect(() => {
-    if (!mapReady || !mapRef.current) return;
+    if (!mapReady) return;
+    const map = mapRef.current;
+    const L = leafletRef.current;
+    if (!map || !L) return;
 
-    void import("leaflet").then(({ default: L }) => {
-      const map = mapRef.current;
-      if (!map) return;
-
-      for (const layer of overlayRef.current) {
+    const active = waypoints.find((waypoint) => waypoint.level === activeLevel);
+    const targetKey = `${activeLevel}:${withinRadius ? "in" : "out"}`;
+    if (targetKeyRef.current !== targetKey) {
+      for (const layer of targetLayersRef.current) {
         map.removeLayer(layer);
       }
-      overlayRef.current = [];
-
-      const active = waypoints.find((waypoint) => waypoint.level === activeLevel);
-      const focusLat = playerPosition?.lat ?? active?.lat ?? target?.lat;
-      const focusLng = playerPosition?.lng ?? active?.lng ?? target?.lng;
+      targetLayersRef.current = [];
+      targetKeyRef.current = targetKey;
 
       if (active) {
         const zone = L.circle([active.lat, active.lng], {
@@ -133,71 +159,87 @@ export function GpsMissionMap({
           weight: 2,
           fillColor: "#22c55e",
           fillOpacity: 0.12,
+          interactive: false,
         }).addTo(map);
-        overlayRef.current.push(zone);
 
-        const marker = L.circleMarker([active.lat, active.lng], {
+        const pin = L.circleMarker([active.lat, active.lng], {
           radius: 10,
           color: "#ffffff",
           weight: 3,
           fillColor: withinRadius ? "#16a34a" : "#166534",
           fillOpacity: 1,
+          interactive: false,
         }).addTo(map);
-        overlayRef.current.push(marker);
+        targetLayersRef.current.push(zone, pin);
       }
+    }
 
-      if (showPlayer && playerPosition) {
-        const player = L.circleMarker([playerPosition.lat, playerPosition.lng], {
+    const showLive = Boolean(showPlayer && playerPosition && target && !isFar);
+    if (showLive && playerPosition && target) {
+      if (playerMarkerRef.current) {
+        playerMarkerRef.current.setLatLng([playerPosition.lat, playerPosition.lng]);
+      } else {
+        playerMarkerRef.current = L.circleMarker([playerPosition.lat, playerPosition.lng], {
           radius: 8,
           color: "#ffffff",
           weight: 3,
           fillColor: "#0f172a",
           fillOpacity: 1,
+          interactive: false,
         }).addTo(map);
-        overlayRef.current.push(player);
-
-        if (target) {
-          const route = L.polyline(
-            [
-              [playerPosition.lat, playerPosition.lng],
-              [target.lat, target.lng],
-            ],
-            {
-              color: withinRadius ? "#16a34a" : "#0f172a",
-              weight: 3,
-              opacity: 0.55,
-              dashArray: withinRadius ? undefined : "8 10",
-              lineCap: "round",
-            },
-          ).addTo(map);
-          overlayRef.current.push(route);
-        }
       }
 
-      const viewKey = `${activeLevel}:${playerPosition ? "p" : "n"}`;
-      if (playerPosition && target) {
-        if (viewKeyRef.current !== viewKey) {
-          map.fitBounds(
-            [
-              [playerPosition.lat, playerPosition.lng],
-              [target.lat, target.lng],
-            ],
-            { padding: [48, 48], maxZoom: 16, animate: false },
-          );
-          viewKeyRef.current = viewKey;
-        } else {
-          map.panTo([playerPosition.lat, playerPosition.lng], {
-            animate: true,
-            duration: 0.35,
-          });
-        }
-      } else if (focusLat !== undefined && focusLng !== undefined) {
-        if (viewKeyRef.current !== viewKey) {
-          map.setView([focusLat, focusLng], 16, { animate: false });
-          viewKeyRef.current = viewKey;
-        }
+      const line: [number, number][] = [
+        [playerPosition.lat, playerPosition.lng],
+        [target.lat, target.lng],
+      ];
+      if (routeRef.current) {
+        routeRef.current.setLatLngs(line);
+        routeRef.current.setStyle({
+          color: withinRadius ? "#16a34a" : "#0f172a",
+          dashArray: withinRadius ? undefined : "8 10",
+        });
+      } else {
+        routeRef.current = L.polyline(line, {
+          color: withinRadius ? "#16a34a" : "#0f172a",
+          weight: 3,
+          opacity: 0.55,
+          dashArray: withinRadius ? undefined : "8 10",
+          lineCap: "round",
+          interactive: false,
+        }).addTo(map);
       }
-    });
+    } else {
+      if (playerMarkerRef.current) {
+        map.removeLayer(playerMarkerRef.current);
+        playerMarkerRef.current = null;
+      }
+      if (routeRef.current) {
+        map.removeLayer(routeRef.current);
+        routeRef.current = null;
+      }
+    }
+
+    const focus = active ?? target;
+    if (showLive && playerPosition && target) {
+      const viewKey = `live:${activeLevel}`;
+      if (lastPanRef.current !== viewKey) {
+        lastPanRef.current = viewKey;
+        map.fitBounds(
+          [
+            [playerPosition.lat, playerPosition.lng],
+            [target.lat, target.lng],
+          ],
+          { padding: [48, 48], maxZoom: 16, animate: false },
+        );
+      }
+    } else if (focus) {
+      const viewKey = `t:${activeLevel}:${focus.lat.toFixed(5)},${focus.lng.toFixed(5)}`;
+      if (lastPanRef.current !== viewKey) {
+        lastPanRef.current = viewKey;
+        map.setView([focus.lat, focus.lng], 16, { animate: false });
+      }
+    }
   }, [
     mapReady,
     waypoints,
@@ -206,6 +248,7 @@ export function GpsMissionMap({
     showPlayer,
     target,
     withinRadius,
+    isFar,
   ]);
 
   const ringSize = 72;
@@ -216,7 +259,10 @@ export function GpsMissionMap({
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--cg-border)] bg-[var(--cg-card)] shadow-[var(--cg-shadow-soft)]">
       <div className="relative">
-        <div ref={containerRef} className="h-[min(36vh,240px)] w-full sm:h-[220px]" />
+        <div
+          ref={containerRef}
+          className="pointer-events-none h-[min(36vh,240px)] w-full touch-manipulation sm:h-[220px]"
+        />
         {showPlayer && playerPosition && target && bearing !== null && !withinRadius ? (
           <div className="pointer-events-none absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--cg-fg)] text-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)]">
             <svg
@@ -264,6 +310,8 @@ export function GpsMissionMap({
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
             {withinRadius ? (
               <p className="text-[0.65rem] font-bold text-[var(--cg-success)]">{t.mapTarget}</p>
+            ) : isFar ? (
+              <p className="text-[0.65rem] text-[var(--cg-muted)]">GPS</p>
             ) : remaining !== null ? (
               <p className="text-base font-bold tabular-nums leading-none text-[var(--cg-fg)]">
                 {remaining}
@@ -276,6 +324,8 @@ export function GpsMissionMap({
         <div className="min-w-0 flex-1 text-sm">
           {withinRadius ? (
             <p className="font-medium text-[var(--cg-success)]">{t.mapAtPoint}</p>
+          ) : isFar ? (
+            <p className="text-[var(--cg-muted)]">{t.mapFar}</p>
           ) : remaining !== null ? (
             <>
               <p className="font-semibold tabular-nums text-[var(--cg-fg)]">

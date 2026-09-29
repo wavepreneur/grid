@@ -47,6 +47,8 @@ export type ArrivalQuiz = {
   correct_option_ids?: string[];
   /** Bonus points when answered correctly (wrong still unlocks with 0). */
   points?: number;
+  /** Side-fact heading after answer. Empty → player chrome “Did you know?”. */
+  side_fact_title?: string;
   /** Side-fact after answer (city tour note). */
   side_fact?: string;
 };

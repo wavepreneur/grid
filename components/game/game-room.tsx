@@ -559,26 +559,32 @@ export function GameRoom({
     });
   }
 
-  function handleBroadcastWalkProgress(level: number, walkedMeters: number) {
-    void broadcast({
-      type: "walk_meters",
-      level,
-      walked_meters: walkedMeters,
-    });
-  }
+  const handleBroadcastWalkProgress = useCallback(
+    (level: number, walkedMeters: number) => {
+      void broadcast({
+        type: "walk_meters",
+        level,
+        walked_meters: walkedMeters,
+      });
+    },
+    [broadcast],
+  );
 
-  function handleBroadcastGpsFix(fix: GpsFixPayload) {
-    void broadcast({
-      type: "gps_fix",
-      level: fix.level,
-      lat: fix.lat,
-      lng: fix.lng,
-      accuracy: fix.accuracy ?? undefined,
-      distance_m: fix.distance_m,
-      within_radius: fix.within_radius,
-      health_radius_bonus_m: fix.health_radius_bonus_m,
-    });
-  }
+  const handleBroadcastGpsFix = useCallback(
+    (fix: GpsFixPayload) => {
+      void broadcast({
+        type: "gps_fix",
+        level: fix.level,
+        lat: fix.lat,
+        lng: fix.lng,
+        accuracy: fix.accuracy ?? undefined,
+        distance_m: fix.distance_m,
+        within_radius: fix.within_radius,
+        health_radius_bonus_m: fix.health_radius_bonus_m,
+      });
+    },
+    [broadcast],
+  );
 
   function handleOpenStation(levelNumber: number, stationCode?: string): Promise<boolean> {
     setError(null);

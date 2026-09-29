@@ -52,6 +52,7 @@ export type QuizLocaleCopy = {
   title?: string;
   description?: string;
   question?: string;
+  side_fact_title?: string;
   side_fact?: string;
   options?: Array<{ id: string; label: string }>;
 };
@@ -195,6 +196,7 @@ export function parseSlotLocale(value: unknown): SlotLocaleCopy {
           title: typeof quizRaw.title === "string" ? quizRaw.title : undefined,
           description: typeof quizRaw.description === "string" ? quizRaw.description : undefined,
           question: typeof quizRaw.question === "string" ? quizRaw.question : undefined,
+          side_fact_title: typeof quizRaw.side_fact_title === "string" ? quizRaw.side_fact_title : undefined,
           side_fact: typeof quizRaw.side_fact === "string" ? quizRaw.side_fact : undefined,
           options: parseOptions(quizRaw.options),
         }
@@ -366,6 +368,7 @@ function inferredSlotKeys(linkId: string, source: SlotLocaleCopy, current: SlotL
     considerDifferent(keys, `${prefix}:quiz:title`, source.quiz.title, current.quiz?.title);
     considerDifferent(keys, `${prefix}:quiz:description`, source.quiz.description, current.quiz?.description);
     considerDifferent(keys, `${prefix}:quiz:question`, source.quiz.question, current.quiz?.question);
+    considerDifferent(keys, `${prefix}:quiz:side_fact_title`, source.quiz.side_fact_title, current.quiz?.side_fact_title);
     considerDifferent(keys, `${prefix}:quiz:side_fact`, source.quiz.side_fact, current.quiz?.side_fact);
     const quizOptions = new Map((current.quiz?.options ?? []).map((option) => [option.id, option.label]));
     for (const option of source.quiz.options ?? []) {
@@ -516,6 +519,7 @@ function applyQuizLocale(quiz: ArrivalQuiz | undefined, copy: SlotLocaleCopy["qu
     title: copy.title?.trim() || quiz.title,
     description: copy.description ?? quiz.description,
     question: copy.question?.trim() || quiz.question,
+    side_fact_title: copy.side_fact_title ?? quiz.side_fact_title,
     side_fact: copy.side_fact ?? quiz.side_fact,
     options: applyOptionLabels(quiz.options, copy.options) ?? quiz.options,
   };
@@ -750,6 +754,7 @@ function collectSlotTranslationUnits(linkId: string, source: SlotLocaleCopy): Tr
     addTranslationUnit(units, `${prefix}:quiz:title`, source.quiz.title);
     addTranslationUnit(units, `${prefix}:quiz:description`, source.quiz.description);
     addTranslationUnit(units, `${prefix}:quiz:question`, source.quiz.question);
+    addTranslationUnit(units, `${prefix}:quiz:side_fact_title`, source.quiz.side_fact_title);
     addTranslationUnit(units, `${prefix}:quiz:side_fact`, source.quiz.side_fact);
     for (const option of source.quiz.options ?? []) {
       addTranslationUnit(units, `${prefix}:quiz:option:${option.id}`, option.label);
@@ -857,6 +862,7 @@ export function seedSlotCopyFromLevel(level: LevelDefinition): SlotLocaleCopy {
           title: level.arrival_quiz.title,
           description: level.arrival_quiz.description,
           question: level.arrival_quiz.question,
+          side_fact_title: level.arrival_quiz.side_fact_title,
           side_fact: level.arrival_quiz.side_fact,
           options: level.arrival_quiz.options?.map((option) => ({
             id: option.id,

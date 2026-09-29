@@ -136,22 +136,18 @@ export function useWalkedDistance(
     return () => navigator.geolocation.clearWatch(watchId);
   }, [enabled, minStep, maxStep, storageKey]);
 
-  // Ease displayed meters toward real meters (~smooth ring).
+  // Ease displayed meters toward real meters without a 60fps React loop.
   useEffect(() => {
     if (!enabled) return;
-    let frame = 0;
-    const tick = () => {
+    const id = window.setInterval(() => {
       setDisplayMeters((current) => {
         const target = metersRef.current;
         const delta = target - current;
-        if (Math.abs(delta) < 0.05) return target;
-        // Catch up quickly but without jumps of several meters.
-        return current + delta * 0.22;
+        if (Math.abs(delta) < 0.05) return current;
+        return current + delta * 0.28;
       });
-      frame = window.requestAnimationFrame(tick);
-    };
-    frame = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frame);
+    }, 80);
+    return () => window.clearInterval(id);
   }, [enabled]);
 
   return { sample, meters, displayMeters, errorKind, isLoading, denied };

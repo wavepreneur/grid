@@ -388,8 +388,19 @@ select.grid-input option {
   margin-inline: auto;
   width: 100%;
   max-width: 30rem;
+  max-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+}
+
+/* Leaflet defaults to touch-action:none and can swallow the whole play scroll. */
+.city-game .leaflet-container {
+  touch-action: manipulation !important;
+  pointer-events: none;
 }
 
 .city-game h1,

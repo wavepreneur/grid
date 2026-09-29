@@ -10,6 +10,9 @@ const PLAY_ACCURACY_PADDING_CAP_METERS = 45;
 /** Cap for lead-device health expansion when the geofence hangs. */
 export const HEALTH_RADIUS_BONUS_CAP_METERS = 80;
 
+/** Beyond this, the live map stays on the waypoint instead of fitting a country-sized line. */
+export const PLAY_LIVE_MAP_MAX_METERS = 12_000;
+
 export function distanceMeters(
   from: GeolocationSample,
   to: Pick<LevelLocation, "lat" | "lng">,

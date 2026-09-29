@@ -4,7 +4,9 @@ import { useState } from "react";
 import { BigButton } from "@/components/game/city/ui";
 import {
   buildVoucherShareMessage,
-  familyVoucherBadge,
+  formatVoucherUntil,
+  liveFamilyVoucherUntil,
+  LIVE_FAMILY_VOUCHER,
   type GrowthOffer,
 } from "@/lib/grid/growth-pack";
 import { playUi } from "@/lib/grid/play-ui";
@@ -16,13 +18,15 @@ type Props = {
 };
 
 export function GrowthRecapCard({ offer, score, language }: Props) {
-  const t = playUi(language);
+  const t = playUi(language).growth;
   const [copied, setCopied] = useState<"code" | "share" | null>(null);
+  const until = formatVoucherUntil(liveFamilyVoucherUntil(), language);
 
   const shareMessage = buildVoucherShareMessage({
     score,
     discountCode: offer.discountCode,
     shareUrl: offer.shareUrl,
+    language,
   });
 
   async function copyCode() {
@@ -61,37 +65,31 @@ export function GrowthRecapCard({ offer, score, language }: Props) {
   return (
     <section className="rounded-3xl border border-[var(--cg-accent)]/40 bg-[var(--cg-card)] px-5 py-5">
       <p className="text-center text-lg font-bold text-[var(--cg-fg)]">
-        🎉 {offer.headline}
+        🎉 {t.familyHeadline}
       </p>
-      {offer.body ? (
-        <p className="mt-2 text-center text-sm leading-relaxed text-[var(--cg-muted)]">
-          {offer.body}
-        </p>
-      ) : null}
+      <p className="mt-2 text-center text-sm leading-relaxed text-[var(--cg-muted)]">
+        {t.familyBody}
+      </p>
 
       {offer.discountCode ? (
         <div className="mt-4 rounded-2xl bg-[var(--cg-bg)] px-4 py-4 text-center">
           <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--cg-muted)]">
-            {familyVoucherBadge()}
+            {t.familyBadge(LIVE_FAMILY_VOUCHER.percent, LIVE_FAMILY_VOUCHER.validDays)}
           </p>
           <p className="mt-1 font-mono text-2xl font-extrabold tracking-wide text-[var(--cg-fg)]">
             {offer.discountCode}
           </p>
-          {offer.discountNote ? (
-            <p className="mt-2 text-xs text-[var(--cg-muted)]">{offer.discountNote}</p>
-          ) : null}
+          <p className="mt-2 text-xs text-[var(--cg-muted)]">{t.familyNote(until)}</p>
         </div>
       ) : null}
 
       <div className="mt-4 space-y-2">
         <BigButton variant="accent" onClick={() => void onShare()}>
-          {copied === "share"
-            ? t.growth.copiedText
-            : `📲 ${offer.shareLabel?.trim() || t.growth.sendFriends}`}
+          {copied === "share" ? t.copiedText : `📲 ${t.familyCta}`}
         </BigButton>
         {offer.discountCode ? (
           <BigButton variant="ghost" onClick={() => void copyCode()}>
-            {copied === "code" ? t.growth.copiedCode : `🎫 ${t.growth.useCode}`}
+            {copied === "code" ? t.copiedCode : `🎫 ${t.useCode}`}
           </BigButton>
         ) : null}
       </div>

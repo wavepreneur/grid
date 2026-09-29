@@ -30,6 +30,7 @@ import {
 } from "@/lib/grid/play-help";
 import { playUi } from "@/lib/grid/play-ui";
 import { PlayGpsHelp } from "@/components/game/play-gps-help";
+import { recoverPlayViewport } from "@/components/game/play-viewport-guard";
 
 export type PlayMorePanel =
   | "menu"
@@ -163,6 +164,7 @@ export function PlayMoreSheet({
       body.style.overscrollBehavior = prevBodyOverscroll || "";
       window.removeEventListener("wheel", blockBackgroundScroll);
       window.removeEventListener("touchmove", blockBackgroundScroll);
+      recoverPlayViewport();
     };
   }, [open]);
 

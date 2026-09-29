@@ -87,6 +87,9 @@ function parseArrivalQuiz(raw: unknown): ArrivalQuiz | undefined {
     ...(typeof q.description === "string" && q.description.trim()
       ? { description: q.description.trim() }
       : {}),
+    ...(typeof q.side_fact_title === "string" && q.side_fact_title.trim()
+      ? { side_fact_title: q.side_fact_title.trim() }
+      : {}),
     ...(typeof q.side_fact === "string" && q.side_fact.trim()
       ? { side_fact: q.side_fact.trim() }
       : {}),

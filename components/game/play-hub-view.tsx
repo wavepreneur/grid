@@ -480,6 +480,7 @@ function OutdoorHub({
   const [healthBonus, setHealthBonus] = useState(0);
   const arrivedPingRef = useRef(false);
   const lastReportRef = useRef(0);
+  const lastGpsFixKeyRef = useRef("");
   const localWalkedRef = useRef(0);
   const healthNearSinceRef = useRef<number | null>(null);
   const healthBonusRef = useRef(0);
@@ -606,13 +607,17 @@ function OutdoorHub({
       if (dist === null) return;
       const bonus = healthBonusRef.current;
       const healthLoc = withHealthRadiusBonus(loc, bonus);
+      const within = isWithinGeofenceForPlay(geo, healthLoc);
+      const key = `${targetLevel.level}:${geo.lat.toFixed(5)}:${geo.lng.toFixed(5)}:${Math.round(dist)}:${within}:${bonus}`;
+      if (key === lastGpsFixKeyRef.current) return;
+      lastGpsFixKeyRef.current = key;
       onBroadcastGpsFix({
         level: targetLevel.level,
         lat: geo.lat,
         lng: geo.lng,
         accuracy: geo.accuracy,
         distance_m: dist,
-        within_radius: isWithinGeofenceForPlay(geo, healthLoc),
+        within_radius: within,
         health_radius_bonus_m: bonus > 0 ? bonus : undefined,
       });
     };

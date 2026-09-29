@@ -37,6 +37,8 @@ export type StudioArrivalQuiz = {
   correct_option_ids?: string[];
   /** Bonus points for a correct opener answer. */
   points?: number;
+  /** Side-fact heading. Empty → “Wusstet ihr?” / “Did you know?”. */
+  side_fact_title?: string;
   /** Side-fact after answer. */
   side_fact?: string;
 };
@@ -122,12 +124,10 @@ function contentToArrivalQuiz(content: StudioTaskContent): StudioArrivalQuiz | n
   if (normalized.hero_image_url?.trim()) {
     quiz.image_url = normalized.hero_image_url.trim();
   }
-  const sideParts = [normalized.success_title?.trim(), normalized.success_info?.trim()].filter(
-    Boolean,
-  );
-  if (sideParts.length > 0) {
-    quiz.side_fact = sideParts.join(" — ");
-  }
+  const factTitle = normalized.success_title?.trim();
+  const factBody = normalized.success_info?.trim();
+  if (factTitle) quiz.side_fact_title = factTitle;
+  if (factBody) quiz.side_fact = factBody;
 
   if (normalized.answer_type === "multi_choice") {
     const ids = normalized.options.filter((o) => o.correct).map((o) => o.id);
@@ -189,6 +189,7 @@ export function parseArrivalQuizOverride(raw: unknown): StudioArrivalQuiz | null
     correct_option_id: q.correct_option_id,
     correct_option_ids: q.correct_option_ids,
     points: typeof q.points === "number" ? Math.max(0, q.points) : undefined,
+    side_fact_title: typeof q.side_fact_title === "string" ? q.side_fact_title : undefined,
     side_fact: typeof q.side_fact === "string" ? q.side_fact : undefined,
   };
 }
@@ -201,6 +202,7 @@ export function arrivalQuizToRuntime(quiz: StudioArrivalQuiz): ArrivalQuiz | nul
     ...(quiz.title?.trim() ? { title: quiz.title.trim() } : {}),
     ...(quiz.image_url?.trim() ? { image_url: quiz.image_url.trim() } : {}),
     ...(quiz.description?.trim() ? { description: quiz.description.trim() } : {}),
+    ...(quiz.side_fact_title?.trim() ? { side_fact_title: quiz.side_fact_title.trim() } : {}),
     ...(quiz.side_fact?.trim() ? { side_fact: quiz.side_fact.trim() } : {}),
     ...(points !== undefined ? { points } : {}),
   };

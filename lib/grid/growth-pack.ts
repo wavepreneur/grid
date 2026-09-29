@@ -6,6 +6,8 @@
  * and must never be copied onto ResolvedEventContent.
  */
 
+import { playUi, playUiLang } from "@/lib/grid/play-ui";
+
 export const GROWTH_SURFACES = [
   "exitmania_b2c",
   "exitmania_teamevent",
@@ -59,6 +61,13 @@ export const LIVE_FAMILY_VOUCHER = {
 
 export const EXITMANIA_SHARE_URL = "https://exitmania.com";
 export const EXITMANIA_TEAM_RANKING_URL = "https://exitmania.com/team-ranking";
+export const EXITMANIA_TEAM_RANKING_URL_EN = "https://exitmania.com/en/team-ranking";
+
+export function exitmaniaTeamRankingUrl(language?: string | null): string {
+  return playUiLang(language) === "en"
+    ? EXITMANIA_TEAM_RANKING_URL_EN
+    : EXITMANIA_TEAM_RANKING_URL;
+}
 
 function addUtcDays(isoDate: string, days: number): Date {
   const [year, month, day] = isoDate.split("-").map(Number);
@@ -73,6 +82,18 @@ export function formatDeDay(date: Date): string {
   const day = String(date.getUTCDate()).padStart(2, "0");
   const month = String(date.getUTCMonth() + 1).padStart(2, "0");
   return `${day}.${month}.${date.getUTCFullYear()}`;
+}
+
+export function formatVoucherUntil(date: Date, language?: string | null): string {
+  if (playUiLang(language) === "en") {
+    return date.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }
+  return formatDeDay(date);
 }
 
 export function familyVoucherBadge(): string {
@@ -116,18 +137,24 @@ export function buildVoucherShareMessage(input: {
   score?: number | null;
   discountCode?: string | null;
   shareUrl?: string | null;
+  language?: string | null;
 }): { title: string; text: string; url: string } {
+  const g = playUi(input.language).growth;
   const url =
     input.shareUrl && isSafeHttpUrl(input.shareUrl) ? input.shareUrl : EXITMANIA_SHARE_URL;
   const challenge =
     typeof input.score === "number"
-      ? `${input.score} Punkte. Schlag mich, wenn du kannst 🔥`
-      : "Schlag mich, wenn du kannst 🔥";
+      ? g.shareChallenge(input.score)
+      : g.shareChallengePlain;
   const codeLine = input.discountCode
-    ? `🎟️ ${LIVE_FAMILY_VOUCHER.percent} %-Code: ${input.discountCode} — ${LIVE_FAMILY_VOUCHER.validDays} Tage, Team bis 4 Personen`
+    ? g.shareCodeLine(
+        LIVE_FAMILY_VOUCHER.percent,
+        input.discountCode,
+        LIVE_FAMILY_VOUCHER.validDays,
+      )
     : null;
   return {
-    title: "Schlag mich, wenn du kannst",
+    title: g.shareTitle,
     text: [challenge, codeLine, url].filter(Boolean).join("\n\n"),
     url,
   };

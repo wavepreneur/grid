@@ -254,6 +254,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
             title: slot.quiz.title ?? "",
             description: slot.quiz.description ?? "",
             question: slot.quiz.question,
+            side_fact_title: slot.quiz.side_fact_title ?? "",
             side_fact: slot.quiz.side_fact ?? "",
             options: slot.quiz.options.map((option) => ({ id: option.id, label: option.label })),
           }
@@ -679,6 +680,22 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
                       onChange={(question) => {
                         handleValue(`${prefix}:quiz:question`, source.quiz?.question ?? "", question);
                         patchQuiz(linkId, { question });
+                      }}
+                    />
+                    <TranslatableField
+                      unitKey={`${prefix}:quiz:side_fact_title`}
+                      label="Side-Fact Überschrift"
+                      value={row.quiz?.side_fact_title ?? ""}
+                      source={source.quiz?.side_fact_title}
+                      confirmed={confirmedSet.has(`${prefix}:quiz:side_fact_title`)}
+                      onConfirm={handleConfirm}
+                      onChange={(side_fact_title) => {
+                        handleValue(
+                          `${prefix}:quiz:side_fact_title`,
+                          source.quiz?.side_fact_title ?? "",
+                          side_fact_title,
+                        );
+                        patchQuiz(linkId, { side_fact_title });
                       }}
                     />
                     <TranslatableField

@@ -71,6 +71,7 @@ function translationUnitsForGame(game: StudioGame, links: StudioGameTaskLink[]) 
             title: slot.quiz.title ?? "",
             description: slot.quiz.description ?? "",
             question: slot.quiz.question,
+            side_fact_title: slot.quiz.side_fact_title ?? "",
             side_fact: slot.quiz.side_fact ?? "",
             options: slot.quiz.options.map((option) => ({ id: option.id, label: option.label })),
           }

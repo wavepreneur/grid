@@ -128,6 +128,45 @@ async function saveBlobToDevice(blob: Blob, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
+function CapturePrimary({
+  cityStyle,
+  children,
+  ...props
+}: {
+  cityStyle: boolean;
+  children: ReactNode;
+  disabled?: boolean;
+  onClick?: () => void;
+  onPointerDown?: (event: PointerEvent<HTMLButtonElement>) => void;
+}) {
+  return cityStyle ? (
+    <BigButton {...props}>{children}</BigButton>
+  ) : (
+    <GridButton {...props}>{children}</GridButton>
+  );
+}
+
+function CaptureSecondary({
+  cityStyle,
+  children,
+  ...props
+}: {
+  cityStyle: boolean;
+  children: ReactNode;
+  disabled?: boolean;
+  onClick?: () => void;
+}) {
+  return cityStyle ? (
+    <BigButton variant="outline" {...props}>
+      {children}
+    </BigButton>
+  ) : (
+    <GridButton variant="secondary" {...props}>
+      {children}
+    </GridButton>
+  );
+}
+
 export function MediaCapturePanel({
   kind,
   overlayImageUrl,
@@ -595,41 +634,6 @@ export function MediaCapturePanel({
   const remainingSeconds = Math.max(0, EVENT_CAPTURE_VIDEO_MAX_SECONDS - elapsed);
   const recordProgress = Math.min(1, elapsed / EVENT_CAPTURE_VIDEO_MAX_SECONDS);
 
-  function PrimaryButton({
-    children,
-    ...props
-  }: {
-    children: ReactNode;
-    disabled?: boolean;
-    onClick?: () => void;
-    onPointerDown?: (event: PointerEvent<HTMLButtonElement>) => void;
-  }) {
-    return cityStyle ? (
-      <BigButton {...props}>{children}</BigButton>
-    ) : (
-      <GridButton {...props}>{children}</GridButton>
-    );
-  }
-
-  function SecondaryButton({
-    children,
-    ...props
-  }: {
-    children: ReactNode;
-    disabled?: boolean;
-    onClick?: () => void;
-  }) {
-    return cityStyle ? (
-      <BigButton variant="outline" {...props}>
-        {children}
-      </BigButton>
-    ) : (
-      <GridButton variant="secondary" {...props}>
-        {children}
-      </GridButton>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <p
@@ -642,7 +646,8 @@ export function MediaCapturePanel({
         {hint}
       </p>
 
-      <PrimaryButton
+      <CapturePrimary
+        cityStyle={cityStyle}
         disabled={disabled || isPending}
         onPointerDown={(event) => {
           if (isVideo) {
@@ -658,7 +663,7 @@ export function MediaCapturePanel({
           <Camera className="h-5 w-5" strokeWidth={2.4} />
           {t.capture.openCam}
         </span>
-      </PrimaryButton>
+      </CapturePrimary>
       {cameraError ? (
         <p
           className={
@@ -680,7 +685,7 @@ export function MediaCapturePanel({
             : "w-full text-center text-sm text-slate-500 underline"
         }
       >
-        Aus der Galerie
+        {t.capture.fromGallery}
       </button>
 
       {allowSkip ? (
@@ -831,12 +836,16 @@ export function MediaCapturePanel({
 
             {phase === "preview" ? (
               <>
-                <PrimaryButton disabled={busy || !previewBlob} onClick={() => void sendCapture()}>
-                  {sending || isPending ? t.solve.sending : t.capture.send}
-                </PrimaryButton>
-                <SecondaryButton disabled={busy} onClick={retake}>
-                  Neu versuchen
-                </SecondaryButton>
+                <CapturePrimary
+                  cityStyle={cityStyle}
+                  disabled={busy || !previewBlob}
+                  onClick={() => void sendCapture()}
+                >
+                  {sending ? t.solve.sending : t.capture.send}
+                </CapturePrimary>
+                <CaptureSecondary cityStyle={cityStyle} disabled={busy} onClick={retake}>
+                  {t.capture.retake}
+                </CaptureSecondary>
                 <button
                   type="button"
                   disabled={busy || !previewBlob || saving}
@@ -849,18 +858,23 @@ export function MediaCapturePanel({
             ) : (
               <>
                 {isVideo ? (
-                  <PrimaryButton
+                  <CapturePrimary
+                    cityStyle={cityStyle}
                     disabled={busy || (!cameraReady && !cameraError)}
                     onClick={() => (recording ? stopRecording() : startRecording())}
                   >
                     {recording
-                      ? `Aufnahme stoppen · ${remainingSeconds} s`
+                      ? t.capture.stopRecording(remainingSeconds)
                       : shootLabel}
-                  </PrimaryButton>
+                  </CapturePrimary>
                 ) : (
-                  <PrimaryButton disabled={busy || !cameraReady} onClick={() => void snapshotPhoto()}>
+                  <CapturePrimary
+                    cityStyle={cityStyle}
+                    disabled={busy || !cameraReady}
+                    onClick={() => void snapshotPhoto()}
+                  >
                     {shootLabel}
-                  </PrimaryButton>
+                  </CapturePrimary>
                 )}
                 {cameraError ? (
                   <button
@@ -869,7 +883,7 @@ export function MediaCapturePanel({
                     onClick={() => fileRef.current?.click()}
                     className="w-full text-center text-sm font-semibold text-[var(--cg-muted)] disabled:opacity-40"
                   >
-                    Aus der Galerie
+                    {t.capture.fromGallery}
                   </button>
                 ) : null}
               </>

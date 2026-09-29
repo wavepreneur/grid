@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GeolocationSample } from "@/lib/grid/level-types";
+import { distanceMeters } from "@/lib/grid/geofence";
 import {
   geoErrorKindFromCode,
   type GeoErrorKind,
@@ -15,6 +16,9 @@ type GeolocationState = {
   denied: boolean;
 };
 
+const MIN_MOVE_METERS = 4;
+const MIN_ACCURACY_DELTA_METERS = 20;
+
 export function useGeolocation(enabled: boolean): GeolocationState {
   const [state, setState] = useState<GeolocationState>({
     sample: null,
@@ -22,8 +26,10 @@ export function useGeolocation(enabled: boolean): GeolocationState {
     isLoading: enabled,
     denied: false,
   });
+  const lastSampleRef = useRef<GeolocationSample | null>(null);
 
   useEffect(() => {
+    lastSampleRef.current = null;
     if (!enabled) {
       setState({ sample: null, errorKind: null, isLoading: false, denied: false });
       return;
@@ -43,12 +49,22 @@ export function useGeolocation(enabled: boolean): GeolocationState {
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
+        const next: GeolocationSample = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        };
+        const prev = lastSampleRef.current;
+        if (prev) {
+          const moved = distanceMeters(prev, next);
+          const accDelta = Math.abs((prev.accuracy ?? 0) - (next.accuracy ?? 0));
+          if (moved < MIN_MOVE_METERS && accDelta < MIN_ACCURACY_DELTA_METERS) {
+            return;
+          }
+        }
+        lastSampleRef.current = next;
         setState({
-          sample: {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          },
+          sample: next,
           errorKind: null,
           isLoading: false,
           denied: false,
@@ -56,6 +72,7 @@ export function useGeolocation(enabled: boolean): GeolocationState {
       },
       (error) => {
         const kind = geoErrorKindFromCode(error.code);
+        lastSampleRef.current = null;
         setState({
           sample: null,
           errorKind: kind,

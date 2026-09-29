@@ -10,6 +10,22 @@ import { playUi } from "@/lib/grid/play-ui";
 import { FormattedTaskText } from "@/components/game/formatted-task-text";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
 
+function quizSideFact(
+  quiz: ArrivalQuiz,
+  fallbackTitle: string,
+): { title: string; body: string } | null {
+  const authoredTitle = quiz.side_fact_title?.trim() ?? "";
+  const body = quiz.side_fact?.trim() ?? "";
+  if (!authoredTitle && !body) return null;
+  if (authoredTitle) return { title: authoredTitle, body };
+  const sep = " — ";
+  const at = body.indexOf(sep);
+  if (at > 0 && at <= 80) {
+    return { title: body.slice(0, at).trim(), body: body.slice(at + sep.length).trim() };
+  }
+  return { title: fallbackTitle, body };
+}
+
 type Props = {
   title: string;
   spotLabel: string;
@@ -63,6 +79,7 @@ export function PlayQuizView({
         ? t.quiz.headingIndoor
         : t.quiz.headingOutdoor;
   const intro = mode === "online" ? t.quiz.introOnline : t.quiz.introTeam;
+  const fact = quizSideFact(quiz, t.quiz.didYouKnow);
 
   function isRightOption(id: string) {
     return multi
@@ -271,12 +288,14 @@ export function PlayQuizView({
               : t.quiz.wrongKey}
           </p>
 
-          {quiz.side_fact?.trim() ? (
+          {fact ? (
             <div className="rounded-2xl bg-[var(--cg-secondary)] px-4 py-4 text-left">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--cg-muted)]">
-                {t.quiz.didYouKnow}
+                {fact.title}
               </p>
-              <p className="mt-1 text-base text-[var(--cg-fg)]">{quiz.side_fact.trim()}</p>
+              {fact.body ? (
+                <p className="mt-1 text-base text-[var(--cg-fg)]">{fact.body}</p>
+              ) : null}
             </div>
           ) : null}
 

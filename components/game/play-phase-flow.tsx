@@ -234,6 +234,14 @@ export function PlayPhaseFlow({
   const showChrome = phase === "hub" || !level || !slot;
 
   useEffect(() => {
+    function openMenu() {
+      onMorePanel("menu");
+    }
+    window.addEventListener("grid:open-play-menu", openMenu);
+    return () => window.removeEventListener("grid:open-play-menu", openMenu);
+  }, [onMorePanel]);
+
+  useEffect(() => {
     scrollPlayToTop();
     const t = window.setTimeout(scrollPlayToTop, 50);
     return () => window.clearTimeout(t);

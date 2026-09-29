@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { parseContentConfig } from "@/lib/grid/content-engine";
 import { parseGrowthPack } from "@/lib/grid/growth-pack";
 import { parseTeamGameState } from "@/lib/grid/game-state";
 import { buildEventPortalResultsUrl } from "@/lib/grid/codes";
@@ -124,6 +125,7 @@ async function maybeSendHrRecap(input: {
     recapUrl,
     surface: input.pack.surface,
     photoUrls: input.photoUrls,
+    language: parseContentConfig(input.event.content_config).language,
   });
   if (!mailed.ok) {
     console.error("[growth] HR recap mail skipped", mailed.error);

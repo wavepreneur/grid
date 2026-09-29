@@ -46,6 +46,8 @@ export type StudioArrivalQuizOverride = {
   correct_option_ids?: string[];
   /** Bonus points when answered correctly (0 = unlock only). */
   points?: number;
+  /** Side-fact heading after answer (from pool task success_title). */
+  side_fact_title?: string;
   /** Side-fact after answer (from pool task success_info). */
   side_fact?: string;
 };

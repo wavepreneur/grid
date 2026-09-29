@@ -340,6 +340,7 @@ export type PlayUiCopy = {
     mapFollowCounts: string;
     mapSearching: string;
     mapWaitLead: string;
+    mapFar: string;
     walkFree: string;
     walkDone: string;
     metersLeft: string;
@@ -552,6 +553,9 @@ export type PlayUiCopy = {
     savePhone: string;
     saving: string;
     send: string;
+    fromGallery: string;
+    retake: string;
+    stopRecording: (s: number) => string;
     unknownKind: string;
     noFile: string;
     sendVideo: string;
@@ -717,6 +721,15 @@ export type PlayUiCopy = {
     sendFriends: string;
     copiedCode: string;
     useCode: string;
+    familyHeadline: string;
+    familyBody: string;
+    familyCta: string;
+    familyBadge: (percent: number, days: number) => string;
+    familyNote: (until: string) => string;
+    shareTitle: string;
+    shareChallenge: (score: number) => string;
+    shareChallengePlain: string;
+    shareCodeLine: (percent: number, code: string, days: number) => string;
   };
   walletHint: {
     empty: string;
@@ -1180,6 +1193,7 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       mapFollowCounts: "Das Handy vom Team Lead zählt die Meter.",
       mapSearching: "GPS wird gesucht…",
       mapWaitLead: "Warten auf die Position vom Team Lead.",
+      mapFar: "Noch weit vom Punkt — die Karte zeigt das Ziel.",
       walkFree: "Lauft frei — kein fester Punkt nötig",
       walkDone: "Fertig",
       metersLeft: "Meter übrig",
@@ -1398,6 +1412,9 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       savePhone: "Aufs Handy speichern",
       saving: "Speichern…",
       send: "Senden",
+      fromGallery: "Aus der Galerie",
+      retake: "Neu versuchen",
+      stopRecording: (s) => `Aufnahme stoppen · ${s} s`,
       unknownKind: "Unbekannter Aufnahme-Typ.",
       noFile: "Keine Datei ausgewählt.",
       sendVideo: "Bitte ein Video senden.",
@@ -1568,6 +1585,17 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       sendFriends: "An Freunde senden",
       copiedCode: "Code kopiert",
       useCode: "Selbst nutzen · Code kopieren",
+      familyHeadline: "Mit Familie & Freunden spielen",
+      familyBody:
+        "20 % auf euer nächstes Exitmania-Spiel. Selbst einlösen — oder mit einem Tipp an Freunde senden.",
+      familyCta: "Per Messenger senden",
+      familyBadge: (percent, days) => `${percent} % · ${days} Tage · Team bis 4`,
+      familyNote: (until) => `Einlösbar bis ${until}. Gilt für alle.`,
+      shareTitle: "Schlag mich, wenn du kannst",
+      shareChallenge: (score) => `${score} Punkte. Schlag mich, wenn du kannst 🔥`,
+      shareChallengePlain: "Schlag mich, wenn du kannst 🔥",
+      shareCodeLine: (percent, code, days) =>
+        `🎟️ ${percent} %-Code: ${code} — ${days} Tage, Team bis 4 Personen`,
     },
     walletHint: {
       empty: "Gesammelte Hinweise aus den Leveln",
@@ -1976,6 +2004,7 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       mapFollowCounts: "The team lead’s phone counts the metres.",
       mapSearching: "Looking for GPS…",
       mapWaitLead: "Waiting for the team lead’s position.",
+      mapFar: "Still far from the point — the map shows the target.",
       walkFree: "Walk freely — no fixed point needed",
       walkDone: "Done",
       metersLeft: "metres left",
@@ -2193,6 +2222,9 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       savePhone: "Save to phone",
       saving: "Saving…",
       send: "Send",
+      fromGallery: "From the gallery",
+      retake: "Try again",
+      stopRecording: (s) => `Stop recording · ${s} s`,
       unknownKind: "Unknown capture type.",
       noFile: "No file selected.",
       sendVideo: "Please send a video.",
@@ -2363,6 +2395,17 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       sendFriends: "Send to friends",
       copiedCode: "Code copied",
       useCode: "Use it yourself · copy code",
+      familyHeadline: "Play with family & friends",
+      familyBody:
+        "20% off your next Exitmania game. Redeem it yourself — or send a tip to friends.",
+      familyCta: "Send via messenger",
+      familyBadge: (percent, days) => `${percent}% · ${days} days · team of up to 4`,
+      familyNote: (until) => `Redeem by ${until}. Valid for everyone.`,
+      shareTitle: "Beat my score if you can",
+      shareChallenge: (score) => `${score} points. Beat me if you can 🔥`,
+      shareChallengePlain: "Beat me if you can 🔥",
+      shareCodeLine: (percent, code, days) =>
+        `🎟️ ${percent}% code: ${code} — ${days} days, team of up to 4`,
     },
     walletHint: {
       empty: "Clues collected from the levels",

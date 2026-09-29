@@ -7,7 +7,7 @@ import { X } from "lucide-react";
 import { GrowthRecapCard } from "@/components/game/growth-recap-card";
 import { BigButton } from "@/components/game/city/ui";
 import type { GrowthOffer } from "@/lib/grid/growth-pack";
-import { EXITMANIA_TEAM_RANKING_URL } from "@/lib/grid/growth-pack";
+import { exitmaniaTeamRankingUrl } from "@/lib/grid/growth-pack";
 import { eventRankingPath, eventRecapPath } from "@/lib/grid/event-routes";
 import { levelPlayOutcome, type TeamGameState } from "@/lib/grid/game-state";
 import type { LevelDefinition } from "@/lib/grid/level-types";
@@ -35,8 +35,9 @@ function rankingSrc(
   inviteCode: string,
   joinCode: string,
   teamevent: boolean,
+  language?: string | null,
 ): string {
-  if (!teamevent) return `${EXITMANIA_TEAM_RANKING_URL}?embed=1`;
+  if (!teamevent) return `${exitmaniaTeamRankingUrl(language)}?embed=1`;
   const path = eventRankingPath(inviteCode, joinCode);
   return path.includes("?") ? `${path}&embed=1` : `${path}?embed=1`;
 }
@@ -71,7 +72,7 @@ export function GameOverFlywheel({
   const missionName = eventTitle?.replace(/^\[Test\]\s*/, "").trim() || "";
   const teamLabel = teamHeadline(teamName, t.team);
   const teamevent = growthOffer?.surface === "exitmania_teamevent";
-  const embedSrc = rankingSrc(inviteCode, joinCode, teamevent);
+  const embedSrc = rankingSrc(inviteCode, joinCode, teamevent, language);
 
   useEffect(() => {
     setMounted(true);
@@ -175,9 +176,6 @@ export function GameOverFlywheel({
       <section className="rounded-3xl border border-[var(--cg-primary)]/25 bg-[var(--cg-card)] px-5 py-5 text-center">
         <p className="text-lg font-bold text-[var(--cg-fg)]">
           {teamevent ? t.over.liveRankingEvent : t.over.highscoreQ}
-        </p>
-        <p className="mt-2 text-sm leading-relaxed text-[var(--cg-muted)]">
-          {teamevent ? t.over.rateEvent : t.over.rateHighscore}
         </p>
         <div className="mt-4">
           <BigButton onClick={() => setRankingOpen(true)}>

@@ -450,7 +450,9 @@ export function TaskEditor({ task, returnTo }: Props) {
           />
           <div className="space-y-4">
             <div>
-              <StudioLabel hint="Steht groß über der Info im Erfolgs-Screen">Überschrift</StudioLabel>
+              <StudioLabel hint="Wird in der App die Überschrift über der Info — statt „Wusstet ihr?“ / „Did you know?“. Leer lassen für den Standard.">
+                Überschrift
+              </StudioLabel>
               <StudioInput
                 value={content.success_title ?? ""}
                 onChange={(e) =>
@@ -465,7 +467,7 @@ export function TaskEditor({ task, returnTo }: Props) {
               <StudioLabel
                 hint={
                   content.answer_type === "choice" || content.answer_type === "multi_choice"
-                    ? "Bei Einstiegsfragen: erscheint nach der Antwort als „Wusstet ihr?“. Bei normalen Missionen: nur nach korrekter Lösung."
+                    ? "Bei Einstiegsfragen: erscheint nach der Antwort. Bei normalen Missionen: nur nach korrekter Lösung."
                     : "Erscheint im Erfolgs-Screen, nachdem die Aufgabe richtig gelöst wurde. Leer lassen, wenn es nichts zu notieren gibt."
                 }
               >
