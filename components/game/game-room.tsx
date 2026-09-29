@@ -72,6 +72,7 @@ import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session
 import type { LobbyPlayer, PlayerSession } from "@/lib/grid/types";
 import { usesPhasedPlay } from "@/lib/grid/play-slots";
 import { playUi } from "@/lib/grid/play-ui";
+import { PlayDocumentLang } from "@/components/game/play-viewport-guard";
 import { playPlaySfx, unlockPlayAudio } from "@/lib/grid/play-sfx";
 import { useRouter } from "next/navigation";
 
@@ -1166,6 +1167,7 @@ export function GameRoom({
   if (phased && usesMissionShell(eventContent)) {
     return (
       <>
+        <PlayDocumentLang language={eventContent.language} />
         <CityPlayShell mode={eventContent.contentMode}>
           {deskTestBar}
           {playBody}
@@ -1216,6 +1218,7 @@ export function GameRoom({
 
   return (
     <>
+      <PlayDocumentLang language={eventContent.language} />
       <div className="flex min-w-0 flex-col gap-5 sm:gap-6">
         <IdentityBar
           inviteCode={inviteCode}

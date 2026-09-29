@@ -56,6 +56,7 @@ import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session
 import { abandonTeamSession } from "@/lib/grid/session-recovery";
 import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
 import { playUi } from "@/lib/grid/play-ui";
+import { PlayDocumentLang } from "@/components/game/play-viewport-guard";
 
 type LobbyRoomProps = {
   inviteCode: string;
@@ -582,6 +583,7 @@ export function LobbyRoom({
 
   return (
     <div className="flex flex-col gap-5">
+      <PlayDocumentLang language={language} />
       {busy?.variant === "start" ? (
         <div className="fixed inset-0 z-[200] bg-[var(--cg-bg,#f7f4ee)]">
           <GameGateSkeleton

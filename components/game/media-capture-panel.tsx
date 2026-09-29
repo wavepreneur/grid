@@ -32,7 +32,7 @@ import {
   stampCapturePhoto,
   type CaptureBrandStamp,
 } from "@/lib/grid/capture-stamp";
-import { playUi } from "@/lib/grid/play-ui";
+import { playUi, playUiLang } from "@/lib/grid/play-ui";
 
 type CaptureContext = {
   inviteCode: string;
@@ -732,7 +732,11 @@ export function MediaCapturePanel({
 
       {mounted && open
         ? createPortal(
-            <div className="city-game fixed inset-0 z-[4000] flex h-[100dvh] w-screen flex-col bg-black">
+            <div
+              className="city-game fixed inset-0 z-[4000] flex h-[100dvh] w-screen flex-col bg-black"
+              lang={playUiLang(language)}
+              translate="no"
+            >
           <div className="relative isolate min-h-0 flex-1 bg-black">
             <video
               ref={videoRef}

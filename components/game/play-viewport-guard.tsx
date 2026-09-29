@@ -1,6 +1,24 @@
 "use client";
 
 import { useEffect } from "react";
+import { playUiLang } from "@/lib/grid/play-ui";
+
+/** Keep Safari from translating booked English chrome into German. */
+export function PlayDocumentLang({ language }: { language?: string | null }) {
+  useEffect(() => {
+    const html = document.documentElement;
+    const prevLang = html.lang;
+    const prevTranslate = html.getAttribute("translate");
+    html.lang = playUiLang(language);
+    html.setAttribute("translate", "no");
+    return () => {
+      html.lang = prevLang;
+      if (prevTranslate == null) html.removeAttribute("translate");
+      else html.setAttribute("translate", prevTranslate);
+    };
+  }, [language]);
+  return null;
+}
 
 function layoutHeightPx(): number {
   return Math.round(window.innerHeight);
