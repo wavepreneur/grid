@@ -388,11 +388,6 @@ select.grid-input option {
   margin-inline: auto;
   width: 100%;
   max-width: 30rem;
-  max-height: 100dvh;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
