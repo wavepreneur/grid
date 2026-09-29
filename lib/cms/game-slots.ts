@@ -423,17 +423,21 @@ export function buildGameSlots(
 
     const geoLink =
       missions.length > 0
-        ? (geos[index] ??
+        ? (geos.find((g) => g.sort_order === levelLink.sort_order) ??
+          geos[index] ??
           (overrides.geo_task_id
             ? (geos.find((g) => g.task_id === overrides.geo_task_id) ?? null)
             : null))
         : null;
+    const openerOff =
+      overrides.opener_enabled === false ||
+      (geoLink ? parseLinkOverrides(geoLink.overrides).opener_enabled === false : false);
 
     let quiz: StudioArrivalQuiz | null = null;
     let quizSource: GameSlot["quizSource"] = "none";
 
     // Prefer live opener pool content over frozen arrival_quiz snapshot.
-    if (openerTaskId && openerTasksById[openerTaskId]) {
+    if (!openerOff && openerTaskId && openerTasksById[openerTaskId]) {
       const live = taskToOpenerArrivalQuiz(
         openerTasksById[openerTaskId]!,
         typeof overrides.opener_points === "number" ? overrides.opener_points : null,
@@ -444,12 +448,12 @@ export function buildGameSlots(
       }
     }
 
-    if (!quiz && fromOverride) {
+    if (!openerOff && !quiz && fromOverride) {
       quiz = fromOverride;
       quizSource = openerTaskId ? "opener_task" : "override";
     }
 
-    if (!quiz && geoLink) {
+    if (!openerOff && !quiz && geoLink) {
       quiz = contentToArrivalQuiz(geoLink.task.content);
       if (quiz) quizSource = "geo_task";
     }

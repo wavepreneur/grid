@@ -15,6 +15,9 @@ import {
   createGameFromTemplate,
   duplicateGames,
 } from "@/app/actions/cms/games";
+import { composeGamesFromPacks } from "@/app/actions/cms/packs";
+import { PackSearchSelect } from "@/components/cms/packs/pack-search-select";
+import { composeGameName, gameUsesLayerPacks } from "@/lib/cms/layer-packs";
 import {
   STUDIO_TAB_LOCALES,
   localeFlag,
@@ -96,7 +99,7 @@ const GAME_LIST_GRID =
 type GameSort = "updated" | "created" | "status" | "name" | "language";
 type LanguageFilter = "alle" | StudioLanguage;
 type TranslationFilter = "alle" | "open" | "started" | "done";
-type CreateMode = "blank" | "template";
+type CreateMode = "compose" | "blank" | "template";
 
 const SURFACE_OPTIONS: ContentMode[] = ["outdoor", "indoor", "online"];
 
@@ -221,6 +224,11 @@ export function GameList({ initialGames, initialTemplates }: Props) {
   const [name, setName] = useState("");
   const [surface, setSurface] = useState<ContentMode>("outdoor");
   const [templateId, setTemplateId] = useState<string>("");
+  const [layer1PackId, setLayer1PackId] = useState<string | null>(null);
+  const [layer2PackId, setLayer2PackId] = useState<string | null>(null);
+  const [layer3PackId, setLayer3PackId] = useState<string | null>(null);
+  const [layer1Label, setLayer1Label] = useState("");
+  const [layer2Label, setLayer2Label] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -306,6 +314,11 @@ export function GameList({ initialGames, initialTemplates }: Props) {
     setName("");
     setSurface("outdoor");
     setTemplateId(presetTemplateId ?? templates[0]?.id ?? "");
+    setLayer1PackId(null);
+    setLayer2PackId(null);
+    setLayer3PackId(null);
+    setLayer1Label("");
+    setLayer2Label("");
     setError(null);
   }
 
@@ -314,6 +327,30 @@ export function GameList({ initialGames, initialTemplates }: Props) {
     setError(null);
     setCreating(true);
     try {
+      if (createMode === "compose") {
+        const autoName = name.trim() || composeGameName(layer1Label, layer2Label);
+        const result = await composeGamesFromPacks({
+          name: autoName,
+          surface,
+          layer1_pack_id: layer1PackId,
+          layer2_pack_id: layer2PackId,
+          layer3_pack_id: layer3PackId,
+        });
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
+        const createdId = result.data?.createdIds[0];
+        if (!createdId) {
+          setError("Erstellen fehlgeschlagen.");
+          return;
+        }
+        setOpen(false);
+        await refreshGames();
+        router.push(`/admin/games/${createdId}`);
+        return;
+      }
+
       if (createMode === "template") {
         if (!templateId) {
           setError("Bitte eine Vorlage auswählen.");
@@ -565,10 +602,21 @@ export function GameList({ initialGames, initialTemplates }: Props) {
           <StudioSectionTitle
             icon={<IconPlus size={18} />}
             title="Neues Spiel"
-            description="Spielort wählen — Ablauf später: Quiz → Level → Bonus."
+            description="Zuerst spielbar machen. Packs später andocken — Mission nicht kopieren."
           />
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setCreateMode("compose")}
+                className={`tap-lift rounded-2xl px-4 py-2.5 text-sm font-bold ${
+                  createMode === "compose"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground"
+                }`}
+              >
+                Packs andocken
+              </button>
               <button
                 type="button"
                 onClick={() => setCreateMode("blank")}
@@ -594,7 +642,42 @@ export function GameList({ initialGames, initialTemplates }: Props) {
               </button>
             </div>
 
-            {createMode === "blank" ? (
+            {createMode === "compose" ? (
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div>
+                  <StudioLabel hint="Pro Stadt, andockbar an jede Mission">Stadt</StudioLabel>
+                  <PackSearchSelect
+                    layer={1}
+                    value={layer1PackId}
+                    onChange={(id, pack) => {
+                      setLayer1PackId(id);
+                      setLayer1Label(pack?.name ?? pack?.city_slug ?? "");
+                    }}
+                  />
+                </div>
+                <div>
+                  <StudioLabel hint="Einmal pflegen, alle Städte">Mission</StudioLabel>
+                  <PackSearchSelect
+                    layer={2}
+                    value={layer2PackId}
+                    onChange={(id, pack) => {
+                      setLayer2PackId(id);
+                      setLayer2Label(pack?.name ?? "");
+                    }}
+                  />
+                </div>
+                <div>
+                  <StudioLabel hint="Bonus / Rollen">Team</StudioLabel>
+                  <PackSearchSelect
+                    layer={3}
+                    value={layer3PackId}
+                    onChange={(id) => setLayer3PackId(id)}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {createMode === "blank" || createMode === "compose" ? (
               <div>
                 <StudioLabel>Wo wird gespielt?</StudioLabel>
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
@@ -641,12 +724,18 @@ export function GameList({ initialGames, initialTemplates }: Props) {
             ) : null}
 
             <div>
-              <StudioLabel>Name</StudioLabel>
+              <StudioLabel>
+                {createMode === "compose" ? "Name (optional)" : "Name"}
+              </StudioLabel>
               <StudioInput
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                required
-                placeholder="z. B. Berlin City Quest"
+                required={createMode !== "compose"}
+                placeholder={
+                  createMode === "compose"
+                    ? composeGameName(layer1Label, layer2Label) || "Stadt · Mission"
+                    : "z. B. Berlin City Quest"
+                }
               />
             </div>
 
@@ -905,6 +994,21 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         itemLabel={duplicateIds.length === 1 ? "Spiel" : "Spiele"}
         selectedCount={duplicateIds.length}
         pending={duplicatePending}
+        extra={
+          duplicateIds.some((id) => {
+            const game = games.find((entry) => entry.id === id);
+            return game ? gameUsesLayerPacks(game) : false;
+          }) ? (
+            <p className="mt-3 text-sm text-slate-600">
+              Zusammengesteckte Spiele kopieren nur die drei Pack-Verweise. Layer 2 und 3 werden
+              nicht vervielfacht — für eine neue Stadt das Stadt-Pack tauschen.
+            </p>
+          ) : (
+            <p className="mt-3 text-sm text-slate-600">
+              Legacy-Spiele ohne Packs kopieren weiterhin alle Aufgaben-Verknüpfungen.
+            </p>
+          )
+        }
         onConfirm={confirmDuplicate}
       />
 

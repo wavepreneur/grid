@@ -232,8 +232,9 @@ export type LayerFeatureCheck = {
 /** Decision checklist — run before building Studio features. */
 export const LAYER_FEATURE_CHECKLIST: LayerFeatureCheck[] = [
   { question: "Layer 1 pro Stadt schnell anpassbar?", layers: [1] },
-  { question: "Layer 2 global konsistent?", layers: [2] },
+  { question: "Layer 2 global konsistent (ein Pack, alle Städte)?", layers: [2] },
   { question: "Layer 3 Rollen/Trigger abbildbar?", layers: [3] },
+  { question: "L1 pro Stadt duplizierbar (Aufgaben+Logik), L2/L3 andocken statt kopieren?", layers: [1, 2, 3] },
   { question: "Runtime-Surface (Outdoor/Indoor/Online, Pulse)?", layers: [1, 2, 3] },
   { question: "Alpha/Beta/Gamma-Asymmetrie?", layers: [3] },
   { question: "Player-Phasen Hub → Quiz → Level → Bonus?", layers: [1, 2, 3] },

@@ -65,6 +65,8 @@ export type GameLinkOverrides = {
   arrival_quiz?: StudioArrivalQuizOverride;
   /** Pool task used as Einstiegsfrage (content snapshotted into arrival_quiz). */
   opener_task_id?: string;
+  /** City pack: false = this stop has no opener quiz. */
+  opener_enabled?: boolean;
   /** Points override for opener (default: task scoring.points). */
   opener_points?: number;
   /** Optional Layer-1 geo task linked to this mission slot. */

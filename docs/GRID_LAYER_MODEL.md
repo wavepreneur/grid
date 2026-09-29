@@ -43,7 +43,7 @@ Layer sind **Bausteine**, kein festes 3-Stufen-Rezept. Spiele kombinieren sie fr
 | Outdoor | GPS-Wegpunkte (`local_waypoints`) |
 | Indoor | Stationen + Stationscodes (`local_stations`) — laufen im Gebäude, ohne GPS |
 | Online | Kein Layer-1-Hub; Einstiegsquiz optional an der Mission |
-| Studio-Feld | `studio_tasks.layer = 1`, `city_slug`, GPS/`station` in overrides |
+| Studio-Feld | `studio_tasks.layer = 1`, Pack `city_id` (Exitmania UUID), `city_slug` nur Label, GPS/`station` in overrides |
 
 **Typische Spiele:** Nur Layer 1 (+ optional Layer-3-Bonus) = Stadt-Entdecker.
 
@@ -184,7 +184,7 @@ Code: `lib/cms/layer-model.ts` → `LAYER_GAME_PRESETS`.
 
 | Dimension | Mechanismus |
 |-----------|-------------|
-| **Städte** | Layer 1 Waypoints/Stations pro `city_slug`; Layer 2 global |
+| **Städte** | Layer 1 Waypoints/Stations an GRID `cities.id` (Exitmania `source_city_id`); `city_slug` nur Label |
 | **Surfaces** | `content_mode` + Dual-Fallback |
 | **Sprache** | Pro Team (`teams.language` — Roadmap) |
 | **Rollen** | Layer 3 + Alpha/Beta/Gamma |
@@ -214,10 +214,31 @@ events.studio_game_version_id  → eingefrorener Snapshot
 studio_tasks.layer              → 1 | 2 | 3
 studio_tasks.content_context    → outdoor | indoor | online | any
 studio_tasks.role_assignment    → alpha | beta | gamma | team | none
-
+studio_layer_packs              → benannte Packs je Layer (Stadt / Mission / Team)
+studio_layer_packs.city_id      → GRID cities.id (Exitmania cities.id via source_city_id)
+studio_layer_pack_items         → Tasks + GPS/Bonus-Overrides im Pack
+studio_games.slug               → stabiler Spiel-Code (= Exitmania grid_content_pack_slug)
+studio_games.layer1_pack_id     → Stadt-Pack (oder null = Legacy studio_game_tasks)
+studio_games.layer2_pack_id     → Missions-Pack, geteilt über alle Städte
+studio_games.layer3_pack_id     → Team-Pack, geteilt über alle Städte
 studio_games.active_layers      → [1, 2, 3]
 studio_games.runtime_profiles   → Surfaces + allowed_fallbacks
 ```
+
+Skalierung: 100k Städte × 20 Missionen × 50 Sprachen = Packs referenzieren, nicht kopieren.
+Layer 1 ist städtisch: Duplizieren klont Aufgaben + Reihenfolge + Bedingungen. Inhalt in Aufgaben, GPS im Spiel.
+Layer 2/3 einmal pro Spieltyp — andocken, nicht kopieren. Bedingungen bleiben im Spiel-Editor.
+CMS: `/admin/packs` sind Bündel, kein zweites CMS.
+
+### Stabile Identitäten
+
+| Was | Stabiler Schlüssel | Was sich ändern darf |
+|-----|--------------------|----------------------|
+| Spiel (Exitmania ↔ GRID) | `studio_games.slug` = Exitmania `games.grid_content_pack_slug` | Titel, Storefront-Slug, Sprache |
+| Stadt | Exitmania `cities.id` → GRID `cities.source_city_id` → Pack `city_id` | `slug`, `slug_en`, `name`, `name_en` |
+
+`city_slug` auf Packs/Spielen ist nur das **aktuelle Label** für Suche und Runtime-Lookup, kein Join.
+Buchung: `content_pack_slug` = GRID-Spiel-Code. Ein Code für DE und EN.
 
 ---
 
@@ -249,13 +270,25 @@ Gleiche Engine, unterschiedliches Layer-Profil und Transport — kein separates 
 ## 11. Studio-UI-Struktur (Soll-Zustand)
 
 ```text
-Spiel-Editor
-├── Einstellungen (Name, Sprache, Primary Surface)
-├── Layer-Profil          ← Layer + erlaubte Fallbacks (Indoor / Online)
-├── Layer 1 — Geo         ← Outdoor-Waypoints + Indoor-Stationen (gleicher Slot)
-├── Layer 2 — Mission     ← Globale Level (einmal)
-└── Layer 3 — Bonus       ← Rollen-Aufgaben, Trigger, content_context
+Aufgaben
+└── voller Editor (Titel, Tags, Q&A, Nach der Lösung)
+
+Spiele
+├── Packs andocken     ← L1 Stadt / L2 Mission / L3 Team (FKs)
+├── Einstellungen      ← Name, Sprache, Primary Surface
+├── Layer-Profil       ← Fallbacks
+└── Aufgaben + Bedingungen  ← Opener, Bonus, GPS/Meter, Indoor-Code (schreibt GPS auf L1-Pack)
+
+Layer-Packs
+├── Städte (L1)        ← Aufgabenliste + Reihenfolge; Duplikat klont Tasks+Logik
+├── Missionen (L2)     ← einmal, alle Städte, andocken
+└── Teams (L3)         ← Bonus/Rollen, einmal, andocken
 ```
+
+Neue Stadt: Layer-1-Pack duplizieren → 10 Aufgaben in Aufgaben überschreiben → Koordinaten im Spiel unter Bedingungen. L2/L3 der Vorlage andocken.
+Ein Spiel zuerst spielbar machen, dann „Als Packs speichern“.
+Spiel duplizieren bei Pack-Spielen: nur die drei Verweise kopieren.
+Bestehende Spiele ohne Pack-IDs bleiben auf `studio_game_tasks`.
 
 **Nicht priorisieren:** Loquiz-Flow-Modi als Haupt-UX; Online Ready/Board/Feed vor Phasen-Runtime.
 
@@ -270,7 +303,7 @@ Spiel-Editor
 | Surfaces-Typen (outdoor/indoor/online) | ✅ Typen | `play-surface.ts`, `layer-model` |
 | Player-Phasen Hub→Quiz→Level→Bonus | ✅ Basis | inkl. Bonus-Phase + City-UI (`frontend_idee`) |
 | local_stations + Code-Override | 🟡 Schema + Loader | Migration; Defaults wenn keine Rows |
-| Studio Layer-UI | 🟡 Basis | Dual-Fallback + Create-Surface + Spielablauf-Slots |
+| Studio Layer-Packs (Stadt/Mission/Team) | ✅ Basis | `studio_layer_packs`, CMS `/admin/packs` |
 | Logic Rules zur Laufzeit | ⬜ Roadmap | Heute: linear `current_level + 1` |
 | content_mode im Loader | ✅ Basis | Surface-Filter + Stationen |
 | Player-UI wie frontend_idee | 🟡 Basis | `PlayPhaseFlow` unter `/e/…` |
@@ -306,10 +339,11 @@ Spiel-Editor
 | Layer-Typen & Presets | `lib/cms/layer-model.ts` |
 | Level / Config / Stations | `lib/grid/level-types.ts` |
 | UI-Prototyp | `frontend_idee/` |
+| Layer-Packs | `lib/cms/layer-packs.ts`, `app/actions/cms/packs.ts` |
 | Studio Layer-Profil | `components/cms/games/game-layer-profile-panel.tsx` |
 | Content Loader | `lib/grid/content-loader.ts` |
 | Rollen | `lib/grid/archetype-roles.ts` |
 
 ---
 
-*Zuletzt aktualisiert: August 2026.*
+*Zuletzt aktualisiert: September 2026.*

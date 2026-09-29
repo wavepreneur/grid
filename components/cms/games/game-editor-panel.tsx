@@ -16,6 +16,7 @@ import { gameLocales, localeCoverageMap } from "@/lib/cms/game-i18n";
 import { localeLabel, parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
 import { StudioBadge, StudioPanel } from "@/components/cms/admin-shell";
 import { GameLayerProfilePanel } from "@/components/cms/games/game-layer-profile-panel";
+import { GameCompositionPanel } from "@/components/cms/games/game-composition-panel";
 import { GameLogicPanel } from "@/components/cms/games/game-logic-panel";
 import { GameSlotsPanel } from "@/components/cms/games/game-slots-panel";
 import { GameDeleteButton } from "@/components/cms/games/game-delete-button";
@@ -56,6 +57,7 @@ import {
 } from "@/lib/cms/game-slots";
 import { parseLogicRules, type StudioLogicRule } from "@/lib/cms/logic-rules";
 import type { StudioGame, StudioGameTaskLink } from "@/lib/cms/types";
+import { gameUsesLayerPacks } from "@/lib/cms/layer-packs";
 import {
   parseFollowUpTrigger,
   withFollowUpTrigger,
@@ -775,12 +777,18 @@ export function GameEditorPanel({
         </StudioPanel>
       </form>
 
+      <GameCompositionPanel
+        game={game}
+        onGameChange={(next) => setGame(toEditorState(next))}
+      />
+
       <GameSlotsPanel
         gameId={game.id}
         surface={surface}
         routeOrder={routeOrder}
         language={game.language}
         initialLinks={taskLinks}
+        packBacked={gameUsesLayerPacks(game)}
       />
       </div>
       ) : null}

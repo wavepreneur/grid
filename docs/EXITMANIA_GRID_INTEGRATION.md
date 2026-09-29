@@ -68,7 +68,7 @@ Content-Type: application/json
   "team_count": 1,
   "players_per_team": 5,
   "city_slug": "berlin",
-  "content_pack_slug": "berlin-classic",
+  "content_pack_slug": "hew9geeus2",
   "booking_reference": "exitmania:booking:{uuid}",
   "route_override": { "levels": { "2": { "location": { ... } } } },
   "modules": {
@@ -83,7 +83,9 @@ Content-Type: application/json
 }
 ```
 
-`content_pack_slug` ist der **Studio-Spiel-Slug** (oder die Spiel-UUID). GRID bindet die veröffentlichte Version. `city_slug` wählt Layer 1 (GPS/Stationen) — dieselbe Mission, viele Städte.
+`content_pack_slug` ist der **stabile GRID-Spiel-Code** (`studio_games.slug`, z. B. `hew9geeus2`) — auf Exitmania in `games.grid_content_pack_slug`, ein Code für beide Sprachen. Storefront-Slugs und Stadt-Slugs dürfen sich ändern; sie sind kein Join. `city_slug` in der Buchung ist das **aktuelle** Stadt-Label für Layer 1 (GPS/Stationen).
+
+Städte: Exitmania `cities.id` (UUID) ist die Stadt-Identität. GRID cached sie als `cities.source_city_id`. Packs speichern `city_id`, nicht den Slug.
 
 **Idempotent:** Gleiche `booking_reference` + Org → bestehendes Event zurück.
 

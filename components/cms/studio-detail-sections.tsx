@@ -47,7 +47,7 @@ export function StudioGameDetailSection({
       description={
         game.is_template
           ? "Vorlage bearbeiten — Aufgaben, Layer und Logik werden beim Erstellen neuer Spiele dupliziert."
-          : `Spiel-Code ${game.slug}${game.city_slug ? ` · Stadt ${game.city_slug}` : ""} — Veröffentlichen und Live-Events steuerst du in der Spiele-Liste.`
+          : `Spiel-Code ${game.slug}${game.city_slug ? ` · Stadt ${game.city_slug}` : ""}. Bedingungen im Spiel, Inhalt in Aufgaben. Live-Events in der Spiele-Liste.`
       }
     >
       <GameEditorPanel game={game} taskLinks={linksQuery.data ?? []} locale={locale} />

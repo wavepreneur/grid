@@ -1,0 +1,15 @@
+import { StudioPage } from "@/components/cms/studio-page";
+import { PackEditorSection } from "@/components/cms/packs/pack-editor-section";
+
+type Props = {
+  params: Promise<{ id: string }>;
+};
+
+export default async function AdminPackDetailPage({ params }: Props) {
+  const { id } = await params;
+  return (
+    <StudioPage title="Pack" description="Bündel aus bestehenden Aufgaben. Inhalt in Aufgaben, Logik im Spiel.">
+      <PackEditorSection packId={id} />
+    </StudioPage>
+  );
+}

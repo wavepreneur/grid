@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   BarChart3,
   Code2,
+  Layers,
   LayoutGrid,
   PanelLeftClose,
   PanelLeftOpen,
@@ -58,9 +59,16 @@ const NAV: NavItem[] = [
     match: (p) => p.startsWith("/admin/tasks"),
   },
   {
+    href: "/admin/packs",
+    label: "2. Layer-Packs",
+    note: "Bündel · Stadt / Mission / Team",
+    icon: Layers,
+    match: (p) => p.startsWith("/admin/packs"),
+  },
+  {
     href: "/admin/games",
-    label: "2. Spiele",
-    note: "Aufgaben zu Layern verknüpfen",
+    label: "3. Spiele",
+    note: "Spiel · Bedingungen · Packs",
     icon: LayoutGrid,
     match: (p) => p.startsWith("/admin/games"),
   },
@@ -136,6 +144,18 @@ function prefetchForHref(
       queryKey: queryKeys.tasks.list(orgSlug),
       queryFn: async () => {
         const result = await listTasks();
+        if (!result.success) throw new Error(result.error);
+        return result.data!;
+      },
+    });
+    return;
+  }
+  if (href === "/admin/packs") {
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.packs.list(orgSlug, 1, ""),
+      queryFn: async () => {
+        const { listLayerPacks } = await import("@/app/actions/cms/packs");
+        const result = await listLayerPacks({ layer: 1, limit: 40 });
         if (!result.success) throw new Error(result.error);
         return result.data!;
       },

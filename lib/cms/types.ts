@@ -139,6 +139,12 @@ export type StudioGame = {
   logic_rules: unknown[];
   active_layers: StudioLayer[];
   runtime_profiles: RuntimeProfiles;
+  /** City pack (Layer 1). Null = this layer still uses studio_game_tasks. */
+  layer1_pack_id: string | null;
+  /** Mission pack (Layer 2) — shared across cities. */
+  layer2_pack_id: string | null;
+  /** Team pack (Layer 3) — shared across cities. */
+  layer3_pack_id: string | null;
   status: StudioGameStatus;
   published_version_number: number;
   is_template: boolean;
@@ -224,6 +230,9 @@ export type UpdateGameInput = {
   logic_rules?: import("@/lib/cms/logic-rules").StudioLogicRule[];
   active_layers?: StudioLayer[];
   runtime_profiles?: RuntimeProfiles;
+  layer1_pack_id?: string | null;
+  layer2_pack_id?: string | null;
+  layer3_pack_id?: string | null;
 };
 
 export { DEFAULT_RUNTIME_PROFILES };

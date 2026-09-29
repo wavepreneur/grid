@@ -7,10 +7,10 @@ export default function AdminGamesPage() {
   return (
     <StudioPage
       title="Spiele"
-      description="Neue Stadt? Spiel duplizieren, Layer 1 austauschen, fertig. Layer 2 und 3 bleiben verknüpft."
+      description="Spiel zuerst spielbar machen. Packs später andocken — Layer 1 duplizieren, Layer 2/3 nur anhängen."
       actions={
-        <StudioLinkButton href="/admin/tasks" variant="ghost" icon={<IconPuzzle size={16} />}>
-          Aufgaben
+        <StudioLinkButton href="/admin/packs" variant="ghost" icon={<IconPuzzle size={16} />}>
+          Layer-Packs
         </StudioLinkButton>
       }
     >

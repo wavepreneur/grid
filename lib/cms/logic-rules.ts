@@ -525,10 +525,14 @@ export function compileStudioGameToLevels(input: {
       const runtimeQuiz = slot.quiz ? arrivalQuizToRuntime(slot.quiz) : null;
       if (runtimeQuiz) level.arrival_quiz = runtimeQuiz;
 
-      // Geo / GPS from paired Layer-1 link
-      if (slot.geoLink && input.game.gps_enabled) {
-        const geoOverrides = parseLinkOverrides(slot.geoLink.overrides);
-        const gps = geoOverrides.gps ?? geoOverrides.location;
+      const levelOverrides = parseLinkOverrides(slot.levelLink.overrides);
+      if (input.game.gps_enabled) {
+        const geoOverrides = slot.geoLink ? parseLinkOverrides(slot.geoLink.overrides) : {};
+        const gps =
+          geoOverrides.gps ??
+          geoOverrides.location ??
+          levelOverrides.gps ??
+          levelOverrides.location;
         if (gps) {
           level.location = {
             lat: gps.lat,
@@ -541,7 +545,6 @@ export function compileStudioGameToLevels(input: {
         }
       }
 
-      const levelOverrides = parseLinkOverrides(slot.levelLink.overrides);
       const indoorGame =
         parseRuntimeProfiles(input.game.runtime_profiles).default_mode === "indoor";
       if (indoorGame || levelOverrides.station?.code) {

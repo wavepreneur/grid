@@ -31,6 +31,12 @@ export const queryKeys = {
       [...queryKeys.tasks.all, "library", query, quizOnly, tags] as const,
     libraryTags: (orgSlug: string) => [...queryKeys.tasks.all, "library-tags", orgSlug] as const,
   },
+  packs: {
+    all: ["grid", "studio", "packs"] as const,
+    list: (orgSlug: string, layer: number, search = "") =>
+      [...queryKeys.packs.all, "list", orgSlug, layer, search] as const,
+    detail: (packId: string) => [...queryKeys.packs.all, "detail", packId] as const,
+  },
   tickets: {
     all: ["grid", "studio", "tickets"] as const,
     list: (orgSlug?: string) => [...queryKeys.tickets.all, "list", orgSlug ?? ""] as const,

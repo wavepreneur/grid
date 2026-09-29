@@ -163,6 +163,7 @@ type Props = {
   routeOrder?: "linear" | "free";
   language?: string;
   initialLinks: StudioGameTaskLink[];
+  packBacked?: boolean;
 };
 
 export function GameSlotsPanel({
@@ -170,6 +171,7 @@ export function GameSlotsPanel({
   surface,
   routeOrder = "linear",
   initialLinks,
+  packBacked = false,
 }: Props) {
   const cache = useStudioCache();
   const { confirm } = useStudioConfirm();
@@ -299,7 +301,14 @@ export function GameSlotsPanel({
         `${gameId}:${slot.index}`,
       ),
     );
-    const existingGps = parseGpsOverride(overrides.location ?? overrides.gps);
+    const existingGps =
+      parseGpsOverride(overrides.location ?? overrides.gps) ??
+      parseGpsOverride(
+        slot.geoLink
+          ? parseLinkOverrides(slot.geoLink.overrides).location ??
+              parseLinkOverrides(slot.geoLink.overrides).gps
+          : null,
+      );
     if (unlock.type === "after_task_delay" && unlock.meters && unlock.meters > 0) {
       setOutdoorActivation("after_meters");
       setDelayMeters(Math.max(MIN_DISTANCE_UNLOCK_METERS, unlock.meters));
@@ -588,10 +597,21 @@ export function GameSlotsPanel({
     <StudioPanel>
       <StudioSectionTitle
         title="3 · Aufgaben"
-        description={`Aufgaben aus dem Pool zuweisen und Reihenfolge festlegen. Surface: ${contentModeLabel(surface)}.`}
+        description={
+          packBacked
+            ? `Bedingungen bleiben hier. GPS und Freischaltung speichern wir im Stadt-Pack, Mission und Bonus bleiben geteilt. Surface: ${contentModeLabel(surface)}.`
+            : `Aufgaben aus dem Pool zuweisen und Reihenfolge festlegen. Surface: ${contentModeLabel(surface)}.`
+        }
       />
 
-      <StudioHint tone="info">{activationHint}</StudioHint>
+      {packBacked ? (
+        <StudioHint tone="info">
+          Inhalt der Fragen in Aufgaben. Koordinaten, Meter, Indoor-Code und Opener/Bonus in
+          Bedingungen. Layer 2 und 3 nicht kopieren — andocken.
+        </StudioHint>
+      ) : (
+        <StudioHint tone="info">{activationHint}</StudioHint>
+      )}
 
       {error ? <StudioError message={error} /> : null}
       {message ? <StudioSuccess message={message} /> : null}
@@ -784,7 +804,6 @@ export function GameSlotsPanel({
           </p>
         )}
       </div>
-
 
       {editSlot ? (
         <StudioModal

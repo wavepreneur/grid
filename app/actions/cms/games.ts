@@ -49,6 +49,8 @@ import {
 } from "@/lib/grid/stations";
 import { PUSHABLE_EVENT_STATUSES, withLastLivePushAt } from "@/lib/cms/live-push";
 import { pingTeamsContentUpdated } from "@/lib/grid/content-ping";
+import { loadMergedGameTaskLinksForGame, addTaskToLayerPack, removeTaskFromLayerPack, reorderPackBackedGameTasks, savePackBackedGameLink } from "@/app/actions/cms/packs";
+import { gameUsesLayerPacks, packItemToGameLink, parsePackLinkId } from "@/lib/cms/layer-packs";
 
 function normalizeGameRow(row: StudioGame): StudioGame {
   return {
@@ -58,6 +60,9 @@ function normalizeGameRow(row: StudioGame): StudioGame {
     active_layers: parseActiveLayers((row as StudioGame).active_layers),
     runtime_profiles: parseRuntimeProfiles((row as StudioGame).runtime_profiles),
     logic_rules: (row as StudioGame).logic_rules ?? [],
+    layer1_pack_id: (row as StudioGame).layer1_pack_id ?? null,
+    layer2_pack_id: (row as StudioGame).layer2_pack_id ?? null,
+    layer3_pack_id: (row as StudioGame).layer3_pack_id ?? null,
   };
 }
 
@@ -149,6 +154,9 @@ export type CreateGameInput = {
   /** Player surface chosen at create time. */
   surface?: "outdoor" | "indoor" | "online";
   language?: StudioLanguage;
+  layer1_pack_id?: string | null;
+  layer2_pack_id?: string | null;
+  layer3_pack_id?: string | null;
 };
 
 async function ensureUniqueGameSlug(
@@ -200,6 +208,13 @@ export async function createGame(input: CreateGameInput): Promise<ActionResult<S
       feature_flags: {},
       logic_rules: [],
       status: "draft" as const,
+      ...(input.layer1_pack_id || input.layer2_pack_id || input.layer3_pack_id
+        ? {
+            layer1_pack_id: input.layer1_pack_id ?? null,
+            layer2_pack_id: input.layer2_pack_id ?? null,
+            layer3_pack_id: input.layer3_pack_id ?? null,
+          }
+        : {}),
     };
 
     const { data, error } = await supabase
@@ -253,43 +268,18 @@ function mapTaskRow(raw: Record<string, unknown>): StudioTask {
 export async function listGameTasks(gameId: string): Promise<ActionResult<StudioGameTaskLink[]>> {
   try {
     const supabase = createAdminClient();
-    const { data, error } = await supabase
-      .from("studio_game_tasks")
-      .select("id, game_id, task_id, layer, sort_order, overrides, studio_tasks(*)")
-      .eq("game_id", gameId)
-      .order("sort_order");
+    const { data: gameRow, error: gameError } = await supabase
+      .from("studio_games")
+      .select("*")
+      .eq("id", gameId)
+      .maybeSingle();
+    if (gameError) throw new Error(gameError.message);
+    if (!gameRow) return { success: true, data: [] };
 
-    if (error) throw new Error(error.message);
-
-    const links: StudioGameTaskLink[] = (data ?? []).flatMap((row) => {
-      const r = row as {
-        id: string;
-        game_id: string;
-        task_id: string;
-        layer?: number;
-        sort_order: number;
-        overrides: Record<string, unknown>;
-        studio_tasks: Record<string, unknown> | Record<string, unknown>[] | null;
-      };
-      const taskRaw = Array.isArray(r.studio_tasks) ? r.studio_tasks[0] : r.studio_tasks;
-      if (!taskRaw) return [];
-      const partial = {
-        id: r.id,
-        game_id: r.game_id,
-        task_id: r.task_id,
-        sort_order: r.sort_order,
-        overrides: r.overrides ?? {},
-        layer: (r.layer === 1 || r.layer === 2 || r.layer === 3 ? r.layer : 2) as StudioLayer,
-        task: mapTaskRow(taskRaw),
-      };
-      return [
-        {
-          ...partial,
-          layer: parseLinkLayer(partial),
-        },
-      ];
-    });
-
+    const links = await loadMergedGameTaskLinksForGame(
+      supabase,
+      normalizeGameRow(gameRow as StudioGame),
+    );
     return { success: true, data: links };
   } catch (error) {
     return {
@@ -321,6 +311,20 @@ export async function updateGame(input: UpdateGameInput): Promise<ActionResult<S
     if (input.logic_rules !== undefined) payload.logic_rules = parseLogicRules(input.logic_rules);
     if (input.active_layers !== undefined) payload.active_layers = input.active_layers;
     if (input.runtime_profiles !== undefined) payload.runtime_profiles = input.runtime_profiles;
+    if (input.layer1_pack_id !== undefined) payload.layer1_pack_id = input.layer1_pack_id;
+    if (input.layer2_pack_id !== undefined) payload.layer2_pack_id = input.layer2_pack_id;
+    if (input.layer3_pack_id !== undefined) payload.layer3_pack_id = input.layer3_pack_id;
+
+    if (input.layer1_pack_id) {
+      const { data: cityPack } = await supabase
+        .from("studio_layer_packs")
+        .select("city_slug")
+        .eq("id", input.layer1_pack_id)
+        .maybeSingle();
+      if (cityPack && input.city_slug === undefined) {
+        payload.city_slug = (cityPack as { city_slug?: string | null }).city_slug ?? null;
+      }
+    }
 
     const { data, error } = await supabase
       .from("studio_games")
@@ -362,6 +366,39 @@ export async function addTaskToGame(
 ): Promise<ActionResult<StudioGameTaskLink>> {
   try {
     const supabase = createAdminClient();
+    const { data: gameRow } = await supabase
+      .from("studio_games")
+      .select("layer1_pack_id, layer2_pack_id, layer3_pack_id, runtime_profiles")
+      .eq("id", gameId)
+      .maybeSingle();
+    const indoorGame =
+      parseRuntimeProfiles(gameRow?.runtime_profiles).default_mode === "indoor";
+    const packIdForLayer =
+      layer === 1
+        ? gameRow?.layer1_pack_id
+        : layer === 2
+          ? gameRow?.layer2_pack_id
+          : gameRow?.layer3_pack_id;
+    if (packIdForLayer) {
+      const extras: { overrides?: Record<string, unknown> } = {};
+      if (indoorGame && layer === 1) {
+        extras.overrides = { station: { code: randomStationAccessCode() } };
+      }
+      const added = await addTaskToLayerPack(String(packIdForLayer), taskId, extras);
+      if (!added.success) return { success: false, error: added.error };
+      const item = (added.data ?? []).find((row) => row.task_id === taskId);
+      if (!item) return { success: false, error: "Pack-Eintrag nach dem Hinzufügen nicht gefunden." };
+      revalidatePath(`/admin/games/${gameId}`);
+      return {
+        success: true,
+        data: packItemToGameLink({
+          gameId,
+          packId: String(packIdForLayer),
+          item,
+          layer,
+        }),
+      };
+    }
 
     const { data: existing } = await supabase
       .from("studio_game_tasks")
@@ -379,14 +416,6 @@ export async function addTaskToGame(
       .eq("layer", layer);
 
     if (countError) throw new Error(countError.message);
-
-    const { data: gameRow } = await supabase
-      .from("studio_games")
-      .select("runtime_profiles")
-      .eq("id", gameId)
-      .maybeSingle();
-    const indoorGame =
-      parseRuntimeProfiles(gameRow?.runtime_profiles).default_mode === "indoor";
 
     let insertOverrides: Record<string, unknown> = {};
     if (indoorGame && layer !== 3) {
@@ -455,6 +484,14 @@ export async function addTaskToGame(
 
 export async function removeTaskFromGame(linkId: string, gameId: string): Promise<ActionResult<{ id: string }>> {
   try {
+    const packed = parsePackLinkId(linkId);
+    if (packed) {
+      const removed = await removeTaskFromLayerPack(packed.packId, packed.itemId);
+      if (!removed.success) return { success: false, error: removed.error };
+      revalidatePath(`/admin/games/${gameId}`);
+      return { success: true, data: { id: linkId } };
+    }
+
     const supabase = createAdminClient();
     const { error } = await supabase.from("studio_game_tasks").delete().eq("id", linkId);
     if (error) throw new Error(error.message);
@@ -506,6 +543,21 @@ export async function updateGameTaskLocation(
   location: { lat: number; lng: number; radius_meters: number } | null,
 ): Promise<ActionResult<StudioGameTaskLink>> {
   try {
+    if (parsePackLinkId(linkId)) {
+      const linksResult = await listGameTasks(gameId);
+      if (!linksResult.success) return { success: false, error: linksResult.error };
+      const existing = linksResult.data?.find((link) => link.id === linkId);
+      if (!existing) return { success: false, error: "Task-Zuweisung nicht gefunden." };
+      const overrides = { ...(existing.overrides as Record<string, unknown>) };
+      if (location) {
+        overrides.location = location;
+        overrides.gps = location;
+      } else {
+        delete overrides.location;
+        delete overrides.gps;
+      }
+      return savePackBackedGameLink({ gameId, linkId, overrides });
+    }
     const supabase = createAdminClient();
     const { data: existing, error: fetchError } = await supabase
       .from("studio_game_tasks")
@@ -553,41 +605,205 @@ export async function updateGameTaskLocation(
   }
 }
 
+type GameLinkConfigPatch = {
+  location?: { lat: number; lng: number; radius_meters: number } | null;
+  role?: GameLinkOverrides["role"];
+  trigger?: BonusTrigger | null;
+  arrival_quiz?: GameLinkOverrides["arrival_quiz"] | null;
+  opener_task_id?: string | null;
+  opener_points?: number | null;
+  bonus_task_id?: string | null;
+  bonus_bindings?: Array<{
+    task_id: string;
+    role: "alpha" | "beta" | "gamma" | "team";
+    when: {
+      type:
+        | "immediate"
+        | "delay_minutes"
+        | "delay_meters"
+        | "game_minutes"
+        | "interval_minutes";
+      minutes?: number;
+      meters?: number;
+    };
+  }> | null;
+  geo_task_id?: string | null;
+  unlock?: GameLinkOverrides["unlock"] | null;
+  visible_to?: GameLinkOverrides["visible_to"] | null;
+  station?: GameLinkOverrides["station"] | null;
+  ends_game?: boolean | null;
+};
+
+async function applyGameLinkConfigPatch(
+  supabase: ReturnType<typeof createAdminClient>,
+  orgId: string,
+  overrides: GameLinkOverrides,
+  patch: GameLinkConfigPatch,
+): Promise<ActionResult<GameLinkOverrides>> {
+  if (patch.location !== undefined) {
+    if (patch.location) {
+      overrides.location = patch.location;
+      overrides.gps = patch.location;
+    } else {
+      delete overrides.location;
+      delete overrides.gps;
+    }
+  }
+  if (patch.role !== undefined) {
+    overrides.role = patch.role;
+  }
+  if (patch.trigger !== undefined) {
+    if (patch.trigger) overrides.trigger = patch.trigger;
+    else delete overrides.trigger;
+  }
+  if (patch.arrival_quiz !== undefined && patch.opener_task_id === undefined) {
+    if (patch.arrival_quiz) overrides.arrival_quiz = patch.arrival_quiz;
+    else delete overrides.arrival_quiz;
+  }
+  if (patch.opener_task_id !== undefined) {
+    if (patch.opener_task_id) {
+      const { data: openerTask, error: openerError } = await supabase
+        .from("studio_tasks")
+        .select("id, title, description, content, organization_id")
+        .eq("id", patch.opener_task_id)
+        .eq("is_active", true)
+        .or(`organization_id.eq.${orgId},organization_id.is.null`)
+        .maybeSingle();
+
+      if (openerError) throw new Error(openerError.message);
+      if (!openerTask) {
+        return { success: false, error: "Einstiegs-Aufgabe nicht gefunden." };
+      }
+
+      const pointsOverride =
+        patch.opener_points !== undefined ? patch.opener_points : (overrides.opener_points ?? null);
+
+      const quiz = taskToOpenerArrivalQuiz(
+        {
+          title: openerTask.title as string,
+          description: (openerTask.description as string) ?? "",
+          content: normalizeTaskContent(openerTask.content),
+        },
+        pointsOverride,
+      );
+      if (!quiz) {
+        return {
+          success: false,
+          error: "Einstiegs-Aufgabe muss Multiple Choice sein (eine oder mehrere richtige Antworten).",
+        };
+      }
+
+      overrides.opener_task_id = patch.opener_task_id;
+      overrides.opener_enabled = true;
+      overrides.arrival_quiz = quiz;
+      if (typeof pointsOverride === "number") {
+        overrides.opener_points = Math.max(0, Math.round(pointsOverride));
+      } else {
+        delete overrides.opener_points;
+      }
+    } else {
+      overrides.opener_enabled = false;
+      delete overrides.opener_task_id;
+      delete overrides.opener_points;
+      delete overrides.arrival_quiz;
+    }
+  } else if (patch.opener_points !== undefined && overrides.opener_task_id) {
+    const { data: openerTask, error: openerError } = await supabase
+      .from("studio_tasks")
+      .select("id, title, description, content")
+      .eq("id", overrides.opener_task_id)
+      .maybeSingle();
+
+    if (openerError) throw new Error(openerError.message);
+    if (openerTask) {
+      const quiz = taskToOpenerArrivalQuiz(
+        {
+          title: openerTask.title as string,
+          description: (openerTask.description as string) ?? "",
+          content: normalizeTaskContent(openerTask.content),
+        },
+        patch.opener_points,
+      );
+      if (quiz) {
+        overrides.arrival_quiz = quiz;
+        if (typeof patch.opener_points === "number") {
+          overrides.opener_points = Math.max(0, Math.round(patch.opener_points));
+        } else {
+          delete overrides.opener_points;
+        }
+      }
+    }
+  }
+  if (patch.bonus_task_id !== undefined) {
+    if (patch.bonus_task_id) overrides.bonus_task_id = patch.bonus_task_id;
+    else delete overrides.bonus_task_id;
+  }
+  if (patch.bonus_bindings !== undefined) {
+    if (patch.bonus_bindings && patch.bonus_bindings.length > 0) {
+      overrides.bonus_bindings = patch.bonus_bindings;
+      overrides.bonus_task_id = patch.bonus_bindings[0]!.task_id;
+    } else {
+      overrides.bonus_bindings = [];
+      delete overrides.bonus_task_id;
+    }
+  }
+  if (patch.geo_task_id !== undefined) {
+    if (patch.geo_task_id) overrides.geo_task_id = patch.geo_task_id;
+    else delete overrides.geo_task_id;
+  }
+  if (patch.unlock !== undefined) {
+    if (patch.unlock) overrides.unlock = patch.unlock;
+    else delete overrides.unlock;
+  }
+  if (patch.visible_to !== undefined) {
+    if (patch.visible_to) overrides.visible_to = patch.visible_to;
+    else delete overrides.visible_to;
+  }
+  if (patch.station !== undefined) {
+    if (patch.station) overrides.station = patch.station;
+    else delete overrides.station;
+  }
+  if (patch.ends_game !== undefined) {
+    if (patch.ends_game) overrides.ends_game = true;
+    else delete overrides.ends_game;
+  }
+  return { success: true, data: overrides };
+}
+
 export async function updateGameTaskLinkConfig(
   gameId: string,
   linkId: string,
-  patch: {
-    location?: { lat: number; lng: number; radius_meters: number } | null;
-    role?: GameLinkOverrides["role"];
-    trigger?: BonusTrigger | null;
-    arrival_quiz?: GameLinkOverrides["arrival_quiz"] | null;
-    opener_task_id?: string | null;
-    opener_points?: number | null;
-    bonus_task_id?: string | null;
-    bonus_bindings?: Array<{
-      task_id: string;
-      role: "alpha" | "beta" | "gamma" | "team";
-      when: {
-        type:
-          | "immediate"
-          | "delay_minutes"
-          | "delay_meters"
-          | "game_minutes"
-          | "interval_minutes";
-        minutes?: number;
-        meters?: number;
-      };
-    }> | null;
-    geo_task_id?: string | null;
-    unlock?: GameLinkOverrides["unlock"] | null;
-    visible_to?: GameLinkOverrides["visible_to"] | null;
-    station?: GameLinkOverrides["station"] | null;
-    ends_game?: boolean | null;
-  },
+  patch: GameLinkConfigPatch,
 ): Promise<ActionResult<StudioGameTaskLink>> {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
+
+    if (parsePackLinkId(linkId)) {
+      const linksResult = await listGameTasks(gameId);
+      if (!linksResult.success) return { success: false, error: linksResult.error };
+      const existingLink = linksResult.data?.find((link) => link.id === linkId);
+      if (!existingLink) return { success: false, error: "Task-Zuweisung nicht gefunden." };
+
+      const overrides: GameLinkOverrides = {
+        ...(((existingLink.overrides as GameLinkOverrides) ?? {}) as GameLinkOverrides),
+      };
+      const applied = await applyGameLinkConfigPatch(supabase, orgId, overrides, patch);
+      if (!applied.success) return applied;
+
+      const saved = await savePackBackedGameLink({
+        gameId,
+        linkId,
+        overrides: applied.data,
+        openerTaskId: patch.opener_task_id,
+        bonusBindingsTouched: patch.bonus_bindings !== undefined,
+        endsGame: patch.ends_game,
+      });
+      if (!saved.success) return saved;
+      revalidatePath(`/admin/games/${gameId}`);
+      return saved;
+    }
+
     const { data: existing, error: fetchError } = await supabase
       .from("studio_game_tasks")
       .select("id, task_id, overrides")
@@ -601,141 +817,12 @@ export async function updateGameTaskLinkConfig(
     const overrides: GameLinkOverrides = {
       ...(((existing as { overrides: GameLinkOverrides }).overrides ?? {}) as GameLinkOverrides),
     };
-
-    if (patch.location !== undefined) {
-      if (patch.location) {
-        overrides.location = patch.location;
-        overrides.gps = patch.location;
-      } else {
-        delete overrides.location;
-        delete overrides.gps;
-      }
-    }
-    if (patch.role !== undefined) {
-      overrides.role = patch.role;
-    }
-    if (patch.trigger !== undefined) {
-      if (patch.trigger) overrides.trigger = patch.trigger;
-      else delete overrides.trigger;
-    }
-    if (patch.arrival_quiz !== undefined && patch.opener_task_id === undefined) {
-      if (patch.arrival_quiz) overrides.arrival_quiz = patch.arrival_quiz;
-      else delete overrides.arrival_quiz;
-    }
-    if (patch.opener_task_id !== undefined) {
-      if (patch.opener_task_id) {
-        const { data: openerTask, error: openerError } = await supabase
-          .from("studio_tasks")
-          .select("id, title, description, content, organization_id")
-          .eq("id", patch.opener_task_id)
-          .eq("is_active", true)
-          .or(`organization_id.eq.${orgId},organization_id.is.null`)
-          .maybeSingle();
-
-        if (openerError) throw new Error(openerError.message);
-        if (!openerTask) {
-          return { success: false, error: "Einstiegs-Aufgabe nicht gefunden." };
-        }
-
-        const pointsOverride =
-          patch.opener_points !== undefined
-            ? patch.opener_points
-            : (overrides.opener_points ?? null);
-
-        const quiz = taskToOpenerArrivalQuiz(
-          {
-            title: openerTask.title as string,
-            description: (openerTask.description as string) ?? "",
-            content: normalizeTaskContent(openerTask.content),
-          },
-          pointsOverride,
-        );
-        if (!quiz) {
-          return {
-            success: false,
-            error:
-              "Einstiegs-Aufgabe muss Multiple Choice sein (eine oder mehrere richtige Antworten).",
-          };
-        }
-
-        overrides.opener_task_id = patch.opener_task_id;
-        overrides.arrival_quiz = quiz;
-        if (typeof pointsOverride === "number") {
-          overrides.opener_points = Math.max(0, Math.round(pointsOverride));
-        } else {
-          delete overrides.opener_points;
-        }
-      } else {
-        delete overrides.opener_task_id;
-        delete overrides.opener_points;
-        delete overrides.arrival_quiz;
-      }
-    } else if (patch.opener_points !== undefined && overrides.opener_task_id) {
-      const { data: openerTask, error: openerError } = await supabase
-        .from("studio_tasks")
-        .select("id, title, description, content")
-        .eq("id", overrides.opener_task_id)
-        .maybeSingle();
-
-      if (openerError) throw new Error(openerError.message);
-      if (openerTask) {
-        const quiz = taskToOpenerArrivalQuiz(
-          {
-            title: openerTask.title as string,
-            description: (openerTask.description as string) ?? "",
-            content: normalizeTaskContent(openerTask.content),
-          },
-          patch.opener_points,
-        );
-        if (quiz) {
-          overrides.arrival_quiz = quiz;
-          if (typeof patch.opener_points === "number") {
-            overrides.opener_points = Math.max(0, Math.round(patch.opener_points));
-          } else {
-            delete overrides.opener_points;
-          }
-        }
-      }
-    }
-    if (patch.bonus_task_id !== undefined) {
-      if (patch.bonus_task_id) overrides.bonus_task_id = patch.bonus_task_id;
-      else delete overrides.bonus_task_id;
-    }
-    if (patch.bonus_bindings !== undefined) {
-      if (patch.bonus_bindings && patch.bonus_bindings.length > 0) {
-        overrides.bonus_bindings = patch.bonus_bindings;
-        // Keep legacy pointer on first for older readers
-        overrides.bonus_task_id = patch.bonus_bindings[0]!.task_id;
-      } else {
-        // Persist [] so reopen does not revive the bonus via Layer-3 trigger fallback.
-        overrides.bonus_bindings = [];
-        delete overrides.bonus_task_id;
-      }
-    }
-    if (patch.geo_task_id !== undefined) {
-      if (patch.geo_task_id) overrides.geo_task_id = patch.geo_task_id;
-      else delete overrides.geo_task_id;
-    }
-    if (patch.unlock !== undefined) {
-      if (patch.unlock) overrides.unlock = patch.unlock;
-      else delete overrides.unlock;
-    }
-    if (patch.visible_to !== undefined) {
-      if (patch.visible_to) overrides.visible_to = patch.visible_to;
-      else delete overrides.visible_to;
-    }
-    if (patch.station !== undefined) {
-      if (patch.station) overrides.station = patch.station;
-      else delete overrides.station;
-    }
-    if (patch.ends_game !== undefined) {
-      if (patch.ends_game) overrides.ends_game = true;
-      else delete overrides.ends_game;
-    }
+    const applied = await applyGameLinkConfigPatch(supabase, orgId, overrides, patch);
+    if (!applied.success) return applied;
 
     const { error: updateError } = await supabase
       .from("studio_game_tasks")
-      .update({ overrides })
+      .update({ overrides: applied.data })
       .eq("id", linkId)
       .eq("game_id", gameId);
 
@@ -867,6 +954,9 @@ export async function reorderGameTasksInLayer(
   orderedLinkIds: string[],
 ): Promise<ActionResult<{ count: number }>> {
   try {
+    if (orderedLinkIds.some((id) => parsePackLinkId(id))) {
+      return reorderPackBackedGameTasks(gameId, layer, orderedLinkIds);
+    }
     const supabase = createAdminClient();
     const results = await Promise.all(
       orderedLinkIds.map((linkId, index) =>
@@ -895,6 +985,9 @@ export async function reorderGameTasks(
   orderedLinkIds: string[],
 ): Promise<ActionResult<{ count: number }>> {
   try {
+    if (orderedLinkIds.some((id) => parsePackLinkId(id))) {
+      return reorderPackBackedGameTasks(gameId, 2, orderedLinkIds);
+    }
     const supabase = createAdminClient();
     const results = await Promise.all(
       orderedLinkIds.map((linkId, index) =>
@@ -1399,6 +1492,13 @@ async function copyGameWithLinks(
       logic_rules: source.logic_rules,
       active_layers: source.active_layers,
       runtime_profiles: source.runtime_profiles,
+      ...(gameUsesLayerPacks(source)
+        ? {
+            layer1_pack_id: source.layer1_pack_id ?? null,
+            layer2_pack_id: source.layer2_pack_id ?? null,
+            layer3_pack_id: source.layer3_pack_id ?? null,
+          }
+        : {}),
       is_template: false,
       status: "draft",
       published_version_number: 0,
@@ -1407,6 +1507,10 @@ async function copyGameWithLinks(
     .single();
 
   if (error) throw new Error(error.message);
+
+  if (gameUsesLayerPacks(source)) {
+    return normalizeGameRow(data as StudioGame);
+  }
 
   const { data: sourceLinks } = await supabase
     .from("studio_game_tasks")
@@ -1536,30 +1640,57 @@ export async function saveGameLocale(input: {
     if (updateError) throw new Error(updateError.message);
 
     if (input.slots?.length) {
-      const { data: links, error: linksError } = await supabase
-        .from("studio_game_tasks")
-        .select("id, overrides")
-        .eq("game_id", input.gameId)
-        .in(
-          "id",
-          input.slots.map((slot) => slot.linkId),
-        );
-      if (linksError) throw new Error(linksError.message);
-      const copyById = new Map(input.slots.map((slot) => [slot.linkId, slot.copy]));
-      for (const link of links ?? []) {
-        const copy = copyById.get(link.id as string);
-        if (!copy) continue;
+      const packSlots = input.slots.filter((slot) => parsePackLinkId(slot.linkId));
+      const legacySlots = input.slots.filter((slot) => !parsePackLinkId(slot.linkId));
+
+      for (const slot of packSlots) {
+        const parsed = parsePackLinkId(slot.linkId);
+        if (!parsed) continue;
+        const { data: item, error: itemError } = await supabase
+          .from("studio_layer_pack_items")
+          .select("overrides")
+          .eq("id", parsed.itemId)
+          .maybeSingle();
+        if (itemError) throw new Error(itemError.message);
+        if (!item) continue;
         const overrides = withLinkLocale(
-          (link.overrides as Record<string, unknown>) ?? {},
+          (item.overrides as Record<string, unknown>) ?? {},
           input.language,
-          copy,
+          slot.copy,
         );
-        const { error: linkError } = await supabase
+        const { error: packError } = await supabase
+          .from("studio_layer_pack_items")
+          .update({ overrides, updated_at: new Date().toISOString() })
+          .eq("id", parsed.itemId);
+        if (packError) throw new Error(packError.message);
+      }
+
+      if (legacySlots.length > 0) {
+        const { data: links, error: linksError } = await supabase
           .from("studio_game_tasks")
-          .update({ overrides })
-          .eq("id", link.id)
-          .eq("game_id", input.gameId);
-        if (linkError) throw new Error(linkError.message);
+          .select("id, overrides")
+          .eq("game_id", input.gameId)
+          .in(
+            "id",
+            legacySlots.map((slot) => slot.linkId),
+          );
+        if (linksError) throw new Error(linksError.message);
+        const copyById = new Map(legacySlots.map((slot) => [slot.linkId, slot.copy]));
+        for (const link of links ?? []) {
+          const copy = copyById.get(link.id as string);
+          if (!copy) continue;
+          const overrides = withLinkLocale(
+            (link.overrides as Record<string, unknown>) ?? {},
+            input.language,
+            copy,
+          );
+          const { error: linkError } = await supabase
+            .from("studio_game_tasks")
+            .update({ overrides })
+            .eq("id", link.id)
+            .eq("game_id", input.gameId);
+          if (linkError) throw new Error(linkError.message);
+        }
       }
     }
 
