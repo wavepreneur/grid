@@ -62,6 +62,18 @@ const COPY = {
   },
 } as const;
 
+function aboHref(
+  lang: PlayUiLang,
+  input: { teamName?: string; score?: string; resultsUrl?: string },
+): string {
+  const params = new URLSearchParams();
+  if (input.teamName?.trim()) params.set("team", input.teamName.trim());
+  if (input.score?.trim()) params.set("score", input.score.trim());
+  if (input.resultsUrl) params.set("results", input.resultsUrl);
+  params.set("lang", lang);
+  return `/next/abo?${params.toString()}`;
+}
+
 export function GridAboNextPage({ language = "de", teamName, score, resultsUrl }: Props) {
   const t = COPY[language];
   const [sent, setSent] = useState(false);
@@ -91,9 +103,35 @@ export function GridAboNextPage({ language = "de", teamName, score, resultsUrl }
   return (
     <main className="min-h-[100dvh] bg-[#f8fafc] text-slate-900">
       <div className="mx-auto max-w-2xl px-5 py-12">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-600">
-          {t.kicker}
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-600">
+            {t.kicker}
+          </p>
+          <nav aria-label={language === "en" ? "Language" : "Sprache"} className="flex items-center gap-1">
+            <a
+              href={aboHref("de", { teamName, score, resultsUrl })}
+              hrefLang="de"
+              lang="de"
+              aria-current={language === "de" ? "true" : undefined}
+              className={`rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide ${
+                language === "de" ? "bg-slate-900 text-white" : "text-slate-400 hover:text-slate-700"
+              }`}
+            >
+              DE
+            </a>
+            <a
+              href={aboHref("en", { teamName, score, resultsUrl })}
+              hrefLang="en"
+              lang="en"
+              aria-current={language === "en" ? "true" : undefined}
+              className={`rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide ${
+                language === "en" ? "bg-slate-900 text-white" : "text-slate-400 hover:text-slate-700"
+              }`}
+            >
+              EN
+            </a>
+          </nav>
+        </div>
         <h1 className="mt-3 text-3xl font-bold tracking-tight">{t.headline}</h1>
         {teamName ? (
           <p className="mt-3 text-base text-slate-600">

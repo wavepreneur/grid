@@ -12,14 +12,16 @@ export const metadata: Metadata = {
 
 type Props = {
   params: Promise<{ inviteCode: string; joinCode: string }>;
+  searchParams: Promise<{ lang?: string }>;
 };
 
-export default async function TeamRecapPage({ params }: Props) {
+export default async function TeamRecapPage({ params, searchParams }: Props) {
   const { inviteCode, joinCode } = await params;
+  const { lang } = await searchParams;
   const recap = await loadPublicTeamRecap(inviteCode, joinCode);
   if (!recap) notFound();
   if ("expired" in recap) {
-    const t = playUi(recap.language).over;
+    const t = playUi(lang ?? recap.language).over;
     return (
       <CityPlayShell>
         <div className="flex min-h-[60dvh] flex-col items-center justify-center px-6 text-center">
@@ -41,7 +43,7 @@ export default async function TeamRecapPage({ params }: Props) {
         levels={recap.eventContent.levels}
         gameState={recap.gameState}
         growthOffer={recap.eventContent.growthOffer}
-        language={recap.eventContent.language}
+        language={lang ?? recap.eventContent.language}
       />
     </CityPlayShell>
   );

@@ -11,7 +11,7 @@ import { exitmaniaTeamRankingUrl } from "@/lib/grid/growth-pack";
 import { eventRankingPath, eventRecapPath } from "@/lib/grid/event-routes";
 import { levelPlayOutcome, type TeamGameState } from "@/lib/grid/game-state";
 import type { LevelDefinition } from "@/lib/grid/level-types";
-import { playUi } from "@/lib/grid/play-ui";
+import { playUi, playUiLang, type PlayUiLang } from "@/lib/grid/play-ui";
 
 type Props = {
   inviteCode: string;
@@ -54,7 +54,9 @@ export function GameOverFlywheel({
   extras,
   language,
 }: Props) {
-  const t = playUi(language);
+  const bookedLang = playUiLang(language);
+  const [uiLang, setUiLang] = useState<PlayUiLang>(bookedLang);
+  const t = playUi(uiLang);
   const [copied, setCopied] = useState(false);
   const [rankingOpen, setRankingOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -72,11 +74,23 @@ export function GameOverFlywheel({
   const missionName = eventTitle?.replace(/^\[Test\]\s*/, "").trim() || "";
   const teamLabel = teamHeadline(teamName, t.team);
   const teamevent = growthOffer?.surface === "exitmania_teamevent";
-  const embedSrc = rankingSrc(inviteCode, joinCode, teamevent, language);
+  const embedSrc = rankingSrc(inviteCode, joinCode, teamevent, uiLang);
+
+  useEffect(() => {
+    setUiLang(bookedLang);
+  }, [bookedLang]);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  function switchUiLang(next: PlayUiLang) {
+    setUiLang(next);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", next);
+    window.history.replaceState(window.history.state, "", url);
+  }
 
   useEffect(() => {
     if (!rankingOpen) return;
@@ -110,6 +124,37 @@ export function GameOverFlywheel({
       className="cg-animate-rise-in space-y-5 px-5 pb-[max(2.5rem,calc(1.25rem+env(safe-area-inset-bottom)))] pt-[max(2.5rem,env(safe-area-inset-top))]"
       translate="no"
     >
+      <div className="flex justify-end">
+        <nav
+          aria-label={uiLang === "en" ? "Language" : "Sprache"}
+          className="flex items-center gap-1"
+        >
+          <button
+            type="button"
+            aria-current={uiLang === "de" ? "true" : undefined}
+            onClick={() => switchUiLang("de")}
+            className={`rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide ${
+              uiLang === "de"
+                ? "bg-[var(--cg-fg)] text-[var(--cg-bg)]"
+                : "text-[var(--cg-muted)]"
+            }`}
+          >
+            DE
+          </button>
+          <button
+            type="button"
+            aria-current={uiLang === "en" ? "true" : undefined}
+            onClick={() => switchUiLang("en")}
+            className={`rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide ${
+              uiLang === "en"
+                ? "bg-[var(--cg-fg)] text-[var(--cg-bg)]"
+                : "text-[var(--cg-muted)]"
+            }`}
+          >
+            EN
+          </button>
+        </nav>
+      </div>
       <div className="space-y-2 text-center">
         <span
           aria-hidden
@@ -188,7 +233,7 @@ export function GameOverFlywheel({
         <GrowthRecapCard
           offer={growthOffer}
           score={score}
-          language={language}
+          language={uiLang}
         />
       ) : null}
 
