@@ -218,6 +218,16 @@ export function TaskEditorPreview({ title, description, content }: Props) {
         mediaType={openTile?.media_type}
         mediaUrl={openTile?.media_url}
         onClose={() => setOpenTileId(null)}
+        headerSlot={
+          scoring.countdown_seconds && scoring.countdown_seconds > 0 ? (
+            <LevelScoringBar
+              scoring={scoring}
+              startedAt={previewStartedAt}
+              compact
+              embedded
+            />
+          ) : null
+        }
         tipSlot={
           openTile?.hint_text?.trim() ? (
             unlockedHints[openTile.id] ? (

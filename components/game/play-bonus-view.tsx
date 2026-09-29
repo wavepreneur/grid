@@ -689,7 +689,14 @@ export function PlayBonusView({
         )}
       </div>
 
-      <MediaModal tile={activeTile} onClose={() => setActiveTile(null)} language={language} />
+      <MediaModal
+        tile={activeTile}
+        onClose={() => setActiveTile(null)}
+        language={language}
+        scoring={bonus.scoring}
+        startedAt={scoringStartedAt}
+        scoringSnapshot={scoringSnapshot}
+      />
     </section>
   );
 }

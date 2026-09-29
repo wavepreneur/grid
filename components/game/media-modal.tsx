@@ -4,10 +4,13 @@ import { useEffect, useState } from "react";
 import { Lightbulb } from "lucide-react";
 import { ContentMediaSheet } from "@/components/game/city/content-media-sheet";
 import { BigButton } from "@/components/game/city/ui";
+import { LevelScoringBar } from "@/components/game/level-scoring-bar";
 import { TileHintModal } from "@/components/game/tile-hint-modal";
 import type { PurchasedTileHint } from "@/lib/grid/game-state";
-import type { LevelContentTile } from "@/lib/grid/level-types";
+import type { LevelContentTile, LevelScoring } from "@/lib/grid/level-types";
 import { HINT_POINT_COST } from "@/lib/grid/level-types";
+import type { LevelScoringSnapshot } from "@/lib/grid/level-scoring";
+import { hasLiveLevelScoring } from "@/lib/grid/level-scoring";
 import { playTileTypeLabel, playUi } from "@/lib/grid/play-ui";
 
 type MediaModalProps = {
@@ -18,6 +21,10 @@ type MediaModalProps = {
   isPending?: boolean;
   language?: string | null;
   onPurchaseHint?: (tileId: string) => void;
+  scoring?: LevelScoring;
+  startedAt?: string | null;
+  fallbackStartedAt?: string | null;
+  scoringSnapshot?: LevelScoringSnapshot | null;
 };
 
 export function MediaModal({
@@ -27,6 +34,10 @@ export function MediaModal({
   isPending = false,
   language,
   onPurchaseHint,
+  scoring,
+  startedAt,
+  fallbackStartedAt,
+  scoringSnapshot,
 }: MediaModalProps) {
   const t = playUi(language);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -91,6 +102,19 @@ export function MediaModal({
         onClose={onClose}
         tipSlot={tipSlot}
         language={language}
+        headerSlot={
+          scoring && hasLiveLevelScoring(scoring) ? (
+            <LevelScoringBar
+              scoring={scoring}
+              startedAt={startedAt}
+              fallbackStartedAt={fallbackStartedAt}
+              snapshot={scoringSnapshot}
+              compact
+              embedded
+              language={language}
+            />
+          ) : null
+        }
       />
 
       <TileHintModal

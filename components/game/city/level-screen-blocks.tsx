@@ -172,9 +172,19 @@ export function LevelTaskCard({ children }: { children: ReactNode }) {
   return <div className="space-y-4">{children}</div>;
 }
 
-export function LevelScoreHud({ children }: { children: ReactNode }) {
+export function LevelScoreHud({
+  children,
+  align = "center",
+}: {
+  children: ReactNode;
+  align?: "center" | "start";
+}) {
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2 px-1">
+    <div
+      className={`flex flex-wrap items-center gap-2 px-1 ${
+        align === "start" ? "justify-start" : "justify-center"
+      }`}
+    >
       {children}
     </div>
   );

@@ -151,6 +151,9 @@ export function ExitmaniaLevelView({
         isPending={isPending}
         onPurchaseHint={onPurchaseHint}
         language={language}
+        scoring={level.scoring}
+        startedAt={levelStartedAt}
+        fallbackStartedAt={teamStartedAt}
       />
       <HintUnlockToast purchasedHints={purchasedHints} myPlayerId={myPlayerId} language={language} />
     </div>

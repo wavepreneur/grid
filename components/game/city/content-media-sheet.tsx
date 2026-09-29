@@ -12,6 +12,8 @@ type ContentMediaSheetProps = {
   onClose: () => void;
   /** Optional tip strip below media. */
   tipSlot?: ReactNode;
+  /** Live scoring / countdown — stays visible while the tile is open. */
+  headerSlot?: ReactNode;
   /** Override empty-state copy when no mediaUrl. */
   emptyMessage?: string;
   language?: string | null;
@@ -28,6 +30,7 @@ export function ContentMediaSheet({
   mediaUrl,
   onClose,
   tipSlot,
+  headerSlot,
   emptyMessage,
   language,
 }: ContentMediaSheetProps) {
@@ -70,6 +73,12 @@ export function ContentMediaSheet({
         >
           <X className="h-5 w-5" strokeWidth={2.5} />
         </button>
+
+        {headerSlot ? (
+          <div className="shrink-0 border-b border-[var(--cg-border)] bg-[var(--cg-bg)] px-3 pb-2.5 pt-[max(0.75rem,env(safe-area-inset-top))] pr-[max(3.75rem,calc(env(safe-area-inset-right)+3.25rem))]">
+            {headerSlot}
+          </div>
+        ) : null}
 
         <div className={`relative min-h-0 flex-1 ${isImage ? "bg-black" : "bg-[#f7f6f0]"}`}>
           {mediaUrl?.trim() ? (
