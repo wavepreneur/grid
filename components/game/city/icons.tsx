@@ -104,6 +104,14 @@ export function IconUser(p: Props) {
   );
 }
 
+export function IconNav(p: Props) {
+  return (
+    <I fill="currentColor" stroke="none" {...p}>
+      <polygon points="3 11 22 2 13 21 11 13 3 11" />
+    </I>
+  );
+}
+
 export function IconLock(p: Props) {
   return (
     <I {...p}>

@@ -19,7 +19,18 @@ export function firstPuzzleLocation(levels: LevelDefinition[] | undefined | null
   return null;
 }
 
-/** Opens walking directions in the phone maps app / Google Maps. */
+/** Opens walking directions in the phone maps app. Apple Maps on iPhone/iPad, Google Maps elsewhere. */
 export function walkingDirectionsUrl(coords: StartCoords): string {
-  return `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}&travelmode=walking`;
+  const dest = `${coords.lat},${coords.lng}`;
+  if (prefersAppleMaps()) {
+    return `https://maps.apple.com/?daddr=${encodeURIComponent(dest)}&dirflg=w`;
+  }
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}&travelmode=walking`;
+}
+
+function prefersAppleMaps(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/i.test(ua)) return true;
+  return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
 }

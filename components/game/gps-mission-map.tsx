@@ -9,7 +9,9 @@ import {
   distanceMeters,
   PLAY_LIVE_MAP_MAX_METERS,
 } from "@/lib/grid/geofence";
+import { IconNav } from "@/components/game/city/icons";
 import { playUi } from "@/lib/grid/play-ui";
+import { walkingDirectionsUrl } from "@/lib/grid/start-location";
 
 export type GpsMapWaypoint = {
   level: number;
@@ -274,6 +276,17 @@ export function GpsMissionMap({
               <path d="M32 6 L46 50 L32 40 L18 50 Z" fill="currentColor" />
             </svg>
           </div>
+        ) : null}
+        {target && !withinRadius ? (
+          <a
+            href={walkingDirectionsUrl({ lat: target.lat, lng: target.lng })}
+            target="_blank"
+            rel="noreferrer"
+            className="absolute bottom-3 left-3 z-[2] inline-flex items-center gap-1.5 rounded-full bg-[var(--cg-fg)] px-3 py-2 text-xs font-semibold tracking-wide text-[var(--cg-bg)] shadow-[var(--cg-shadow-lift)]"
+          >
+            <IconNav size={14} />
+            {t.mapNavigate}
+          </a>
         ) : null}
       </div>
 

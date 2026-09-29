@@ -341,6 +341,7 @@ export type PlayUiCopy = {
     mapSearching: string;
     mapWaitLead: string;
     mapFar: string;
+    mapNavigate: string;
     walkFree: string;
     walkDone: string;
     metersLeft: string;
@@ -1193,7 +1194,8 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       mapFollowCounts: "Das Handy vom Team Lead zählt die Meter.",
       mapSearching: "GPS wird gesucht…",
       mapWaitLead: "Warten auf die Position vom Team Lead.",
-      mapFar: "Noch weit vom Punkt — die Karte zeigt das Ziel.",
+      mapFar: "Noch weit. Wegpunkt ab unter 12 km.",
+      mapNavigate: "Route",
       walkFree: "Lauft frei — kein fester Punkt nötig",
       walkDone: "Fertig",
       metersLeft: "Meter übrig",
@@ -2004,7 +2006,8 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       mapFollowCounts: "The team lead’s phone counts the metres.",
       mapSearching: "Looking for GPS…",
       mapWaitLead: "Waiting for the team lead’s position.",
-      mapFar: "Still far from the point — the map shows the target.",
+      mapFar: "Still far. Waypoint within 12 km.",
+      mapNavigate: "Directions",
       walkFree: "Walk freely — no fixed point needed",
       walkDone: "Done",
       metersLeft: "metres left",
