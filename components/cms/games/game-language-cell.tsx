@@ -40,7 +40,7 @@ export function GameLanguageCell({
   const comfortable = variant === "comfortable";
 
   return (
-    <div className={`flex flex-wrap items-center ${comfortable ? "gap-2" : "gap-1"}`}>
+    <div className={`flex flex-wrap items-center ${comfortable ? "gap-2.5" : "gap-1"}`}>
       {shown.map((language) => {
         const short = localeShort(language);
         const label = localeLabel(language);
@@ -66,19 +66,22 @@ export function GameLanguageCell({
               }
               className={
                 comfortable
-                  ? `inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold ${tone}`
+                  ? `inline-flex items-center gap-2 rounded-2xl px-3.5 py-2 text-sm font-bold ${tone}`
                   : `inline-flex min-h-7 min-w-7 flex-col items-center justify-center rounded-lg px-1.5 py-0.5 text-[10px] font-extrabold tracking-wide ${tone}`
               }
             >
-              <span className={comfortable ? "text-sm leading-none" : undefined} aria-hidden>
+              <span className={comfortable ? "text-base leading-none" : undefined} aria-hidden>
                 {localeFlag(language)}
               </span>
-              {short}
+              {comfortable ? label : short}
+              {comfortable && isSource ? (
+                <span className="text-xs font-semibold opacity-70">Quelle</span>
+              ) : null}
               {percent !== null ? (
                 <span
                   className={
                     comfortable
-                      ? "text-[11px] font-semibold opacity-80"
+                      ? "text-xs font-semibold opacity-75"
                       : "text-[8px] font-bold leading-none"
                   }
                 >
@@ -97,14 +100,14 @@ export function GameLanguageCell({
             onClick={() => onAdd(language)}
             className={
               comfortable
-                ? "inline-flex items-center gap-1.5 rounded-xl border border-dashed border-border px-2.5 py-1.5 text-xs font-bold text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-40"
+                ? "inline-flex items-center gap-2 rounded-2xl border border-dashed border-border px-3.5 py-2 text-sm font-bold text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-40"
                 : "inline-flex h-7 min-w-7 items-center justify-center rounded-lg border border-dashed border-border px-1.5 text-[10px] font-extrabold tracking-wide text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-40"
             }
           >
-            <span className={comfortable ? "text-sm leading-none" : undefined} aria-hidden>
+            <span className={comfortable ? "text-base leading-none" : undefined} aria-hidden>
               {localeFlag(language)}
             </span>
-            {short}
+            {comfortable ? label : short}
           </button>
         );
       })}

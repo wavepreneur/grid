@@ -294,29 +294,30 @@ export function GameEditorPanel({
         <StudioSectionTitle
           title="Sprache"
           description="Ein Spiel, mehrere Texte. Die Buchung sperrt die Sprache — Spieler wechseln sie nicht."
+          action={
+            !game.is_template && game.status !== "archived" ? (
+              <StudioButton
+                type="button"
+                variant="secondary"
+                size="sm"
+                icon={<IconPlay size={16} />}
+                onClick={() => setTestOpen(true)}
+              >
+                {localeLabel(locale)} testen
+              </StudioButton>
+            ) : null
+          }
         />
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <GameLanguageCell
-            gameId={game.id}
-            locales={gameLocales(initialGame)}
-            sourceLocale={initialGame.language}
-            activeLocale={locale}
-            coverageByLocale={localeCoverageMap(initialGame)}
-            adding={pending}
-            onAdd={handleAddLocale}
-          />
-          {!game.is_template && game.status !== "archived" ? (
-            <StudioButton
-              type="button"
-              variant="secondary"
-              size="sm"
-              icon={<IconPlay size={16} />}
-              onClick={() => setTestOpen(true)}
-            >
-              {localeLabel(locale)} testen
-            </StudioButton>
-          ) : null}
-        </div>
+        <GameLanguageCell
+          gameId={game.id}
+          locales={gameLocales(initialGame)}
+          sourceLocale={initialGame.language}
+          activeLocale={locale}
+          coverageByLocale={localeCoverageMap(initialGame)}
+          adding={pending}
+          onAdd={handleAddLocale}
+          variant="comfortable"
+        />
       </StudioPanel>
 
       {!isSourceLocale ? (

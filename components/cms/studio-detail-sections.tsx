@@ -4,6 +4,8 @@ import { StudioPage } from "@/components/cms/studio-page";
 import { GameEditorPanel } from "@/components/cms/games/game-editor-panel";
 import { TaskEditor } from "@/components/cms/tasks/task-editor";
 import { StudioGameDetailSkeleton, StudioTaskDetailSkeleton } from "@/components/cms/studio-list-skeletons";
+import { resolveGameCopy } from "@/lib/cms/game-i18n";
+import { localeLabel, parseStudioLanguage } from "@/lib/cms/languages";
 import {
   useStudioGame,
   useStudioGameTaskLinks,
@@ -41,13 +43,22 @@ export function StudioGameDetailSection({
     );
   }
 
+  const activeLocale = parseStudioLanguage(locale ?? game.language);
+  const sourceLocale = parseStudioLanguage(game.language);
+  const localeCopy = resolveGameCopy(game, activeLocale);
+  const pageTitle = localeCopy.name?.trim() || game.name;
+  const localeNote =
+    activeLocale !== sourceLocale
+      ? `${localeLabel(activeLocale)} · Ausgangssprache ${localeLabel(sourceLocale)}`
+      : null;
+
   return (
     <StudioPage
-      title={game.name}
+      title={pageTitle}
       description={
         game.is_template
           ? "Vorlage bearbeiten — Aufgaben, Layer und Logik werden beim Erstellen neuer Spiele dupliziert."
-          : `Spiel-Code ${game.slug}${game.city_slug ? ` · Stadt ${game.city_slug}` : ""}. Bedingungen im Spiel, Inhalt in Aufgaben. Live-Events in der Spiele-Liste.`
+          : `${localeNote ? `${localeNote}. ` : ""}Spiel-Code ${game.slug}${game.city_slug ? ` · Stadt ${game.city_slug}` : ""}. Bedingungen im Spiel, Inhalt in Aufgaben.`
       }
     >
       <GameEditorPanel game={game} taskLinks={linksQuery.data ?? []} locale={locale} />
