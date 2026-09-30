@@ -16,6 +16,7 @@ export const queryKeys = {
     liveMeta: (gameIds: string[]) =>
       [...queryKeys.games.all, "live-meta", "list", [...gameIds].sort().join(",")] as const,
     detail: (gameId: string) => [...queryKeys.games.all, "detail", gameId] as const,
+    recipeOrigin: (gameId: string) => [...queryKeys.games.all, "recipe-origin", gameId] as const,
     taskLinks: (gameId: string) => [...queryKeys.games.all, "task-links", gameId] as const,
     liveMetaSingle: (gameId: string) =>
       [...queryKeys.games.all, "live-meta", "single", gameId] as const,
@@ -35,6 +36,8 @@ export const queryKeys = {
     all: ["grid", "studio", "packs"] as const,
     list: (orgSlug: string, layer: number, search = "") =>
       [...queryKeys.packs.all, "list", orgSlug, layer, search] as const,
+    recipes: (orgSlug: string, includeArchived = false) =>
+      [...queryKeys.packs.all, "recipes", orgSlug, includeArchived] as const,
     detail: (packId: string) => [...queryKeys.packs.all, "detail", packId] as const,
   },
   tickets: {

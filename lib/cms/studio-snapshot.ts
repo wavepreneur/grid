@@ -5,10 +5,13 @@ import type { CompiledGameLogic } from "@/lib/cms/logic-rules";
 import { parseLogicRules, orderLinksForCompile } from "@/lib/cms/logic-rules";
 import type { StudioGame, StudioGameTaskLink } from "@/lib/cms/types";
 import { parseStudioLanguage } from "@/lib/cms/languages";
+import { loadRecipeOriginGame } from "@/app/actions/cms/packs";
 import {
   localizedFeatureFlags,
   parseTranslations,
   pickLocalizedSnapshot,
+  recipeShellMedia,
+  withGeoQuizLocales,
 } from "@/lib/cms/game-i18n";
 import { buildGameSlots } from "@/lib/cms/game-slots";
 
@@ -84,17 +87,24 @@ export async function loadStudioVersionSnapshot(
     language: parseStudioLanguage(rawGame.language),
     translations: parseTranslations(rawGame.translations),
   };
+  const origin = await loadRecipeOriginGame(supabase, game);
+  const shell = recipeShellMedia(origin);
   const levels = extractLevelsFromSnapshot(snapshot);
   const compiledLogic = extractCompiledLogicFromSnapshot(snapshot);
   const language = parseStudioLanguage(locale ?? game.language);
   const tasks = Array.isArray(snapshot.tasks) ? (snapshot.tasks as StudioGameTaskLink[]) : [];
-  const slotLinks = tasks.length > 0 ? buildGameSlots(tasks).map((slot) => slot.levelLink) : [];
+  const slotLinks = tasks.length > 0
+    ? buildGameSlots(tasks).map((slot) => ({
+        overrides: withGeoQuizLocales(slot.levelLink.overrides, slot.geoLink?.overrides),
+      }))
+    : [];
   const localized = pickLocalizedSnapshot({
     locales: snapshot.locales,
     game,
     levels,
     slotLinks,
     locale: language,
+    origin,
   });
 
   return {
@@ -103,7 +113,9 @@ export async function loadStudioVersionSnapshot(
       name: localized.name,
       description: localized.description,
       farewell_text: localized.farewell_text,
-      feature_flags: localizedFeatureFlags(game.feature_flags, localized),
+      logo_url: shell?.logo_url ?? game.logo_url,
+      duration_minutes: shell?.duration_minutes ?? game.duration_minutes,
+      feature_flags: localizedFeatureFlags(origin?.feature_flags ?? game.feature_flags, localized),
     },
     levels: localized.levels,
     compiledLogic: compiledLogic

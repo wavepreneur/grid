@@ -9,10 +9,11 @@ import {
   updateGame,
   updateGameLayerProfile,
 } from "@/app/actions/cms/games";
+import { setComposeRecipeOrigin } from "@/app/actions/cms/packs";
 import { GameLanguageCell } from "@/components/cms/games/game-language-cell";
 import { GameTranslationPanel } from "@/components/cms/games/game-translation-panel";
 import { GameTestPlayModal } from "@/components/cms/games/game-test-play-modal";
-import { gameLocales, localeCoverageMap } from "@/lib/cms/game-i18n";
+import { collectCityShellTranslationUnits, gameLocales, localeCoverageMap } from "@/lib/cms/game-i18n";
 import { localeLabel, parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
 import { StudioBadge, StudioPanel } from "@/components/cms/admin-shell";
 import { GameLayerProfilePanel } from "@/components/cms/games/game-layer-profile-panel";
@@ -22,8 +23,10 @@ import { GameSlotsPanel } from "@/components/cms/games/game-slots-panel";
 import { GameDeleteButton } from "@/components/cms/games/game-delete-button";
 import { GameDuplicateButton } from "@/components/cms/games/game-duplicate-button";
 import { GameLivePushButton } from "@/components/cms/games/game-live-push-button";
+import { RecipeCityTranslatePanel } from "@/components/cms/games/recipe-city-translate-panel";
 import { ImageUploadField } from "@/components/cms/shared/image-upload-field";
 import { useStudioCache } from "@/lib/platform/studio-cache";
+import { useInvalidateStudioPacks } from "@/lib/hooks/use-studio-packs";
 import { useStudioDirtySnapshot } from "@/components/cms/studio-unsaved";
 import {
   IconDevices,
@@ -37,6 +40,7 @@ import {
 import {
   StudioButton,
   StudioError,
+  StudioHint,
   StudioInput,
   StudioLabel,
   StudioSectionTitle,
@@ -50,6 +54,7 @@ import {
   type ContentMode,
 } from "@/lib/cms/layer-model";
 import {
+  cityShellQuizSlots,
   surfaceDescriptionDe,
   surfaceLabelDe,
   surfaceTaglineDe,
@@ -57,7 +62,7 @@ import {
 } from "@/lib/cms/game-slots";
 import { parseLogicRules, type StudioLogicRule } from "@/lib/cms/logic-rules";
 import type { StudioGame, StudioGameTaskLink } from "@/lib/cms/types";
-import { gameUsesLayerPacks } from "@/lib/cms/layer-packs";
+import { gameUsesLayerPacks, isRecipeCityShell } from "@/lib/cms/layer-packs";
 import {
   parseFollowUpTrigger,
   withFollowUpTrigger,
@@ -66,6 +71,10 @@ import {
 
 type Props = {
   game: StudioGame;
+  origin?: StudioGame | null;
+  isRecipeSource?: boolean;
+  recipeName?: string | null;
+  recipeId?: string | null;
   taskLinks: StudioGameTaskLink[];
   locale?: string;
 };
@@ -121,11 +130,16 @@ function SurfaceIcon({ mode, active }: { mode: ContentMode; active: boolean }) {
 
 export function GameEditorPanel({
   game: initialGame,
+  origin = null,
+  isRecipeSource = false,
+  recipeName = null,
+  recipeId = null,
   taskLinks,
   locale: localeParam,
 }: Props) {
   const router = useRouter();
   const cache = useStudioCache();
+  const invalidatePacks = useInvalidateStudioPacks();
   const [game, setGame] = useState<GameEditorState>(() => toEditorState(initialGame));
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -134,13 +148,39 @@ export function GameEditorPanel({
 
   const locale = parseStudioLanguage(localeParam ?? initialGame.language);
   const isSourceLocale = locale === parseStudioLanguage(initialGame.language);
+  const recipeBound = isRecipeCityShell(initialGame, origin, isRecipeSource);
+  const shell = recipeBound && origin ? origin : game;
+  const shellFlags = (shell.feature_flags ?? {}) as Record<string, unknown>;
+  const cityShellSlots = useMemo(
+    () => (recipeBound ? cityShellQuizSlots(taskLinks) : []),
+    [recipeBound, taskLinks],
+  );
+  const cityShellUnits = useMemo(
+    () =>
+      recipeBound
+        ? collectCityShellTranslationUnits({ game, slots: cityShellSlots })
+        : undefined,
+    [cityShellSlots, game, recipeBound],
+  );
+  const cityShellAliases = useMemo(
+    () =>
+      cityShellSlots.flatMap((slot) =>
+        slot.geoId
+          ? ([
+              [slot.geoId, slot.linkId],
+              [slot.linkId, slot.geoId],
+            ] satisfies Array<[string, string]>)
+          : [],
+      ),
+    [cityShellSlots],
+  );
   const surface = parseRuntimeProfiles(game.runtime_profiles).default_mode;
   const routeOrder = parseRuntimeProfiles(game.runtime_profiles).route_order;
-  const followUp = parseFollowUpTrigger(game.feature_flags);
-  const countdownOn = Boolean(game.duration_minutes && game.duration_minutes > 0);
-  const lastCountdownMinutes = useRef(lastPositiveDuration(initialGame.duration_minutes));
-  if (game.duration_minutes && game.duration_minutes > 0) {
-    lastCountdownMinutes.current = game.duration_minutes;
+  const followUp = parseFollowUpTrigger(shell.feature_flags);
+  const countdownOn = Boolean(shell.duration_minutes && shell.duration_minutes > 0);
+  const lastCountdownMinutes = useRef(lastPositiveDuration(shell.duration_minutes));
+  if (shell.duration_minutes && shell.duration_minutes > 0) {
+    lastCountdownMinutes.current = shell.duration_minutes;
   }
 
   const settingsSnapshot = useMemo(
@@ -166,19 +206,23 @@ export function GameEditorPanel({
     setError(null);
     setMessage(null);
     startTransition(async () => {
-      const result = await updateGame({
-        id: game.id,
-        name: game.name,
-        description: game.description,
-        language: game.language,
-        city_slug: game.city_slug,
-        duration_minutes: game.duration_minutes,
-        gps_enabled: game.gps_enabled,
-        farewell_text: game.farewell_text,
-        logo_url: game.logo_url,
-        feature_flags: game.feature_flags ?? {},
-        runtime_profiles: parseRuntimeProfiles(game.runtime_profiles),
-      });
+      const result = await updateGame(
+        recipeBound
+          ? { id: game.id, name: game.name, city_slug: game.city_slug }
+          : {
+              id: game.id,
+              name: game.name,
+              description: game.description,
+              language: game.language,
+              city_slug: game.city_slug,
+              duration_minutes: game.duration_minutes,
+              gps_enabled: game.gps_enabled,
+              farewell_text: game.farewell_text,
+              logo_url: game.logo_url,
+              feature_flags: game.feature_flags ?? {},
+              runtime_profiles: parseRuntimeProfiles(game.runtime_profiles),
+            },
+      );
       if (!result.success) {
         setError(result.error);
         return;
@@ -310,19 +354,26 @@ export function GameEditorPanel({
         />
         <GameLanguageCell
           gameId={game.id}
-          locales={gameLocales(game)}
+          locales={gameLocales(game, origin)}
           sourceLocale={game.language}
           activeLocale={locale}
-          coverageByLocale={localeCoverageMap(game)}
+          coverageByLocale={localeCoverageMap(game, origin, cityShellUnits, cityShellAliases)}
           adding={pending}
           onAdd={handleAddLocale}
           variant="comfortable"
         />
+        {isRecipeSource && recipeId && !isSourceLocale ? (
+          <div className="mt-4">
+            <RecipeCityTranslatePanel recipeId={recipeId} language={locale} />
+          </div>
+        ) : null}
       </StudioPanel>
 
       {!isSourceLocale ? (
         <GameTranslationPanel
           game={game}
+          origin={origin}
+          isRecipeSource={isRecipeSource}
           locale={locale}
           taskLinks={taskLinks}
           onGameChange={(next) => {
@@ -380,6 +431,25 @@ export function GameEditorPanel({
             title="2 · Spieldaten"
             description="Titel, Bild, Briefing/FAQ-Links und Kurztext für Spieler."
           />
+          {isRecipeSource ? (
+            <StudioHint>
+              Das ist das Hauptspiel{recipeName ? ` von „${recipeName}“` : ""}. Änderungen an
+              Spielinfo, Layer 2 und Layer 3 gelten für alle Städte dieses Rezepts.
+            </StudioHint>
+          ) : recipeBound && origin ? (
+            <StudioHint>
+              Bild, Briefing, Abschied, Dauer und Links kommen live vom Ursprungsspiel {origin.name}.
+              Eine Änderung dort gilt für alle Städte dieses Rezepts. Hier änderst du nur den
+              Stadtnamen.
+              <button
+                type="button"
+                className="ml-1 font-semibold text-primary underline-offset-2 hover:underline"
+                onClick={() => router.push(`/admin/games/${origin.id}`)}
+              >
+                Ursprung öffnen
+              </button>
+            </StudioHint>
+          ) : null}
 
           <div className="mb-6 flex flex-wrap items-center gap-3">
             <StudioBadge tone={game.status === "published" ? "live" : "draft"}>
@@ -391,6 +461,7 @@ export function GameEditorPanel({
             </StudioBadge>
             {game.is_template ? <StudioBadge tone="draft">Vorlage</StudioBadge> : null}
             <StudioBadge>{surfaceLabelDe(surface)}</StudioBadge>
+            {isRecipeSource ? <StudioBadge tone="live">Hauptspiel</StudioBadge> : null}
             <p className="text-xs text-muted-foreground">
               Veröffentlichen und Live-Events steuerst du in der Spiele-Liste.
             </p>
@@ -427,10 +498,21 @@ export function GameEditorPanel({
             <div className="md:col-span-2">
               <ImageUploadField
                 label="Bild"
-                hint="Wird in Lobby und Einstieg gezeigt"
-                value={game.logo_url ?? ""}
-                onChange={(url) => setGame({ ...game, logo_url: url || null })}
-                onClear={() => setGame({ ...game, logo_url: null })}
+                hint={
+                  recipeBound
+                    ? "Kommt vom Ursprungsspiel — gilt für alle Städte des Rezepts"
+                    : "Wird in Lobby und Einstieg gezeigt"
+                }
+                value={shell.logo_url ?? ""}
+                readOnly={recipeBound}
+                onChange={(url) => {
+                  if (recipeBound) return;
+                  setGame({ ...game, logo_url: url || null });
+                }}
+                onClear={() => {
+                  if (recipeBound) return;
+                  setGame({ ...game, logo_url: null });
+                }}
               />
             </div>
             <div className="md:col-span-2">
@@ -438,19 +520,19 @@ export function GameEditorPanel({
               <StudioInput
                 type="url"
                 placeholder="https://…"
-                value={String(
-                  (game.feature_flags as Record<string, unknown> | null)?.briefing_iframe_url ??
-                    "",
-                )}
-                onChange={(e) =>
+                readOnly={recipeBound}
+                disabled={recipeBound}
+                value={String(shellFlags.briefing_iframe_url ?? "")}
+                onChange={(e) => {
+                  if (recipeBound) return;
                   setGame({
                     ...game,
                     feature_flags: {
                       ...(game.feature_flags ?? {}),
                       briefing_iframe_url: e.target.value.trim(),
                     },
-                  })
-                }
+                  });
+                }}
               />
               <p className="mt-1.5 text-xs text-muted-foreground">
                 Spielregeln als Webseite — öffnet sich vollflächig in Lobby und Spielmenü.
@@ -461,18 +543,19 @@ export function GameEditorPanel({
               <StudioInput
                 type="url"
                 placeholder="https://…"
-                value={String(
-                  (game.feature_flags as Record<string, unknown> | null)?.faq_iframe_url ?? "",
-                )}
-                onChange={(e) =>
+                readOnly={recipeBound}
+                disabled={recipeBound}
+                value={String(shellFlags.faq_iframe_url ?? "")}
+                onChange={(e) => {
+                  if (recipeBound) return;
                   setGame({
                     ...game,
                     feature_flags: {
                       ...(game.feature_flags ?? {}),
                       faq_iframe_url: e.target.value.trim(),
                     },
-                  })
-                }
+                  });
+                }}
               />
               <p className="mt-1.5 text-xs text-muted-foreground">
                 Technik, Störungen, Tipps — im Spielmenü unter FAQ.
@@ -483,18 +566,19 @@ export function GameEditorPanel({
               <StudioInput
                 type="url"
                 placeholder="https://youtu.be/…"
-                value={String(
-                  (game.feature_flags as Record<string, unknown> | null)?.intro_youtube_url ?? "",
-                )}
-                onChange={(e) =>
+                readOnly={recipeBound}
+                disabled={recipeBound}
+                value={String(shellFlags.intro_youtube_url ?? "")}
+                onChange={(e) => {
+                  if (recipeBound) return;
                   setGame({
                     ...game,
                     feature_flags: {
                       ...(game.feature_flags ?? {}),
                       intro_youtube_url: e.target.value.trim(),
                     },
-                  })
-                }
+                  });
+                }}
               />
               <p className="mt-1.5 text-xs text-muted-foreground">
                 Outdoor: nach der Lobby, direkt vor der Karte. Andere Sprachen im Tab Übersetzung.
@@ -511,8 +595,10 @@ export function GameEditorPanel({
                 <label className="mt-4 flex items-center gap-2 text-sm font-medium">
                   <input
                     type="checkbox"
+                    disabled={recipeBound}
                     checked={followUp.enabled}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      if (recipeBound) return;
                       setGame({
                         ...game,
                         feature_flags: withFollowUpTrigger(game.feature_flags, {
@@ -524,8 +610,8 @@ export function GameEditorPanel({
                               : followUp.kind
                             : "none",
                         }),
-                      })
-                    }
+                      });
+                    }}
                   />
                   Folge-Trigger aktiv
                 </label>
@@ -535,15 +621,17 @@ export function GameEditorPanel({
                       <StudioLabel>Art</StudioLabel>
                       <StudioSelect
                         value={followUp.kind}
-                        onChange={(e) =>
+                        disabled={recipeBound}
+                        onChange={(e) => {
+                          if (recipeBound) return;
                           setGame({
                             ...game,
                             feature_flags: withFollowUpTrigger(game.feature_flags, {
                               ...followUp,
                               kind: e.target.value as FollowUpKind,
                             }),
-                          })
-                        }
+                          });
+                        }}
                       >
                         <option value="micro_pulse">Micro-Pulse (REST)</option>
                         <option value="slack_program">Slack / Teams-Programm</option>
@@ -553,15 +641,17 @@ export function GameEditorPanel({
                       <StudioLabel>Kanal</StudioLabel>
                       <StudioSelect
                         value={followUp.channel ?? "web"}
-                        onChange={(e) =>
+                        disabled={recipeBound}
+                        onChange={(e) => {
+                          if (recipeBound) return;
                           setGame({
                             ...game,
                             feature_flags: withFollowUpTrigger(game.feature_flags, {
                               ...followUp,
                               channel: e.target.value as "slack" | "msteams" | "web" | "api",
                             }),
-                          })
-                        }
+                          });
+                        }}
                       >
                         <option value="web">Web</option>
                         <option value="slack">Slack</option>
@@ -575,48 +665,57 @@ export function GameEditorPanel({
                         type="number"
                         min={1}
                         placeholder="7"
+                        readOnly={recipeBound}
+                        disabled={recipeBound}
                         value={followUp.cadence_days ?? ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          if (recipeBound) return;
                           setGame({
                             ...game,
                             feature_flags: withFollowUpTrigger(game.feature_flags, {
                               ...followUp,
                               cadence_days: e.target.value ? Number(e.target.value) : null,
                             }),
-                          })
-                        }
+                          });
+                        }}
                       />
                     </div>
                     <div>
                       <StudioLabel>Program-Slug (optional)</StudioLabel>
                       <StudioInput
                         placeholder="weekly-pulse"
+                        readOnly={recipeBound}
+                        disabled={recipeBound}
                         value={followUp.program_slug ?? ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          if (recipeBound) return;
                           setGame({
                             ...game,
                             feature_flags: withFollowUpTrigger(game.feature_flags, {
                               ...followUp,
                               program_slug: e.target.value.trim() || null,
                             }),
-                          })
-                        }
+                          });
+                        }}
                       />
                     </div>
                     <div className="sm:col-span-2">
                       <StudioLabel>CTA-Text</StudioLabel>
                       <StudioInput
                         placeholder="Nächsten Pulse starten"
+                        readOnly={recipeBound}
+                        disabled={recipeBound}
                         value={followUp.cta_label ?? ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          if (recipeBound) return;
                           setGame({
                             ...game,
                             feature_flags: withFollowUpTrigger(game.feature_flags, {
                               ...followUp,
                               cta_label: e.target.value.trim() || null,
                             }),
-                          })
-                        }
+                          });
+                        }}
                       />
                     </div>
                     <div className="sm:col-span-2">
@@ -624,16 +723,19 @@ export function GameEditorPanel({
                       <StudioInput
                         type="url"
                         placeholder="https://…"
+                        readOnly={recipeBound}
+                        disabled={recipeBound}
                         value={followUp.cta_url ?? ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          if (recipeBound) return;
                           setGame({
                             ...game,
                             feature_flags: withFollowUpTrigger(game.feature_flags, {
                               ...followUp,
                               cta_url: e.target.value.trim() || null,
                             }),
-                          })
-                        }
+                          });
+                        }}
                       />
                       <p className="mt-1.5 text-xs text-muted-foreground">
                         Kein Checkout in GRID. Der Link zeigt auf den Commerce-Partner.
@@ -644,11 +746,29 @@ export function GameEditorPanel({
               </section>
             </div>
             <div className="md:col-span-2">
-              <StudioLabel>Kurztext (optional, Fallback ohne Link)</StudioLabel>
+              <StudioLabel>Kurztext / Briefing (optional, Fallback ohne Link)</StudioLabel>
               <StudioTextarea
                 className="min-h-20"
-                value={game.description}
-                onChange={(e) => setGame({ ...game, description: e.target.value })}
+                readOnly={recipeBound}
+                disabled={recipeBound}
+                value={shell.description ?? ""}
+                onChange={(e) => {
+                  if (recipeBound) return;
+                  setGame({ ...game, description: e.target.value });
+                }}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <StudioLabel>Abschiedstext</StudioLabel>
+              <StudioTextarea
+                className="min-h-20"
+                readOnly={recipeBound}
+                disabled={recipeBound}
+                value={shell.farewell_text ?? ""}
+                onChange={(e) => {
+                  if (recipeBound) return;
+                  setGame({ ...game, farewell_text: e.target.value });
+                }}
               />
             </div>
             <div className="md:col-span-2">
@@ -709,14 +829,16 @@ export function GameEditorPanel({
                     type="checkbox"
                     className="mt-1 h-4 w-4 accent-primary"
                     checked={countdownOn}
-                    onChange={(e) =>
+                    disabled={recipeBound}
+                    onChange={(e) => {
+                      if (recipeBound) return;
                       setGame({
                         ...game,
                         duration_minutes: e.target.checked
                           ? lastCountdownMinutes.current
                           : null,
-                      })
-                    }
+                      });
+                    }}
                   />
                   <span>
                     <span className="block text-base font-bold text-foreground">
@@ -734,8 +856,11 @@ export function GameEditorPanel({
                     <StudioInput
                       type="number"
                       min={1}
-                      value={game.duration_minutes ?? lastCountdownMinutes.current}
+                      readOnly={recipeBound}
+                      disabled={recipeBound}
+                      value={shell.duration_minutes ?? lastCountdownMinutes.current}
                       onChange={(e) => {
+                        if (recipeBound) return;
                         const next = Math.max(
                           1,
                           Number(e.target.value) || lastCountdownMinutes.current,
@@ -833,6 +958,37 @@ export function GameEditorPanel({
             initialLinks={taskLinks}
             initialRules={game.logic_rules}
           />
+          {recipeId && !isRecipeSource ? (
+            <div className="rounded-2xl border border-border bg-secondary/50 p-4">
+              <p className="text-sm font-semibold text-foreground">Hauptspiel des Rezepts</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Spielinfo, Layer 2 und Layer 3 werden am Ursprung gepflegt. Setze dieses Spiel als
+                Quelle, wenn es das Hauptspiel ist (z. B. München).
+              </p>
+              <div className="mt-3">
+                <StudioButton
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => {
+                    startTransition(async () => {
+                      const result = await setComposeRecipeOrigin(recipeId, game.id);
+                      if (!result.success) {
+                        setError(result.error);
+                        return;
+                      }
+                      cache.invalidateGame(game.id);
+                      invalidatePacks();
+                      router.refresh();
+                    });
+                  }}
+                >
+                  Dieses Spiel als Hauptspiel setzen
+                </StudioButton>
+              </div>
+            </div>
+          ) : null}
         </div>
       </details>
       ) : null}

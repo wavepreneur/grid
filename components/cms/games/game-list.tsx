@@ -45,6 +45,7 @@ import {
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { queryKeys } from "@/lib/platform/query-keys";
 import { prefetchStudioGame } from "@/lib/hooks/use-studio-game-detail";
+import { useComposeRecipes } from "@/lib/hooks/use-studio-packs";
 import { StudioBulkBar, StudioSelectCheckbox } from "@/components/cms/shared/studio-bulk-bar";
 import { StudioDeleteModal } from "@/components/cms/shared/studio-delete-modal";
 import { StudioDuplicateModal } from "@/components/cms/shared/studio-duplicate-modal";
@@ -63,6 +64,7 @@ import {
   IconPlay,
   IconPlus,
   IconSearch,
+  IconStar,
   IconTemplate,
   IconDownload,
   IconTrash,
@@ -94,6 +96,7 @@ type GameWithLive = StudioGame & { liveEventCount: number };
 type GameSort = "updated" | "created" | "status" | "name" | "language";
 type LanguageFilter = "alle" | StudioLanguage;
 type TranslationFilter = "alle" | "open" | "started" | "done";
+type SourceFilter = "alle" | "quellen";
 type CreateMode = "compose" | "blank" | "template";
 
 const SURFACE_OPTIONS: ContentMode[] = ["outdoor", "indoor", "online"];
@@ -199,6 +202,11 @@ export function GameList({ initialGames, initialTemplates }: Props) {
   const refreshGames = useRefreshStudioGamesList();
   const { data: games = initialGames } = useStudioGamesList(initialGames);
   const { data: templates = initialTemplates } = useStudioTemplates(initialTemplates);
+  const { data: recipes = [] } = useComposeRecipes();
+  const originIds = useMemo(
+    () => new Set(recipes.map((recipe) => recipe.origin_game_id).filter((id): id is string => Boolean(id))),
+    [recipes],
+  );
   const gameIds = useMemo(() => games.map((g) => g.id), [games]);
   const { data: liveMetaData } = useGamesLiveMeta(gameIds);
   const liveMeta = Array.isArray(liveMetaData) ? liveMetaData : [];
@@ -240,6 +248,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
   const [surfaceTab, setSurfaceTab] = useState<"alle" | ContentMode>("alle");
   const [languageTab, setLanguageTab] = useState<LanguageFilter>("alle");
   const [translationTab, setTranslationTab] = useState<TranslationFilter>("alle");
+  const [sourceTab, setSourceTab] = useState<SourceFilter>("alle");
   const [query, setQuery] = useState("");
 
   const scopedGames = useMemo(() => {
@@ -253,6 +262,9 @@ export function GameList({ initialGames, initialTemplates }: Props) {
       if (surfaceTab !== "alle" && gameDefaultSurface(g) !== surfaceTab) {
         return false;
       }
+      if (sourceTab === "quellen" && !originIds.has(g.id)) {
+        return false;
+      }
       if (!q) return true;
       return (
         g.name.toLowerCase().includes(q) ||
@@ -260,7 +272,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         (g.city_slug ?? "").toLowerCase().includes(q)
       );
     });
-  }, [gamesWithLive, statusTab, surfaceTab, query]);
+  }, [gamesWithLive, statusTab, surfaceTab, sourceTab, originIds, query]);
 
   const filteredGames = useMemo(
     () =>
@@ -288,7 +300,13 @@ export function GameList({ initialGames, initialTemplates }: Props) {
     };
   }, [scopedGames, languageTab]);
 
-  const sortedGames = useMemo(() => sortGames(filteredGames, sort), [filteredGames, sort]);
+  const sortedGames = useMemo(() => {
+    const sorted = sortGames(filteredGames, sort);
+    if (originIds.size === 0) return sorted;
+    const origins = sorted.filter((g) => originIds.has(g.id));
+    const rest = sorted.filter((g) => !originIds.has(g.id));
+    return [...origins, ...rest];
+  }, [filteredGames, sort, originIds]);
   const sortedTemplates = useMemo(
     () => sortGames(templates, "updated"),
     [templates],
@@ -728,7 +746,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
                 required={createMode !== "compose"}
                 placeholder={
                   createMode === "compose"
-                    ? composeGameName(layer1Label, layer2Label) || "Stadt · Mission"
+                    ? composeGameName(layer1Label, layer2Label) || "Mission Stadt"
                     : "z. B. Berlin City Quest"
                 }
               />
@@ -805,6 +823,20 @@ export function GameList({ initialGames, initialTemplates }: Props) {
                 id: mode,
                 label: surfaceLabelDe(mode),
               })),
+            ]}
+          />
+          <FilterTrack
+            aria-label="Hauptspiele"
+            value={sourceTab}
+            onChange={setSourceTab}
+            options={[
+              { id: "alle", label: "Alle Spiele" },
+              {
+                id: "quellen",
+                label: "Hauptspiele",
+                count: originIds.size,
+                title: "Nur Ursprungsspiele der Rezepte — Spielinfo, Layer 2 und 3 gelten für alle Städte",
+              },
             ]}
           />
           <FilterTrack
@@ -889,6 +921,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
               <GameRow
                 key={game.id}
                 game={game}
+                isOrigin={originIds.has(game.id)}
                 selected={selectedIds.has(game.id)}
                 onToggle={(checked) => toggleOne(game.id, checked)}
                 onDuplicate={() => openDuplicateModal([game.id])}
@@ -1121,12 +1154,14 @@ function formatListDate(iso: string): string {
 
 function GameRow({
   game,
+  isOrigin,
   selected,
   onToggle,
   onDuplicate,
   onDelete,
 }: {
   game: GameWithLive;
+  isOrigin: boolean;
   selected: boolean;
   onToggle: (checked: boolean) => void;
   onDuplicate: () => void;
@@ -1198,6 +1233,15 @@ function GameRow({
                     <h2 className="text-base font-bold leading-snug text-foreground sm:text-lg">
                       {game.name}
                     </h2>
+                    {isOrigin ? (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-800"
+                        title="Hauptspiel des Rezepts — Spielinfo, Layer 2 und 3 gelten für alle Städte"
+                      >
+                        <IconStar size={12} className="fill-amber-500 text-amber-500" />
+                        Hauptspiel
+                      </span>
+                    ) : null}
                     {game.liveEventCount > 0 ? (
                       <Chip tone="bg-success/20 text-success-foreground">Live</Chip>
                     ) : null}

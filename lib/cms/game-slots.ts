@@ -530,6 +530,45 @@ export function buildGameSlots(
   });
 }
 
+/** Layer 1 city stop — never the shared mission pack. */
+export function layer1LinkForSlot(slot: GameSlot): StudioGameTaskLink | null {
+  if (slot.geoLink) return slot.geoLink;
+  if (parseLinkLayer(slot.levelLink) === 1) return slot.levelLink;
+  return null;
+}
+
+/** German opener copy from the city pack task, not from Layer 2. */
+export function layer1OpenerQuiz(link: StudioGameTaskLink): StudioArrivalQuiz | null {
+  return (
+    taskToOpenerArrivalQuiz(link.task) ??
+    parseArrivalQuizOverride(parseLinkOverrides(link.overrides).arrival_quiz)
+  );
+}
+
+/** Title + opener quizzes on the level-slot id the translation UI uses. */
+export function cityShellQuizSlots(taskLinks: StudioGameTaskLink[]) {
+  return buildGameSlots(taskLinks).map((slot) => {
+    const geo = layer1LinkForSlot(slot);
+    const quiz = (geo ? layer1OpenerQuiz(geo) : null) ?? slot.quiz;
+    return {
+      linkId: slot.levelLink.id,
+      geoId: geo?.id ?? null,
+      source: {
+        quiz: quiz
+          ? {
+              title: quiz.title ?? "",
+              description: quiz.description ?? "",
+              question: quiz.question,
+              side_fact_title: quiz.side_fact_title ?? "",
+              side_fact: quiz.side_fact ?? "",
+              options: quiz.options.map((option) => ({ id: option.id, label: option.label })),
+            }
+          : undefined,
+      },
+    };
+  });
+}
+
 export function slotPhaseSummary(slot: GameSlot): string {
   const bonusCount = slot.bonusBindings.length || (slot.bonusLink ? 1 : 0);
   const parts = [

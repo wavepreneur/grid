@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getLayerPack, listLayerPacks } from "@/app/actions/cms/packs";
+import { getLayerPack, listComposeRecipes, listLayerPacks } from "@/app/actions/cms/packs";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import type { StudioLayer } from "@/lib/cms/layer-model";
 import { queryKeys } from "@/lib/platform/query-keys";
@@ -11,7 +11,7 @@ export function useStudioLayerPacks(layer: StudioLayer, search = "") {
   return useQuery({
     queryKey: queryKeys.packs.list(orgSlug, layer, search),
     queryFn: async () => {
-      const result = await listLayerPacks({ layer, search, limit: layer === 1 ? 40 : 200 });
+      const result = await listLayerPacks({ layer, search, limit: layer === 1 ? 500 : 200 });
       if (!result.success) throw new Error(result.error);
       return result.data!;
     },
@@ -28,6 +28,18 @@ export function useStudioLayerPack(packId: string | null) {
       return result.data!;
     },
     enabled: Boolean(packId),
+  });
+}
+
+export function useComposeRecipes(includeArchived = false) {
+  const { orgSlug } = useStudioShell();
+  return useQuery({
+    queryKey: queryKeys.packs.recipes(orgSlug, includeArchived),
+    queryFn: async () => {
+      const result = await listComposeRecipes({ includeArchived });
+      if (!result.success) throw new Error(result.error);
+      return result.data ?? [];
+    },
   });
 }
 

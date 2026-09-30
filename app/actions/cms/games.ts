@@ -13,19 +13,22 @@ import {
 import { isStudioLanguage, localeLabel, parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
 import {
   applyTranslationUnits,
+  aliasSlotConfirmedKeys,
   buildSnapshotLocales,
+  collectCityShellTranslationUnits,
   collectTranslationUnits,
   isMachineTranslatableUnit,
   localeCopyWithCoverage,
   localesFromOverrides,
-  mergeSlotCopy,
   parseConfirmed,
   parseTranslations,
-  resolveGameCopy,
+  resolveSharedGameCopy,
   seedLocaleCopy,
   seedSlotCopyFromStudio,
+  isLocaleComplete,
   type GameLocaleCopy,
   type SlotLocaleCopy,
+  withGeoQuizLocales,
   withLinkLocale,
 } from "@/lib/cms/game-i18n";
 import { translateUnitsNative } from "@/lib/cms/gemini-translate";
@@ -40,7 +43,14 @@ import {
 import type { BonusTrigger, GameLinkOverrides } from "@/lib/cms/game-link-config";
 import { parseLinkLayer, parseLinkOverrides } from "@/lib/cms/game-link-config";
 import { parseBonusBindings } from "@/lib/cms/bonus-bindings";
-import { buildGameSlots, surfaceToPreset, taskToOpenerArrivalQuiz } from "@/lib/cms/game-slots";
+import {
+  buildGameSlots,
+  cityShellQuizSlots,
+  layer1LinkForSlot,
+  layer1OpenerQuiz,
+  surfaceToPreset,
+  taskToOpenerArrivalQuiz,
+} from "@/lib/cms/game-slots";
 import { normalizeTaskContent } from "@/lib/cms/task-content";
 import {
   compileGameLogic,
@@ -56,8 +66,9 @@ import {
 } from "@/lib/grid/stations";
 import { PUSHABLE_EVENT_STATUSES, withLastLivePushAt } from "@/lib/cms/live-push";
 import { pingTeamsContentUpdated } from "@/lib/grid/content-ping";
-import { loadMergedGameTaskLinksForGame, addTaskToLayerPack, fillComposeShellIfEmpty, removeTaskFromLayerPack, reorderPackBackedGameTasks, savePackBackedGameLink } from "@/app/actions/cms/packs";
-import { gameUsesLayerPacks, packItemToGameLink, parsePackLinkId } from "@/lib/cms/layer-packs";
+import { withCityShellTranslations } from "@/lib/cms/city-shell-i18n";
+import { loadMergedGameTaskLinksForGame, addTaskToLayerPack, fetchPackItems, fillComposeShellIfEmpty, loadRecipeOriginContext, loadRecipeOriginGame, removeTaskFromLayerPack, reorderPackBackedGameTasks, savePackBackedGameLink } from "@/app/actions/cms/packs";
+import { gameUsesLayerPacks, isRecipeCityShell, mergePackLinksOntoGame, packItemToGameLink, parsePackLinkId } from "@/lib/cms/layer-packs";
 
 function normalizeGameRow(row: StudioGame): StudioGame {
   return {
@@ -70,6 +81,76 @@ function normalizeGameRow(row: StudioGame): StudioGame {
     layer1_pack_id: (row as StudioGame).layer1_pack_id ?? null,
     layer2_pack_id: (row as StudioGame).layer2_pack_id ?? null,
     layer3_pack_id: (row as StudioGame).layer3_pack_id ?? null,
+    compose_recipe_id: (row as StudioGame).compose_recipe_id ?? null,
+  };
+}
+
+function overlayCityShellCoverage(game: StudioGame, links: StudioGameTaskLink[]): StudioGame {
+  return withCityShellTranslations(game, links);
+}
+
+async function overlayCityShellCoverageOnListedGames(
+  supabase: ReturnType<typeof createAdminClient>,
+  orgId: string,
+  games: StudioGame[],
+): Promise<StudioGame[]> {
+  const { data: recipes, error } = await supabase
+    .from("studio_compose_recipes")
+    .select("origin_game_id")
+    .eq("organization_id", orgId);
+  if (error && !/origin_game_id|schema cache/i.test(error.message)) {
+    throw new Error(error.message);
+  }
+  const originIds = new Set(
+    (recipes ?? [])
+      .map((row) => (typeof row.origin_game_id === "string" ? row.origin_game_id : null))
+      .filter((id): id is string => Boolean(id)),
+  );
+  const shells = games.filter((game) => isRecipeCityShell(game, null, originIds.has(game.id)));
+  if (shells.length === 0) return games;
+
+  const packIds = [
+    ...new Set(
+      shells.flatMap((game) =>
+        [game.layer1_pack_id, game.layer2_pack_id, game.layer3_pack_id].filter(
+          (id): id is string => Boolean(id),
+        ),
+      ),
+    ),
+  ];
+  const packsById = new Map<string, Awaited<ReturnType<typeof fetchPackItems>>>();
+  for (let index = 0; index < packIds.length; index += 25) {
+    const chunk = packIds.slice(index, index + 25);
+    const rows = await Promise.all(
+      chunk.map(async (id) => [id, await fetchPackItems(supabase, id)] as const),
+    );
+    for (const [id, items] of rows) packsById.set(id, items);
+  }
+
+  const nextById = new Map(games.map((game) => [game.id, game]));
+  for (const game of shells) {
+    const links = mergePackLinksOntoGame({
+      game,
+      legacyLinks: [],
+      packs: {
+        1: game.layer1_pack_id ? packsById.get(game.layer1_pack_id) : undefined,
+        2: game.layer2_pack_id ? packsById.get(game.layer2_pack_id) : undefined,
+        3: game.layer3_pack_id ? packsById.get(game.layer3_pack_id) : undefined,
+      },
+    });
+    nextById.set(game.id, overlayCityShellCoverage(game, links));
+  }
+  return games.map((game) => nextById.get(game.id) ?? game);
+}
+
+function quizCopyFromLayer1(quiz: NonNullable<ReturnType<typeof layer1OpenerQuiz>>) {
+  return {
+    title: quiz.title ?? "",
+    description: quiz.description ?? "",
+    question: quiz.question,
+    side_fact_title: quiz.side_fact_title ?? "",
+    side_fact: quiz.side_fact ?? "",
+    options: quiz.options.map((option) => ({ id: option.id, label: option.label })),
   };
 }
 
@@ -105,7 +186,33 @@ function sourceSlotsFromLinks(links: StudioGameTaskLink[]) {
   });
 }
 
-function translationUnitsForGame(game: StudioGame, links: StudioGameTaskLink[]) {
+function openerSlotsFromLinks(links: StudioGameTaskLink[]) {
+  return buildGameSlots(links).flatMap((slot) => {
+    const geo = layer1LinkForSlot(slot);
+    if (!geo) return [];
+    const quiz = layer1OpenerQuiz(geo);
+    if (!quiz) return [];
+    return [
+      {
+        linkId: geo.id,
+        source: { quiz: quizCopyFromLayer1(quiz) } satisfies SlotLocaleCopy,
+        overrides: geo.overrides,
+      },
+    ];
+  });
+}
+
+function translationUnitsForGame(
+  game: StudioGame,
+  links: StudioGameTaskLink[],
+  recipeBound = false,
+) {
+  if (recipeBound) {
+    return collectCityShellTranslationUnits({
+      game,
+      slots: cityShellQuizSlots(links),
+    });
+  }
   return collectTranslationUnits({
     game,
     slots: sourceSlotsFromLinks(links).map(({ linkId, source }) => ({ linkId, source })),
@@ -124,9 +231,10 @@ export async function listGames(): Promise<ActionResult<StudioGame[]>> {
       .order("updated_at", { ascending: false });
 
     if (error) throw new Error(error.message);
+    const games = (data ?? []).map((row) => normalizeGameRow(row as StudioGame));
     return {
       success: true,
-      data: (data ?? []).map((row) => normalizeGameRow(row as StudioGame)),
+      data: await overlayCityShellCoverageOnListedGames(supabase, orgId, games),
     };
   } catch (error) {
     return {
@@ -1133,10 +1241,14 @@ export async function publishGame(
       openerTasksById,
     });
     const slots = buildGameSlots(links, { openerTasksById });
+    const origin = await loadRecipeOriginGame(supabase, game);
     const locales = buildSnapshotLocales({
       game,
+      origin,
       levels: compiled.levels,
-      slotLinks: slots.map((slot) => slot.levelLink),
+      slotLinks: slots.map((slot) => ({
+        overrides: withGeoQuizLocales(slot.levelLink.overrides, slot.geoLink?.overrides),
+      })),
     });
 
     const nextVersion = game.published_version_number + 1;
@@ -1573,14 +1685,18 @@ export async function addGameLocale(
     if (language === game.language) {
       return { success: true, data: game };
     }
+    const context = await loadRecipeOriginContext(supabase, game);
+    const recipeBound = isRecipeCityShell(game, context.origin, context.isSource);
     const translations = { ...game.translations };
     if (!translations[language]) {
       const linksResult = await listGameTasks(gameId);
       const units = translationUnitsForGame(
         game,
         linksResult.success ? linksResult.data ?? [] : [],
+        recipeBound,
       );
-      translations[language] = localeCopyWithCoverage(undefined, seedLocaleCopy(game), units);
+      const seed = recipeBound ? { name: game.name } : seedLocaleCopy(game);
+      translations[language] = localeCopyWithCoverage(undefined, seed, units);
     }
 
     const { data, error: updateError } = await supabase
@@ -1624,22 +1740,43 @@ export async function saveGameLocale(input: {
     const game = normalizeGameRow(row as StudioGame);
     const source = parseStudioLanguage(game.language);
     const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    const context = await loadRecipeOriginContext(supabase, game);
+    const recipeBound = isRecipeCityShell(game, context.origin, context.isSource);
+    const linksResult = await listGameTasks(input.gameId);
+    const links = linksResult.success ? linksResult.data ?? [] : [];
+    const units = translationUnitsForGame(game, links, recipeBound);
 
     if (input.language === source) {
       if (input.copy.name !== undefined) payload.name = input.copy.name.trim();
-      if (input.copy.description !== undefined) payload.description = input.copy.description;
-      if (input.copy.farewell_text !== undefined) payload.farewell_text = input.copy.farewell_text;
+      if (!recipeBound) {
+        if (input.copy.description !== undefined) payload.description = input.copy.description;
+        if (input.copy.farewell_text !== undefined) payload.farewell_text = input.copy.farewell_text;
+      }
     } else {
-      const linksResult = await listGameTasks(input.gameId);
-      const units = translationUnitsForGame(
-        game,
-        linksResult.success ? linksResult.data ?? [] : [],
+      const aliases = cityShellQuizSlots(links).flatMap((slot) =>
+        slot.geoId
+          ? ([
+              [slot.geoId, slot.linkId],
+              [slot.linkId, slot.geoId],
+            ] satisfies Array<[string, string]>)
+          : [],
       );
+      const storeCopy = recipeBound
+        ? {
+            name: input.copy.name,
+            confirmed: aliasSlotConfirmedKeys(
+              parseConfirmed(input.copy.confirmed).filter(
+                (key) => key === "game:name" || key.includes(":quiz:"),
+              ),
+              aliases,
+            ).filter((key) => key === "game:name" || units.some((unit) => unit.key === key)),
+          }
+        : input.copy;
       payload.translations = {
         ...game.translations,
         [input.language]: localeCopyWithCoverage(
-          game.translations[input.language],
-          input.copy,
+          recipeBound ? undefined : game.translations[input.language],
+          storeCopy,
           units,
         ),
       };
@@ -1654,9 +1791,14 @@ export async function saveGameLocale(input: {
       .single();
     if (updateError) throw new Error(updateError.message);
 
-    if (input.slots?.length) {
-      const packSlots = input.slots.filter((slot) => parsePackLinkId(slot.linkId));
-      const legacySlots = input.slots.filter((slot) => !parsePackLinkId(slot.linkId));
+    const openerIds = new Set(openerSlotsFromLinks(links).map((slot) => slot.linkId));
+    const incomingSlots = recipeBound
+      ? (input.slots ?? []).filter((slot) => openerIds.has(slot.linkId))
+      : input.slots;
+
+    if (incomingSlots?.length) {
+      const packSlots = incomingSlots.filter((slot) => parsePackLinkId(slot.linkId));
+      const legacySlots = incomingSlots.filter((slot) => !parsePackLinkId(slot.linkId));
 
       for (const slot of packSlots) {
         const parsed = parsePackLinkId(slot.linkId);
@@ -1755,52 +1897,36 @@ export async function translateGameLocale(input: {
     const linksResult = await listGameTasks(input.gameId);
     if (!linksResult.success) return { success: false, error: linksResult.error };
     const links = linksResult.data ?? [];
+    const context = await loadRecipeOriginContext(supabase, game);
+    const recipeBound = isRecipeCityShell(game, context.origin, context.isSource);
+    const origin = context.origin;
+
+    const openerSlots = openerSlotsFromLinks(links);
+    const shellSlots = cityShellQuizSlots(links);
     const sourceSlots = sourceSlotsFromLinks(links);
-    const units = collectTranslationUnits({
-      game,
-      slots: sourceSlots.map(({ linkId, source }) => ({ linkId, source })),
-    });
-
-    const resolved = resolveGameCopy(game, input.language);
-    let gameCopy: GameLocaleCopy = {
-      ...seedLocaleCopy(game),
-      ...game.translations[input.language],
-      ...resolved,
-    };
+    const units = recipeBound
+      ? collectCityShellTranslationUnits({ game, slots: shellSlots })
+      : collectTranslationUnits({
+          game,
+          slots: sourceSlots.map(({ linkId, source }) => ({ linkId, source })),
+        });
+    const existingCopy: GameLocaleCopy = recipeBound
+      ? { name: game.translations[input.language]?.name ?? game.name, ...game.translations[input.language] }
+      : { ...seedLocaleCopy(game), ...game.translations[input.language] };
     const slotCopies: Record<string, SlotLocaleCopy> = {};
-    for (const slot of sourceSlots) {
-      slotCopies[slot.linkId] = mergeSlotCopy(
-        slot.source,
-        localesFromOverrides(slot.overrides)[input.language] ?? {},
-      );
+    if (recipeBound) {
+      for (const slot of shellSlots) {
+        slotCopies[slot.linkId] = { quiz: slot.source.quiz };
+      }
+    } else {
+      for (const slot of sourceSlots) {
+        slotCopies[slot.linkId] = localesFromOverrides(slot.overrides)[input.language] ?? {};
+      }
     }
 
-    const confirmed = new Set(parseConfirmed(game.translations[input.language]?.confirmed));
-    const currentUnits = collectTranslationUnits({
-      game: {
-        name: gameCopy.name ?? "",
-        description: gameCopy.description ?? "",
-        farewell_text: gameCopy.farewell_text ?? "",
-        feature_flags: {
-          briefing_iframe_url: gameCopy.briefing_iframe_url ?? "",
-          faq_iframe_url: gameCopy.faq_iframe_url ?? "",
-          intro_youtube_url: gameCopy.intro_youtube_url ?? "",
-        },
-      },
-      slots: Object.entries(slotCopies).map(([linkId, source]) => ({ linkId, source })),
-    });
-    const currentByKey = Object.fromEntries(currentUnits.map((unit) => [unit.key, unit.source]));
-
-    const toTranslate: typeof units = [];
-    const copyAsIs: Record<string, string> = {};
-    for (const unit of units) {
-      if (confirmed.has(unit.key)) continue;
-      const current = currentByKey[unit.key];
-      if (current?.trim() && current.trim() !== unit.source.trim()) continue;
-      if (isMachineTranslatableUnit(unit)) toTranslate.push(unit);
-      else copyAsIs[unit.key] = unit.source;
-    }
-
+    const toTranslate = units.filter(
+      (unit) => unit.key !== "game:name" && isMachineTranslatableUnit(unit),
+    );
     const translated =
       toTranslate.length > 0
         ? await translateUnitsNative({
@@ -1811,21 +1937,64 @@ export async function translateGameLocale(input: {
         : {};
 
     const applied = applyTranslationUnits({
-      gameCopy,
+      gameCopy: existingCopy,
       slotCopies,
-      linkIds: sourceSlots.map((slot) => slot.linkId),
-      values: { ...copyAsIs, ...translated },
+      linkIds: (recipeBound ? shellSlots : sourceSlots).map((slot) => slot.linkId),
+      values: translated,
     });
-    gameCopy = {
-      ...applied.gameCopy,
-      confirmed: parseConfirmed([...confirmed, ...Object.keys(translated)]),
+    const gameCopy: GameLocaleCopy = {
+      ...(recipeBound ? existingCopy : applied.gameCopy),
+      name: existingCopy.name,
+      confirmed: parseConfirmed([
+        ...parseConfirmed(existingCopy.confirmed).filter((key) =>
+          recipeBound ? !key.includes(":quiz:") : true,
+        ),
+        ...Object.keys(translated),
+      ]),
     };
 
+    const openerByGeo = new Map(openerSlots.map((slot) => [slot.linkId, slot]));
     const saved = await saveGameLocale({
       gameId: input.gameId,
       language: input.language,
       copy: gameCopy,
-      slots: Object.entries(applied.slotCopies).map(([linkId, copy]) => ({ linkId, copy })),
+      slots: recipeBound
+        ? shellSlots.flatMap((slot) => {
+            if (!slot.geoId) return [];
+            const opener = openerByGeo.get(slot.geoId);
+            return [
+              {
+                linkId: slot.geoId,
+                copy: {
+                  ...localesFromOverrides(opener?.overrides)[input.language],
+                  quiz: applied.slotCopies[slot.linkId]?.quiz,
+                },
+              },
+            ];
+          })
+        : buildGameSlots(links).flatMap((slot) => {
+            const copy = applied.slotCopies[slot.levelLink.id] ?? {};
+            const geo = layer1LinkForSlot(slot);
+            const rows: Array<{ linkId: string; copy: SlotLocaleCopy }> = [
+              {
+                linkId: slot.levelLink.id,
+                copy: {
+                  ...copy,
+                  quiz: localesFromOverrides(slot.levelLink.overrides)[input.language]?.quiz,
+                },
+              },
+            ];
+            if (geo) {
+              rows.push({
+                linkId: geo.id,
+                copy: {
+                  ...localesFromOverrides(geo.overrides)[input.language],
+                  quiz: copy.quiz,
+                },
+              });
+            }
+            return rows;
+          }),
     });
     if (!saved.success) return { success: false, error: saved.error };
 
@@ -1833,7 +2002,12 @@ export async function translateGameLocale(input: {
       success: true,
       data: {
         game: saved.data!,
-        copy: gameCopy,
+        copy: recipeBound
+          ? {
+              ...resolveSharedGameCopy(saved.data!, input.language, origin),
+              confirmed: gameCopy.confirmed,
+            }
+          : gameCopy,
         slots: applied.slotCopies,
         translated: Object.keys(translated).length,
       },
@@ -1892,6 +2066,67 @@ export async function duplicateGames(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Spiele konnten nicht dupliziert werden.",
+    };
+  }
+}
+
+export async function translateRecipeCityLocales(input: {
+  recipeId: string;
+  language: StudioLanguage;
+  limit?: number;
+}): Promise<ActionResult<{ processed: number; remaining: number; translatedFields: number; total: number }>> {
+  try {
+    if (!isStudioLanguage(input.language)) {
+      return { success: false, error: "Diese Sprache wird noch nicht unterstützt." };
+    }
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const { data: recipe, error: recipeError } = await supabase
+      .from("studio_compose_recipes")
+      .select("id, origin_game_id")
+      .eq("id", input.recipeId)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    if (recipeError) throw new Error(recipeError.message);
+    if (!recipe) return { success: false, error: "Rezept nicht gefunden." };
+
+    const { data: rows, error } = await supabase
+      .from("studio_games")
+      .select("*")
+      .eq("organization_id", orgId)
+      .eq("compose_recipe_id", input.recipeId)
+      .neq("is_template", true)
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+
+    const originId = typeof recipe.origin_game_id === "string" ? recipe.origin_game_id : null;
+    const pending = (rows ?? [])
+      .map((row) => normalizeGameRow(row as StudioGame))
+      .filter((game) => game.id !== originId && !isLocaleComplete(game, input.language));
+    const limit = Math.min(4, Math.max(1, Math.floor(input.limit ?? 4)));
+    const batch = pending.slice(0, limit);
+    let translatedFields = 0;
+    for (const game of batch) {
+      const result = await translateGameLocale({ gameId: game.id, language: input.language });
+      if (!result.success) {
+        return { success: false, error: `${game.name}: ${result.error}` };
+      }
+      translatedFields += result.data?.translated ?? 0;
+    }
+    revalidatePath("/admin/games");
+    return {
+      success: true,
+      data: {
+        processed: batch.length,
+        remaining: Math.max(0, pending.length - batch.length),
+        translatedFields,
+        total: pending.length,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Städte konnten nicht übersetzt werden.",
     };
   }
 }

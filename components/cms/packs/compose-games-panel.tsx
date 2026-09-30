@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
+import Link from "next/link";
 import {
+  archiveComposeRecipe,
   composeGamesFromPacks,
   listComposeRecipes,
   listExistingComposeCities,
@@ -11,11 +13,13 @@ import {
 import { StudioModal } from "@/components/cms/shared/studio-modal";
 import { StudioButton, StudioError, StudioInput, StudioSuccess } from "@/components/cms/studio-ui";
 import {
+  IconArchive,
   IconGamepad,
   IconKeyRound,
   IconMapPin,
   IconPlus,
   IconSearch,
+  IconStar,
   IconUsers,
 } from "@/components/cms/studio-icons";
 import { COMPOSE_GAMES_MAX, type StudioComposeRecipe, type StudioLayerPack } from "@/lib/cms/layer-packs";
@@ -38,6 +42,7 @@ export function ComposeGamesPanel() {
   const [openLayer, setOpenLayer] = useState<OpenLayer>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [archiving, startArchive] = useTransition();
   useEffect(() => {
     void listComposeRecipes().then((result) => {
       if (result.success) setRecipes(result.data ?? []);
@@ -74,6 +79,7 @@ export function ComposeGamesPanel() {
   }
 
   const active = creating || Boolean(recipeId);
+  const selectedRecipe = recipes.find((row) => row.id === recipeId) ?? null;
 
   return (
     <section className="overflow-hidden rounded-3xl bg-card shadow-soft">
@@ -103,6 +109,7 @@ export function ComposeGamesPanel() {
               <p className="text-sm font-bold">{recipe.name}</p>
               <p className={`mt-0.5 text-[11px] font-semibold ${selected ? "opacity-80" : "text-muted-foreground"}`}>
                 {recipe.surface === "indoor" ? "Indoor" : "Outdoor"}
+                {recipe.origin_game_name ? ` · ${recipe.origin_game_name}` : ""}
               </p>
             </button>
           );
@@ -163,6 +170,55 @@ export function ComposeGamesPanel() {
               ))}
             </div>
           </div>
+
+          {selectedRecipe ? (
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-secondary/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              {selectedRecipe.origin_game_id ? (
+                <Link
+                  href={`/admin/games/${selectedRecipe.origin_game_id}`}
+                  className="inline-flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground hover:text-primary"
+                >
+                  <IconStar size={16} className="fill-amber-500 text-amber-500" />
+                  <span className="truncate">
+                    Hauptspiel: {selectedRecipe.origin_game_name ?? "Ursprung öffnen"}
+                  </span>
+                </Link>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Noch kein Hauptspiel — das erste Spiel mit Spielinfo wird zur Quelle.
+                </p>
+              )}
+              <StudioButton
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={archiving}
+                icon={<IconArchive size={16} />}
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      "Rezept archivieren? Bestehende Spiele bleiben. Neue Städte kannst du damit nicht mehr anlegen.",
+                    )
+                  ) {
+                    return;
+                  }
+                  startArchive(async () => {
+                    const result = await archiveComposeRecipe(selectedRecipe.id);
+                    if (!result.success) {
+                      setError(result.error);
+                      return;
+                    }
+                    setRecipes((current) => current.filter((row) => row.id !== selectedRecipe.id));
+                    resetDraft();
+                    invalidate();
+                    setMessage("Rezept archiviert. Die bestehenden Spiele bleiben.");
+                  });
+                }}
+              >
+                {archiving ? "Archiviert…" : "Rezept archivieren"}
+              </StudioButton>
+            </div>
+          ) : null}
 
           <div className="mt-8 flex flex-col items-center justify-center gap-6 sm:flex-row sm:gap-4">
             <LayerNode

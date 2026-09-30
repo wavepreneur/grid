@@ -3,7 +3,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { getGameDeleteStatus } from "@/app/actions/cms/delete";
 import { getGame, listGameTasks } from "@/app/actions/cms/games";
+import { getRecipeOriginContext } from "@/app/actions/cms/packs";
 import { queryKeys } from "@/lib/platform/query-keys";
+import type { StudioGame } from "@/lib/cms/types";
 
 export function useStudioGame(gameId: string) {
   return useQuery({
@@ -16,6 +18,18 @@ export function useStudioGame(gameId: string) {
     },
     enabled: Boolean(gameId),
     placeholderData: (previous) => previous,
+  });
+}
+
+export function useRecipeOrigin(game: StudioGame | undefined) {
+  return useQuery({
+    queryKey: queryKeys.games.recipeOrigin(game?.id ?? ""),
+    queryFn: async () => {
+      const result = await getRecipeOriginContext(game!.id);
+      if (!result.success) throw new Error(result.error);
+      return result.data ?? { origin: null, isSource: false, recipe: null };
+    },
+    enabled: Boolean(game?.id),
   });
 }
 

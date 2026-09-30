@@ -4,9 +4,10 @@ import { StudioPage } from "@/components/cms/studio-page";
 import { GameEditorPanel } from "@/components/cms/games/game-editor-panel";
 import { TaskEditor } from "@/components/cms/tasks/task-editor";
 import { StudioGameDetailSkeleton, StudioTaskDetailSkeleton } from "@/components/cms/studio-list-skeletons";
-import { resolveGameCopy } from "@/lib/cms/game-i18n";
+import { resolveSharedGameCopy } from "@/lib/cms/game-i18n";
 import { localeLabel, parseStudioLanguage } from "@/lib/cms/languages";
 import {
+  useRecipeOrigin,
   useStudioGame,
   useStudioGameTaskLinks,
 } from "@/lib/hooks/use-studio-game-detail";
@@ -21,9 +22,13 @@ export function StudioGameDetailSection({
 }) {
   const gameQuery = useStudioGame(gameId);
   const linksQuery = useStudioGameTaskLinks(gameId);
+  const originQuery = useRecipeOrigin(gameQuery.data);
 
   const game = gameQuery.data;
-  const isInitialLoad = gameQuery.isPending && !game;
+  const originContext = originQuery.data ?? { origin: null, isSource: false, recipe: null };
+  const origin = originContext.origin;
+  const waitingForOrigin = Boolean(game?.compose_recipe_id) && originQuery.isPending;
+  const isInitialLoad = (gameQuery.isPending && !game) || waitingForOrigin;
 
   if (isInitialLoad) {
     return (
@@ -43,10 +48,22 @@ export function StudioGameDetailSection({
     );
   }
 
+  if (originQuery.isError) {
+    return (
+      <StudioPage title={game.name} description="">
+        <p className="text-sm text-red-600">
+          {originQuery.error instanceof Error
+            ? originQuery.error.message
+            : "Rezept-Ursprung konnte nicht geladen werden."}
+        </p>
+      </StudioPage>
+    );
+  }
+
   const activeLocale = parseStudioLanguage(locale ?? game.language);
   const sourceLocale = parseStudioLanguage(game.language);
-  const localeCopy = resolveGameCopy(game, activeLocale);
-  const pageTitle = localeCopy.name?.trim() || game.name;
+  const localeCopy = resolveSharedGameCopy(game, activeLocale, origin);
+  const pageTitle = localeCopy.name.trim() || game.name;
   const localeNote =
     activeLocale !== sourceLocale
       ? `${localeLabel(activeLocale)} · Ausgangssprache ${localeLabel(sourceLocale)}`
@@ -61,7 +78,15 @@ export function StudioGameDetailSection({
           : `${localeNote ? `${localeNote}. ` : ""}Spiel-Code ${game.slug}${game.city_slug ? ` · Stadt ${game.city_slug}` : ""}. Bedingungen im Spiel, Inhalt in Aufgaben.`
       }
     >
-      <GameEditorPanel game={game} taskLinks={linksQuery.data ?? []} locale={locale} />
+      <GameEditorPanel
+        game={game}
+        origin={origin}
+        isRecipeSource={originContext.isSource}
+        recipeName={originContext.recipe?.name ?? null}
+        recipeId={originContext.recipe?.id ?? null}
+        taskLinks={linksQuery.data ?? []}
+        locale={locale}
+      />
     </StudioPage>
   );
 }

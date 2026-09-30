@@ -20,6 +20,7 @@ type Props = {
   detail?: string;
   accept?: string;
   requireTransparency?: boolean;
+  readOnly?: boolean;
 };
 
 export function ImageUploadField({
@@ -31,6 +32,7 @@ export function ImageUploadField({
   detail,
   accept = "image/jpeg,image/png,image/webp,image/gif",
   requireTransparency = false,
+  readOnly = false,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +74,7 @@ export function ImageUploadField({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={value} alt="" className="h-full w-full object-cover" />
           </div>
+          {readOnly ? null : (
           <div className="flex flex-col gap-2">
             <StudioButton
               type="button"
@@ -95,11 +98,12 @@ export function ImageUploadField({
               Entfernen
             </StudioButton>
           </div>
+          )}
         </div>
       ) : (
         <button
           type="button"
-          disabled={pending}
+          disabled={pending || readOnly}
           onClick={() => inputRef.current?.click()}
           className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-sm text-slate-500 transition hover:border-teal-300 hover:bg-teal-50/50 hover:text-teal-700 disabled:opacity-50"
         >
@@ -121,8 +125,12 @@ export function ImageUploadField({
         <StudioInput
           value={value}
           placeholder="https://…"
-          disabled={pending}
-          onChange={(e) => onChange(e.target.value)}
+          disabled={pending || readOnly}
+          readOnly={readOnly}
+          onChange={(e) => {
+            if (readOnly) return;
+            onChange(e.target.value);
+          }}
         />
       </div>
     </div>

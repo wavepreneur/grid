@@ -23,7 +23,7 @@ export const PACK_SEARCH_LIMIT = 40;
 export const COMPOSE_GAMES_MAX = 500;
 export const COMPOSE_L1_LIST_MAX = 500;
 export const DUPLICATE_PACKS_MAX = 100;
-export const CREATE_CITIES_MAX = 100;
+export const CREATE_CITIES_MAX = 500;
 
 export type StudioLayerPack = {
   id: string;
@@ -221,6 +221,7 @@ export function sharedLayer1ItemOverrides(source: Record<string, unknown>): Reco
   const next: Record<string, unknown> = { ...source };
   delete next.location;
   delete next.gps;
+  delete next.locales;
   const prev =
     next.station && typeof next.station === "object" ? (next.station as Record<string, unknown>) : {};
   next.station = {
@@ -255,12 +256,19 @@ export type StudioComposeRecipe = {
   layer3_pack_id: string | null;
   surface: "outdoor" | "indoor" | "online";
   language: StudioLanguage;
+  origin_game_id: string | null;
+  origin_game_name: string | null;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 };
 
-export function normalizeComposeRecipeRow(row: Record<string, unknown>): StudioComposeRecipe {
+export function normalizeComposeRecipeRow(
+  row: Record<string, unknown>,
+  originName?: string | null,
+): StudioComposeRecipe {
   const surface = row.surface;
+  const originId = typeof row.origin_game_id === "string" ? row.origin_game_id : null;
   return {
     id: String(row.id),
     organization_id: String(row.organization_id),
@@ -269,9 +277,24 @@ export function normalizeComposeRecipeRow(row: Record<string, unknown>): StudioC
     layer3_pack_id: typeof row.layer3_pack_id === "string" ? row.layer3_pack_id : null,
     surface: surface === "indoor" || surface === "online" ? surface : "outdoor",
     language: parseStudioLanguage(row.language),
+    origin_game_id: originId,
+    origin_game_name: originName?.trim() || null,
+    archived_at: typeof row.archived_at === "string" ? row.archived_at : null,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
   };
+}
+
+/** Thin city game of a recipe — not the origin where Spielinfo / L2 / L3 are edited. */
+export function isRecipeCityShell(
+  game: { id: string; compose_recipe_id?: string | null },
+  origin?: { id: string } | null,
+  isSource = false,
+): boolean {
+  if (isSource) return false;
+  if (!game.compose_recipe_id) return false;
+  if (origin && origin.id === game.id) return false;
+  return true;
 }
 
 function virtualLink(args: {
@@ -412,6 +435,6 @@ export function mergePackLinksOntoGame(input: {
 export function composeGameName(cityLabel: string | null | undefined, missionName: string | null | undefined): string {
   const city = (cityLabel ?? "").trim();
   const mission = (missionName ?? "").trim();
-  if (city && mission) return `${city} · ${mission}`;
+  if (city && mission) return `${mission} ${city}`;
   return city || mission || "Neues Spiel";
 }

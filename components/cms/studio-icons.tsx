@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import type { LucideProps } from "lucide-react";
 import {
   ALargeSmall,
+  Archive,
   ArrowRight,
   ArrowUpDown,
   Building2,
@@ -31,6 +32,7 @@ import {
   Route,
   Save,
   Search,
+  Star,
   Ticket,
   Trash2,
   Upload,
@@ -160,4 +162,10 @@ export function IconLayers(props: IconProps) {
 }
 export function IconLanguages(props: IconProps) {
   return wrap(Languages, props);
+}
+export function IconStar(props: IconProps) {
+  return wrap(Star, props);
+}
+export function IconArchive(props: IconProps) {
+  return wrap(Archive, props);
 }

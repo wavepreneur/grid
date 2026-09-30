@@ -231,19 +231,42 @@ export function withLinkLocale(
   return { ...overrides, locales };
 }
 
-export function gameLocales(game: Pick<StudioGame, "language" | "translations">): StudioLanguage[] {
+export function gameLocales(
+  game: Pick<StudioGame, "language" | "translations">,
+  origin?: Pick<StudioGame, "language" | "translations"> | null,
+): StudioLanguage[] {
   const source = parseStudioLanguage(game.language);
   const extras = Object.keys(parseTranslations(game.translations)).filter(isReadyLocaleKey);
-  return [...new Set([source, ...extras])] as StudioLanguage[];
+  const originExtras = origin
+    ? [
+        parseStudioLanguage(origin.language),
+        ...Object.keys(parseTranslations(origin.translations)).filter(isReadyLocaleKey),
+      ]
+    : [];
+  return [...new Set([source, ...extras, ...originExtras])] as StudioLanguage[];
 }
 
 export function localeCoverageMap(
   game: Pick<StudioGame, "language" | "translations">,
+  origin?: Pick<StudioGame, "language" | "translations"> | null,
+  units?: TranslationUnit[],
+  slotIdAliases?: Array<[string, string]>,
 ): Partial<Record<StudioLanguage, TranslationCoverage>> {
   const map: Partial<Record<StudioLanguage, TranslationCoverage>> = {};
-  for (const locale of gameLocales(game)) {
+  for (const locale of gameLocales(game, origin)) {
     if (locale === parseStudioLanguage(game.language)) continue;
-    map[locale] = localeCoverage(game, locale);
+    if (units) {
+      const raw = parseConfirmed(parseTranslations(game.translations)[locale]?.confirmed);
+      const named = units.some((unit) => unit.key === "game:name")
+        ? parseConfirmed([...raw, "game:name"])
+        : raw;
+      map[locale] = coverageForConfirmed(
+        units,
+        slotIdAliases ? aliasSlotConfirmedKeys(named, slotIdAliases) : named,
+      );
+    } else {
+      map[locale] = localeCoverage(game, locale);
+    }
   }
   return map;
 }
@@ -328,6 +351,24 @@ export function coverageForConfirmed(
     if (valid.has(key)) count += 1;
   }
   return { confirmed: count, total: units.length };
+}
+
+/** Map opener-quiz keys between Layer-1 item ids and the slot id the translation UI uses. */
+export function aliasSlotConfirmedKeys(
+  keys: Iterable<string>,
+  idPairs: Array<[string, string]>,
+): string[] {
+  const list = [...keys];
+  const extra: string[] = [];
+  for (const key of list) {
+    if (!key.startsWith("slot:")) continue;
+    for (const [from, to] of idPairs) {
+      if (!from || !to || from === to) continue;
+      const prefix = `slot:${from}:`;
+      if (key.startsWith(prefix)) extra.push(`slot:${to}:${key.slice(prefix.length)}`);
+    }
+  }
+  return parseConfirmed([...list, ...extra]);
 }
 
 function considerDifferent(
@@ -488,6 +529,55 @@ export function resolveGameCopy(
     // Do not fall back to the source-language YouTube clip (DE ≠ EN).
     intro_youtube_url: copy.intro_youtube_url?.trim() || "",
   };
+}
+
+/** Same-language copy only — no German briefing/URLs on an English tab. */
+export function resolveOwnedLocaleCopy(
+  game: Pick<
+    StudioGame,
+    "language" | "name" | "description" | "farewell_text" | "translations" | "feature_flags"
+  >,
+  locale: string,
+): ReturnType<typeof resolveGameCopy> {
+  const source = parseStudioLanguage(game.language);
+  if (locale === source) return resolveGameCopy(game, locale);
+  const copy = parseTranslations(game.translations)[locale] ?? {};
+  return {
+    name: copy.name?.trim() || "",
+    description: copy.description ?? "",
+    farewell_text: copy.farewell_text ?? "",
+    briefing_iframe_url: copy.briefing_iframe_url?.trim() || "",
+    faq_iframe_url: copy.faq_iframe_url?.trim() || "",
+    intro_youtube_url: copy.intro_youtube_url?.trim() || "",
+  };
+}
+
+/** City games keep their own name; Spielinfo comes from the recipe origin in the same language. */
+export function resolveSharedGameCopy(
+  game: Pick<
+    StudioGame,
+    "id" | "language" | "name" | "description" | "farewell_text" | "translations" | "feature_flags"
+  >,
+  locale: string,
+  origin?: Pick<
+    StudioGame,
+    "id" | "language" | "name" | "description" | "farewell_text" | "translations" | "feature_flags"
+  > | null,
+): ReturnType<typeof resolveGameCopy> {
+  if (!origin || origin.id === game.id) return resolveGameCopy(game, locale);
+  const cityName =
+    locale === parseStudioLanguage(game.language)
+      ? game.name
+      : parseTranslations(game.translations)[locale]?.name?.trim() || game.name;
+  const shared = resolveOwnedLocaleCopy(origin, locale);
+  return { ...shared, name: cityName };
+}
+
+export function recipeShellMedia(
+  origin?: Pick<StudioGame, "logo_url" | "duration_minutes"> | null,
+): { logo_url: string | null; duration_minutes: number | null } | null {
+  if (!origin) return null;
+  return { logo_url: origin.logo_url, duration_minutes: origin.duration_minutes };
 }
 
 export function localizedFeatureFlags(
@@ -804,6 +894,59 @@ export function collectTranslationUnits(input: {
   ];
 }
 
+/** City recipe shells: only the city title and Layer-1 opener quizzes. */
+export function collectCityShellTranslationUnits(input: {
+  game: Pick<StudioGame, "name">;
+  slots: Array<{ linkId: string; source: Pick<SlotLocaleCopy, "quiz"> }>;
+}): TranslationUnit[] {
+  const units: TranslationUnit[] = [];
+  addTranslationUnit(units, "game:name", input.game.name);
+  units.push(...collectOpenerQuizUnits(input.slots));
+  return units;
+}
+
+/** City-specific opener quizzes only — not shared Layer 2/3 copy, not URLs. */
+export function collectOpenerQuizUnits(
+  slots: Array<{ linkId: string; source: Pick<SlotLocaleCopy, "quiz"> }>,
+): TranslationUnit[] {
+  return slots.flatMap((slot) => {
+    const prefix = `slot:${slot.linkId}`;
+    const units: TranslationUnit[] = [];
+    const quiz = slot.source.quiz;
+    if (!quiz) return units;
+    addTranslationUnit(units, `${prefix}:quiz:title`, quiz.title);
+    addTranslationUnit(units, `${prefix}:quiz:description`, quiz.description);
+    addTranslationUnit(units, `${prefix}:quiz:question`, quiz.question);
+    addTranslationUnit(units, `${prefix}:quiz:side_fact_title`, quiz.side_fact_title);
+    addTranslationUnit(units, `${prefix}:quiz:side_fact`, quiz.side_fact);
+    for (const option of quiz.options ?? []) {
+      addTranslationUnit(units, `${prefix}:quiz:option:${option.id}`, option.label);
+    }
+    return units;
+  });
+}
+
+/** Apply city opener locale from Layer 1 without overwriting shared Layer 2 copy. */
+export function withGeoQuizLocales(levelOverrides: unknown, geoOverrides: unknown): unknown {
+  if (!geoOverrides) return levelOverrides;
+  const mission = localesFromOverrides(levelOverrides);
+  const geo = localesFromOverrides(geoOverrides);
+  const keys = new Set([...Object.keys(mission), ...Object.keys(geo)]);
+  if (keys.size === 0) return levelOverrides;
+  const locales: Record<string, SlotLocaleCopy> = {};
+  for (const locale of keys) {
+    locales[locale] = {
+      ...mission[locale],
+      quiz: geo[locale]?.quiz,
+    };
+  }
+  const base =
+    levelOverrides && typeof levelOverrides === "object" && !Array.isArray(levelOverrides)
+      ? { ...(levelOverrides as Record<string, unknown>) }
+      : {};
+  return { ...base, locales };
+}
+
 export function localeCopyWithCoverage(
   current: GameLocaleCopy | undefined,
   next: GameLocaleCopy,
@@ -921,14 +1064,18 @@ export type LocalizedStudioContent = {
 export function localizeStudioGameContent(input: {
   game: Pick<
     StudioGame,
-    "language" | "name" | "description" | "farewell_text" | "translations" | "feature_flags"
+    "id" | "language" | "name" | "description" | "farewell_text" | "translations" | "feature_flags"
   >;
   levels: LevelDefinition[];
   slotLinks: Array<{ overrides?: unknown }>;
   locale: string;
+  origin?: Pick<
+    StudioGame,
+    "id" | "language" | "name" | "description" | "farewell_text" | "translations" | "feature_flags"
+  > | null;
 }): LocalizedStudioContent {
   const source = parseStudioLanguage(input.game.language);
-  const copy = resolveGameCopy(input.game, input.locale);
+  const copy = resolveSharedGameCopy(input.game, input.locale, input.origin);
   return {
     ...copy,
     levels: localizeLevels(input.levels, input.slotLinks, input.locale, source),
@@ -959,18 +1106,23 @@ export function parseSnapshotLocales(value: unknown): Record<string, LocalizedSt
 export function buildSnapshotLocales(input: {
   game: Pick<
     StudioGame,
-    "language" | "name" | "description" | "farewell_text" | "translations" | "feature_flags"
+    "id" | "language" | "name" | "description" | "farewell_text" | "translations" | "feature_flags"
   >;
   levels: LevelDefinition[];
   slotLinks: Array<{ overrides?: unknown }>;
+  origin?: Pick<
+    StudioGame,
+    "id" | "language" | "name" | "description" | "farewell_text" | "translations" | "feature_flags"
+  > | null;
 }): Record<string, LocalizedStudioContent> {
   const locales: Record<string, LocalizedStudioContent> = {};
-  for (const locale of gameLocales(input.game)) {
+  for (const locale of gameLocales(input.game, input.origin)) {
     locales[locale] = localizeStudioGameContent({
       game: input.game,
       levels: input.levels,
       slotLinks: input.slotLinks,
       locale,
+      origin: input.origin,
     });
   }
   return locales;
@@ -980,20 +1132,35 @@ export function pickLocalizedSnapshot(input: {
   locales: unknown;
   game: Pick<
     StudioGame,
-    "language" | "name" | "description" | "farewell_text" | "translations" | "feature_flags"
+    "id" | "language" | "name" | "description" | "farewell_text" | "translations" | "feature_flags"
   >;
   levels: LevelDefinition[];
   slotLinks?: Array<{ overrides?: unknown }>;
   locale: string;
+  origin?: Pick<
+    StudioGame,
+    "id" | "language" | "name" | "description" | "farewell_text" | "translations" | "feature_flags"
+  > | null;
 }): LocalizedStudioContent {
   const frozen = parseSnapshotLocales(input.locales)[input.locale];
-  if (frozen) return frozen;
-  return localizeStudioGameContent({
+  const live = localizeStudioGameContent({
     game: input.game,
     levels: input.levels,
     slotLinks: input.slotLinks ?? [],
     locale: input.locale,
+    origin: input.origin,
   });
+  if (!frozen) return live;
+  if (!input.origin) return frozen;
+  return {
+    ...frozen,
+    name: live.name,
+    description: live.description,
+    farewell_text: live.farewell_text,
+    briefing_iframe_url: live.briefing_iframe_url,
+    faq_iframe_url: live.faq_iframe_url,
+    intro_youtube_url: live.intro_youtube_url,
+  };
 }
 
 /** URLs, pure numbers/coords, and dedicated URL fields stay as-is. */

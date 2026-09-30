@@ -1,9 +1,10 @@
-import { headers } from "next/headers";
+import https from "node:https";
 import { localeLabel, type StudioLanguage } from "@/lib/cms/languages";
 import type { TranslationUnit } from "@/lib/cms/game-i18n";
 
-const GEMINI_MODELS = ["gemini-2.0-flash-exp", "gemini-2.0-flash"] as const;
+const GEMINI_MODELS = ["gemini-3.8-flash", "gemini-flash-latest"] as const;
 const CHUNK_SIZE = 32;
+const DEFAULT_REFERER = "https://www.exitmania.com/";
 
 const NATIVE_VOICE: Record<StudioLanguage, string> = {
   de: "Schreib natürliches Deutsch, wie man es im Spiel auf dem Handy liest — klar, lebendig, teamtauglich.",
@@ -18,6 +19,12 @@ const NATIVE_VOICE: Record<StudioLanguage, string> = {
 function apiKey(): string | null {
   const key = process.env.GOOGLE_AI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim();
   return key || null;
+}
+
+function allowedReferer(): string {
+  const configured = process.env.GEMINI_HTTP_REFERER?.trim();
+  if (configured) return configured.endsWith("/") ? configured : `${configured}/`;
+  return DEFAULT_REFERER;
 }
 
 function parseJsonObject(raw: string): Record<string, string> {
@@ -38,24 +45,10 @@ function parseJsonObject(raw: string): Record<string, string> {
   return out;
 }
 
-async function requestReferer(): Promise<string> {
-  try {
-    const incoming = await headers();
-    const origin = incoming.get("origin");
-    if (origin) return origin.replace(/\/$/, "") + "/";
-    const referer = incoming.get("referer");
-    if (referer) return new URL(referer).origin + "/";
-  } catch {
-    /* not in a request */
-  }
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL.replace(/^https?:\/\//, "")}/`;
-  return "http://localhost:3000/";
-}
-
 function geminiHttpError(status: number, detail: string): Error {
   if (status === 403 && /referer/i.test(detail)) {
     return new Error(
-      "Gemini-Key ist auf Websites beschränkt. Im Google Cloud Console beim Key: Anwendungsbeschränkung auf „Keine“ stellen. HTTP-Referrer gilt nur im Browser, Studio ruft den Server auf.",
+      "Gemini-Key ist auf Websites beschränkt. Dieser Key akzeptiert www.exitmania.com. In der Cloud Console denselben Key öffnen und speichern, oder GEMINI_HTTP_REFERER auf die erlaubte URL setzen.",
     );
   }
   if (status === 403) {
@@ -64,31 +57,52 @@ function geminiHttpError(status: number, detail: string): Error {
   return new Error(`Gemini ${status}${detail ? `: ${detail.slice(0, 180)}` : ""}`);
 }
 
-async function generateJson(model: string, key: string, prompt: string): Promise<Record<string, string>> {
-  const referer = await requestReferer();
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": key,
-        Referer: referer,
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.45,
-          responseMimeType: "application/json",
+function postGemini(model: string, key: string, body: string): Promise<{ status: number; text: string }> {
+  const referer = allowedReferer();
+  const path = `/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: "generativelanguage.googleapis.com",
+        path,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body),
+          "x-goog-api-key": key,
+          Referer: referer,
         },
-      }),
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk) => chunks.push(chunk as Buffer));
+        res.on("end", () =>
+          resolve({
+            status: res.statusCode ?? 0,
+            text: Buffer.concat(chunks).toString("utf8"),
+          }),
+        );
+      },
+    );
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+async function generateJson(model: string, key: string, prompt: string): Promise<Record<string, string>> {
+  const body = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.45,
+      responseMimeType: "application/json",
     },
-  );
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw geminiHttpError(response.status, detail);
+  });
+  const response = await postGemini(model, key, body);
+  if (response.status < 200 || response.status >= 300) {
+    throw geminiHttpError(response.status, response.text);
   }
-  const payload = (await response.json()) as {
+  const payload = JSON.parse(response.text) as {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     error?: { message?: string };
   };
@@ -116,6 +130,9 @@ function buildPrompt(input: {
     "",
     "Rules:",
     "- Keep the same meaning and energy. Informal German stays informal. A riddle stays a riddle — never explain the answer.",
+    "- Keep every emoji exactly, in the same place.",
+    "- Keep line breaks, blank lines, and paragraph structure exactly. Do not collapse the text into one block.",
+    "- Keep the same capitalization: ALL CAPS stays ALL CAPS, Title Case stays Title Case, mixed case stays mixed.",
     "- Keep proper nouns, city names, character names, brand names, codes, numbers, HTML/markdown, and punctuation.",
     "- Do not translate URLs. Do not add headings, notes, or extra sentences.",
     "- Return only a JSON object mapping each given key to the translated string. Same keys, no extras.",
@@ -149,7 +166,7 @@ export async function translateUnitsNative(input: {
         const part = await generateJson(model, key, prompt);
         for (const unit of chunk) {
           const value = part[unit.key];
-          if (typeof value === "string" && value.trim()) merged[unit.key] = value.trim();
+          if (typeof value === "string" && value.trim()) merged[unit.key] = value;
         }
         done = true;
         lastError = null;

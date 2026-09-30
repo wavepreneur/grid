@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { loadMergedGameTaskLinksForGame } from "@/app/actions/cms/packs";
+import { loadMergedGameTaskLinksForGame, loadRecipeOriginGame } from "@/app/actions/cms/packs";
 import { parseBonusBindings } from "@/lib/cms/bonus-bindings";
 import { parseLinkLayer, type GameLinkOverrides } from "@/lib/cms/game-link-config";
 import {
@@ -16,7 +16,9 @@ import { parseStudioLanguage } from "@/lib/cms/languages";
 import {
   localizedFeatureFlags,
   localizeStudioGameContent,
+  recipeShellMedia,
   parseTranslations,
+  withGeoQuizLocales,
 } from "@/lib/cms/game-i18n";
 import { buildGameSlots } from "@/lib/cms/game-slots";
 
@@ -64,6 +66,8 @@ export async function loadLiveStudioGameSnapshot(
   if (!gameRow) return null;
 
   const game = normalizeGameRow(gameRow as StudioGame);
+  const origin = await loadRecipeOriginGame(supabase, game);
+  const shell = recipeShellMedia(origin);
 
   const links = await loadMergedGameTaskLinksForGame(supabase, game);
 
@@ -148,8 +152,11 @@ export async function loadLiveStudioGameSnapshot(
   const localized = localizeStudioGameContent({
     game,
     levels: compiled.levels,
-    slotLinks: buildGameSlots(links, { openerTasksById }).map((slot) => slot.levelLink),
+    slotLinks: buildGameSlots(links, { openerTasksById }).map((slot) => ({
+      overrides: withGeoQuizLocales(slot.levelLink.overrides, slot.geoLink?.overrides),
+    })),
     locale: language,
+    origin,
   });
 
   return {
@@ -158,7 +165,9 @@ export async function loadLiveStudioGameSnapshot(
       name: localized.name,
       description: localized.description,
       farewell_text: localized.farewell_text,
-      feature_flags: localizedFeatureFlags(game.feature_flags, localized),
+      logo_url: shell?.logo_url ?? game.logo_url,
+      duration_minutes: shell?.duration_minutes ?? game.duration_minutes,
+      feature_flags: localizedFeatureFlags(origin?.feature_flags ?? game.feature_flags, localized),
     },
     levels: localized.levels,
     compiledLogic: { ...compiled, levels: localized.levels },

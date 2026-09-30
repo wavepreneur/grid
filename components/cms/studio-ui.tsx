@@ -35,7 +35,7 @@ export function StudioTextarea({
 }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
-      className={`${inputCls} min-h-[6rem] resize-y ${className}`}
+      className={`${inputCls} min-h-[6rem] resize-y disabled:opacity-50 ${className}`}
       {...props}
     />
   );
