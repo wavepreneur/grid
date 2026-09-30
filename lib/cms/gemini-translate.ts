@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { localeLabel, type StudioLanguage } from "@/lib/cms/languages";
 import type { TranslationUnit } from "@/lib/cms/game-i18n";
 
@@ -37,12 +38,43 @@ function parseJsonObject(raw: string): Record<string, string> {
   return out;
 }
 
+async function requestReferer(): Promise<string> {
+  try {
+    const incoming = await headers();
+    const origin = incoming.get("origin");
+    if (origin) return origin.replace(/\/$/, "") + "/";
+    const referer = incoming.get("referer");
+    if (referer) return new URL(referer).origin + "/";
+  } catch {
+    /* not in a request */
+  }
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL.replace(/^https?:\/\//, "")}/`;
+  return "http://localhost:3000/";
+}
+
+function geminiHttpError(status: number, detail: string): Error {
+  if (status === 403 && /referer/i.test(detail)) {
+    return new Error(
+      "Gemini-Key ist auf Websites beschränkt. Im Google Cloud Console beim Key: Anwendungsbeschränkung auf „Keine“ stellen. HTTP-Referrer gilt nur im Browser, Studio ruft den Server auf.",
+    );
+  }
+  if (status === 403) {
+    return new Error("Gemini hat den Key abgelehnt (403). Generative Language API und Key-Rechte prüfen.");
+  }
+  return new Error(`Gemini ${status}${detail ? `: ${detail.slice(0, 180)}` : ""}`);
+}
+
 async function generateJson(model: string, key: string, prompt: string): Promise<Record<string, string>> {
+  const referer = await requestReferer();
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": key,
+        Referer: referer,
+      },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
@@ -54,7 +86,7 @@ async function generateJson(model: string, key: string, prompt: string): Promise
   );
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    throw new Error(`Gemini ${response.status}${detail ? `: ${detail.slice(0, 240)}` : ""}`);
+    throw geminiHttpError(response.status, detail);
   }
   const payload = (await response.json()) as {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
