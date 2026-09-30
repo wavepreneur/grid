@@ -22,7 +22,6 @@ import {
   STUDIO_TAB_LOCALES,
   localeFlag,
   localeLabel,
-  localeShort,
   parseStudioLanguage,
   type StudioLanguage,
 } from "@/lib/cms/languages";
@@ -91,10 +90,6 @@ import {
 } from "@/lib/cms/game-slots";
 
 type GameWithLive = StudioGame & { liveEventCount: number };
-
-/** Checkbox · Spiel (flex) · Sprache · Fläche · Status · Ver. · Code (≈ hew9geeus2) · Datum · Aktionen */
-const GAME_LIST_GRID =
-  "lg:grid lg:grid-cols-[2rem_minmax(0,1fr)_8.25rem_5.5rem_9.5rem_2.25rem_6.75rem_4.75rem_13rem] lg:items-center lg:gap-x-3";
 
 type GameSort = "updated" | "created" | "status" | "name" | "language";
 type LanguageFilter = "alle" | StudioLanguage;
@@ -820,7 +815,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
               { id: "alle", label: "Alle Sprachen" },
               ...STUDIO_TAB_LOCALES.map((locale) => ({
                 id: locale,
-                label: localeShort(locale),
+                label: localeLabel(locale),
                 prefix: localeFlag(locale),
                 count: translationTab === "alle" ? undefined : languageCounts[locale] ?? 0,
                 title: localeLabel(locale),
@@ -889,33 +884,18 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         ) : sortedGames.length === 0 ? (
           <Empty>Keine Treffer für diese Filter.</Empty>
         ) : (
-          <div className="overflow-hidden rounded-2xl bg-card shadow-soft">
-            <div
-              className={`hidden border-b border-border/70 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground ${GAME_LIST_GRID}`}
-            >
-              <span />
-              <span className="min-w-0 truncate">Spiel</span>
-              <span className="truncate">Sprache</span>
-              <span className="truncate">Fläche</span>
-              <span className="truncate">Status</span>
-              <span className="truncate">Ver.</span>
-              <span className="truncate">Code</span>
-              <span className="truncate text-right">Geändert</span>
-              <span className="truncate text-right">Aktionen</span>
-            </div>
-            <ul className="divide-y divide-border/70">
-              {sortedGames.map((game) => (
-                <GameRow
-                  key={game.id}
-                  game={game}
-                  selected={selectedIds.has(game.id)}
-                  onToggle={(checked) => toggleOne(game.id, checked)}
-                  onDuplicate={() => openDuplicateModal([game.id])}
-                  onDelete={() => openDeleteModal([game.id])}
-                />
-              ))}
-            </ul>
-          </div>
+          <ul className="space-y-3">
+            {sortedGames.map((game) => (
+              <GameRow
+                key={game.id}
+                game={game}
+                selected={selectedIds.has(game.id)}
+                onToggle={(checked) => toggleOne(game.id, checked)}
+                onDuplicate={() => openDuplicateModal([game.id])}
+                onDelete={() => openDeleteModal([game.id])}
+              />
+            ))}
+          </ul>
         )}
       </section>
 
@@ -1115,6 +1095,7 @@ function GameLanguageBadges({ game }: { game: StudioGame }) {
       locales={gameLocales(game)}
       sourceLocale={parseStudioLanguage(game.language)}
       coverageByLocale={localeCoverageMap(game)}
+      variant="comfortable"
       adding={adding}
       onAdd={(language) => {
         setAdding(true);
@@ -1165,14 +1146,24 @@ function GameRow({
     void prefetchStudioGame(queryClient, game.id);
   }
 
+  const meta = [
+    surfaceChip,
+    game.slug,
+    city || null,
+    `v${game.published_version_number}`,
+    formatListDate(game.updated_at),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <li
-      className={`[content-visibility:auto] [contain-intrinsic-size:auto_4.75rem] ${
-        selected ? "bg-primary/5" : "bg-card"
+      className={`rounded-2xl shadow-soft [content-visibility:auto] [contain-intrinsic-size:auto_8.5rem] ${
+        selected ? "bg-primary/5 ring-1 ring-primary/20" : "bg-card"
       }`}
     >
-      <div className={`flex items-start gap-2 px-3 py-2.5 ${GAME_LIST_GRID}`}>
-        <div className="shrink-0 pt-0.5 lg:pt-0">
+      <div className="flex items-start gap-3 p-4 sm:gap-4 sm:p-5">
+        <div className="shrink-0 pt-1">
           <StudioSelectCheckbox
             checked={selected}
             onChange={onToggle}
@@ -1180,145 +1171,107 @@ function GameRow({
           />
         </div>
 
-        <Link
-          href={openHref}
-          prefetch
-          onMouseEnter={prefetch}
-          onFocus={prefetch}
-          className="min-w-0 overflow-hidden"
-        >
-          <div className="flex min-w-0 items-center gap-2.5">
-            {game.logo_url?.trim() ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={game.logo_url}
-                alt=""
-                className="h-8 w-8 shrink-0 rounded-lg object-cover"
-              />
-            ) : (
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
-                <IconGamepad size={16} />
-              </span>
-            )}
-            <div className="min-w-0 overflow-hidden">
-              <div className="flex min-w-0 items-center gap-1.5">
-                <h2
-                  className="min-w-0 truncate whitespace-nowrap text-sm font-bold text-foreground"
-                  title={game.name}
-                >
-                  {game.name}
-                </h2>
-                {game.liveEventCount > 0 ? (
-                  <span className="shrink-0">
-                    <Chip tone="bg-success/20 text-success-foreground">Live</Chip>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <Link
+              href={openHref}
+              prefetch
+              onMouseEnter={prefetch}
+              onFocus={prefetch}
+              className="min-w-0 flex-1"
+            >
+              <div className="flex items-start gap-3">
+                {game.logo_url?.trim() ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={game.logo_url}
+                    alt=""
+                    className="h-11 w-11 shrink-0 rounded-xl object-cover"
+                  />
+                ) : (
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
+                    <IconGamepad size={20} />
                   </span>
-                ) : null}
+                )}
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-base font-bold leading-snug text-foreground sm:text-lg">
+                      {game.name}
+                    </h2>
+                    {game.liveEventCount > 0 ? (
+                      <Chip tone="bg-success/20 text-success-foreground">Live</Chip>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">{meta}</p>
+                </div>
               </div>
-              <p className="truncate whitespace-nowrap font-mono text-[11px] text-muted-foreground lg:hidden">
-                {game.status === "published"
-                  ? "Veröffentlicht"
-                  : game.status === "archived"
-                    ? "Archiv"
-                    : "Entwurf"}
-                {` · ${game.slug}`}
-                {city ? ` · ${city}` : ""}
-                {` · v${game.published_version_number}`}
-              </p>
+            </Link>
+
+            <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+              {game.status === "archived" ? (
+                <Chip tone="bg-secondary text-muted-foreground">Archiv</Chip>
+              ) : (
+                <GameStatusSwitch
+                  gameId={game.id}
+                  status={game.status}
+                  publishedVersionNumber={game.published_version_number}
+                  liveEventCount={game.liveEventCount}
+                />
+              )}
+              <Link
+                href={openHref}
+                prefetch
+                onMouseEnter={prefetch}
+                onFocus={prefetch}
+                className="tap-lift inline-flex h-9 items-center rounded-xl bg-primary px-3 text-sm font-bold text-primary-foreground"
+              >
+                Öffnen
+              </Link>
+              <button
+                type="button"
+                disabled={!canTest}
+                title={canTest ? "Testen" : "Archivierte Spiele können nicht getestet werden"}
+                aria-label={`${game.name} testen`}
+                onClick={() => setTestOpen(true)}
+                className="tap-lift inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30"
+              >
+                <IconPlay size={16} />
+              </button>
+              {isIndoor ? (
+                <button
+                  type="button"
+                  title="Stationscodes"
+                  aria-label={`${game.name} Codes`}
+                  onClick={() => setCodesOpen(true)}
+                  className="tap-lift inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground"
+                >
+                  <IconDownload size={16} />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                title="Duplizieren"
+                aria-label={`${game.name} duplizieren`}
+                onClick={onDuplicate}
+                className="tap-lift inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground"
+              >
+                <IconCopy size={16} />
+              </button>
+              <button
+                type="button"
+                title="Löschen"
+                aria-label={`${game.name} löschen`}
+                onClick={onDelete}
+                className="tap-lift inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-destructive"
+              >
+                <IconTrash size={16} />
+              </button>
             </div>
           </div>
-        </Link>
 
-        <div className="hidden min-w-0 lg:block">
-          <GameLanguageBadges game={game} />
-        </div>
-        <p className="hidden truncate text-xs font-semibold text-foreground lg:block">
-          {surfaceChip}
-        </p>
-        <div className="hidden overflow-hidden lg:block">
-          {game.status === "archived" ? (
-            <Chip tone="bg-secondary text-muted-foreground">Archiv</Chip>
-          ) : (
-            <GameStatusSwitch
-              gameId={game.id}
-              status={game.status}
-              publishedVersionNumber={game.published_version_number}
-              liveEventCount={game.liveEventCount}
-              compact
-            />
-          )}
-        </div>
-        <p className="hidden truncate tabular-nums text-xs text-muted-foreground lg:block">
-          {game.published_version_number}
-        </p>
-        <div className="hidden min-w-0 overflow-hidden lg:block">
-          <p
-            className="truncate whitespace-nowrap font-mono text-[11px] font-semibold text-foreground"
-            title={city ? `${game.slug} · ${city}` : game.slug}
-          >
-            {game.slug}
-          </p>
-        </div>
-        <p
-          className="hidden truncate text-right text-xs tabular-nums text-muted-foreground lg:block"
-          title={game.updated_at}
-        >
-          {formatListDate(game.updated_at)}
-        </p>
-
-        <div className="grid w-full shrink-0 grid-cols-[auto_2rem_2rem_2rem_2rem] items-center justify-items-end gap-0.5">
-          <span className="mr-1 lg:hidden">
-            <Chip tone="bg-primary/12 text-primary">{surfaceChip}</Chip>
-          </span>
-          <Link
-            href={openHref}
-            prefetch
-            onMouseEnter={prefetch}
-            onFocus={prefetch}
-            className="tap-lift inline-flex h-8 items-center rounded-xl bg-primary px-2.5 text-xs font-bold text-primary-foreground"
-          >
-            Öffnen
-          </Link>
-          <button
-            type="button"
-            disabled={!canTest}
-            title={canTest ? "Testen" : "Archivierte Spiele können nicht getestet werden"}
-            aria-label={`${game.name} testen`}
-            onClick={() => setTestOpen(true)}
-            className="tap-lift inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30"
-          >
-            <IconPlay size={15} />
-          </button>
-          {isIndoor ? (
-            <button
-              type="button"
-              title="Stationscodes"
-              aria-label={`${game.name} Codes`}
-              onClick={() => setCodesOpen(true)}
-              className="tap-lift inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground"
-            >
-              <IconDownload size={15} />
-            </button>
-          ) : (
-            <span className="hidden h-8 w-8 lg:block" aria-hidden />
-          )}
-          <button
-            type="button"
-            title="Duplizieren"
-            aria-label={`${game.name} duplizieren`}
-            onClick={onDuplicate}
-            className="tap-lift inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            <IconCopy size={15} />
-          </button>
-          <button
-            type="button"
-            title="Löschen"
-            aria-label={`${game.name} löschen`}
-            onClick={onDelete}
-            className="tap-lift inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-destructive"
-          >
-            <IconTrash size={15} />
-          </button>
+          <div className="mt-4 border-t border-border/60 pt-3">
+            <GameLanguageBadges game={game} />
+          </div>
         </div>
       </div>
 
