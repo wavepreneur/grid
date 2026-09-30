@@ -8,7 +8,7 @@ type Props = {
 export default async function AdminPackDetailPage({ params }: Props) {
   const { id } = await params;
   return (
-    <StudioPage title="Pack" description="Bündel aus bestehenden Aufgaben. Inhalt in Aufgaben, Logik im Spiel.">
+    <StudioPage title="Bestandteil" description="Ein benannter Teil aus einem getesteten Spiel. Inhalt bleibt in den Zutaten.">
       <PackEditorSection packId={id} />
     </StudioPage>
   );

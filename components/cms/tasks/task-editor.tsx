@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { getTasksBlastRadius } from "@/app/actions/cms/packs";
 import { upsertTask, type TaskUpsertInput } from "@/app/actions/cms/tasks";
 import { TaskDeleteButton } from "@/components/cms/tasks/task-delete-button";
 import { TaskDuplicateButton } from "@/components/cms/tasks/task-duplicate-button";
@@ -49,6 +50,14 @@ export function TaskEditor({ task, returnTo }: Props) {
   const cache = useStudioCache();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [reach, setReach] = useState<{ packCount: number; gameCount: number } | null>(null);
+
+  useEffect(() => {
+    if (!task?.id) return;
+    void getTasksBlastRadius([task.id]).then((result) => {
+      if (result.success) setReach(result.data?.[task.id] ?? null);
+    });
+  }, [task?.id]);
 
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
@@ -153,6 +162,13 @@ export function TaskEditor({ task, returnTo }: Props) {
     >
       <div className="min-w-0 space-y-6">
         {error ? <StudioError message={error} /> : null}
+        {reach && reach.packCount > 0 ? (
+          <StudioHint tone={reach.packCount > 1 || reach.gameCount > 1 ? "warn" : "info"}>
+            {reach.packCount > 1 || reach.gameCount > 1
+              ? `Achtung: Du bearbeitest die Basis-Aufgabe. Das wirkt auf ${reach.packCount} Packs und ${reach.gameCount} Spiele. Orts-Text und GPS/Codes gehören ins Stadt-Pack, nicht hier.`
+              : "Diese Aufgabe hängt an einem Pack. GPS und Indoor-Codes bleiben am Stadt-Pack."}
+          </StudioHint>
+        ) : null}
 
         <StudioPanel>
           <StudioSectionTitle

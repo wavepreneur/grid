@@ -157,8 +157,8 @@ Indoor = GPS-Game **ohne GPS**: Teilnehmer laufen zu Objekten, Codes ersetzen de
 | `kind` | puzzle \| search \| logic \| team \| finale |
 | `global_level_id` | Slot → dieselbe Layer-2-Mission |
 
-**Defaults:** Codes werden beim Content-Pack / Publish vergeben.  
-**Kunden-Override:** wie GPS — Deltas in `events.route_override.stations` (Code, Place), kein neues Spiel.
+**Defaults:** Codes werden am **Layer-1-Pack-Item** vordefiniert (`overrides.station.code`) und sind als Liste ladbar.  
+**Kunden-Override:** wie GPS — Deltas in `events.route_override.stations` (Code, Place), nur dieses Event. Studio-Codes und andere Buchungen bleiben.
 
 DB: `local_stations` (parallel zu `local_waypoints`), Unique `(city_id, global_level_id)` und `(city_id, code)`.
 
@@ -216,19 +216,21 @@ studio_tasks.content_context    → outdoor | indoor | online | any
 studio_tasks.role_assignment    → alpha | beta | gamma | team | none
 studio_layer_packs              → benannte Packs je Layer (Stadt / Mission / Team)
 studio_layer_packs.city_id      → GRID cities.id (Exitmania cities.id via source_city_id)
-studio_layer_pack_items         → Tasks + GPS/Bonus-Overrides im Pack
+studio_layer_pack_items         → Tasks + GPS/Station/Bonus-Overrides (kein Task-Klon pro Stadt)
+studio_compose_recipes          → benanntes L2+L3+Surface; Compose hängt viele L1 daran
 studio_games.slug               → stabiler Spiel-Code (= Exitmania grid_content_pack_slug)
 studio_games.layer1_pack_id     → Stadt-Pack (oder null = Legacy studio_game_tasks)
 studio_games.layer2_pack_id     → Missions-Pack, geteilt über alle Städte
 studio_games.layer3_pack_id     → Team-Pack, geteilt über alle Städte
+studio_games.compose_recipe_id  → welches Rezept diese dünne Zeile erzeugt hat
 studio_games.active_layers      → [1, 2, 3]
 studio_games.runtime_profiles   → Surfaces + allowed_fallbacks
 ```
 
-Skalierung: 100k Städte × 20 Missionen × 50 Sprachen = Packs referenzieren, nicht kopieren.
-Layer 1 ist städtisch: Duplizieren klont Aufgaben + Reihenfolge + Bedingungen. Inhalt in Aufgaben, GPS im Spiel.
-Layer 2/3 einmal pro Spieltyp — andocken, nicht kopieren. Bedingungen bleiben im Spiel-Editor.
-CMS: `/admin/packs` sind Bündel, kein zweites CMS.
+Skalierung: Packs referenzieren, nicht kopieren. Unique `(org, l1, l2, l3)` — Compose ist idempotent.
+Layer 1 teilt die Task-Hülle. GPS (Outdoor) und Stationscode (Indoor) sitzen nur am Pack-Item. Neue Stadt = neuer Code, leeres GPS, dieselbe `task_id`.
+Layer 2/3 einmal pro Spieltyp — andocken, nicht kopieren. Rezept merkt die Mechanik für die nächsten Städte.
+CMS: `/admin/packs` sind Bündel + „Spiele stecken“, kein zweites CMS.
 
 ### Stabile Identitäten
 
@@ -285,9 +287,10 @@ Layer-Packs
 └── Teams (L3)         ← Bonus/Rollen, einmal, andocken
 ```
 
-Neue Stadt: Layer-1-Pack duplizieren → 10 Aufgaben in Aufgaben überschreiben → Koordinaten im Spiel unter Bedingungen. L2/L3 der Vorlage andocken.
-Ein Spiel zuerst spielbar machen, dann „Als Packs speichern“.
-Spiel duplizieren bei Pack-Spielen: nur die drei Verweise kopieren.
+Neue Stadt: Layer-1-Pack von Vorlage ableiten — **dieselben Tasks**, GPS leer, **neue Indoor-Codes**. Ortstext nur als Override. Klon nur, wenn das Rätsel wirklich ein anderes ist.
+Seed-Spiel in Spiele → Mission/Bonus → als L2/L3-Pack. Dann Städte × Mission × Team stecken (dünne Games + Codes, auch unfertig verkaufbar).
+Indoor: Codes am L1-Pack vordefinieren und herunterladen. Teamevent tauscht sie nur in `route_override.stations`.
+Live-Events bleiben auf dem Snapshot, bis „Live pushen“.
 Bestehende Spiele ohne Pack-IDs bleiben auf `studio_game_tasks`.
 
 **Nicht priorisieren:** Loquiz-Flow-Modi als Haupt-UX; Online Ready/Board/Feed vor Phasen-Runtime.
@@ -304,6 +307,7 @@ Bestehende Spiele ohne Pack-IDs bleiben auf `studio_game_tasks`.
 | Player-Phasen Hub→Quiz→Level→Bonus | ✅ Basis | inkl. Bonus-Phase + City-UI (`frontend_idee`) |
 | local_stations + Code-Override | 🟡 Schema + Loader | Migration; Defaults wenn keine Rows |
 | Studio Layer-Packs (Stadt/Mission/Team) | ✅ Basis | `studio_layer_packs`, CMS `/admin/packs` |
+| Compose-Rezepte + dünne Games | ✅ Basis | Unique Combo, Indoor-Codes am L1-Item |
 | Logic Rules zur Laufzeit | ⬜ Roadmap | Heute: linear `current_level + 1` |
 | content_mode im Loader | ✅ Basis | Surface-Filter + Stationen |
 | Player-UI wie frontend_idee | 🟡 Basis | `PlayPhaseFlow` unter `/e/…` |

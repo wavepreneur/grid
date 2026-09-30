@@ -51,7 +51,7 @@ export function CitySearchSelect({ value, selected, onChange, placeholder }: Pro
     <div className="relative">
       <StudioInput
         value={open ? query : label}
-        placeholder={placeholder ?? "Stadt suchen…"}
+        placeholder={placeholder ?? "Exitmania-Stadt suchen…"}
         onFocus={() => {
           setOpen(true);
           setQuery("");

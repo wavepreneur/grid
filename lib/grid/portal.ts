@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_GPS_RADIUS_METERS } from "@/lib/cms/gps-defaults";
+import { parseCustomerStationCode } from "@/lib/grid/stations";
 import { parseContentConfig, parseRouteOverride } from "@/lib/grid/content-engine";
 import { bumpEventContentRevision } from "@/lib/grid/content-revision";
 import { loadResolvedEventContent } from "@/lib/grid/content-loader";
@@ -31,6 +32,13 @@ export type PortalQuiz = {
   correct_index: 0 | 1 | 2 | 3;
 };
 
+export type PortalStation = {
+  level: number;
+  title: string;
+  place: string;
+  code: string;
+};
+
 export type PortalAccess = {
   team_name: string;
   access_code: string;
@@ -48,11 +56,13 @@ export type PortalSnapshot = {
   show_waypoints: boolean;
   waypoints: PortalWaypoint[];
   quizzes: PortalQuiz[];
+  stations: PortalStation[];
   accesses: PortalAccess[];
   invite_code: string;
   locked: boolean;
   modules: EventModules;
   show_quizzes: boolean;
+  show_stations: boolean;
   show_intelligence: boolean;
 };
 
@@ -65,6 +75,7 @@ export type PortalSaveInput = {
     answers: [string, string, string, string];
     correct_index: 0 | 1 | 2 | 3;
   }>;
+  stations: Array<{ level: number; code: string; place?: string }>;
 };
 
 type PortalEventRow = {
@@ -150,6 +161,15 @@ export function validatePortalSave(input: PortalSaveInput): string | null {
     }
   }
 
+  for (const station of input.stations) {
+    if (!Number.isInteger(station.level) || station.level < 1) {
+      return "Ungültige Station.";
+    }
+    if (!parseCustomerStationCode(station.code)) {
+      return `Stationscode für Aufgabe ${station.level}: 2–24 Buchstaben oder Zahlen.`;
+    }
+  }
+
   return null;
 }
 
@@ -220,6 +240,15 @@ export async function loadPortalSnapshot(token: string): Promise<PortalSnapshot 
       correct_index: quizCorrectIndex(level.arrival_quiz),
     }));
 
+  const stations: PortalStation[] = content.levels
+    .filter((level) => level.station)
+    .map((level) => ({
+      level: level.level,
+      title: level.title,
+      place: level.station?.place ?? "",
+      code: level.station?.code ?? "",
+    }));
+
   const supabase = createAdminClient();
   const { data: teams, error: teamsError } = await supabase
     .from("teams")
@@ -265,11 +294,13 @@ export async function loadPortalSnapshot(token: string): Promise<PortalSnapshot 
     show_waypoints: modules.custom_routes,
     waypoints,
     quizzes,
+    stations,
     accesses,
     invite_code: event.invite_code,
     locked,
     modules,
     show_quizzes: modules.custom_quiz,
+    show_stations: modules.custom_routes && stations.length > 0,
     show_intelligence: modules.team_intelligence,
   };
 }
@@ -308,6 +339,7 @@ export async function savePortalOverrides(
     duration_minutes: input.duration_minutes,
     waypoints: modules.custom_routes ? input.waypoints : [],
     quizzes: modules.custom_quiz ? input.quizzes : [],
+    stations: modules.custom_routes ? input.stations : [],
   };
   const validationError = validatePortalSave(gatedInput);
   if (validationError) {
@@ -340,6 +372,15 @@ export async function savePortalOverrides(
   for (const quiz of gatedInput.quizzes) {
     if (!allowedQuizLevels.has(quiz.level)) {
       throw new Error(`Aufgabe ${quiz.level} hat kein überschreibbares Einstiegsquiz.`);
+    }
+  }
+
+  const allowedStationLevels = new Set(
+    content.levels.filter((level) => level.station).map((level) => level.level),
+  );
+  for (const station of gatedInput.stations) {
+    if (!allowedStationLevels.has(station.level)) {
+      throw new Error(`Aufgabe ${station.level} hat keinen überschreibbaren Stationscode.`);
     }
   }
 
@@ -379,9 +420,24 @@ export async function savePortalOverrides(
     };
   }
 
+  const nextStations: NonNullable<EventRouteOverride["stations"]> = {
+    ...(currentOverride.stations ?? {}),
+  };
+  for (const station of gatedInput.stations) {
+    const parsed = parseCustomerStationCode(station.code);
+    if (!parsed) continue;
+    const previous = nextStations[String(station.level)] ?? {};
+    nextStations[String(station.level)] = {
+      ...previous,
+      code: parsed,
+      ...(station.place !== undefined ? { place: station.place } : {}),
+    };
+  }
+
   const nextOverride: EventRouteOverride = {
     ...currentOverride,
     levels: nextLevels,
+    stations: nextStations,
   };
 
   const supabase = createAdminClient();

@@ -16,7 +16,7 @@ export function PackEditorSection({ packId }: { packId: string }) {
   if (query.isError || !query.data) {
     return (
       <StudioError
-        message={query.error instanceof Error ? query.error.message : "Pack nicht gefunden."}
+        message={query.error instanceof Error ? query.error.message : "Bestandteil nicht gefunden."}
       />
     );
   }

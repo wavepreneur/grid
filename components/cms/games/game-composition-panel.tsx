@@ -3,9 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { updateGame } from "@/app/actions/cms/games";
-import { saveGameAsLayerPacks } from "@/app/actions/cms/packs";
 import { PackSearchSelect } from "@/components/cms/packs/pack-search-select";
-import { StudioButton, StudioError } from "@/components/cms/studio-ui";
+import { StudioError, StudioLinkButton } from "@/components/cms/studio-ui";
 import { gameUsesLayerPacks, layerPackHintDe, layerPackLabelDe } from "@/lib/cms/layer-packs";
 import type { StudioGame } from "@/lib/cms/types";
 import { useInvalidateStudioPacks } from "@/lib/hooks/use-studio-packs";
@@ -51,23 +50,12 @@ export function GameCompositionPanel({ game, onGameChange }: Props) {
     });
   }
 
-  function extractPacks() {
-    startTransition(async () => {
-      const result = await saveGameAsLayerPacks(game.id);
-      if (!result.success) {
-        setError(result.error);
-        return;
-      }
-      setError(null);
-      refresh(result.data);
-    });
-  }
-
   return (
     <section className="rounded-3xl bg-card p-5 shadow-soft">
-      <h2 className="text-lg font-bold">Packs andocken</h2>
+      <h2 className="text-lg font-bold">Teile dieses Spiels</h2>
       <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-        Spiel zuerst spielbar machen. Danach Layer 1 (Stadt) duplizieren, Layer 2 und 3 nur anhängen.
+        Nach dem Testen unter Rezepte aufteilen und benennen. Hier siehst du, welcher Ort, welche
+        Mission und welches Team hängen.
         {pending ? " Speichert…" : ""}
       </p>
       {error ? (
@@ -77,12 +65,9 @@ export function GameCompositionPanel({ game, onGameChange }: Props) {
       ) : null}
       {!packed ? (
         <div className="mt-4">
-          <StudioButton type="button" disabled={pending} onClick={extractPacks}>
-            Dieses Spiel als Packs speichern
-          </StudioButton>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Erzeugt Stadt-, Missions- und Team-Pack aus den aktuellen Slots. GPS liegt danach im Stadt-Pack.
-          </p>
+          <StudioLinkButton href="/admin/packs" variant="secondary">
+            Unter Rezepte aufteilen und benennen
+          </StudioLinkButton>
         </div>
       ) : null}
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -92,7 +77,7 @@ export function GameCompositionPanel({ game, onGameChange }: Props) {
           return (
             <div key={layer} className="rounded-2xl bg-secondary/60 p-4">
               <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                Layer {layer} · {layerPackLabelDe(layer)}
+                {layerPackLabelDe(layer)}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">{layerPackHintDe(layer)}</p>
               <div className="mt-3">
@@ -107,14 +92,14 @@ export function GameCompositionPanel({ game, onGameChange }: Props) {
                   href={`/admin/packs/${current}`}
                   className="mt-2 inline-block text-xs font-semibold text-primary underline-offset-2 hover:underline"
                 >
-                  Pack öffnen
+                  Bestandteil öffnen
                 </Link>
               ) : (
                 <Link
                   href="/admin/packs"
                   className="mt-2 inline-block text-xs font-semibold text-primary underline-offset-2 hover:underline"
                 >
-                  Pack anlegen
+                  Unter Rezepte aufteilen
                 </Link>
               )}
             </div>

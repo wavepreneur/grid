@@ -17,6 +17,7 @@ import {
   type PortalAccess,
   type PortalSaveInput,
   type PortalSnapshot,
+  type PortalStation,
 } from "@/lib/grid/portal";
 
 function absoluteUrl(pathOrUrl: string): string {
@@ -56,6 +57,7 @@ function parseCoordinatePair(value: string): { lat: number; lng: number } | null
 export function EventPortalForm({ initial }: Props) {
   const [duration, setDuration] = useState(String(initial.duration_minutes));
   const [waypoints, setWaypoints] = useState(initial.waypoints);
+  const [stations, setStations] = useState<PortalStation[]>(initial.stations);
   const [quizzes, setQuizzes] = useState(initial.quizzes);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -64,7 +66,7 @@ export function EventPortalForm({ initial }: Props) {
 
   const [goHost, setGoHost] = useState("gridos.vercel.app/go");
   const [goUrl, setGoUrl] = useState("https://gridos.vercel.app/go");
-  const showPrepare = initial.show_waypoints || initial.show_quizzes;
+  const showPrepare = initial.show_waypoints || initial.show_quizzes || initial.show_stations;
 
   useEffect(() => {
     const origin = window.location.origin;
@@ -115,6 +117,11 @@ export function EventPortalForm({ initial }: Props) {
         lat: waypoint.lat,
         lng: waypoint.lng,
       })),
+      stations: stations.map((station) => ({
+        level: station.level,
+        code: station.code,
+        place: station.place,
+      })),
       quizzes: quizzes
         .filter((quiz) => quiz.question.trim() || quiz.answers.some((answer) => answer.trim()))
         .map((quiz) => ({
@@ -134,6 +141,7 @@ export function EventPortalForm({ initial }: Props) {
     }
 
     setWaypoints(result.data.waypoints);
+    setStations(result.data.stations);
     setQuizzes(result.data.quizzes);
     setDuration(String(result.data.duration_minutes));
     setSaved(true);
@@ -231,6 +239,68 @@ export function EventPortalForm({ initial }: Props) {
               <EmptyModule
                 title="Eigene Routen"
                 body="Hier erscheinen die GPS-Punkte zum Verschieben. Die Karten-Ansicht folgt — das Modul ist für dieses Event schon frei."
+              />
+            )
+          ) : null}
+
+          {initial.show_stations ? (
+            stations.length > 0 ? (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Stationscodes überschreiben</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    Nur dieses Event. Das Hauptspiel und andere Buchungen behalten die Studio-Codes.
+                  </p>
+                </div>
+                {stations.map((station) => (
+                  <fieldset
+                    key={station.level}
+                    className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4"
+                  >
+                    <legend className="px-1 text-sm font-semibold text-slate-800">
+                      Aufgabe {station.level} · {station.title}
+                    </legend>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <GridLabel>Code</GridLabel>
+                        <GridInput
+                          disabled={initial.locked}
+                          value={station.code}
+                          onChange={(event) =>
+                            setStations((current) =>
+                              current.map((row) =>
+                                row.level === station.level
+                                  ? { ...row, code: event.target.value.toUpperCase() }
+                                  : row,
+                              ),
+                            )
+                          }
+                        />
+                      </div>
+                      <div>
+                        <GridLabel>Ort (optional)</GridLabel>
+                        <GridInput
+                          disabled={initial.locked}
+                          value={station.place}
+                          onChange={(event) =>
+                            setStations((current) =>
+                              current.map((row) =>
+                                row.level === station.level
+                                  ? { ...row, place: event.target.value }
+                                  : row,
+                              ),
+                            )
+                          }
+                        />
+                      </div>
+                    </div>
+                  </fieldset>
+                ))}
+              </div>
+            ) : (
+              <EmptyModule
+                title="Stationscodes"
+                body="Indoor-Codes zum Austauschen erscheinen hier, sobald das Spiel Stationen hat."
               />
             )
           ) : null}

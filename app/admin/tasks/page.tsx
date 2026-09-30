@@ -7,11 +7,11 @@ export default function AdminTasksPage() {
   return (
     <StudioPage
       eyebrow="GRID Studio · Schritt 1"
-      title="Aufgaben"
-      description="Hier entsteht der Vorrat. Packs (Stadt / Mission / Team) bündeln die Aufgaben — das Spiel steckt sie nur zusammen."
+      title="Zutaten"
+      description="Hier sammelst du den Vorrat. Je mehr Rätsel, desto schneller entstehen später neue Spiele. Inhalt bleibt hier — Spiele und Rezepte greifen nur darauf zu."
       actions={
         <StudioLinkButton href="/admin/tasks/new" icon={<IconPlus size={16} />}>
-          Neue Aufgabe
+          Neue Zutat
         </StudioLinkButton>
       }
     >

@@ -16,10 +16,12 @@ import { parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
 import type { RoleAssignment, StudioLayer } from "@/lib/cms/layer-model";
 import { isStudioLayer } from "@/lib/cms/layer-model";
 import { DEFAULT_TASK_CONTENT, type StudioGame, type StudioGameTaskLink, type StudioTask } from "@/lib/cms/types";
+import { randomStationAccessCode } from "@/lib/grid/stations";
 
 export const PACK_SLOT_MAX = 30;
 export const PACK_SEARCH_LIMIT = 40;
-export const COMPOSE_GAMES_MAX = 250;
+export const COMPOSE_GAMES_MAX = 500;
+export const COMPOSE_L1_LIST_MAX = 500;
 export const DUPLICATE_PACKS_MAX = 100;
 export const CREATE_CITIES_MAX = 100;
 
@@ -129,25 +131,25 @@ export function packItemToGameLink(args: {
 }
 
 export function layerPackLabelDe(layer: StudioLayer): string {
-  if (layer === 1) return "Stadt";
+  if (layer === 1) return "Ort";
   if (layer === 2) return "Mission";
   return "Team";
 }
 
 export function layerPackTitleDe(layer: StudioLayer): string {
-  if (layer === 1) return "Städte (Layer 1)";
-  if (layer === 2) return "Missionen (Layer 2)";
-  return "Teams (Layer 3)";
+  if (layer === 1) return "Ort";
+  if (layer === 2) return "Mission";
+  return "Team";
 }
 
 export function layerPackHintDe(layer: StudioLayer): string {
   if (layer === 1) {
-    return "Die Einstiegsaufgaben dieser Stadt plus Reihenfolge und Bedingungen. Stadt aus Exitmania wählen — der Slug darf sich ändern. Duplizieren kopiert Aufgaben und Logik.";
+    return "Outdoor: Exitmania-Stadt + GPS. Indoor: Quizzes mit Code im Gebäude. Entsteht beim Aufteilen eines getesteten Spiels oder durch Anhängen einer Stadt.";
   }
   if (layer === 2) {
-    return "Die Mission. Einmal, für alle Städte. Nicht kopieren, nur andocken.";
+    return "Die Mission aus einem getesteten Spiel — einmal benennen, dann in jedes Rezept legen.";
   }
-  return "Bonusaufgaben und wann sie erscheinen. Einmal, für alle Städte.";
+  return "Die Team-Dynamik aus demselben Spiel — einmal benennen, dann kombinieren.";
 }
 
 export function mapStudioTaskRow(raw: Record<string, unknown>): StudioTask {
@@ -211,6 +213,64 @@ export function parsePackItemOverrides(raw: unknown): LayerPackItemOverrides {
     ...(role ? { role } : {}),
     when: parseBonusWhen(o.when),
     locales: o.locales && typeof o.locales === "object" ? (o.locales as Record<string, unknown>) : undefined,
+  };
+}
+
+/** New city pack: keep structure, drop GPS, mint a fresh indoor code. */
+export function sharedLayer1ItemOverrides(source: Record<string, unknown>): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...source };
+  delete next.location;
+  delete next.gps;
+  const prev =
+    next.station && typeof next.station === "object" ? (next.station as Record<string, unknown>) : {};
+  next.station = {
+    ...(typeof prev.name === "string" ? { name: prev.name } : {}),
+    ...(typeof prev.kind === "string" ? { kind: prev.kind } : {}),
+    place: "",
+    code: randomStationAccessCode(),
+  };
+  return next;
+}
+
+export function withFreshStationCode(overrides: Record<string, unknown>): Record<string, unknown> {
+  const station =
+    overrides.station && typeof overrides.station === "object"
+      ? (overrides.station as Record<string, unknown>)
+      : {};
+  if (typeof station.code === "string" && station.code.trim()) return overrides;
+  return {
+    ...overrides,
+    station: {
+      ...station,
+      code: randomStationAccessCode(),
+    },
+  };
+}
+
+export type StudioComposeRecipe = {
+  id: string;
+  organization_id: string;
+  name: string;
+  layer2_pack_id: string | null;
+  layer3_pack_id: string | null;
+  surface: "outdoor" | "indoor" | "online";
+  language: StudioLanguage;
+  created_at: string;
+  updated_at: string;
+};
+
+export function normalizeComposeRecipeRow(row: Record<string, unknown>): StudioComposeRecipe {
+  const surface = row.surface;
+  return {
+    id: String(row.id),
+    organization_id: String(row.organization_id),
+    name: String(row.name ?? ""),
+    layer2_pack_id: typeof row.layer2_pack_id === "string" ? row.layer2_pack_id : null,
+    layer3_pack_id: typeof row.layer3_pack_id === "string" ? row.layer3_pack_id : null,
+    surface: surface === "indoor" || surface === "online" ? surface : "outdoor",
+    language: parseStudioLanguage(row.language),
+    created_at: String(row.created_at ?? ""),
+    updated_at: String(row.updated_at ?? ""),
   };
 }
 

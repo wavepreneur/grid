@@ -6,9 +6,12 @@ import { useRouter } from "next/navigation";
 import {
   addTaskToLayerPack,
   deleteLayerPack,
+  getTasksBlastRadius,
+  listPackStationCodes,
   removeTaskFromLayerPack,
   reorderLayerPackItems,
   updateLayer1ItemGps,
+  updateLayer1ItemStation,
   updateLayer3Item,
   updateLayerPack,
 } from "@/app/actions/cms/packs";
@@ -17,7 +20,7 @@ import { GpsWaypointPicker } from "@/components/cms/gps/gps-waypoint-picker";
 import { CitySearchSelect } from "@/components/cms/packs/city-search-select";
 import { StudioDeleteModal } from "@/components/cms/shared/studio-delete-modal";
 import { StudioButton, StudioError, StudioHint, StudioInput, StudioLabel, StudioSelect, StudioSuccess } from "@/components/cms/studio-ui";
-import { IconMapPin, IconPlus, IconSave, IconTrash } from "@/components/cms/studio-icons";
+import { IconDownload, IconKeyRound, IconMapPin, IconPlus, IconSave, IconTrash } from "@/components/cms/studio-icons";
 import { defaultMapCenter, type GpsPin } from "@/lib/cms/gps-defaults";
 import { BONUS_WHEN_OPTIONS, type BonusAudience, type BonusWhenType } from "@/lib/cms/bonus-bindings";
 import type { DirectoryCity } from "@/lib/cms/city-directory";
@@ -44,8 +47,18 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
   const [pending, startTransition] = useTransition();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [gpsOpenId, setGpsOpenId] = useState<string | null>(null);
+  const [codeDrafts, setCodeDrafts] = useState<Record<string, string>>({});
+  const [reach, setReach] = useState<Record<string, { packCount: number; gameCount: number }>>({});
   const debounced = useDebouncedValue(search, 200);
   const { data: library = [] } = useTaskLibrarySearch(debounced);
+
+  useEffect(() => {
+    const ids = [...new Set(items.map((item) => item.task_id))];
+    if (ids.length === 0) return;
+    void getTasksBlastRadius(ids).then((result) => {
+      if (result.success) setReach(result.data ?? {});
+    });
+  }, [items]);
 
   useEffect(() => {
     if (!initialPack.city_id) return;
@@ -130,7 +143,9 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
           </div>
           {pack.layer === 1 ? (
             <div>
-              <StudioLabel hint="Identität ist die Exitmania-Stadt, nicht der Slug">Stadt</StudioLabel>
+              <StudioLabel hint="Nur aus Exitmania. Leer = Indoor-Pack ohne Stadt. GRID legt keine Städte an.">
+                Exitmania-Stadt
+              </StudioLabel>
               <CitySearchSelect
                 value={cityId}
                 selected={city}
@@ -161,17 +176,67 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {pack.layer === 1
-            ? "Reihenfolge und welche Aufgaben. Inhalt in Aufgaben. Koordinaten und Meter hier — nach dem Duplizieren neu setzen."
+            ? "Reihenfolge und welche Aufgaben. Inhalt in Aufgaben. GPS und Stationscode hier — nach dem Teilen einer Stadt neu setzen, die Aufgabe bleibt geteilt."
             : pack.layer === 2
               ? "Einmal pflegen, an jede Stadt andocken. Nicht kopieren."
               : "Bonus und wann — einmal, für alle Städte."}
         </p>
+        {pack.layer === 1 ? (
+          <div className="mt-3">
+            <StudioButton
+              type="button"
+              size="sm"
+              variant="secondary"
+              icon={<IconDownload size={14} />}
+              disabled={pending || items.length === 0}
+              onClick={() => {
+                startTransition(async () => {
+                  const result = await listPackStationCodes(pack.id);
+                  if (!result.success) {
+                    setError(result.error);
+                    return;
+                  }
+                  const rows = [
+                    ["Station", "Aufgabe", "Code"],
+                    ...(result.data?.cards ?? []).map((card) => [
+                      String(card.index),
+                      card.title,
+                      card.code,
+                    ]),
+                  ];
+                  const csv = rows
+                    .map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(";"))
+                    .join("\n");
+                  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+                  const href = URL.createObjectURL(blob);
+                  const link = document.createElement("a");
+                  link.href = href;
+                  link.download = `${pack.name.replaceAll(/\s+/g, "-").toLowerCase()}-codes.csv`;
+                  link.click();
+                  URL.revokeObjectURL(href);
+                });
+              }}
+            >
+              Codes herunterladen
+            </StudioButton>
+          </div>
+        ) : null}
         <div className="mt-4 space-y-2">
           {items.map((item, index) => {
             const parsed = parsePackItemOverrides(item.overrides);
             const gps = parsed.gps;
+            const stationCode = parsed.station?.code ?? "";
+            const blast = reach[item.task_id];
             return (
               <div key={item.id} className="rounded-2xl border border-border px-3 py-3">
+                <div className="flex gap-3">
+                  <span
+                    aria-hidden
+                    className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-secondary text-sm font-bold tabular-nums"
+                  >
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="font-semibold">{item.task.title}</p>
@@ -180,6 +245,17 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
                         {gps
                           ? `${gps.lat.toFixed(4)}, ${gps.lng.toFixed(4)} · ${gps.radius_meters} m`
                           : "Noch keine Koordinaten"}
+                        {stationCode ? ` · Code ${stationCode}` : " · Code fehlt"}
+                      </p>
+                    ) : null}
+                    {blast && blast.packCount > 1 ? (
+                      <p className="mt-1 text-xs font-semibold text-amber-800">
+                        Achtung: Basis-Aufgabe — Änderung wirkt auf {blast.packCount} Packs
+                        {blast.gameCount > 0 ? ` / ${blast.gameCount} Spiele` : ""}.
+                      </p>
+                    ) : pack.layer === 1 ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        GPS und Code sind der Override für {pack.name}. Die Aufgabe selbst bleibt geteilt.
                       </p>
                     ) : null}
                     <Link
@@ -235,6 +311,44 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
                       onSaved={(next) => setItems(next)}
                       onError={setError}
                     />
+                  </div>
+                ) : null}
+                {pack.layer === 1 ? (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                    <div>
+                      <StudioLabel hint="Indoor: Spieler tippt diesen Code. Outdoor ignoriert ihn. Teamevent kann ihn nur am Event tauschen.">
+                        Stationscode
+                      </StudioLabel>
+                      <StudioInput
+                        value={codeDrafts[item.id] ?? stationCode}
+                        onChange={(e) =>
+                          setCodeDrafts((current) => ({ ...current, [item.id]: e.target.value.toUpperCase() }))
+                        }
+                        placeholder="z. B. K7M2"
+                      />
+                    </div>
+                    <StudioButton
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      icon={<IconKeyRound size={14} />}
+                      disabled={pending}
+                      onClick={() => {
+                        startTransition(async () => {
+                          const result = await updateLayer1ItemStation(pack.id, item.id, {
+                            code: codeDrafts[item.id] ?? stationCode,
+                          });
+                          if (!result.success) {
+                            setError(result.error);
+                            return;
+                          }
+                          setItems(result.data ?? items);
+                          setMessage("Stationscode gespeichert.");
+                        });
+                      }}
+                    >
+                      Code speichern
+                    </StudioButton>
                   </div>
                 ) : null}
                 {pack.layer === 3 ? (
@@ -293,6 +407,8 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
                     </div>
                   </div>
                 ) : null}
+                  </div>
+                </div>
               </div>
             );
           })}

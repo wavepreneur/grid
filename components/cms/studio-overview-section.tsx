@@ -11,7 +11,6 @@ import {
   IconPuzzle,
   IconRoute,
   IconTemplate,
-  IconTicket,
 } from "@/components/cms/studio-icons";
 import { StudioOverviewSkeleton } from "@/components/cms/studio-list-skeletons";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
@@ -20,22 +19,22 @@ import { queryKeys } from "@/lib/platform/query-keys";
 
 const areas = [
   {
+    href: "/admin/tasks",
+    icon: IconPuzzle,
+    name: "Zutaten",
+    text: "Rätsel einmal anlegen — der Vorrat für jedes Spiel.",
+  },
+  {
     href: "/admin/games",
     icon: IconGamepad,
     name: "Spiele",
-    text: "Spiele in Layern zusammenstellen, duplizieren und veröffentlichen.",
+    text: "Eine Mahlzeit kochen, testen und abschmecken.",
   },
   {
-    href: "/admin/tasks",
-    icon: IconPuzzle,
-    name: "Aufgaben",
-    text: "Rätsel einmal anlegen und mit beliebig vielen Spielen verknüpfen.",
-  },
-  {
-    href: "/admin/tickets",
-    icon: IconTicket,
-    name: "Tickets",
-    text: "Zugänge und Aktivierungen für Live-Events verwalten.",
+    href: "/admin/packs",
+    icon: IconLayers,
+    name: "Rezepte",
+    text: "Spiel teilen, benennen, mit Städten zu neuen Spielen kombinieren.",
   },
 ];
 
@@ -57,7 +56,7 @@ export function StudioOverviewSection() {
   return (
     <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Aufgaben" value={String(stats.tasks)} note="in der Bibliothek" />
+        <Stat label="Zutaten" value={String(stats.tasks)} note="im Vorrat" />
         <Stat label="Spiele" value={String(stats.games)} note={`${stats.templates} Vorlagen`} />
         <Stat label="Ticket-Sätze" value={String(stats.activePools)} note="Zugangscodes" />
         <Stat
@@ -92,21 +91,21 @@ export function StudioOverviewSection() {
           <ul className="space-y-2">
             <WorkflowRow
               step={1}
-              title="Aufgaben anlegen"
-              text="Rätsel in der Bibliothek — unabhängig von Spielen."
+              title="Zutaten sammeln"
+              text="Rätsel in den Vorrat — je mehr, desto besser."
               href="/admin/tasks"
             />
             <WorkflowRow
               step={2}
-              title="Spiel zusammenstellen"
-              text="Ablauf sortieren und Version veröffentlichen."
+              title="Ein Spiel kochen"
+              text="Vollständig bauen, testen, abschmecken."
               href="/admin/games"
             />
             <WorkflowRow
               step={3}
-              title="Live-Event starten"
-              text="Teams treten über den Einladungslink bei."
-              href="/admin/games"
+              title="Rezept kombinieren"
+              text="Teilen, benennen, mit Städten neue Spiele erzeugen."
+              href="/admin/packs"
             />
           </ul>
         </Panel>

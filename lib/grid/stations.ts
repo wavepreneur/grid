@@ -20,6 +20,9 @@ const ACCESS_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 export const STATION_ACCESS_CODE_MIN = 4;
 export const STATION_ACCESS_CODE_MAX = 10;
+/** Teamevent-Portal: Kunde darf kürzere/längere Wörter oder Zahlen setzen. */
+export const CUSTOMER_STATION_CODE_MIN = 2;
+export const CUSTOMER_STATION_CODE_MAX = 24;
 
 /** Default codes A1, A2, … then B1 — legacy pack fallback. */
 export function defaultStationCode(index1Based: number): string {
@@ -68,6 +71,16 @@ export function stationAccessCodeFromSeed(
 export function parseStationAccessCode(raw: string): string | null {
   const code = normalizeStationCode(raw);
   if (code.length < STATION_ACCESS_CODE_MIN || code.length > STATION_ACCESS_CODE_MAX) {
+    return null;
+  }
+  if (!/^[A-Z0-9]+$/.test(code)) return null;
+  return code;
+}
+
+/** Event-Portal / route_override — Wörter oder Zahlen, nur dieses Event. */
+export function parseCustomerStationCode(raw: string): string | null {
+  const code = normalizeStationCode(raw);
+  if (code.length < CUSTOMER_STATION_CODE_MIN || code.length > CUSTOMER_STATION_CODE_MAX) {
     return null;
   }
   if (!/^[A-Z0-9]+$/.test(code)) return null;

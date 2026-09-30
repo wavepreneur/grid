@@ -49,7 +49,7 @@ export function PackSearchSelect({
     if (selected?.id === value) {
       return selected.city_slug ? `${selected.name} (${selected.city_slug})` : selected.name;
     }
-    return "Gewähltes Pack";
+    return "Gewählter Teil";
   }, [selected, value]);
 
   return (
@@ -82,12 +82,14 @@ export function PackSearchSelect({
                 setOpen(false);
               }}
             >
-              Kein Pack
+              Keinen wählen
             </button>
           ) : null}
           {packs.length === 0 ? (
             <p className="px-3 py-2 text-xs text-muted-foreground">
-              {layer === 1 ? "Stadtname tippen — die Liste bleibt kurz, auch bei 100.000 Städten." : "Noch keine Packs."}
+              {layer === 1
+                ? "Stadtname tippen — die Liste bleibt kurz."
+                : "Noch kein Teil. Teile zuerst ein Spiel unter Rezepte."}
             </p>
           ) : (
             packs.map((pack) => (

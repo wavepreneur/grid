@@ -4,9 +4,15 @@ import { revalidatePath } from "next/cache";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
 import { parseBonusWhen, type BonusAudience } from "@/lib/cms/bonus-bindings";
 import { parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
-import { DEFAULT_RUNTIME_PROFILES, isStudioLayer, type StudioLayer } from "@/lib/cms/layer-model";
+import {
+  DEFAULT_RUNTIME_PROFILES,
+  isStudioLayer,
+  parseRuntimeProfiles,
+  type StudioLayer,
+} from "@/lib/cms/layer-model";
 import {
   COMPOSE_GAMES_MAX,
+  COMPOSE_L1_LIST_MAX,
   CREATE_CITIES_MAX,
   DUPLICATE_PACKS_MAX,
   PACK_SEARCH_LIMIT,
@@ -14,19 +20,24 @@ import {
   gameUsesLayerPacks,
   mapStudioTaskRow,
   mergePackLinksOntoGame,
+  normalizeComposeRecipeRow,
   normalizeLayerPackRow,
   parsePackLinkId,
+  sharedLayer1ItemOverrides,
   splitOverridesForLayerPacks,
   stripGeoFromMissionOverrides,
+  withFreshStationCode,
+  type StudioComposeRecipe,
   type StudioLayerPack,
   type StudioLayerPackItem,
 } from "@/lib/cms/layer-packs";
-import { slugifyStudio, type StudioGame, type StudioGameTaskLink, type StudioTask } from "@/lib/cms/types";
+import { slugifyStudio, type StudioGame, type StudioGameTaskLink } from "@/lib/cms/types";
 import { isUuid } from "@/lib/cms/city-directory";
 import { parseLinkLayer, parseLinkOverrides } from "@/lib/cms/game-link-config";
 import { surfaceToPreset } from "@/lib/cms/game-slots";
 import { parseGpsOverride, type GpsPin } from "@/lib/cms/gps-defaults";
 import { generateGameSlug } from "@/lib/grid/codes";
+import { parseCustomerStationCode, randomStationAccessCode } from "@/lib/grid/stations";
 import type { ActionResult } from "@/lib/grid/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -62,26 +73,6 @@ async function ensureUniquePackSlug(
     candidate = `${base}-${attempt + 2}`.slice(0, 64);
   }
   throw new Error("Pack-Slug konnte nicht erzeugt werden.");
-}
-
-async function ensureUniqueTaskSlug(
-  supabase: AdminClient,
-  organizationId: string,
-  name: string,
-): Promise<string> {
-  const base = slugifyStudio(name) || "aufgabe";
-  let candidate = base.slice(0, 64);
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    const { data } = await supabase
-      .from("studio_tasks")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("slug", candidate)
-      .maybeSingle();
-    if (!data) return candidate;
-    candidate = `${base}-${attempt + 2}`.slice(0, 64);
-  }
-  throw new Error("Aufgaben-Slug konnte nicht erzeugt werden.");
 }
 
 function mapPackItemRow(row: Record<string, unknown>): StudioLayerPackItem | null {
@@ -138,12 +129,13 @@ async function getOwnedCity(
   if (!cityId || !isUuid(cityId)) return null;
   const { data, error } = await supabase
     .from("cities")
-    .select("id, slug, name")
+    .select("id, slug, name, source_city_id")
     .eq("id", cityId)
     .eq("organization_id", orgId)
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) return null;
+  if (!data.source_city_id) return null;
   return { id: String(data.id), slug: String(data.slug), name: String(data.name) };
 }
 
@@ -221,7 +213,7 @@ export async function listLayerPacks(input: {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
-    const limit = Math.min(200, Math.max(1, input.limit ?? PACK_SEARCH_LIMIT));
+    const limit = Math.min(COMPOSE_L1_LIST_MAX, Math.max(1, input.limit ?? PACK_SEARCH_LIMIT));
     const search = sanitizeIlike(input.search ?? "");
 
     let query = supabase
@@ -289,11 +281,8 @@ export async function createLayerPack(input: {
     const slug = await ensureUniquePackSlug(supabase, orgId, input.layer, name);
     const city = input.layer === 1 ? await getOwnedCity(supabase, orgId, input.city_id) : null;
     if (input.layer === 1 && input.city_id && !city) {
-      return { success: false, error: "Stadt nicht gefunden." };
+      return { success: false, error: "Stadt kommt nur aus Exitmania — bitte dort anlegen und hier suchen." };
     }
-    const citySlug =
-      city?.slug ??
-      (input.layer === 1 && input.city_slug?.trim() ? slugifyStudio(input.city_slug) || input.city_slug.trim() : null);
 
     const { data, error } = await supabase
       .from("studio_layer_packs")
@@ -303,7 +292,7 @@ export async function createLayerPack(input: {
         slug,
         name,
         city_id: city?.id ?? null,
-        city_slug: citySlug,
+        city_slug: city?.slug ?? null,
         language: parseStudioLanguage(input.language),
         slot_count: 0,
       })
@@ -365,12 +354,10 @@ export async function updateLayerPack(input: {
         payload.city_slug = null;
       } else {
         const city = await getOwnedCity(supabase, orgId, input.city_id);
-        if (!city) return { success: false, error: "Stadt nicht gefunden." };
+        if (!city) return { success: false, error: "Stadt kommt nur aus Exitmania — bitte dort anlegen und hier suchen." };
         payload.city_id = city.id;
         payload.city_slug = city.slug;
       }
-    } else if (input.city_slug !== undefined && pack.layer === 1 && input.city_id === undefined) {
-      payload.city_slug = input.city_slug?.trim() ? slugifyStudio(input.city_slug) || input.city_slug.trim() : null;
     }
 
     const { data, error } = await supabase
@@ -450,11 +437,14 @@ export async function addTaskToLayerPack(
       return { success: false, error: `Maximal ${PACK_SLOT_MAX} Stops pro Pack.` };
     }
 
-    const overrides: Record<string, unknown> = { ...(extras?.overrides ?? {}) };
+    let overrides: Record<string, unknown> = { ...(extras?.overrides ?? {}) };
     if (pack.layer === 3) {
       overrides.bind_slot = extras?.bind_slot ?? overrides.bind_slot ?? 0;
       overrides.role = extras?.role ?? overrides.role ?? "gamma";
       if (!overrides.when) overrides.when = { type: "immediate" };
+    }
+    if (pack.layer === 1) {
+      overrides = withFreshStationCode(overrides);
     }
 
     const { error: insertError } = await supabase.from("studio_layer_pack_items").insert({
@@ -624,43 +614,156 @@ export async function updateLayer1ItemGps(
   }
 }
 
-function tagsForCity(source: string[] | undefined, citySlug: string | null): string[] {
-  const next = [...(source ?? [])].filter(Boolean);
-  if (citySlug && !next.includes(citySlug)) next.push(citySlug);
-  return [...new Set(next)];
+export async function updateLayer1ItemStation(
+  packId: string,
+  itemId: string,
+  station: { code?: string; place?: string; name?: string },
+): Promise<ActionResult<StudioLayerPackItem[]>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const pack = await getOwnedPack(supabase, orgId, packId);
+    if (!pack) return { success: false, error: "Pack nicht gefunden." };
+    if (pack.layer !== 1) return { success: false, error: "Stationscodes nur im Stadt-Pack." };
+
+    const code = station.code?.trim()
+      ? parseCustomerStationCode(station.code)
+      : randomStationAccessCode();
+    if (station.code?.trim() && !code) {
+      return { success: false, error: "Code: 2–24 Zeichen, nur Buchstaben und Zahlen." };
+    }
+
+    const { data: existing, error: fetchError } = await supabase
+      .from("studio_layer_pack_items")
+      .select("overrides")
+      .eq("id", itemId)
+      .eq("pack_id", packId)
+      .maybeSingle();
+    if (fetchError) throw new Error(fetchError.message);
+    if (!existing) return { success: false, error: "Eintrag nicht gefunden." };
+
+    const previous = (existing.overrides as Record<string, unknown>) ?? {};
+    const prevStation =
+      previous.station && typeof previous.station === "object"
+        ? (previous.station as Record<string, unknown>)
+        : {};
+    const overrides = {
+      ...previous,
+      station: {
+        ...prevStation,
+        code,
+        ...(station.place !== undefined ? { place: station.place } : {}),
+        ...(station.name !== undefined ? { name: station.name } : {}),
+      },
+    };
+    const { error } = await supabase
+      .from("studio_layer_pack_items")
+      .update({ overrides, updated_at: new Date().toISOString() })
+      .eq("id", itemId)
+      .eq("pack_id", packId);
+    if (error) throw new Error(error.message);
+    revalidatePacks();
+    return { success: true, data: await fetchPackItems(supabase, packId) };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Stationscode konnte nicht gespeichert werden.",
+    };
+  }
 }
 
-async function cloneTaskRow(
-  supabase: AdminClient,
-  orgId: string,
-  source: StudioTask,
-  citySlug: string | null,
-): Promise<string> {
-  const slug = await ensureUniqueTaskSlug(
-    supabase,
-    orgId,
-    `${source.title}-${citySlug || "copy"}-${Math.random().toString(36).slice(2, 6)}`,
-  );
-  const { data, error } = await supabase
-    .from("studio_tasks")
-    .insert({
-      organization_id: orgId,
-      slug,
-      title: source.title,
-      description: source.description,
-      language: source.language,
-      city_slug: citySlug ?? source.city_slug,
-      game_type: source.game_type,
-      tags: tagsForCity(source.tags, citySlug),
-      content: source.content,
-      layer: source.layer,
-      content_context: source.content_context,
-      role_assignment: source.role_assignment,
-    })
-    .select("id")
-    .single();
-  if (error) throw new Error(error.message);
-  return data.id as string;
+export async function listPackStationCodes(
+  packId: string,
+): Promise<ActionResult<{ packName: string; cards: Array<{ index: number; title: string; code: string }> }>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const pack = await getOwnedPack(supabase, orgId, packId);
+    if (!pack) return { success: false, error: "Pack nicht gefunden." };
+    if (pack.layer !== 1) return { success: false, error: "Codes gibt es nur im Stadt-Pack." };
+    const items = await fetchPackItems(supabase, packId);
+    const cards = items.map((item, index) => {
+      const station = parsePackItemStation(item.overrides);
+      return {
+        index: index + 1,
+        title: item.task.title,
+        code: station?.code?.trim() || randomStationAccessCode(),
+      };
+    });
+    return { success: true, data: { packName: pack.name, cards } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Codes konnten nicht geladen werden.",
+    };
+  }
+}
+
+export async function getTasksBlastRadius(
+  taskIds: string[],
+): Promise<ActionResult<Record<string, { packCount: number; gameCount: number }>>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const unique = [...new Set(taskIds.filter(Boolean))].slice(0, 80);
+    if (unique.length === 0) return { success: true, data: {} };
+
+    const { data: itemRows, error: itemError } = await supabase
+      .from("studio_layer_pack_items")
+      .select("task_id, pack_id")
+      .in("task_id", unique);
+    if (itemError) throw new Error(itemError.message);
+
+    const packIdsByTask = new Map<string, Set<string>>();
+    for (const row of itemRows ?? []) {
+      const taskId = row.task_id as string;
+      const packId = row.pack_id as string;
+      const set = packIdsByTask.get(taskId) ?? new Set<string>();
+      set.add(packId);
+      packIdsByTask.set(taskId, set);
+    }
+
+    const allPackIds = [...new Set([...packIdsByTask.values()].flatMap((set) => [...set]))];
+    const gameCountByPack = new Map<string, number>();
+    if (allPackIds.length > 0) {
+      const { data: games, error: gameError } = await supabase
+        .from("studio_games")
+        .select("id, layer1_pack_id, layer2_pack_id, layer3_pack_id")
+        .eq("organization_id", orgId)
+        .or(
+          `layer1_pack_id.in.(${allPackIds.join(",")}),layer2_pack_id.in.(${allPackIds.join(",")}),layer3_pack_id.in.(${allPackIds.join(",")})`,
+        );
+      if (gameError) throw new Error(gameError.message);
+      for (const game of games ?? []) {
+        for (const packId of [game.layer1_pack_id, game.layer2_pack_id, game.layer3_pack_id]) {
+          if (typeof packId === "string" && allPackIds.includes(packId)) {
+            gameCountByPack.set(packId, (gameCountByPack.get(packId) ?? 0) + 1);
+          }
+        }
+      }
+    }
+
+    const data: Record<string, { packCount: number; gameCount: number }> = {};
+    for (const taskId of unique) {
+      const packs = packIdsByTask.get(taskId) ?? new Set();
+      let gameCount = 0;
+      for (const packId of packs) gameCount += gameCountByPack.get(packId) ?? 0;
+      data[taskId] = { packCount: packs.size, gameCount };
+    }
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Reichweite konnte nicht geladen werden.",
+    };
+  }
+}
+
+function parsePackItemStation(overrides: Record<string, unknown>): { code?: string } | null {
+  const raw = overrides.station;
+  if (!raw || typeof raw !== "object") return null;
+  const code = (raw as { code?: unknown }).code;
+  return { code: typeof code === "string" ? code : undefined };
 }
 
 async function duplicateOnePack(
@@ -697,15 +800,14 @@ async function duplicateOnePack(
   if (items.length > 0) {
     const insertItems = [];
     for (const [index, item] of items.entries()) {
-      const taskId =
-        source.layer === 1
-          ? await cloneTaskRow(supabase, orgId, item.task, copy.city_slug)
-          : item.task_id;
       insertItems.push({
         pack_id: copy.id,
-        task_id: taskId,
+        task_id: item.task_id,
         sort_order: item.sort_order ?? index,
-        overrides: { ...item.overrides },
+        overrides:
+          source.layer === 1
+            ? sharedLayer1ItemOverrides(item.overrides)
+            : { ...item.overrides },
       });
     }
     const { error: itemError } = await supabase.from("studio_layer_pack_items").insert(insertItems);
@@ -822,6 +924,139 @@ async function ensureUniqueGameSlug(supabase: AdminClient, organizationId: strin
   throw new Error("Spiel-Code konnte nicht erzeugt werden.");
 }
 
+function composeShellHasContent(game: StudioGame): boolean {
+  const flags = (game.feature_flags ?? {}) as Record<string, unknown>;
+  const flagUrl = (key: string) => typeof flags[key] === "string" && String(flags[key]).trim().length > 0;
+  return Boolean(
+    game.logo_url?.trim() ||
+      game.description?.trim() ||
+      flagUrl("briefing_iframe_url") ||
+      flagUrl("faq_iframe_url") ||
+      flagUrl("intro_youtube_url"),
+  );
+}
+
+function textOrFallback(current: unknown, fallback: unknown): string {
+  const cur = typeof current === "string" ? current.trim() : "";
+  if (cur) return typeof current === "string" ? current : cur;
+  return typeof fallback === "string" ? fallback : "";
+}
+
+function mergeComposeShell(
+  target: StudioGame,
+  source: StudioGame,
+  runtimeProfiles: ReturnType<typeof parseRuntimeProfiles>,
+): Record<string, unknown> {
+  const sourceProfiles = parseRuntimeProfiles(source.runtime_profiles);
+  const targetFlags = (target.feature_flags ?? {}) as Record<string, unknown>;
+  const sourceFlags = (source.feature_flags ?? {}) as Record<string, unknown>;
+  const feature_flags: Record<string, unknown> = { ...sourceFlags, ...targetFlags };
+  for (const key of ["briefing_iframe_url", "faq_iframe_url", "intro_youtube_url"]) {
+    if (!String(targetFlags[key] ?? "").trim() && String(sourceFlags[key] ?? "").trim()) {
+      feature_flags[key] = sourceFlags[key];
+    }
+  }
+  const translations =
+    target.translations && Object.keys(target.translations).length > 0
+      ? target.translations
+      : (source.translations ?? {});
+  return {
+    logo_url: target.logo_url?.trim() ? target.logo_url : source.logo_url,
+    description: textOrFallback(target.description, source.description),
+    farewell_text: textOrFallback(target.farewell_text, source.farewell_text),
+    duration_minutes: target.duration_minutes ?? source.duration_minutes,
+    feature_flags,
+    translations,
+    logic_rules:
+      Array.isArray(target.logic_rules) && target.logic_rules.length > 0
+        ? target.logic_rules
+        : (source.logic_rules ?? []),
+    language: target.language || source.language,
+    runtime_profiles: {
+      ...runtimeProfiles,
+      route_order: sourceProfiles.route_order,
+      role_labels: sourceProfiles.role_labels,
+    },
+  };
+}
+
+function composeShellPayload(
+  source: StudioGame,
+  runtimeProfiles: ReturnType<typeof parseRuntimeProfiles>,
+): Record<string, unknown> {
+  return mergeComposeShell(
+    {
+      ...source,
+      logo_url: null,
+      description: "",
+      farewell_text: "",
+      duration_minutes: null,
+      feature_flags: {},
+      translations: {},
+      logic_rules: [],
+    } as StudioGame,
+    source,
+    runtimeProfiles,
+  );
+}
+
+async function findComposeShellSource(
+  supabase: AdminClient,
+  orgId: string,
+  layer2Id: string | null,
+  layer3Id: string | null,
+  excludeId?: string,
+): Promise<StudioGame | null> {
+  if (!layer2Id && !layer3Id) return null;
+  let query = supabase
+    .from("studio_games")
+    .select("*")
+    .eq("organization_id", orgId)
+    .neq("is_template", true)
+    .order("created_at", { ascending: true });
+  if (layer2Id) query = query.eq("layer2_pack_id", layer2Id);
+  else query = query.is("layer2_pack_id", null);
+  if (layer3Id) query = query.eq("layer3_pack_id", layer3Id);
+  else query = query.is("layer3_pack_id", null);
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  const rows = (data ?? [])
+    .map((row) => asStudioGame(row as Record<string, unknown>))
+    .filter((game) => game.id !== excludeId);
+  const original = rows.find((game) => !game.compose_recipe_id && composeShellHasContent(game));
+  if (original) return original;
+  return rows.find((game) => composeShellHasContent(game)) ?? null;
+}
+
+export async function fillComposeShellIfEmpty(game: StudioGame): Promise<StudioGame> {
+  if (!gameUsesLayerPacks(game)) return game;
+  const supabase = createAdminClient();
+  const source = await findComposeShellSource(
+    supabase,
+    game.organization_id,
+    game.layer2_pack_id,
+    game.layer3_pack_id,
+    game.id,
+  );
+  if (!source) return game;
+  const shell = mergeComposeShell(game, source, parseRuntimeProfiles(game.runtime_profiles));
+  const sameLogo = (game.logo_url ?? "") === (shell.logo_url ?? "");
+  const sameDesc = (game.description ?? "") === (shell.description ?? "");
+  const sameFlags = JSON.stringify(game.feature_flags ?? {}) === JSON.stringify(shell.feature_flags ?? {});
+  if (sameLogo && sameDesc && sameFlags && (game.duration_minutes ?? null) === (shell.duration_minutes ?? null)) {
+    return game;
+  }
+  const { data, error } = await supabase
+    .from("studio_games")
+    .update({ ...shell, updated_at: new Date().toISOString() })
+    .eq("id", game.id)
+    .eq("organization_id", game.organization_id)
+    .select("*")
+    .single();
+  if (error || !data) return game;
+  return asStudioGame(data as Record<string, unknown>);
+}
+
 export async function composeGamesFromPacks(input: {
   name?: string;
   surface?: "outdoor" | "indoor" | "online";
@@ -830,7 +1065,8 @@ export async function composeGamesFromPacks(input: {
   layer2_pack_id?: string | null;
   layer3_pack_id?: string | null;
   layer1_pack_ids?: string[];
-}): Promise<ActionResult<{ createdIds: string[]; createdCount: number }>> {
+  recipe_id?: string | null;
+}): Promise<ActionResult<{ createdIds: string[]; createdCount: number; skippedCount: number }>> {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
@@ -860,6 +1096,12 @@ export async function composeGamesFromPacks(input: {
     if (input.layer2_pack_id && !mission) return { success: false, error: "Missions-Pack nicht gefunden." };
     if (input.layer3_pack_id && !team) return { success: false, error: "Team-Pack nicht gefunden." };
 
+    let recipeId = input.recipe_id ?? null;
+    if (recipeId) {
+      const recipe = await getOwnedRecipe(supabase, orgId, recipeId);
+      if (!recipe) return { success: false, error: "Rezept nicht gefunden." };
+    }
+
     const cityPacks: StudioLayerPack[] = [];
     for (const packId of l1Ids) {
       const pack = await getOwnedPack(supabase, orgId, packId);
@@ -867,10 +1109,61 @@ export async function composeGamesFromPacks(input: {
       cityPacks.push(pack);
     }
 
+    const shellSource = await findComposeShellSource(
+      supabase,
+      orgId,
+      mission?.id ?? null,
+      team?.id ?? null,
+    );
+    const shell = shellSource ? composeShellPayload(shellSource, runtime_profiles) : null;
+
+    const existingByL1 = new Map<string, StudioGame>();
+    if (cityPacks.length > 0) {
+      const { data: existing, error: existingError } = await supabase
+        .from("studio_games")
+        .select("*")
+        .eq("organization_id", orgId)
+        .in(
+          "layer1_pack_id",
+          cityPacks.map((pack) => pack.id),
+        );
+      if (existingError) throw new Error(existingError.message);
+      for (const row of existing ?? []) {
+        const game = asStudioGame(row as Record<string, unknown>);
+        if (
+          (game.layer2_pack_id ?? null) === (mission?.id ?? null) &&
+          (game.layer3_pack_id ?? null) === (team?.id ?? null)
+        ) {
+          existingByL1.set(game.layer1_pack_id as string, game);
+        }
+      }
+    }
+
     const targets = cityPacks.length > 0 ? cityPacks : [null];
     const createdIds: string[] = [];
+    let skippedCount = 0;
+
+    if (surface === "indoor") {
+      for (const city of cityPacks) {
+        await ensureLayer1StationCodes(supabase, city.id);
+      }
+    }
 
     for (const city of targets) {
+      if (city && existingByL1.has(city.id)) {
+        skippedCount += 1;
+        const existing = existingByL1.get(city.id)!;
+        if (shellSource) {
+          const filled = mergeComposeShell(existing, shellSource, runtime_profiles);
+          const { error: fillError } = await supabase
+            .from("studio_games")
+            .update({ ...filled, updated_at: new Date().toISOString() })
+            .eq("id", existing.id)
+            .eq("organization_id", orgId);
+          if (fillError) throw new Error(fillError.message);
+        }
+        continue;
+      }
       const slug = await ensureUniqueGameSlug(supabase, orgId);
       const autoName =
         input.name?.trim() ||
@@ -896,19 +1189,208 @@ export async function composeGamesFromPacks(input: {
           layer1_pack_id: city?.id ?? input.layer1_pack_id ?? null,
           layer2_pack_id: mission?.id ?? null,
           layer3_pack_id: team?.id ?? null,
+          compose_recipe_id: recipeId,
+          ...(shell ?? {}),
         })
         .select("id")
         .single();
-      if (error) throw new Error(error.message);
+      if (error) {
+        if (/studio_games_layer_combo_key|duplicate key/i.test(error.message)) {
+          skippedCount += 1;
+          continue;
+        }
+        throw new Error(error.message);
+      }
       createdIds.push(data.id as string);
     }
 
     revalidatePacks();
-    return { success: true, data: { createdIds, createdCount: createdIds.length } };
+    return { success: true, data: { createdIds, createdCount: createdIds.length, skippedCount } };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Spiele konnten nicht zusammengesteckt werden.",
+    };
+  }
+}
+
+async function getOwnedRecipe(
+  supabase: AdminClient,
+  orgId: string,
+  recipeId: string,
+): Promise<StudioComposeRecipe | null> {
+  const { data, error } = await supabase
+    .from("studio_compose_recipes")
+    .select("*")
+    .eq("id", recipeId)
+    .eq("organization_id", orgId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? normalizeComposeRecipeRow(data as Record<string, unknown>) : null;
+}
+
+export async function listExistingComposeCities(input: {
+  layer2_pack_id?: string | null;
+  layer3_pack_id?: string | null;
+}): Promise<ActionResult<{ layer1PackIds: string[] }>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    let query = supabase
+      .from("studio_games")
+      .select("layer1_pack_id")
+      .eq("organization_id", orgId)
+      .not("layer1_pack_id", "is", null);
+    if (input.layer2_pack_id) query = query.eq("layer2_pack_id", input.layer2_pack_id);
+    else query = query.is("layer2_pack_id", null);
+    if (input.layer3_pack_id) query = query.eq("layer3_pack_id", input.layer3_pack_id);
+    else query = query.is("layer3_pack_id", null);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return {
+      success: true,
+      data: {
+        layer1PackIds: [
+          ...new Set(
+            (data ?? [])
+              .map((row) => row.layer1_pack_id)
+              .filter((id): id is string => typeof id === "string"),
+          ),
+        ],
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Bestehende Städte konnten nicht geladen werden.",
+    };
+  }
+}
+
+export async function listComposeRecipes(): Promise<ActionResult<StudioComposeRecipe[]>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from("studio_compose_recipes")
+      .select("*")
+      .eq("organization_id", orgId)
+      .order("updated_at", { ascending: false })
+      .limit(80);
+    if (error) throw new Error(error.message);
+    return {
+      success: true,
+      data: (data ?? []).map((row) => normalizeComposeRecipeRow(row as Record<string, unknown>)),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Rezepte konnten nicht geladen werden.",
+    };
+  }
+}
+
+export async function saveComposeRecipe(input: {
+  id?: string;
+  name: string;
+  layer2_pack_id?: string | null;
+  layer3_pack_id?: string | null;
+  surface?: "outdoor" | "indoor" | "online";
+  language?: StudioLanguage;
+}): Promise<ActionResult<StudioComposeRecipe>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const name = input.name.trim();
+    if (name.length < 2) return { success: false, error: "Bitte einen Rezept-Namen eingeben." };
+    const surface = input.surface === "indoor" || input.surface === "online" ? input.surface : "outdoor";
+    const payload = {
+      name,
+      layer2_pack_id: input.layer2_pack_id ?? null,
+      layer3_pack_id: input.layer3_pack_id ?? null,
+      surface,
+      language: parseStudioLanguage(input.language),
+      updated_at: new Date().toISOString(),
+    };
+    if (input.id) {
+      const existing = await getOwnedRecipe(supabase, orgId, input.id);
+      if (!existing) return { success: false, error: "Rezept nicht gefunden." };
+      const { data, error } = await supabase
+        .from("studio_compose_recipes")
+        .update(payload)
+        .eq("id", input.id)
+        .eq("organization_id", orgId)
+        .select("*")
+        .single();
+      if (error) throw new Error(error.message);
+      return { success: true, data: normalizeComposeRecipeRow(data as Record<string, unknown>) };
+    }
+    const { data, error } = await supabase
+      .from("studio_compose_recipes")
+      .insert({ organization_id: orgId, ...payload })
+      .select("*")
+      .single();
+    if (error) throw new Error(error.message);
+    revalidatePacks();
+    return { success: true, data: normalizeComposeRecipeRow(data as Record<string, unknown>) };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Rezept konnte nicht gespeichert werden.",
+    };
+  }
+}
+
+export async function swapRecipeLayer(
+  recipeId: string,
+  patch: { layer2_pack_id?: string | null; layer3_pack_id?: string | null },
+): Promise<ActionResult<{ updatedCount: number }>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const recipe = await getOwnedRecipe(supabase, orgId, recipeId);
+    if (!recipe) return { success: false, error: "Rezept nicht gefunden." };
+
+    const nextL2 = patch.layer2_pack_id !== undefined ? patch.layer2_pack_id : recipe.layer2_pack_id;
+    const nextL3 = patch.layer3_pack_id !== undefined ? patch.layer3_pack_id : recipe.layer3_pack_id;
+    if (nextL2) {
+      const pack = await getOwnedPack(supabase, orgId, nextL2);
+      if (!pack || pack.layer !== 2) return { success: false, error: "Missions-Pack nicht gefunden." };
+    }
+    if (nextL3) {
+      const pack = await getOwnedPack(supabase, orgId, nextL3);
+      if (!pack || pack.layer !== 3) return { success: false, error: "Team-Pack nicht gefunden." };
+    }
+
+    const { error: recipeError } = await supabase
+      .from("studio_compose_recipes")
+      .update({
+        layer2_pack_id: nextL2,
+        layer3_pack_id: nextL3,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", recipeId)
+      .eq("organization_id", orgId);
+    if (recipeError) throw new Error(recipeError.message);
+
+    const { data, error } = await supabase
+      .from("studio_games")
+      .update({
+        layer2_pack_id: nextL2,
+        layer3_pack_id: nextL3,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("organization_id", orgId)
+      .eq("compose_recipe_id", recipeId)
+      .select("id");
+    if (error) throw new Error(error.message);
+
+    revalidatePacks();
+    return { success: true, data: { updatedCount: data?.length ?? 0 } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Layer konnte nicht getauscht werden.",
     };
   }
 }
@@ -919,7 +1401,17 @@ function asStudioGame(row: Record<string, unknown>): StudioGame {
     layer1_pack_id: (row.layer1_pack_id as string | null) ?? null,
     layer2_pack_id: (row.layer2_pack_id as string | null) ?? null,
     layer3_pack_id: (row.layer3_pack_id as string | null) ?? null,
+    compose_recipe_id: (row.compose_recipe_id as string | null) ?? null,
   };
+}
+
+async function ensureLayer1StationCodes(supabase: AdminClient, packId: string) {
+  const items = await fetchPackItems(supabase, packId);
+  for (const item of items) {
+    const next = withFreshStationCode(item.overrides);
+    if (JSON.stringify(next) === JSON.stringify(item.overrides)) continue;
+    await writePackItemOverrides(supabase, packId, item.id, next);
+  }
 }
 
 async function writePackItemOverrides(
@@ -999,7 +1491,10 @@ async function createPackWithItems(
   return fresh ?? pack;
 }
 
-export async function saveGameAsLayerPacks(gameId: string): Promise<ActionResult<StudioGame>> {
+export async function saveGameAsLayerPacks(
+  gameId: string,
+  names?: { layer1?: string; layer2?: string; layer3?: string },
+): Promise<ActionResult<StudioGame>> {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
@@ -1014,6 +1509,22 @@ export async function saveGameAsLayerPacks(gameId: string): Promise<ActionResult
 
     const game = asStudioGame(gameRow as Record<string, unknown>);
     if (gameUsesLayerPacks(game)) {
+      const rename = async (packId: string | null, name: string | undefined) => {
+        const next = name?.trim();
+        if (!packId || !next) return;
+        const pack = await getOwnedPack(supabase, orgId, packId);
+        if (!pack) return;
+        const { error } = await supabase
+          .from("studio_layer_packs")
+          .update({ name: next, updated_at: new Date().toISOString() })
+          .eq("id", packId)
+          .eq("organization_id", orgId);
+        if (error) throw new Error(error.message);
+      };
+      await rename(game.layer1_pack_id, names?.layer1);
+      await rename(game.layer2_pack_id, names?.layer2);
+      await rename(game.layer3_pack_id, names?.layer3);
+      revalidatePacks();
       return { success: true, data: game };
     }
 
@@ -1074,7 +1585,7 @@ export async function saveGameAsLayerPacks(gameId: string): Promise<ActionResult
       l1Items.length > 0
         ? await createPackWithItems(supabase, orgId, {
             layer: 1,
-            name: (typeof city?.name === "string" && city.name.trim()) || citySlug || game.name,
+            name: names?.layer1?.trim() || (typeof city?.name === "string" && city.name.trim()) || citySlug || game.name,
             city_id: typeof city?.id === "string" ? city.id : null,
             city_slug: (typeof city?.slug === "string" && city.slug) || citySlug,
             language,
@@ -1085,7 +1596,7 @@ export async function saveGameAsLayerPacks(gameId: string): Promise<ActionResult
       layer2.length > 0
         ? await createPackWithItems(supabase, orgId, {
             layer: 2,
-            name: `${game.name} · Mission`,
+            name: names?.layer2?.trim() || `${game.name} · Mission`,
             language,
             items: layer2.map((item) => ({
               task_id: item.task_id,
@@ -1098,7 +1609,7 @@ export async function saveGameAsLayerPacks(gameId: string): Promise<ActionResult
       layer3.length > 0
         ? await createPackWithItems(supabase, orgId, {
             layer: 3,
-            name: `${game.name} · Team`,
+            name: names?.layer3?.trim() || `${game.name} · Team`,
             language,
             items: layer3.map((item) => {
               const parsed = parseLinkOverrides(item.overrides);

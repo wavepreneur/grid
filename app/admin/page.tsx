@@ -6,7 +6,7 @@ export default function AdminOverviewPage() {
     <StudioPage
       eyebrow="Backoffice"
       title="Willkommen zurück"
-      description="Aufgaben liegen einmal in der Bibliothek und werden mit beliebig vielen Spielen verknüpft. So entstehen aus wenigen Bausteinen schnell neue Stadtvarianten."
+      description="Zutaten sammeln, ein Spiel kochen, dann unter Rezepte teilen und mit Städten kombinieren."
     >
       <StudioOverviewSection />
     </StudioPage>

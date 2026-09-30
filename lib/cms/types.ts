@@ -145,6 +145,8 @@ export type StudioGame = {
   layer2_pack_id: string | null;
   /** Team pack (Layer 3) — shared across cities. */
   layer3_pack_id: string | null;
+  /** Recipe that composed this thin game, if any. */
+  compose_recipe_id?: string | null;
   status: StudioGameStatus;
   published_version_number: number;
   is_template: boolean;

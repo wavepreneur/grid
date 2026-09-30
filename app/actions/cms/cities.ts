@@ -163,7 +163,7 @@ export async function searchDirectoryCities(search = ""): Promise<ActionResult<D
     }
     return {
       success: true,
-      data: rows.map(mapCityRow),
+      data: rows.map(mapCityRow).filter((city) => Boolean(city.source_city_id)),
     };
   } catch (error) {
     return {

@@ -4,6 +4,8 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createLayerPack, deleteLayerPack, duplicateLayerPacks, updateLayerPack } from "@/app/actions/cms/packs";
+import { ComposeGamesPanel } from "@/components/cms/packs/compose-games-panel";
+import { SplitGamePanel } from "@/components/cms/packs/split-game-panel";
 import { CitySearchSelect } from "@/components/cms/packs/city-search-select";
 import { StudioDeleteModal } from "@/components/cms/shared/studio-delete-modal";
 import { StudioDuplicateModal } from "@/components/cms/shared/studio-duplicate-modal";
@@ -33,6 +35,7 @@ export function PackCatalog() {
   const packs = packsQuery.data ?? [];
   const [name, setName] = useState("");
   const [city, setCity] = useState<DirectoryCity | null>(null);
+  const [packKind, setPackKind] = useState<"outdoor" | "indoor">("outdoor");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -40,6 +43,7 @@ export function PackCatalog() {
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<StudioLayerPack | null>(null);
+  const [extraOpen, setExtraOpen] = useState(false);
 
   const sorted = useMemo(
     () => [...packs].sort((a, b) => a.name.localeCompare(b.name, "de", { sensitivity: "base" })),
@@ -52,7 +56,7 @@ export function PackCatalog() {
       const result = await createLayerPack({
         layer,
         name: name.trim() || (city ? cityLabelDe(city) : ""),
-        city_id: layer === 1 ? city?.id ?? null : null,
+        city_id: layer === 1 && packKind === "outdoor" ? city?.id ?? null : null,
       });
       if (!result.success) {
         setError(result.error);
@@ -65,65 +69,45 @@ export function PackCatalog() {
     });
   }
 
-  const canCreate = layer === 1 ? Boolean(city) : Boolean(name.trim());
+  const canCreate =
+    layer === 1
+      ? packKind === "outdoor"
+        ? Boolean(city)
+        : Boolean(name.trim())
+      : Boolean(name.trim());
 
   return (
     <div className="space-y-5">
       {error ? <StudioError message={error} /> : null}
       {message ? <StudioSuccess message={message} /> : null}
 
-      <div className="flex flex-wrap gap-2">
-        {LAYERS.map((id) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => {
-              setLayer(id);
-              setSearch("");
-              setName("");
-              setCity(null);
-            }}
-            className={`rounded-2xl px-4 py-2.5 text-sm font-bold ${
-              layer === id ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"
-            }`}
-          >
-            {layerPackTitleDe(id)}
-          </button>
-        ))}
-      </div>
-      <p className="text-sm text-muted-foreground">{layerPackHintDe(layer)}</p>
+      <SplitGamePanel />
+
+      <ComposeGamesPanel />
 
       <section className="rounded-3xl bg-card p-5 shadow-soft">
-        <h2 className="text-lg font-bold">Neu anlegen</h2>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          {layer === 1 ? (
-            <div>
-              <StudioLabel hint="Exitmania-Stadt, nicht der URL-Slug">Stadt</StudioLabel>
-              <CitySearchSelect
-                value={city?.id ?? null}
-                selected={city}
-                onChange={(next) => {
-                  setCity(next);
-                  if (next && (!name.trim() || (city && name.trim() === cityLabelDe(city)))) {
-                    setName(cityLabelDe(next));
-                  }
-                }}
-              />
-            </div>
-          ) : null}
-          <div>
-            <StudioLabel hint="Kann den Vorschlag überschreiben">Name</StudioLabel>
-            <StudioInput
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={layer === 1 ? "München" : layer === 2 ? "First Profiler" : "Team Basic"}
-            />
-          </div>
-        </div>
-        <div className="mt-4">
-          <StudioButton type="button" disabled={pending || !canCreate} onClick={handleCreate} icon={<IconPlus size={16} />}>
-            Pack anlegen
-          </StudioButton>
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Vorrat</p>
+        <h2 className="mt-1 text-xl font-bold">Deine Bestandteile</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{layerPackHintDe(layer)}</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {LAYERS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => {
+                setLayer(id);
+                setSearch("");
+                setName("");
+                setCity(null);
+                setPackKind("outdoor");
+              }}
+              className={`rounded-2xl px-4 py-2.5 text-sm font-bold ${
+                layer === id ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"
+              }`}
+            >
+              {layerPackTitleDe(id)}
+            </button>
+          ))}
         </div>
       </section>
 
@@ -133,20 +117,20 @@ export function PackCatalog() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={layer === 1 ? "Stadt suchen…" : "Pack suchen…"}
+            placeholder="Bestandteil suchen…"
             className={`${inputCls} mt-0 border-0 bg-secondary pl-11 shadow-none`}
           />
         </div>
         <StudioHint tone="info">
           {layer === 1
-            ? "Pack löschen hängt nur das Bündel ab — Aufgaben und Spiele bleiben. Name ist überschreibbar."
-            : "Mission und Team gibt es wenige. Dieselben Packs docken an jede Stadt — nicht kopieren."}
+            ? "Deine benannten Orte. Im Rezept oben wählst du sie über Ort."
+            : "Die Namen, die du beim Aufteilen vergeben hast. Im Rezept oben wählst du sie über Mission oder Team."}
         </StudioHint>
         <div className="mt-3 space-y-2">
           {packsQuery.isPending && sorted.length === 0 ? (
             <p className="text-sm text-muted-foreground">Laden…</p>
           ) : sorted.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Noch keine Packs in diesem Layer.</p>
+            <p className="text-sm text-muted-foreground">Noch kein Bestandteil. Teile zuerst ein Spiel.</p>
           ) : (
             sorted.map((pack) => (
               <PackCatalogRow
@@ -180,13 +164,13 @@ export function PackCatalog() {
       <StudioDuplicateModal
         open={duplicateOpen}
         onClose={() => setDuplicateOpen(false)}
-        itemLabel={layer === 1 ? "Stadt-Pack" : "Pack"}
+        itemLabel={layer === 1 ? "Ort" : layer === 2 ? "Mission" : "Team"}
         selectedCount={1}
         pending={pending}
         extra={
           <p className="mt-3 text-sm text-slate-600">
             {layer === 1
-              ? "Kopiert Aufgaben, Reihenfolge und Bedingungen (Meter, Opener, Codes). Inhalt danach in Aufgaben anpassen, Koordinaten im Spiel neu setzen."
+              ? "Teilt dieselben Aufgaben. GPS wird geleert, Indoor-Codes neu vergeben. Nur klonen, wenn das Rätsel wirklich ein anderes ist — das ist hier nicht der Default."
               : "Mission und Team nicht kopieren, wenn du nur eine Stadt brauchst — im Spiel andocken."}
           </p>
         }
@@ -199,7 +183,7 @@ export function PackCatalog() {
               return;
             }
             setDuplicateOpen(false);
-            setMessage(`${result.data?.createdCount ?? 0} Pack(s) angelegt.`);
+            setMessage(`${result.data?.createdCount ?? 0} Bestandteil(e) angelegt.`);
             invalidate();
             const id = result.data?.createdIds[0];
             if (id && (result.data?.createdCount ?? 0) === 1) router.push(`/admin/packs/${id}`);
@@ -213,13 +197,13 @@ export function PackCatalog() {
           setDeleteOpen(false);
           setDeleteTarget(null);
         }}
-        title="Pack löschen?"
+        title="Bestandteil löschen?"
         count={1}
-        itemLabel="Pack"
+        itemLabel="Bestandteil"
         pending={pending}
         warnings={
           <StudioHint tone="info">
-            Aufgaben bleiben. Spiele behalten ihre anderen Packs — dieses Pack wird nur abgekoppelt.
+            Zutaten bleiben. Spiele behalten ihre anderen Teile — dieser wird nur abgekoppelt.
           </StudioHint>
         }
         onConfirm={() => {
@@ -232,11 +216,92 @@ export function PackCatalog() {
             }
             setDeleteOpen(false);
             setDeleteTarget(null);
-            setMessage("Pack gelöscht.");
+            setMessage("Bestandteil gelöscht.");
             invalidate();
           });
         }}
       />
+
+      <section className="rounded-3xl bg-card p-5 shadow-soft">
+        <button
+          type="button"
+          onClick={() => setExtraOpen((open) => !open)}
+          className="flex w-full items-center justify-between text-left"
+        >
+          <span>
+            <span className="block text-sm font-bold">Ohne Spiel anlegen</span>
+            <span className="mt-0.5 block text-sm text-muted-foreground">
+              Nur für einen extra Ort oder Indoor-Codes — Mission und Team kommen vom Aufteilen.
+            </span>
+          </span>
+          <span className="text-sm font-bold text-primary">{extraOpen ? "Zuklappen" : "Öffnen"}</span>
+        </button>
+        {extraOpen ? (
+          <div className="mt-4">
+            {layer === 1 ? (
+              <div className="flex w-fit rounded-2xl bg-secondary p-1">
+                {(["outdoor", "indoor"] as const).map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => {
+                      setPackKind(kind);
+                      if (kind === "indoor") setCity(null);
+                    }}
+                    className={`rounded-xl px-3 py-2 text-xs font-bold ${
+                      packKind === kind ? "bg-card text-foreground shadow-soft" : "text-muted-foreground"
+                    }`}
+                  >
+                    {kind === "outdoor" ? "Outdoor · Stadt" : "Indoor · Codes"}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {layer === 1 && packKind === "outdoor" ? (
+                <div>
+                  <StudioLabel hint="Live-Suche in Exitmania. GRID speichert die Stadt nicht neu.">
+                    Exitmania-Stadt
+                  </StudioLabel>
+                  <CitySearchSelect
+                    value={city?.id ?? null}
+                    selected={city}
+                    onChange={(next) => {
+                      setCity(next);
+                      if (next && (!name.trim() || (city && name.trim() === cityLabelDe(city)))) {
+                        setName(cityLabelDe(next));
+                      }
+                    }}
+                  />
+                </div>
+              ) : null}
+              <div>
+                <StudioLabel hint={layer === 1 && packKind === "outdoor" ? "Name des Bestandteils, nicht der Ortsname in Exitmania" : undefined}>
+                  Name
+                </StudioLabel>
+                <StudioInput
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={
+                    layer === 1
+                      ? packKind === "indoor"
+                        ? "z. B. Museum Stationen"
+                        : "wird aus der Stadt vorausgefüllt"
+                      : layer === 2
+                        ? "First Profiler"
+                        : "Team Basic"
+                  }
+                />
+              </div>
+            </div>
+            <div className="mt-4">
+              <StudioButton type="button" disabled={pending || !canCreate} onClick={handleCreate} icon={<IconPlus size={16} />}>
+                Bestandteil anlegen
+              </StudioButton>
+            </div>
+          </div>
+        ) : null}
+      </section>
     </div>
   );
 }

@@ -49,7 +49,7 @@ import {
 } from "@/lib/grid/stations";
 import { PUSHABLE_EVENT_STATUSES, withLastLivePushAt } from "@/lib/cms/live-push";
 import { pingTeamsContentUpdated } from "@/lib/grid/content-ping";
-import { loadMergedGameTaskLinksForGame, addTaskToLayerPack, removeTaskFromLayerPack, reorderPackBackedGameTasks, savePackBackedGameLink } from "@/app/actions/cms/packs";
+import { loadMergedGameTaskLinksForGame, addTaskToLayerPack, fillComposeShellIfEmpty, removeTaskFromLayerPack, reorderPackBackedGameTasks, savePackBackedGameLink } from "@/app/actions/cms/packs";
 import { gameUsesLayerPacks, packItemToGameLink, parsePackLinkId } from "@/lib/cms/layer-packs";
 
 function normalizeGameRow(row: StudioGame): StudioGame {
@@ -245,7 +245,11 @@ export async function getGame(gameId: string): Promise<ActionResult<StudioGame>>
 
     if (error) throw new Error(error.message);
     if (!data) return { success: false, error: "Game nicht gefunden." };
-    return { success: true, data: normalizeGameRow(data as StudioGame) };
+    const game = normalizeGameRow(data as StudioGame);
+    if (gameUsesLayerPacks(game)) {
+      return { success: true, data: normalizeGameRow(await fillComposeShellIfEmpty(game)) };
+    }
+    return { success: true, data: game };
   } catch (error) {
     return {
       success: false,
