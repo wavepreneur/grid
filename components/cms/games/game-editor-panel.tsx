@@ -310,10 +310,10 @@ export function GameEditorPanel({
         />
         <GameLanguageCell
           gameId={game.id}
-          locales={gameLocales(initialGame)}
-          sourceLocale={initialGame.language}
+          locales={gameLocales(game)}
+          sourceLocale={game.language}
           activeLocale={locale}
-          coverageByLocale={localeCoverageMap(initialGame)}
+          coverageByLocale={localeCoverageMap(game)}
           adding={pending}
           onAdd={handleAddLocale}
           variant="comfortable"
@@ -321,7 +321,15 @@ export function GameEditorPanel({
       </StudioPanel>
 
       {!isSourceLocale ? (
-        <GameTranslationPanel game={initialGame} locale={locale} taskLinks={taskLinks} />
+        <GameTranslationPanel
+          game={game}
+          locale={locale}
+          taskLinks={taskLinks}
+          onGameChange={(next) => {
+            cache.setGame(next);
+            setGame(toEditorState(next));
+          }}
+        />
       ) : null}
 
       {isSourceLocale ? (

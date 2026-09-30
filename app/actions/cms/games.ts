@@ -10,18 +10,25 @@ import {
   type StudioTask,
   type UpdateGameInput,
 } from "@/lib/cms/types";
-import { isStudioLanguage, parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
+import { isStudioLanguage, localeLabel, parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
 import {
+  applyTranslationUnits,
   buildSnapshotLocales,
   collectTranslationUnits,
+  isMachineTranslatableUnit,
   localeCopyWithCoverage,
+  localesFromOverrides,
+  mergeSlotCopy,
+  parseConfirmed,
   parseTranslations,
+  resolveGameCopy,
   seedLocaleCopy,
   seedSlotCopyFromStudio,
   type GameLocaleCopy,
   type SlotLocaleCopy,
   withLinkLocale,
 } from "@/lib/cms/game-i18n";
+import { translateUnitsNative } from "@/lib/cms/gemini-translate";
 import { generateGameSlug } from "@/lib/grid/codes";
 import {
   DEFAULT_RUNTIME_PROFILES,
@@ -66,38 +73,42 @@ function normalizeGameRow(row: StudioGame): StudioGame {
   };
 }
 
+function sourceSlotsFromLinks(links: StudioGameTaskLink[]) {
+  return buildGameSlots(links).map((slot) => {
+    const quiz = slot.quiz
+      ? {
+          title: slot.quiz.title ?? "",
+          description: slot.quiz.description ?? "",
+          question: slot.quiz.question,
+          side_fact_title: slot.quiz.side_fact_title ?? "",
+          side_fact: slot.quiz.side_fact ?? "",
+          options: slot.quiz.options.map((option) => ({ id: option.id, label: option.label })),
+        }
+      : null;
+    return {
+      linkId: slot.levelLink.id,
+      source: seedSlotCopyFromStudio({
+        title: slot.levelLink.task.title,
+        description: slot.levelLink.task.description,
+        content: slot.levelLink.task.content,
+        overrides: slot.levelLink.overrides,
+        quiz,
+        bonuses: slot.bonusLinks.map((link) => ({
+          taskId: link.task_id,
+          title: link.task.title,
+          description: link.task.description,
+          content: link.task.content,
+        })),
+      }),
+      overrides: slot.levelLink.overrides,
+    };
+  });
+}
+
 function translationUnitsForGame(game: StudioGame, links: StudioGameTaskLink[]) {
-  const slots = buildGameSlots(links);
   return collectTranslationUnits({
     game,
-    slots: slots.map((slot) => {
-      const quiz = slot.quiz
-        ? {
-            title: slot.quiz.title ?? "",
-            description: slot.quiz.description ?? "",
-            question: slot.quiz.question,
-            side_fact_title: slot.quiz.side_fact_title ?? "",
-            side_fact: slot.quiz.side_fact ?? "",
-            options: slot.quiz.options.map((option) => ({ id: option.id, label: option.label })),
-          }
-        : null;
-      return {
-        linkId: slot.levelLink.id,
-        source: seedSlotCopyFromStudio({
-          title: slot.levelLink.task.title,
-          description: slot.levelLink.task.description,
-          content: slot.levelLink.task.content,
-          overrides: slot.levelLink.overrides,
-          quiz,
-          bonuses: slot.bonusLinks.map((link) => ({
-            taskId: link.task_id,
-            title: link.task.title,
-            description: link.task.description,
-            content: link.task.content,
-          })),
-        }),
-      };
-    }),
+    slots: sourceSlotsFromLinks(links).map(({ linkId, source }) => ({ linkId, source })),
   });
 }
 
@@ -1705,6 +1716,132 @@ export async function saveGameLocale(input: {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Übersetzung konnte nicht gespeichert werden.",
+    };
+  }
+}
+
+export type TranslateGameLocaleResult = {
+  game: StudioGame;
+  copy: GameLocaleCopy;
+  slots: Record<string, SlotLocaleCopy>;
+  translated: number;
+};
+
+export async function translateGameLocale(input: {
+  gameId: string;
+  language: StudioLanguage;
+}): Promise<ActionResult<TranslateGameLocaleResult>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const { data: row, error } = await supabase
+      .from("studio_games")
+      .select("*")
+      .eq("id", input.gameId)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) return { success: false, error: "Spiel nicht gefunden." };
+    if (!isStudioLanguage(input.language)) {
+      return { success: false, error: "Diese Sprache wird noch nicht unterstützt." };
+    }
+
+    const game = normalizeGameRow(row as StudioGame);
+    const sourceLang = parseStudioLanguage(game.language);
+    if (input.language === sourceLang) {
+      return { success: false, error: `${localeLabel(input.language)} ist die Ausgangssprache.` };
+    }
+
+    const linksResult = await listGameTasks(input.gameId);
+    if (!linksResult.success) return { success: false, error: linksResult.error };
+    const links = linksResult.data ?? [];
+    const sourceSlots = sourceSlotsFromLinks(links);
+    const units = collectTranslationUnits({
+      game,
+      slots: sourceSlots.map(({ linkId, source }) => ({ linkId, source })),
+    });
+
+    const resolved = resolveGameCopy(game, input.language);
+    let gameCopy: GameLocaleCopy = {
+      ...seedLocaleCopy(game),
+      ...game.translations[input.language],
+      ...resolved,
+    };
+    const slotCopies: Record<string, SlotLocaleCopy> = {};
+    for (const slot of sourceSlots) {
+      slotCopies[slot.linkId] = mergeSlotCopy(
+        slot.source,
+        localesFromOverrides(slot.overrides)[input.language] ?? {},
+      );
+    }
+
+    const confirmed = new Set(parseConfirmed(game.translations[input.language]?.confirmed));
+    const currentUnits = collectTranslationUnits({
+      game: {
+        name: gameCopy.name ?? "",
+        description: gameCopy.description ?? "",
+        farewell_text: gameCopy.farewell_text ?? "",
+        feature_flags: {
+          briefing_iframe_url: gameCopy.briefing_iframe_url ?? "",
+          faq_iframe_url: gameCopy.faq_iframe_url ?? "",
+          intro_youtube_url: gameCopy.intro_youtube_url ?? "",
+        },
+      },
+      slots: Object.entries(slotCopies).map(([linkId, source]) => ({ linkId, source })),
+    });
+    const currentByKey = Object.fromEntries(currentUnits.map((unit) => [unit.key, unit.source]));
+
+    const toTranslate: typeof units = [];
+    const copyAsIs: Record<string, string> = {};
+    for (const unit of units) {
+      if (confirmed.has(unit.key)) continue;
+      const current = currentByKey[unit.key];
+      if (current?.trim() && current.trim() !== unit.source.trim()) continue;
+      if (isMachineTranslatableUnit(unit)) toTranslate.push(unit);
+      else copyAsIs[unit.key] = unit.source;
+    }
+
+    const translated =
+      toTranslate.length > 0
+        ? await translateUnitsNative({
+            source: sourceLang,
+            target: input.language,
+            units: toTranslate,
+          })
+        : {};
+
+    const applied = applyTranslationUnits({
+      gameCopy,
+      slotCopies,
+      linkIds: sourceSlots.map((slot) => slot.linkId),
+      values: { ...copyAsIs, ...translated },
+    });
+    gameCopy = {
+      ...applied.gameCopy,
+      confirmed: parseConfirmed([...confirmed, ...Object.keys(translated)]),
+    };
+
+    const saved = await saveGameLocale({
+      gameId: input.gameId,
+      language: input.language,
+      copy: gameCopy,
+      slots: Object.entries(applied.slotCopies).map(([linkId, copy]) => ({ linkId, copy })),
+    });
+    if (!saved.success) return { success: false, error: saved.error };
+
+    return {
+      success: true,
+      data: {
+        game: saved.data!,
+        copy: gameCopy,
+        slots: applied.slotCopies,
+        translated: Object.keys(translated).length,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Übersetzung ist fehlgeschlagen.",
     };
   }
 }

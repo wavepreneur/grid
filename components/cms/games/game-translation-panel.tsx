@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { saveGameLocale } from "@/app/actions/cms/games";
+import { saveGameLocale, translateGameLocale } from "@/app/actions/cms/games";
 import { StudioPanel } from "@/components/cms/admin-shell";
-import { IconCheck, IconSave } from "@/components/cms/studio-icons";
+import { IconCheck, IconLanguages, IconSave } from "@/components/cms/studio-icons";
 import {
   StudioButton,
   StudioError,
@@ -40,6 +40,7 @@ type Props = {
   game: StudioGame;
   locale: StudioLanguage;
   taskLinks: StudioGameTaskLink[];
+  onGameChange?: (game: StudioGame) => void;
 };
 
 function sameText(value: string | undefined, source: string | undefined) {
@@ -235,9 +236,10 @@ function OptionFields({
   );
 }
 
-export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
+export function GameTranslationPanel({ game, locale, taskLinks, onGameChange }: Props) {
   const cache = useStudioCache();
   const [pending, startTransition] = useTransition();
+  const [busy, setBusy] = useState<"save" | "translate" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const sourceCopy = resolveGameCopy(game, game.language);
@@ -360,6 +362,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
     event.preventDefault();
     setError(null);
     setMessage(null);
+    setBusy("save");
     startTransition(async () => {
       const result = await saveGameLocale({
         gameId: game.id,
@@ -370,14 +373,42 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
           copy: slotCopy,
         })),
       });
+      setBusy(null);
       if (!result.success) {
         setError(result.error);
         return;
       }
       cache.setGame(result.data!);
+      onGameChange?.(result.data!);
       const saved = result.data!.translations[locale]?.confirmed;
       if (saved) setChecked(parseConfirmed(saved));
       setMessage(`${localeLabel(locale)} gespeichert.`);
+    });
+  }
+
+  function handleTranslate() {
+    setError(null);
+    setMessage(null);
+    setBusy("translate");
+    startTransition(async () => {
+      const result = await translateGameLocale({ gameId: game.id, language: locale });
+      setBusy(null);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      const data = result.data!;
+      cache.setGame(data.game);
+      cache.invalidateGame(data.game.id);
+      onGameChange?.(data.game);
+      setCopy(data.copy);
+      setSlotCopies(data.slots);
+      setChecked(parseConfirmed(data.copy.confirmed));
+      setMessage(
+        data.translated > 0
+          ? `${data.translated} Texte nach ${localeLabel(locale)} übersetzt. Links bitte prüfen.`
+          : `Nichts Neues zu übersetzen — bestätigte Felder und eigene Entwürfe bleiben.`,
+      );
     });
   }
 
@@ -392,9 +423,21 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
           description={`Ausgangssprache bleibt ${localeLabel(game.language)}. GPS, Codes und Logik gelten für alle Sprachen.`}
         />
         <StudioHint>
-          Der Ausgangstext bleibt in den Feldern. Abweichender Text zählt sofort. Haken setzen,
-          wenn die Zeile auch ohne Änderung für diese Sprache stimmt.
+          Der deutsche Ausgangstext wird als natürliche {localeLabel(locale)}-Muttersprache
+          übersetzt — so, wie man es im Spiel wirklich sagt. Bestätigte Felder und eigene
+          Entwürfe bleiben. Links werden kopiert, nicht übersetzt.
         </StudioHint>
+        <div className="mt-4">
+          <StudioButton
+            type="button"
+            variant="secondary"
+            disabled={pending}
+            icon={<IconLanguages size={16} />}
+            onClick={handleTranslate}
+          >
+            {pending && busy === "translate" ? "Übersetzen…" : "Jetzt übersetzen"}
+          </StudioButton>
+        </div>
         <div className="mt-4 rounded-2xl border border-border bg-secondary/50 px-4 py-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <p className="text-sm font-semibold text-foreground">
@@ -819,7 +862,7 @@ export function GameTranslationPanel({ game, locale, taskLinks }: Props) {
       </StudioPanel>
 
       <StudioButton type="submit" disabled={pending} icon={<IconSave size={16} />}>
-        {pending ? "Speichern…" : `${localeLabel(locale)} speichern`}
+        {pending && busy === "save" ? "Speichern…" : `${localeLabel(locale)} speichern`}
       </StudioButton>
     </form>
   );

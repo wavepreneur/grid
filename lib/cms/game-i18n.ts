@@ -995,3 +995,187 @@ export function pickLocalizedSnapshot(input: {
     locale: input.locale,
   });
 }
+
+/** URLs, pure numbers/coords, and dedicated URL fields stay as-is. */
+export function isMachineTranslatableUnit(unit: TranslationUnit): boolean {
+  const text = unit.source.trim();
+  if (!text) return false;
+  if (unit.key.includes("iframe_url") || unit.key.includes("youtube_url") || /:url$/.test(unit.key)) {
+    return false;
+  }
+  if (/^https?:\/\//i.test(text) || /^www\./i.test(text)) return false;
+  if (/^[\d\s.,:+\-/#°]+$/.test(text)) return false;
+  return true;
+}
+
+function cloneSlotCopy(slot: SlotLocaleCopy): SlotLocaleCopy {
+  return {
+    ...slot,
+    options: slot.options?.map((option) => ({ ...option })),
+    tiles: slot.tiles?.map((tile) => ({ ...tile })),
+    hints: slot.hints?.map((hint) => ({ ...hint })),
+    quiz: slot.quiz
+      ? { ...slot.quiz, options: slot.quiz.options?.map((option) => ({ ...option })) }
+      : undefined,
+    station: slot.station ? { ...slot.station } : undefined,
+    bonuses: slot.bonuses
+      ? Object.fromEntries(
+          Object.entries(slot.bonuses).map(([id, bonus]) => [
+            id,
+            {
+              ...bonus,
+              options: bonus.options?.map((option) => ({ ...option })),
+              tiles: bonus.tiles?.map((tile) => ({ ...tile })),
+            },
+          ]),
+        )
+      : undefined,
+  };
+}
+
+function setBonusPath(bonus: BonusLocaleCopy, path: string, value: string): BonusLocaleCopy {
+  if (path === "title") return { ...bonus, title: value };
+  if (path === "description") return { ...bonus, description: value };
+  if (path === "question") return { ...bonus, question: value };
+  if (path === "success_info") return { ...bonus, success_info: value };
+  if (path.startsWith("option:")) {
+    const id = path.slice("option:".length);
+    return {
+      ...bonus,
+      options: (bonus.options ?? []).map((option) => (option.id === id ? { ...option, label: value } : option)),
+    };
+  }
+  if (path.startsWith("tile:")) {
+    const rest = path.slice("tile:".length);
+    const sep = rest.lastIndexOf(":");
+    if (sep <= 0) return bonus;
+    const id = rest.slice(0, sep);
+    const field = rest.slice(sep + 1);
+    return {
+      ...bonus,
+      tiles: (bonus.tiles ?? []).map((tile) => {
+        if (tile.id !== id) return tile;
+        if (field === "label") return { ...tile, label: value };
+        if (field === "url") return { ...tile, url: value };
+        if (field === "hint") return { ...tile, hint_text: value };
+        return tile;
+      }),
+    };
+  }
+  return bonus;
+}
+
+function setSlotPath(slot: SlotLocaleCopy, path: string, value: string): SlotLocaleCopy {
+  if (path === "title") return { ...slot, title: value };
+  if (path === "description") return { ...slot, description: value };
+  if (path === "question") return { ...slot, question: value };
+  if (path === "success_title") return { ...slot, success_title: value };
+  if (path === "success_info") return { ...slot, success_info: value };
+  if (path.startsWith("option:")) {
+    const id = path.slice("option:".length);
+    return {
+      ...slot,
+      options: (slot.options ?? []).map((option) => (option.id === id ? { ...option, label: value } : option)),
+    };
+  }
+  if (path.startsWith("tile:")) {
+    const rest = path.slice("tile:".length);
+    const sep = rest.lastIndexOf(":");
+    if (sep <= 0) return slot;
+    const id = rest.slice(0, sep);
+    const field = rest.slice(sep + 1);
+    return {
+      ...slot,
+      tiles: (slot.tiles ?? []).map((tile) => {
+        if (tile.id !== id) return tile;
+        if (field === "label") return { ...tile, label: value };
+        if (field === "url") return { ...tile, url: value };
+        if (field === "hint") return { ...tile, hint_text: value };
+        return tile;
+      }),
+    };
+  }
+  if (path.startsWith("hint:")) {
+    const id = path.slice("hint:".length);
+    return {
+      ...slot,
+      hints: (slot.hints ?? []).map((hint) => (hint.id === id ? { ...hint, text: value } : hint)),
+    };
+  }
+  if (path.startsWith("quiz:")) {
+    const quizPath = path.slice("quiz:".length);
+    const quiz = { ...(slot.quiz ?? {}) };
+    if (quizPath === "title") quiz.title = value;
+    else if (quizPath === "description") quiz.description = value;
+    else if (quizPath === "question") quiz.question = value;
+    else if (quizPath === "side_fact_title") quiz.side_fact_title = value;
+    else if (quizPath === "side_fact") quiz.side_fact = value;
+    else if (quizPath.startsWith("option:")) {
+      const id = quizPath.slice("option:".length);
+      quiz.options = (quiz.options ?? []).map((option) =>
+        option.id === id ? { ...option, label: value } : option,
+      );
+    }
+    return { ...slot, quiz };
+  }
+  if (path.startsWith("station:")) {
+    const field = path.slice("station:".length);
+    return {
+      ...slot,
+      station: {
+        ...slot.station,
+        ...(field === "name" ? { name: value } : {}),
+        ...(field === "place" ? { place: value } : {}),
+      },
+    };
+  }
+  if (path.startsWith("bonus:")) {
+    const rest = path.slice("bonus:".length);
+    const taskMatch = /^([0-9a-f-]{36}):/i.exec(rest);
+    if (!taskMatch) return slot;
+    const taskId = taskMatch[1]!;
+    const bonusPath = rest.slice(taskId.length + 1);
+    return {
+      ...slot,
+      bonuses: {
+        ...slot.bonuses,
+        [taskId]: setBonusPath(slot.bonuses?.[taskId] ?? {}, bonusPath, value),
+      },
+    };
+  }
+  return slot;
+}
+
+export function applyTranslationUnits(input: {
+  gameCopy: GameLocaleCopy;
+  slotCopies: Record<string, SlotLocaleCopy>;
+  linkIds: string[];
+  values: Record<string, string>;
+}): { gameCopy: GameLocaleCopy; slotCopies: Record<string, SlotLocaleCopy> } {
+  let gameCopy: GameLocaleCopy = { ...input.gameCopy };
+  const slotCopies: Record<string, SlotLocaleCopy> = Object.fromEntries(
+    Object.entries(input.slotCopies).map(([id, slot]) => [id, cloneSlotCopy(slot)]),
+  );
+  const linkIds = [...input.linkIds].sort((a, b) => b.length - a.length);
+
+  for (const [key, value] of Object.entries(input.values)) {
+    if (key.startsWith("game:")) {
+      const field = key.slice("game:".length);
+      if (field === "name") gameCopy = { ...gameCopy, name: value };
+      else if (field === "description") gameCopy = { ...gameCopy, description: value };
+      else if (field === "farewell_text") gameCopy = { ...gameCopy, farewell_text: value };
+      else if (field === "briefing_iframe_url") gameCopy = { ...gameCopy, briefing_iframe_url: value };
+      else if (field === "faq_iframe_url") gameCopy = { ...gameCopy, faq_iframe_url: value };
+      else if (field === "intro_youtube_url") gameCopy = { ...gameCopy, intro_youtube_url: value };
+      continue;
+    }
+    if (!key.startsWith("slot:")) continue;
+    const rest = key.slice("slot:".length);
+    const linkId = linkIds.find((id) => rest.startsWith(`${id}:`));
+    if (!linkId) continue;
+    const path = rest.slice(linkId.length + 1);
+    slotCopies[linkId] = setSlotPath(slotCopies[linkId] ?? {}, path, value);
+  }
+
+  return { gameCopy, slotCopies };
+}
