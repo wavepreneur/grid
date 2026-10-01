@@ -18,6 +18,7 @@ import {
 } from "@/app/actions/cms/packs";
 import { getDirectoryCity } from "@/app/actions/cms/cities";
 import { GpsWaypointPicker } from "@/components/cms/gps/gps-waypoint-picker";
+import { PackRouteOverview } from "@/components/cms/gps/pack-route-overview";
 import { CitySearchSelect } from "@/components/cms/packs/city-search-select";
 import { StudioDeleteModal } from "@/components/cms/shared/studio-delete-modal";
 import { StudioButton, StudioError, StudioHint, StudioInput, StudioLabel, StudioSelect, StudioSuccess } from "@/components/cms/studio-ui";
@@ -171,6 +172,17 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
           </StudioButton>
         </div>
       </section>
+
+      {pack.layer === 1 ? (
+        <PackRouteOverview
+          packId={pack.id}
+          citySlug={pack.city_slug}
+          items={items}
+          disabled={pending}
+          onSaved={setItems}
+          onError={setError}
+        />
+      ) : null}
 
       <section className="rounded-3xl bg-card p-5 shadow-soft">
         <h2 className="text-lg font-bold">
