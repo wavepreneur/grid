@@ -74,7 +74,7 @@ export function GameDeleteButton({
         return;
       }
       setOpen(false);
-      cache.invalidateGame(gameId);
+      cache.removeGame(gameId);
       router.push(redirectTo);
     } finally {
       setPending(false);

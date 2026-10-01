@@ -338,8 +338,10 @@ export function GameTranslationPanel({
     return next;
   }, [locale, slots, sourceSlots]);
   const [slotCopies, setSlotCopies] = useState<Record<string, SlotLocaleCopy>>(seededSlots);
+  const [dirtySlotIds, setDirtySlotIds] = useState<Set<string>>(() => new Set());
   useEffect(() => {
     setSlotCopies(seededSlots);
+    setDirtySlotIds(new Set());
   }, [seededSlots]);
 
   const units = useMemo(
@@ -401,6 +403,12 @@ export function GameTranslationPanel({
   const openPercent = remainingPercent(coverage);
 
   function patchSlot(linkId: string, patch: Partial<SlotLocaleCopy>) {
+    setDirtySlotIds((prev) => {
+      if (prev.has(linkId)) return prev;
+      const next = new Set(prev);
+      next.add(linkId);
+      return next;
+    });
     setSlotCopies((prev) => ({ ...prev, [linkId]: { ...prev[linkId], ...patch } }));
   }
 
@@ -441,8 +449,11 @@ export function GameTranslationPanel({
       const result = await saveGameLocale({
         gameId: game.id,
         language: locale,
-        copy: recipeBound ? { name: copy.name, confirmed } : { ...copy, confirmed },
+        copy: recipeBound
+          ? { name: copy.name, confirmed, coverage }
+          : { ...copy, confirmed, coverage },
         slots: slots.flatMap((slot) => {
+          if (!dirtySlotIds.has(slot.levelLink.id)) return [];
           const copy = slotCopies[slot.levelLink.id] ?? {};
           const geo = layer1LinkForSlot(slot);
           if (recipeBound) {
@@ -483,6 +494,7 @@ export function GameTranslationPanel({
         setError(result.error);
         return;
       }
+      setDirtySlotIds(new Set());
       cache.setGame(result.data!);
       onGameChange?.(result.data!);
       const saved = result.data!.translations[locale]?.confirmed;

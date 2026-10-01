@@ -46,7 +46,17 @@ export function useStudioCache() {
     invalidateGame(gameId: string) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.games.detail(gameId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.games.taskLinks(gameId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.games.all });
+    },
+
+    removeGame(gameId: string) {
+      queryClient.removeQueries({ queryKey: queryKeys.games.detail(gameId) });
+      queryClient.removeQueries({ queryKey: queryKeys.games.taskLinks(gameId) });
+      queryClient.setQueryData<StudioGame[]>(queryKeys.games.list(orgSlug), (old) =>
+        old?.filter((entry) => entry.id !== gameId),
+      );
+      queryClient.setQueryData<StudioGame[]>(queryKeys.games.templates(orgSlug), (old) =>
+        old?.filter((entry) => entry.id !== gameId),
+      );
     },
 
     setTask(task: StudioTask) {

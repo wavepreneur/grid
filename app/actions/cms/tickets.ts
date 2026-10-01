@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
 import type { StudioTicketPool } from "@/lib/cms/types";
@@ -78,7 +77,6 @@ export async function createTicketPool(
       .single();
 
     if (error) throw new Error(error.message);
-    revalidatePath("/admin/tickets");
     return { success: true, data: data as StudioTicketPool };
   } catch (error) {
     return {
@@ -97,7 +95,6 @@ export async function activateTicketPool(poolId: string): Promise<ActionResult<{
       .eq("id", poolId);
 
     if (error) throw new Error(error.message);
-    revalidatePath("/admin/tickets");
     return { success: true, data: { id: poolId } };
   } catch (error) {
     return {

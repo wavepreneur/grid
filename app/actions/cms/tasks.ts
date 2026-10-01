@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
 import {
@@ -38,59 +37,48 @@ async function refreshOpenerQuizSnapshots(
   supabase: ReturnType<typeof createAdminClient>,
   opener: Pick<StudioTask, "id" | "title" | "description" | "content">,
 ): Promise<void> {
-  const { data: links, error } = await supabase
+  const { data: links, error: linksError } = await supabase
     .from("studio_game_tasks")
     .select("id, game_id, overrides")
     .contains("overrides", { opener_task_id: opener.id });
+  const { data: items, error: itemsError } = await supabase
+    .from("studio_layer_pack_items")
+    .select("id, overrides")
+    .contains("overrides", { opener_task_id: opener.id });
 
-  if (error || !links?.length) {
-    // Fallback: JSON contains scan if contains-filter unsupported
-    if (error) {
-      const { data: allLinks } = await supabase
-        .from("studio_game_tasks")
-        .select("id, game_id, overrides");
-      const matched = (allLinks ?? []).filter((row) => {
-        const o = row.overrides as { opener_task_id?: unknown } | null;
-        return o?.opener_task_id === opener.id;
-      });
-      await writeRefreshedOpenerSnapshots(supabase, matched, opener);
-    }
-    return;
+  if (!linksError && links?.length) {
+    await writeRefreshedOpenerSnapshots(supabase, "studio_game_tasks", links, opener);
   }
-
-  await writeRefreshedOpenerSnapshots(supabase, links, opener);
+  if (!itemsError && items?.length) {
+    await writeRefreshedOpenerSnapshots(supabase, "studio_layer_pack_items", items, opener);
+  }
 }
 
 async function writeRefreshedOpenerSnapshots(
   supabase: ReturnType<typeof createAdminClient>,
-  links: Array<{ id: string; game_id: string; overrides: unknown }>,
+  table: "studio_game_tasks" | "studio_layer_pack_items",
+  rows: Array<{ id: string; overrides: unknown }>,
   opener: Pick<StudioTask, "id" | "title" | "description" | "content">,
 ): Promise<void> {
-  for (const link of links) {
-    const overrides = parseLinkOverrides(link.overrides);
-    if (overrides.opener_task_id !== opener.id) continue;
-    const quiz = taskToOpenerArrivalQuiz(
-      {
-        title: opener.title,
-        description: opener.description ?? "",
-        content: normalizeTaskContent(opener.content),
-      },
-      typeof overrides.opener_points === "number" ? overrides.opener_points : null,
-    );
-    if (!quiz) {
-      // Opener no longer valid MC — clear image by rebuilding without snapshot image only
-      // if quiz fails entirely, leave as-is to avoid breaking play mid-edit.
-      continue;
-    }
-    const nextOverrides = {
-      ...overrides,
-      arrival_quiz: quiz,
-    };
-    await supabase
-      .from("studio_game_tasks")
-      .update({ overrides: nextOverrides })
-      .eq("id", link.id);
-  }
+  await Promise.all(
+    rows.map(async (row) => {
+      const overrides = parseLinkOverrides(row.overrides);
+      if (overrides.opener_task_id !== opener.id) return;
+      const quiz = taskToOpenerArrivalQuiz(
+        {
+          title: opener.title,
+          description: opener.description ?? "",
+          content: normalizeTaskContent(opener.content),
+        },
+        typeof overrides.opener_points === "number" ? overrides.opener_points : null,
+      );
+      if (!quiz) return;
+      await supabase
+        .from(table)
+        .update({ overrides: { ...overrides, arrival_quiz: quiz } })
+        .eq("id", row.id);
+    }),
+  );
 }
 
 export async function listTasks(filters: TaskFilterInput = {}): Promise<ActionResult<StudioTask[]>> {
@@ -343,9 +331,6 @@ export async function upsertTask(input: TaskUpsertInput): Promise<ActionResult<S
         description: (data.description as string) ?? "",
         content: normalizeTaskContent(data.content),
       });
-
-      revalidatePath("/admin/tasks");
-      revalidatePath("/admin/games");
       return {
         success: true,
         data: normalizeTaskRow(data as StudioTask),
@@ -364,7 +349,6 @@ export async function upsertTask(input: TaskUpsertInput): Promise<ActionResult<S
       .single();
 
     if (error) throw new Error(friendlyTaskConstraintError(error.message));
-    revalidatePath("/admin/tasks");
     return {
       success: true,
       data: normalizeTaskRow(data as StudioTask),
@@ -464,8 +448,6 @@ export async function duplicateTasks(
     if (createdIds.length === 0) {
       return { success: false, error: "Keine Aufgaben zum Duplizieren gefunden." };
     }
-
-    revalidatePath("/admin/tasks");
     return { success: true, data: { createdIds, createdCount: createdIds.length } };
   } catch (error) {
     return {
@@ -484,7 +466,6 @@ export async function archiveTask(taskId: string): Promise<ActionResult<{ id: st
       .eq("id", taskId);
 
     if (error) throw new Error(error.message);
-    revalidatePath("/admin/tasks");
     return { success: true, data: { id: taskId } };
   } catch (error) {
     return {

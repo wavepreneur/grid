@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
 import {
@@ -253,8 +252,6 @@ export async function createAccessBatch(
       validFrom: null,
       validUntil: input.valid_until?.trim() || null,
     });
-
-    revalidatePath("/admin/tickets");
     return { success: true, data: { batchId: result.batchId } };
   } catch (error) {
     return {
@@ -276,7 +273,6 @@ export async function appendAccessCodes(
       batchId,
       quantity: qty,
     });
-    revalidatePath("/admin/tickets");
     return { success: true, data: { codes } };
   } catch (error) {
     return {
@@ -301,7 +297,6 @@ export async function revokeAccessCode(codeId: string): Promise<ActionResult<{ i
 
     if (error) throw new Error(error.message);
     if (!data) return { success: false, error: "Code nicht gefunden." };
-    revalidatePath("/admin/tickets");
     return { success: true, data: { id: data.id } };
   } catch (error) {
     return {

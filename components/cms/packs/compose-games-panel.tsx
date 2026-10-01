@@ -24,12 +24,14 @@ import {
 } from "@/components/cms/studio-icons";
 import { COMPOSE_GAMES_MAX, type StudioComposeRecipe, type StudioLayerPack } from "@/lib/cms/layer-packs";
 import { useInvalidateStudioPacks } from "@/lib/hooks/use-studio-packs";
+import { useInvalidateStudioGames } from "@/lib/hooks/use-studio-games";
 
 type Surface = "outdoor" | "indoor";
 type OpenLayer = 1 | 2 | 3 | null;
 
 export function ComposeGamesPanel() {
   const invalidate = useInvalidateStudioPacks();
+  const invalidateGames = useInvalidateStudioGames();
   const [recipes, setRecipes] = useState<StudioComposeRecipe[]>([]);
   const [recipeId, setRecipeId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -280,6 +282,7 @@ export function ComposeGamesPanel() {
               setRecipes((current) => [savedRecipe, ...current.filter((row) => row.id !== savedRecipe.id)]);
             }
             invalidate();
+            invalidateGames();
             setMessage(
               created > 0
                 ? `${created} Spiel${created === 1 ? "" : "e"} angelegt${skipped ? `, ${skipped} schon vorhanden` : ""}.`

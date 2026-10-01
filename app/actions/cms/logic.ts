@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseLogicRules, type StudioLogicRule } from "@/lib/cms/logic-rules";
 import type { ActionResult } from "@/lib/grid/types";
@@ -21,7 +20,6 @@ export async function updateGameLogicRules(
       .eq("id", gameId);
 
     if (error) throw new Error(error.message);
-    revalidatePath(`/admin/games/${gameId}`);
     return { success: true, data: { count: normalized.length } };
   } catch (error) {
     return {

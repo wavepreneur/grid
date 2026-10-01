@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
 import {
@@ -13,7 +12,6 @@ import {
 import { isStudioLanguage, localeLabel, parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
 import {
   applyTranslationUnits,
-  aliasSlotConfirmedKeys,
   buildSnapshotLocales,
   collectCityShellTranslationUnits,
   collectTranslationUnits,
@@ -67,8 +65,9 @@ import {
 import { PUSHABLE_EVENT_STATUSES, withLastLivePushAt } from "@/lib/cms/live-push";
 import { pingTeamsContentUpdated } from "@/lib/grid/content-ping";
 import { withCityShellTranslations } from "@/lib/cms/city-shell-i18n";
-import { loadMergedGameTaskLinksForGame, addTaskToLayerPack, fetchPackItems, fillComposeShellIfEmpty, loadRecipeOriginContext, loadRecipeOriginGame, removeTaskFromLayerPack, reorderPackBackedGameTasks, savePackBackedGameLink } from "@/app/actions/cms/packs";
+import { loadMergedGameTaskLinksForGame, addTaskToLayerPack, fetchPackItem, fetchPackItems, fillComposeShellIfEmpty, loadRecipeOriginContext, loadRecipeOriginGame, removeTaskFromLayerPack, reorderPackBackedGameTasks, savePackBackedGameLink } from "@/app/actions/cms/packs";
 import { gameUsesLayerPacks, isRecipeCityShell, mergePackLinksOntoGame, packItemToGameLink, parsePackLinkId } from "@/lib/cms/layer-packs";
+import { localeCopyFromPatch, localeWritePackIds } from "@/lib/cms/studio-mutate";
 
 function normalizeGameRow(row: StudioGame): StudioGame {
   return {
@@ -111,11 +110,9 @@ async function overlayCityShellCoverageOnListedGames(
 
   const packIds = [
     ...new Set(
-      shells.flatMap((game) =>
-        [game.layer1_pack_id, game.layer2_pack_id, game.layer3_pack_id].filter(
-          (id): id is string => Boolean(id),
-        ),
-      ),
+      shells
+        .map((game) => game.layer1_pack_id)
+        .filter((id): id is string => Boolean(id)),
     ),
   ];
   const packsById = new Map<string, Awaited<ReturnType<typeof fetchPackItems>>>();
@@ -134,8 +131,6 @@ async function overlayCityShellCoverageOnListedGames(
       legacyLinks: [],
       packs: {
         1: game.layer1_pack_id ? packsById.get(game.layer1_pack_id) : undefined,
-        2: game.layer2_pack_id ? packsById.get(game.layer2_pack_id) : undefined,
-        3: game.layer3_pack_id ? packsById.get(game.layer3_pack_id) : undefined,
       },
     });
     nextById.set(game.id, overlayCityShellCoverage(game, links));
@@ -343,7 +338,6 @@ export async function createGame(input: CreateGameInput): Promise<ActionResult<S
       .single();
 
     if (error) throw new Error(error.message);
-    revalidatePath("/admin/games");
     return { success: true, data: normalizeGameRow(data as StudioGame) };
   } catch (error) {
     return {
@@ -385,6 +379,35 @@ function mapTaskRow(raw: Record<string, unknown>): StudioTask {
     layer: (raw.layer as StudioTask["layer"]) ?? 2,
     content_context: (raw.content_context as StudioTask["content_context"]) ?? "any",
     role_assignment: (raw.role_assignment as StudioTask["role_assignment"]) ?? "team",
+  };
+}
+
+async function loadLegacyGameTaskLink(
+  supabase: ReturnType<typeof createAdminClient>,
+  gameId: string,
+  linkId: string,
+): Promise<StudioGameTaskLink | null> {
+  const { data, error } = await supabase
+    .from("studio_game_tasks")
+    .select("id, game_id, task_id, layer, sort_order, overrides, studio_tasks(*)")
+    .eq("id", linkId)
+    .eq("game_id", gameId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  const taskRaw = Array.isArray(data.studio_tasks) ? data.studio_tasks[0] : data.studio_tasks;
+  if (!taskRaw || typeof taskRaw !== "object") return null;
+  return {
+    id: String(data.id),
+    game_id: String(data.game_id),
+    task_id: String(data.task_id),
+    layer: parseLinkLayer({
+      layer: data.layer as StudioLayer,
+      overrides: (data.overrides as Record<string, unknown>) ?? {},
+    }),
+    sort_order: typeof data.sort_order === "number" ? data.sort_order : 0,
+    overrides: (data.overrides as Record<string, unknown>) ?? {},
+    task: mapTaskRow(taskRaw as Record<string, unknown>),
   };
 }
 
@@ -457,8 +480,6 @@ export async function updateGame(input: UpdateGameInput): Promise<ActionResult<S
       .single();
 
     if (error) throw new Error(error.message);
-    revalidatePath(`/admin/games/${input.id}`);
-    revalidatePath("/admin/games");
     return { success: true, data: normalizeGameRow(data as StudioGame) };
   } catch (error) {
     return {
@@ -511,7 +532,6 @@ export async function addTaskToGame(
       if (!added.success) return { success: false, error: added.error };
       const item = (added.data ?? []).find((row) => row.task_id === taskId);
       if (!item) return { success: false, error: "Pack-Eintrag nach dem Hinzufügen nicht gefunden." };
-      revalidatePath(`/admin/games/${gameId}`);
       return {
         success: true,
         data: packItemToGameLink({
@@ -583,8 +603,6 @@ export async function addTaskToGame(
       .single();
 
     if (taskError) throw new Error(taskError.message);
-
-    revalidatePath(`/admin/games/${gameId}`);
     return {
       success: true,
       data: {
@@ -611,7 +629,6 @@ export async function removeTaskFromGame(linkId: string, gameId: string): Promis
     if (packed) {
       const removed = await removeTaskFromLayerPack(packed.packId, packed.itemId);
       if (!removed.success) return { success: false, error: removed.error };
-      revalidatePath(`/admin/games/${gameId}`);
       return { success: true, data: { id: linkId } };
     }
 
@@ -649,8 +666,6 @@ export async function removeTaskFromGame(linkId: string, gameId: string): Promis
         ),
       );
     }
-
-    revalidatePath(`/admin/games/${gameId}`);
     return { success: true, data: { id: linkId } };
   } catch (error) {
     return {
@@ -667,17 +682,10 @@ export async function updateGameTaskLocation(
 ): Promise<ActionResult<StudioGameTaskLink>> {
   try {
     if (parsePackLinkId(linkId)) {
-      const linksResult = await listGameTasks(gameId);
-      if (!linksResult.success) return { success: false, error: linksResult.error };
-      const existing = linksResult.data?.find((link) => link.id === linkId);
-      if (!existing) return { success: false, error: "Task-Zuweisung nicht gefunden." };
-      const overrides = { ...(existing.overrides as Record<string, unknown>) };
+      const overrides: Record<string, unknown> = {};
       if (location) {
         overrides.location = location;
         overrides.gps = location;
-      } else {
-        delete overrides.location;
-        delete overrides.gps;
       }
       return savePackBackedGameLink({ gameId, linkId, overrides });
     }
@@ -711,14 +719,8 @@ export async function updateGameTaskLocation(
 
     if (updateError) throw new Error(updateError.message);
 
-    const tasksResult = await listGameTasks(gameId);
-    if (!tasksResult.success) {
-      return { success: false, error: tasksResult.error };
-    }
-    const link = tasksResult.data?.find((l) => l.id === linkId);
+    const link = await loadLegacyGameTaskLink(supabase, gameId, linkId);
     if (!link) return { success: false, error: "Task nach Update nicht gefunden." };
-
-    revalidatePath(`/admin/games/${gameId}`);
     return { success: true, data: link };
   } catch (error) {
     return {
@@ -903,18 +905,18 @@ export async function updateGameTaskLinkConfig(
     const supabase = createAdminClient();
 
     if (parsePackLinkId(linkId)) {
-      const linksResult = await listGameTasks(gameId);
-      if (!linksResult.success) return { success: false, error: linksResult.error };
-      const existingLink = linksResult.data?.find((link) => link.id === linkId);
-      if (!existingLink) return { success: false, error: "Task-Zuweisung nicht gefunden." };
+      const parsed = parsePackLinkId(linkId);
+      if (!parsed) return { success: false, error: "Kein Pack-Slot." };
+      const item = await fetchPackItem(supabase, parsed.itemId);
+      if (!item) return { success: false, error: "Task-Zuweisung nicht gefunden." };
 
       const overrides: GameLinkOverrides = {
-        ...(((existingLink.overrides as GameLinkOverrides) ?? {}) as GameLinkOverrides),
+        ...(((item.overrides as GameLinkOverrides) ?? {}) as GameLinkOverrides),
       };
       const applied = await applyGameLinkConfigPatch(supabase, orgId, overrides, patch);
       if (!applied.success) return applied;
 
-      const saved = await savePackBackedGameLink({
+      return savePackBackedGameLink({
         gameId,
         linkId,
         overrides: applied.data,
@@ -922,9 +924,6 @@ export async function updateGameTaskLinkConfig(
         bonusBindingsTouched: patch.bonus_bindings !== undefined,
         endsGame: patch.ends_game,
       });
-      if (!saved.success) return saved;
-      revalidatePath(`/admin/games/${gameId}`);
-      return saved;
     }
 
     const { data: existing, error: fetchError } = await supabase
@@ -1054,14 +1053,8 @@ export async function updateGameTaskLinkConfig(
       );
     }
 
-    const tasksResult = await listGameTasks(gameId);
-    if (!tasksResult.success) {
-      return { success: false, error: tasksResult.error };
-    }
-    const link = tasksResult.data?.find((l) => l.id === linkId);
+    const link = await loadLegacyGameTaskLink(supabase, gameId, linkId);
     if (!link) return { success: false, error: "Task nach Update nicht gefunden." };
-
-    revalidatePath(`/admin/games/${gameId}`);
     return { success: true, data: link };
   } catch (error) {
     return {
@@ -1093,7 +1086,6 @@ export async function reorderGameTasksInLayer(
     );
     const failed = results.find((r) => r.error);
     if (failed?.error) throw new Error(failed.error.message);
-    revalidatePath(`/admin/games/${gameId}`);
     return { success: true, data: { count: orderedLinkIds.length } };
   } catch (error) {
     return {
@@ -1123,7 +1115,6 @@ export async function reorderGameTasks(
     );
     const failed = results.find((r) => r.error);
     if (failed?.error) throw new Error(failed.error.message);
-    revalidatePath(`/admin/games/${gameId}`);
     return { success: true, data: { count: orderedLinkIds.length } };
   } catch (error) {
     return {
@@ -1289,9 +1280,6 @@ export async function publishGame(
       .eq("id", gameId);
 
     if (updateError) throw new Error(updateError.message);
-
-    revalidatePath("/admin/games");
-    revalidatePath(`/admin/games/${gameId}`);
     return {
       success: true,
       data: { versionId: version.id, versionNumber: version.version_number },
@@ -1412,9 +1400,6 @@ export async function pushLiveStudioGame(gameId: string): Promise<
       .eq("id", gameId)
       .eq("organization_id", orgId);
     if (flagError) throw new Error(flagError.message);
-
-    revalidatePath("/admin/games");
-    revalidatePath(`/admin/games/${gameId}`);
     return {
       success: true,
       data: {
@@ -1464,9 +1449,6 @@ export async function revertGameToDraft(gameId: string): Promise<ActionResult<St
       .single();
 
     if (error) throw new Error(error.message);
-
-    revalidatePath("/admin/games");
-    revalidatePath(`/admin/games/${gameId}`);
     return { success: true, data: data as StudioGame };
   } catch (error) {
     return {
@@ -1504,8 +1486,6 @@ export async function saveGameAsTemplate(gameId: string): Promise<ActionResult<S
       .single();
 
     if (error) throw new Error(error.message);
-
-    revalidatePath("/admin/games");
     return { success: true, data: normalizeGameRow(data as StudioGame) };
   } catch (error) {
     return {
@@ -1532,9 +1512,6 @@ export async function removeGameTemplate(gameId: string): Promise<ActionResult<S
       .single();
 
     if (error) throw new Error(error.message);
-
-    revalidatePath("/admin/games");
-    revalidatePath(`/admin/games/${gameId}`);
     return { success: true, data: normalizeGameRow(data as StudioGame) };
   } catch (error) {
     return {
@@ -1576,8 +1553,6 @@ export async function createGameFromTemplate(
       normalizeGameRow(template as StudioGame),
       name,
     );
-
-    revalidatePath("/admin/games");
     return { success: true, data: copy };
   } catch (error) {
     return {
@@ -1707,15 +1682,91 @@ export async function addGameLocale(
       .select("*")
       .single();
     if (updateError) throw new Error(updateError.message);
-
-    revalidatePath("/admin/games");
-    revalidatePath(`/admin/games/${gameId}`);
     return { success: true, data: normalizeGameRow(data as StudioGame) };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Sprache konnte nicht angelegt werden.",
     };
+  }
+}
+
+async function writeSlotLocalePatches(
+  supabase: ReturnType<typeof createAdminClient>,
+  game: StudioGame,
+  language: StudioLanguage,
+  cityShell: boolean,
+  slots: Array<{ linkId: string; copy: SlotLocaleCopy }>,
+) {
+  if (slots.length === 0) return;
+  const allowedPacks = localeWritePackIds(game, cityShell);
+  const copyByItemId = new Map<string, SlotLocaleCopy>();
+  const copyByLegacyId = new Map<string, SlotLocaleCopy>();
+  for (const slot of slots) {
+    const parsed = parsePackLinkId(slot.linkId);
+    if (parsed) copyByItemId.set(parsed.itemId, slot.copy);
+    else copyByLegacyId.set(slot.linkId, slot.copy);
+  }
+
+  if (copyByItemId.size > 0 && allowedPacks.length > 0) {
+    const { data: items, error } = await supabase
+      .from("studio_layer_pack_items")
+      .select("id, pack_id, overrides")
+      .in("id", [...copyByItemId.keys()])
+      .in("pack_id", allowedPacks);
+    if (error) throw new Error(error.message);
+    const results = await Promise.all(
+      (items ?? []).flatMap((item) => {
+        const copy = copyByItemId.get(item.id as string);
+        if (!copy) return [];
+        return [
+          supabase
+            .from("studio_layer_pack_items")
+            .update({
+              overrides: withLinkLocale(
+                (item.overrides as Record<string, unknown>) ?? {},
+                language,
+                copy,
+              ),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", item.id)
+            .eq("pack_id", item.pack_id),
+        ];
+      }),
+    );
+    const failed = results.find((row) => row.error);
+    if (failed?.error) throw new Error(failed.error.message);
+  }
+
+  if (copyByLegacyId.size > 0) {
+    const { data: links, error } = await supabase
+      .from("studio_game_tasks")
+      .select("id, overrides")
+      .eq("game_id", game.id)
+      .in("id", [...copyByLegacyId.keys()]);
+    if (error) throw new Error(error.message);
+    const results = await Promise.all(
+      (links ?? []).flatMap((link) => {
+        const copy = copyByLegacyId.get(link.id as string);
+        if (!copy) return [];
+        return [
+          supabase
+            .from("studio_game_tasks")
+            .update({
+              overrides: withLinkLocale(
+                (link.overrides as Record<string, unknown>) ?? {},
+                language,
+                copy,
+              ),
+            })
+            .eq("id", link.id)
+            .eq("game_id", game.id),
+        ];
+      }),
+    );
+    const failed = results.find((row) => row.error);
+    if (failed?.error) throw new Error(failed.error.message);
   }
 }
 
@@ -1742,9 +1793,6 @@ export async function saveGameLocale(input: {
     const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
     const context = await loadRecipeOriginContext(supabase, game);
     const recipeBound = isRecipeCityShell(game, context.origin, context.isSource);
-    const linksResult = await listGameTasks(input.gameId);
-    const links = linksResult.success ? linksResult.data ?? [] : [];
-    const units = translationUnitsForGame(game, links, recipeBound);
 
     if (input.language === source) {
       if (input.copy.name !== undefined) payload.name = input.copy.name.trim();
@@ -1753,31 +1801,12 @@ export async function saveGameLocale(input: {
         if (input.copy.farewell_text !== undefined) payload.farewell_text = input.copy.farewell_text;
       }
     } else {
-      const aliases = cityShellQuizSlots(links).flatMap((slot) =>
-        slot.geoId
-          ? ([
-              [slot.geoId, slot.linkId],
-              [slot.linkId, slot.geoId],
-            ] satisfies Array<[string, string]>)
-          : [],
-      );
-      const storeCopy = recipeBound
-        ? {
-            name: input.copy.name,
-            confirmed: aliasSlotConfirmedKeys(
-              parseConfirmed(input.copy.confirmed).filter(
-                (key) => key === "game:name" || key.includes(":quiz:"),
-              ),
-              aliases,
-            ).filter((key) => key === "game:name" || units.some((unit) => unit.key === key)),
-          }
-        : input.copy;
       payload.translations = {
         ...game.translations,
-        [input.language]: localeCopyWithCoverage(
+        [input.language]: localeCopyFromPatch(
           recipeBound ? undefined : game.translations[input.language],
-          storeCopy,
-          units,
+          input.copy,
+          recipeBound,
         ),
       };
     }
@@ -1791,68 +1820,8 @@ export async function saveGameLocale(input: {
       .single();
     if (updateError) throw new Error(updateError.message);
 
-    const openerIds = new Set(openerSlotsFromLinks(links).map((slot) => slot.linkId));
-    const incomingSlots = recipeBound
-      ? (input.slots ?? []).filter((slot) => openerIds.has(slot.linkId))
-      : input.slots;
+    await writeSlotLocalePatches(supabase, game, input.language, recipeBound, input.slots ?? []);
 
-    if (incomingSlots?.length) {
-      const packSlots = incomingSlots.filter((slot) => parsePackLinkId(slot.linkId));
-      const legacySlots = incomingSlots.filter((slot) => !parsePackLinkId(slot.linkId));
-
-      for (const slot of packSlots) {
-        const parsed = parsePackLinkId(slot.linkId);
-        if (!parsed) continue;
-        const { data: item, error: itemError } = await supabase
-          .from("studio_layer_pack_items")
-          .select("overrides")
-          .eq("id", parsed.itemId)
-          .maybeSingle();
-        if (itemError) throw new Error(itemError.message);
-        if (!item) continue;
-        const overrides = withLinkLocale(
-          (item.overrides as Record<string, unknown>) ?? {},
-          input.language,
-          slot.copy,
-        );
-        const { error: packError } = await supabase
-          .from("studio_layer_pack_items")
-          .update({ overrides, updated_at: new Date().toISOString() })
-          .eq("id", parsed.itemId);
-        if (packError) throw new Error(packError.message);
-      }
-
-      if (legacySlots.length > 0) {
-        const { data: links, error: linksError } = await supabase
-          .from("studio_game_tasks")
-          .select("id, overrides")
-          .eq("game_id", input.gameId)
-          .in(
-            "id",
-            legacySlots.map((slot) => slot.linkId),
-          );
-        if (linksError) throw new Error(linksError.message);
-        const copyById = new Map(legacySlots.map((slot) => [slot.linkId, slot.copy]));
-        for (const link of links ?? []) {
-          const copy = copyById.get(link.id as string);
-          if (!copy) continue;
-          const overrides = withLinkLocale(
-            (link.overrides as Record<string, unknown>) ?? {},
-            input.language,
-            copy,
-          );
-          const { error: linkError } = await supabase
-            .from("studio_game_tasks")
-            .update({ overrides })
-            .eq("id", link.id)
-            .eq("game_id", input.gameId);
-          if (linkError) throw new Error(linkError.message);
-        }
-      }
-    }
-
-    revalidatePath("/admin/games");
-    revalidatePath(`/admin/games/${input.gameId}`);
     return { success: true, data: normalizeGameRow(data as StudioGame) };
   } catch (error) {
     return {
@@ -2059,8 +2028,6 @@ export async function duplicateGames(
     if (createdIds.length === 0) {
       return { success: false, error: "Keine Spiele zum Duplizieren gefunden." };
     }
-
-    revalidatePath("/admin/games");
     return { success: true, data: { createdIds, createdCount: createdIds.length } };
   } catch (error) {
     return {
@@ -2113,7 +2080,6 @@ export async function translateRecipeCityLocales(input: {
       }
       translatedFields += result.data?.translated ?? 0;
     }
-    revalidatePath("/admin/games");
     return {
       success: true,
       data: {

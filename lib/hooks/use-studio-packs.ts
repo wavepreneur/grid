@@ -47,6 +47,5 @@ export function useInvalidateStudioPacks() {
   const queryClient = useQueryClient();
   return () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.packs.all });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.games.all });
   };
 }

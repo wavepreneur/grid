@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
 import { isStudioTestBookingReference } from "@/lib/cms/studio-test-session";
@@ -364,8 +363,6 @@ export async function takeGamesOffline(gameIds: string[]): Promise<ActionResult<
       .eq("status", "active");
 
     if (poolsError) throw new Error(poolsError.message);
-
-    revalidatePath("/admin/games");
     return { success: true, data: { gameIds: allowedIds } };
   } catch (error) {
     return {
@@ -453,9 +450,6 @@ export async function deleteGames(gameIds: string[]): Promise<ActionResult<BulkD
         });
       }
     }
-
-    revalidatePath("/admin/games");
-    revalidatePath("/admin/tickets");
     return { success: true, data: { deletedIds, failed } };
   } catch (error) {
     return {
@@ -556,9 +550,6 @@ export async function removeTaskFromLiveGames(
     const supabase = createAdminClient();
     const { error } = await supabase.from("studio_game_tasks").delete().in("id", linkIds);
     if (error) throw new Error(error.message);
-
-    revalidatePath("/admin/tasks");
-    revalidatePath("/admin/games");
     return { success: true, data: { removedLinkIds: linkIds } };
   } catch (error) {
     return {
@@ -612,9 +603,6 @@ export async function deleteTasks(taskIds: string[]): Promise<ActionResult<BulkD
         });
       }
     }
-
-    revalidatePath("/admin/tasks");
-    revalidatePath("/admin/games");
     return { success: true, data: { deletedIds, failed } };
   } catch (error) {
     return {

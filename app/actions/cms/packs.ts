@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
 import { parseBonusWhen, type BonusAudience } from "@/lib/cms/bonus-bindings";
 import { parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
@@ -23,6 +22,7 @@ import {
   mergePackLinksOntoGame,
   normalizeComposeRecipeRow,
   normalizeLayerPackRow,
+  packItemToGameLink,
   parsePackLinkId,
   sharedLayer1ItemOverrides,
   splitOverridesForLayerPacks,
@@ -50,9 +50,7 @@ function sanitizeIlike(raw: string): string {
 }
 
 function revalidatePacks() {
-  revalidatePath("/admin/packs");
-  revalidatePath("/admin/games");
-  revalidatePath("/admin/tasks");
+  // Catalog pages are React Query. Next path revalidation only delays the write.
 }
 
 async function ensureUniquePackSlug(
@@ -92,13 +90,16 @@ function mapPackItemRow(row: Record<string, unknown>): StudioLayerPackItem | nul
   };
 }
 
+const PACK_ITEM_SELECT =
+  "id, pack_id, task_id, sort_order, overrides, created_at, updated_at, studio_tasks(*)";
+
 export async function fetchPackItems(
   supabase: AdminClient,
   packId: string,
 ): Promise<StudioLayerPackItem[]> {
   const { data, error } = await supabase
     .from("studio_layer_pack_items")
-    .select("id, pack_id, task_id, sort_order, overrides, created_at, updated_at, studio_tasks(*)")
+    .select(PACK_ITEM_SELECT)
     .eq("pack_id", packId)
     .order("sort_order");
   if (error) throw new Error(error.message);
@@ -106,6 +107,34 @@ export async function fetchPackItems(
     const item = mapPackItemRow(row as Record<string, unknown>);
     return item ? [item] : [];
   });
+}
+
+export async function fetchPackItem(
+  supabase: AdminClient,
+  itemId: string,
+): Promise<StudioLayerPackItem | null> {
+  const { data, error } = await supabase
+    .from("studio_layer_pack_items")
+    .select(PACK_ITEM_SELECT)
+    .eq("id", itemId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? mapPackItemRow(data as Record<string, unknown>) : null;
+}
+
+async function fetchPackItemAtSort(
+  supabase: AdminClient,
+  packId: string,
+  sortOrder: number,
+): Promise<StudioLayerPackItem | null> {
+  const { data, error } = await supabase
+    .from("studio_layer_pack_items")
+    .select(PACK_ITEM_SELECT)
+    .eq("pack_id", packId)
+    .eq("sort_order", sortOrder)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? mapPackItemRow(data as Record<string, unknown>) : null;
 }
 
 async function fetchPackItemsByIds(
@@ -2046,9 +2075,10 @@ export async function savePackBackedGameLink(input: {
 
     const pack = await getOwnedPack(supabase, orgId, parsed.packId);
     if (!pack) return { success: false, error: "Pack nicht gefunden." };
-    const items = await fetchPackItems(supabase, pack.id);
-    const item = items.find((row) => row.id === parsed.itemId);
-    if (!item) return { success: false, error: "Pack-Eintrag nicht gefunden." };
+    const item = await fetchPackItem(supabase, parsed.itemId);
+    if (!item || item.pack_id !== pack.id) {
+      return { success: false, error: "Pack-Eintrag nicht gefunden." };
+    }
 
     const split = splitOverridesForLayerPacks(input.overrides);
 
@@ -2068,9 +2098,7 @@ export async function savePackBackedGameLink(input: {
       );
     } else if (pack.layer === 2) {
       if (game.layer1_pack_id) {
-        const layer1Items = await fetchPackItems(supabase, game.layer1_pack_id);
-        const sibling =
-          layer1Items.find((row) => row.sort_order === item.sort_order) ?? layer1Items[item.sort_order];
+        const sibling = await fetchPackItemAtSort(supabase, game.layer1_pack_id, item.sort_order);
         if (sibling) {
           const geo = { ...sibling.overrides, ...split.geo };
           if (input.openerTaskId === null) geo.opener_enabled = false;
@@ -2109,7 +2137,13 @@ export async function savePackBackedGameLink(input: {
               when?: { type: string };
             }>)
           : [];
-        const layer3Items = await fetchPackItems(supabase, game.layer3_pack_id);
+        const bindingIds = bindings.map((binding) => binding.task_id).filter(Boolean);
+        const layer3Items =
+          bindingIds.length > 0
+            ? (await fetchPackItems(supabase, game.layer3_pack_id)).filter((row) =>
+                bindingIds.includes(row.task_id),
+              )
+            : [];
         for (const binding of bindings) {
           if (!binding.task_id) continue;
           const existing = layer3Items.find((row) => row.task_id === binding.task_id);
@@ -2132,8 +2166,9 @@ export async function savePackBackedGameLink(input: {
       }
 
       if (input.endsGame) {
+        const siblings = await fetchPackItems(supabase, pack.id);
         await Promise.all(
-          items
+          siblings
             .filter((row) => row.id !== item.id)
             .map(async (row) => {
               if (!(row.overrides as { ends_game?: boolean }).ends_game) return;
@@ -2150,15 +2185,29 @@ export async function savePackBackedGameLink(input: {
       });
     }
 
-    revalidatePacks();
-    const merged = await loadMergedGameTaskLinksForGame(supabase, {
-      ...game,
-      layer1_pack_id: game.layer1_pack_id,
-      layer2_pack_id: game.layer2_pack_id,
-      layer3_pack_id: game.layer3_pack_id,
+    const written = await fetchPackItem(supabase, item.id);
+    if (!written) return { success: false, error: "Slot nach dem Speichern nicht gefunden." };
+    const geoItem =
+      pack.layer === 2 && game.layer1_pack_id
+        ? await fetchPackItemAtSort(supabase, game.layer1_pack_id, written.sort_order)
+        : pack.layer === 1
+          ? written
+          : null;
+    const merged = mergePackLinksOntoGame({
+      game,
+      legacyLinks: [],
+      packs: {
+        1: geoItem ? [geoItem] : undefined,
+        2: pack.layer === 2 ? [written] : undefined,
+        3: pack.layer === 3 ? [written] : undefined,
+      },
     });
-    const link = merged.find((row) => row.id === input.linkId);
-    if (!link) return { success: false, error: "Slot nach dem Speichern nicht gefunden." };
+    const link = merged.find((row) => row.id === input.linkId) ?? packItemToGameLink({
+      gameId: game.id,
+      packId: pack.id,
+      item: written,
+      layer: pack.layer,
+    });
     return { success: true, data: link };
   } catch (error) {
     return {
@@ -2216,8 +2265,6 @@ export async function reorderPackBackedGameTasks(
         }
       }
     }
-
-    revalidatePath(`/admin/games/${gameId}`);
     return { success: true, data: { count: orderedLinkIds.length } };
   } catch (error) {
     return {

@@ -130,7 +130,6 @@ export function TaskEditor({ task, returnTo }: Props) {
         return;
       }
       cache.setTask(result.data!);
-      cache.invalidateTasks();
       acknowledgeSaved(
         JSON.stringify({
           title: result.data!.title,

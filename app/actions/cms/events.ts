@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getGame } from "@/app/actions/cms/games";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
@@ -345,8 +344,6 @@ export async function getOrCreateStudioTestSession(
       runtimeProfiles: game.runtime_profiles,
       language: parseStudioLanguage(language ?? game.language),
     });
-
-    revalidatePath(`/admin/games/${gameId}`);
     return { success: true, data: session };
   } catch (error) {
     return {
@@ -395,8 +392,6 @@ export async function regenerateStudioTestSession(
       runtimeProfiles: game.runtime_profiles,
       language: parseStudioLanguage(language ?? game.language),
     });
-
-    revalidatePath(`/admin/games/${gameId}`);
     return { success: true, data: session };
   } catch (error) {
     return {
@@ -479,9 +474,6 @@ export async function createLiveEventFromGame(
       .single();
 
     if (insertError) throw new Error(insertError.message);
-
-    revalidatePath("/admin/games");
-    revalidatePath(`/admin/games/${gameId}`);
 
     return {
       success: true,
