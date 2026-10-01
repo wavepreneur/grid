@@ -16,6 +16,7 @@ import {
   DUPLICATE_PACKS_MAX,
   PACK_SEARCH_LIMIT,
   PACK_SLOT_MAX,
+  composeCityGameName,
   composeGameName,
   gameUsesLayerPacks,
   mapStudioTaskRow,
@@ -35,6 +36,7 @@ import {
 import { slugifyStudio, type StudioGame, type StudioGameTaskLink, type StudioTask } from "@/lib/cms/types";
 import { normalizeTaskContent } from "@/lib/cms/task-content";
 import { isUuid } from "@/lib/cms/city-directory";
+import { syncExitmaniaCityDirectory } from "@/app/actions/cms/cities";
 import { parseLinkLayer, parseLinkOverrides } from "@/lib/cms/game-link-config";
 import { surfaceToPreset, taskToOpenerArrivalQuiz } from "@/lib/cms/game-slots";
 import { seedCityShellTranslations } from "@/lib/cms/city-shell-i18n";
@@ -264,24 +266,32 @@ export async function listLayerPacks(input: {
     const limit = Math.min(COMPOSE_L1_LIST_MAX, Math.max(1, input.limit ?? PACK_SEARCH_LIMIT));
     const search = sanitizeIlike(input.search ?? "");
 
-    let query = supabase
-      .from("studio_layer_packs")
-      .select("*")
-      .eq("organization_id", orgId)
-      .eq("layer", input.layer)
-      .eq("is_active", true)
-      .order("updated_at", { ascending: false })
-      .limit(limit);
-
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,city_slug.ilike.%${search}%,slug.ilike.%${search}%`);
+    const rows: Record<string, unknown>[] = [];
+    const pageSize = 1000;
+    for (let from = 0; from < limit; from += pageSize) {
+      const to = Math.min(limit, from + pageSize) - 1;
+      let query = supabase
+        .from("studio_layer_packs")
+        .select(
+          "id, organization_id, layer, slug, name, city_id, city_slug, slot_count, is_active, created_at, updated_at",
+        )
+        .eq("organization_id", orgId)
+        .eq("layer", input.layer)
+        .eq("is_active", true)
+        .order("updated_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,city_slug.ilike.%${search}%,slug.ilike.%${search}%`);
+      }
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
+      rows.push(...((data ?? []) as Record<string, unknown>[]));
+      if ((data ?? []).length < to - from + 1) break;
     }
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
     return {
       success: true,
-      data: (data ?? []).map((row) => normalizeLayerPackRow(row as Record<string, unknown>)),
+      data: rows.map((row) => normalizeLayerPackRow(row)),
     };
   } catch (error) {
     return {
@@ -852,7 +862,25 @@ async function loadTaskSlugs(supabase: AdminClient, orgId: string): Promise<Set<
   const page = 1000;
   for (let from = 0; ; from += page) {
     const count = await loadSlugPage(
-      supabase.from("studio_tasks").select("slug").eq("organization_id", orgId).range(from, from + page - 1),
+      supabase.from("studio_tasks").select("slug").eq("organization_id", orgId).order("slug").range(from, from + page - 1),
+      taken,
+    );
+    if (count < page) break;
+  }
+  return taken;
+}
+
+async function loadGameSlugs(supabase: AdminClient, orgId: string): Promise<Set<string>> {
+  const taken = new Set<string>();
+  const page = 1000;
+  for (let from = 0; ; from += page) {
+    const count = await loadSlugPage(
+      supabase
+        .from("studio_games")
+        .select("slug")
+        .eq("organization_id", orgId)
+        .order("slug")
+        .range(from, from + page - 1),
       taken,
     );
     if (count < page) break;
@@ -874,6 +902,7 @@ async function loadPackSlugs(
         .select("slug")
         .eq("organization_id", orgId)
         .eq("layer", layer)
+        .order("slug")
         .range(from, from + page - 1),
       taken,
     );
@@ -1092,7 +1121,10 @@ async function duplicatePackCopies(
       id: packId,
       organization_id: orgId,
       layer: source.layer,
-      slug: mintUniqueSlug(copy.name, packSlugs),
+      slug: mintUniqueSlug(
+        copy.city ? `${copy.city.slug}-${copy.city.id.replace(/-/g, "").slice(0, 8)}` : copy.name,
+        packSlugs,
+      ),
       name: copy.name,
       description: source.description,
       city_id: cityId,
@@ -1317,6 +1349,215 @@ export async function createLayer1PacksForCities(input: {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Städte konnten nicht angelegt werden.",
+    };
+  }
+}
+
+const SEED_ORT_BATCH = 40;
+
+async function findMunichOrtPack(
+  supabase: AdminClient,
+  orgId: string,
+): Promise<StudioLayerPack | null> {
+  const { data, error } = await supabase
+    .from("studio_layer_packs")
+    .select("*")
+    .eq("organization_id", orgId)
+    .eq("layer", 1)
+    .eq("is_active", true)
+    .in("name", ["München", "Munchen", "muenchen"]);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []).map((row) => normalizeLayerPackRow(row as Record<string, unknown>));
+  const exact = rows.find((pack) => pack.name.trim().toLocaleLowerCase("de") === "münchen");
+  if (exact) return exact;
+  return rows.find((pack) => pack.name.trim().toLocaleLowerCase("de") === "munchen") ?? null;
+}
+
+export async function seedOrtPacksFromMunich(): Promise<
+  ActionResult<{
+    createdCount: number;
+    skippedCount: number;
+    remainingCount: number;
+    templateName: string;
+  }>
+> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const synced = await syncExitmaniaCityDirectory();
+    if (!synced.success) return { success: false, error: synced.error };
+
+    const template = await findMunichOrtPack(supabase, orgId);
+    if (!template) {
+      return { success: false, error: "Vorlage München nicht gefunden. Lege zuerst den Ort München an." };
+    }
+
+    const cities = synced.data ?? [];
+    const munichCity =
+      cities.find(
+        (city) => city.country === "DE" && city.name.trim().toLocaleLowerCase("de") === "münchen",
+      ) ?? cities.find((city) => city.name.trim().toLocaleLowerCase("de") === "münchen");
+    if (munichCity && template.city_id !== munichCity.id) {
+      await supabase
+        .from("studio_layer_packs")
+        .update({
+          city_id: munichCity.id,
+          city_slug: munichCity.slug,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", template.id)
+        .eq("organization_id", orgId);
+    }
+
+    const existingRows: Array<{ id?: string; name?: string; city_id?: string | null }> = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error: existingError } = await supabase
+        .from("studio_layer_packs")
+        .select("id, name, city_id")
+        .eq("organization_id", orgId)
+        .eq("layer", 1)
+        .eq("is_active", true)
+        .order("id")
+        .range(from, from + 999);
+      if (existingError) throw new Error(existingError.message);
+      existingRows.push(...(data ?? []));
+      if ((data ?? []).length < 1000) break;
+    }
+
+    const usedCityIds = new Set(
+      (existingRows ?? [])
+        .map((row) => (typeof row.city_id === "string" ? row.city_id : ""))
+        .filter(Boolean),
+    );
+    const usedNames = new Set(
+      (existingRows ?? []).map((row) => String(row.name ?? "").trim().toLocaleLowerCase("de")),
+    );
+
+    const nameCounts = new Map<string, number>();
+    for (const city of cities) {
+      const key = city.name.trim().toLocaleLowerCase("de");
+      nameCounts.set(key, (nameCounts.get(key) ?? 0) + 1);
+    }
+
+    const missing: Array<{ name: string; city: { id: string; slug: string } }> = [];
+    for (const city of cities) {
+      if (usedCityIds.has(city.id)) continue;
+      const nameKey = city.name.trim().toLocaleLowerCase("de");
+      const name =
+        (nameCounts.get(nameKey) ?? 0) > 1 ? `${city.name.trim()} (${city.country})` : city.name.trim();
+      if (usedNames.has(name.trim().toLocaleLowerCase("de"))) continue;
+      missing.push({ name, city: { id: city.id, slug: city.slug } });
+    }
+
+    const chunk = missing.slice(0, SEED_ORT_BATCH);
+    const createdIds = chunk.length > 0 ? await duplicatePackCopies(supabase, orgId, template, chunk) : [];
+
+    revalidatePacks();
+    return {
+      success: true,
+      data: {
+        createdCount: createdIds.length,
+        skippedCount: cities.length - missing.length,
+        remainingCount: Math.max(0, missing.length - createdIds.length),
+        templateName: template.name,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Orte konnten nicht angelegt werden.",
+    };
+  }
+}
+
+export async function relinkOrtPacksToExitmania(): Promise<
+  ActionResult<{ linkedCount: number; updatedCount: number; unmatchedCount: number }>
+> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const synced = await syncExitmaniaCityDirectory();
+    if (!synced.success) return { success: false, error: synced.error };
+    const cities = (synced.data ?? []).filter((city) => city.source_city_id);
+
+    const byId = new Map(cities.map((city) => [city.id, city]));
+    const bySlug = new Map<string, (typeof cities)[number]>();
+    const byNameCountry = new Map<string, (typeof cities)[number]>();
+    const byName = new Map<string, Array<(typeof cities)[number]>>();
+    for (const city of cities) {
+      if (city.slug) bySlug.set(city.slug, city);
+      byNameCountry.set(`${city.name.trim().toLocaleLowerCase("de")}|${city.country}`, city);
+      const nameKey = city.name.trim().toLocaleLowerCase("de");
+      const list = byName.get(nameKey) ?? [];
+      list.push(city);
+      byName.set(nameKey, list);
+    }
+
+    const packs: Array<{ id: string; name: string; slug: string; city_id: string | null; city_slug: string | null }> = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from("studio_layer_packs")
+        .select("id, name, slug, city_id, city_slug")
+        .eq("organization_id", orgId)
+        .eq("layer", 1)
+        .eq("is_active", true)
+        .order("id")
+        .range(from, from + 999);
+      if (error) throw new Error(error.message);
+      packs.push(...((data ?? []) as typeof packs));
+      if ((data ?? []).length < 1000) break;
+    }
+
+    function matchCity(pack: (typeof packs)[number]) {
+      const current = pack.city_id ? byId.get(pack.city_id) : null;
+      if (current?.source_city_id) return current;
+      const nameKey = pack.name.trim().toLocaleLowerCase("de");
+      const suffix = /\(([A-Z]{2})\)$/.exec(pack.name.trim());
+      if (suffix) {
+        const base = pack.name.replace(/\s*\([A-Z]{2}\)$/, "").trim().toLocaleLowerCase("de");
+        const hit = byNameCountry.get(`${base}|${suffix[1]}`);
+        if (hit) return hit;
+      }
+      return (
+        (pack.city_slug ? bySlug.get(pack.city_slug) : null) ??
+        bySlug.get(pack.slug) ??
+        byNameCountry.get(`${nameKey}|DE`) ??
+        (byName.get(nameKey)?.length === 1 ? byName.get(nameKey)?.[0] : null) ??
+        null
+      );
+    }
+
+    let updatedCount = 0;
+    let linkedCount = 0;
+    let unmatchedCount = 0;
+    const now = new Date().toISOString();
+    for (const pack of packs) {
+      const city = matchCity(pack);
+      if (!city) {
+        unmatchedCount += 1;
+        continue;
+      }
+      linkedCount += 1;
+      if (pack.city_id === city.id && pack.city_slug === city.slug) continue;
+      const { error } = await supabase
+        .from("studio_layer_packs")
+        .update({ city_id: city.id, city_slug: city.slug, updated_at: now })
+        .eq("id", pack.id)
+        .eq("organization_id", orgId);
+      if (error) throw new Error(error.message);
+      await supabase
+        .from("studio_games")
+        .update({ city_slug: city.slug, updated_at: now })
+        .eq("layer1_pack_id", pack.id);
+      updatedCount += 1;
+    }
+
+    revalidatePacks();
+    return { success: true, data: { linkedCount, updatedCount, unmatchedCount } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Orte konnten nicht gekoppelt werden.",
     };
   }
 }
@@ -1668,6 +1909,18 @@ export async function composeGamesFromPacks(input: {
       }
     }
 
+    const origin = await findComposeShellSource(
+      supabase,
+      orgId,
+      mission?.id ?? null,
+      team?.id ?? null,
+    );
+    if (recipe) {
+      recipe = await persistRecipeOrigin(supabase, orgId, recipe, origin);
+      recipeId = recipe.id;
+    }
+    const shell = origin ? composeShellPayload(origin, runtime_profiles) : null;
+
     const cityPacks: StudioLayerPack[] = [];
     if (l1Ids.length > 0) {
       const found = new Map<string, StudioLayerPack>();
@@ -1743,7 +1996,8 @@ export async function composeGamesFromPacks(input: {
       const name =
         input.name?.trim() && cityPacks.length <= 1
           ? input.name.trim()
-          : composeGameName(city?.name ?? city?.city_slug, mission?.name) ||
+          : composeCityGameName(origin?.name, city?.name ?? city?.city_slug) ||
+            composeGameName(city?.name ?? city?.city_slug, mission?.name) ||
             input.name?.trim() ||
             "Neues Spiel";
       const draft = composeDraftGame({
@@ -1774,18 +2028,21 @@ export async function composeGamesFromPacks(input: {
         .from("studio_games")
         .insert({
           organization_id: orgId,
-          blueprint_id: null,
+          blueprint_id: origin?.blueprint_id ?? null,
           slug,
           name,
-          description: "",
+          description: typeof shell?.description === "string" ? shell.description : "",
           language,
-          translations,
+          translations: shell?.translations ?? translations,
           city_slug: city?.city_slug ?? null,
           gps_enabled: preset.gpsEnabled,
+          duration_minutes: typeof shell?.duration_minutes === "number" ? shell.duration_minutes : null,
+          farewell_text: typeof shell?.farewell_text === "string" ? shell.farewell_text : "",
+          logo_url: typeof shell?.logo_url === "string" ? shell.logo_url : null,
           active_layers: [...preset.activeLayers],
-          runtime_profiles,
-          feature_flags: {},
-          logic_rules: [],
+          runtime_profiles: (shell?.runtime_profiles as StudioGame["runtime_profiles"]) ?? runtime_profiles,
+          feature_flags: (shell?.feature_flags as Record<string, unknown>) ?? {},
+          logic_rules: Array.isArray(shell?.logic_rules) ? shell.logic_rules : [],
           status: "draft",
           layer1_pack_id: city?.id ?? input.layer1_pack_id ?? null,
           layer2_pack_id: mission?.id ?? null,
@@ -1830,6 +2087,189 @@ export async function composeGamesFromPacks(input: {
   }
 }
 
+const SEED_COMPOSE_BATCH = 80;
+
+function cityGameTranslations(origin: StudioGame, name: string): Record<string, unknown> {
+  const source = origin.translations && typeof origin.translations === "object" ? origin.translations : {};
+  const next: Record<string, unknown> = { ...source };
+  for (const [locale, copy] of Object.entries(source)) {
+    if (!copy || typeof copy !== "object" || Array.isArray(copy)) continue;
+    next[locale] = { ...(copy as Record<string, unknown>), name };
+  }
+  return next;
+}
+
+export async function seedComposeGamesForRecipe(recipeId: string): Promise<
+  ActionResult<{
+    createdCount: number;
+    skippedCount: number;
+    remainingCount: number;
+    originName: string;
+  }>
+> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const recipe = await getOwnedRecipe(supabase, orgId, recipeId);
+    if (!recipe) return { success: false, error: "Rezept nicht gefunden." };
+    if (recipe.archived_at) {
+      return { success: false, error: "Dieses Rezept ist archiviert. Neue Spiele legt du damit nicht mehr an." };
+    }
+    if (!recipe.layer2_pack_id && !recipe.layer3_pack_id) {
+      return { success: false, error: "Rezept braucht Mission oder Team." };
+    }
+
+    const mission = recipe.layer2_pack_id ? await getOwnedPack(supabase, orgId, recipe.layer2_pack_id) : null;
+    const team = recipe.layer3_pack_id ? await getOwnedPack(supabase, orgId, recipe.layer3_pack_id) : null;
+    if (recipe.layer2_pack_id && !mission) return { success: false, error: "Missions-Pack nicht gefunden." };
+    if (recipe.layer3_pack_id && !team) return { success: false, error: "Team-Pack nicht gefunden." };
+
+    let origin: StudioGame | null = null;
+    if (recipe.origin_game_id) {
+      const { data, error } = await supabase
+        .from("studio_games")
+        .select("*")
+        .eq("id", recipe.origin_game_id)
+        .eq("organization_id", orgId)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      origin = data ? asStudioGame(data as Record<string, unknown>) : null;
+    }
+    if (!origin) {
+      origin = await findComposeShellSource(supabase, orgId, mission?.id ?? null, team?.id ?? null);
+    }
+    if (!origin) {
+      return { success: false, error: "Hauptspiel First Profiler München nicht gefunden." };
+    }
+    const ensured = await persistRecipeOrigin(supabase, orgId, recipe, origin);
+    if (!origin.compose_recipe_id) {
+      await supabase
+        .from("studio_games")
+        .update({ compose_recipe_id: ensured.id, updated_at: new Date().toISOString() })
+        .eq("id", origin.id)
+        .eq("organization_id", orgId);
+    }
+
+    const surface = ensured.surface === "indoor" ? "indoor" : "outdoor";
+    const preset = surfaceToPreset(surface);
+    const runtime_profiles = {
+      ...DEFAULT_RUNTIME_PROFILES,
+      ...(origin.runtime_profiles ?? {}),
+      default_mode: preset.defaultMode,
+      allowed_fallbacks: [...preset.allowedFallbacks],
+      indoor_one_click: preset.allowedFallbacks.includes("indoor"),
+    };
+    const shell = composeShellPayload(origin, runtime_profiles);
+    const language = parseStudioLanguage(origin.language || ensured.language);
+
+    const packs: StudioLayerPack[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from("studio_layer_packs")
+        .select("*")
+        .eq("organization_id", orgId)
+        .eq("layer", 1)
+        .eq("is_active", true)
+        .order("name")
+        .order("id")
+        .range(from, from + 999);
+      if (error) throw new Error(error.message);
+      for (const row of data ?? []) packs.push(normalizeLayerPackRow(row as Record<string, unknown>));
+      if ((data ?? []).length < 1000) break;
+    }
+
+    const existingByL1 = new Set<string>();
+    for (let from = 0; ; from += 1000) {
+      let query = supabase
+        .from("studio_games")
+        .select("layer1_pack_id")
+        .eq("organization_id", orgId)
+        .not("layer1_pack_id", "is", null);
+      if (mission?.id) query = query.eq("layer2_pack_id", mission.id);
+      else query = query.is("layer2_pack_id", null);
+      if (team?.id) query = query.eq("layer3_pack_id", team.id);
+      else query = query.is("layer3_pack_id", null);
+      const { data, error } = await query.order("id").range(from, from + 999);
+      if (error) throw new Error(error.message);
+      for (const row of data ?? []) {
+        if (typeof row.layer1_pack_id === "string") existingByL1.add(row.layer1_pack_id);
+      }
+      if ((data ?? []).length < 1000) break;
+    }
+
+    const usedCityIds = new Set<string>();
+    for (const pack of packs) {
+      if (existingByL1.has(pack.id) && pack.city_id) usedCityIds.add(pack.city_id);
+    }
+
+    const missing: StudioLayerPack[] = [];
+    const seenCity = new Set<string>();
+    for (const pack of packs) {
+      if (!pack.city_id) continue;
+      if (existingByL1.has(pack.id) || usedCityIds.has(pack.city_id) || seenCity.has(pack.city_id)) continue;
+      seenCity.add(pack.city_id);
+      missing.push(pack);
+    }
+
+    const chunk = missing.slice(0, SEED_COMPOSE_BATCH);
+    const slugs = await loadGameSlugs(supabase, orgId);
+    const now = new Date().toISOString();
+    const rows = chunk.map((city) => {
+      const name = composeCityGameName(origin!.name, city.name);
+      return {
+        id: crypto.randomUUID(),
+        organization_id: orgId,
+        blueprint_id: origin!.blueprint_id ?? null,
+        slug: mintUniqueSlug(`fp-${city.city_slug || city.slug}`, slugs),
+        name,
+        description: typeof shell.description === "string" ? shell.description : "",
+        language,
+        translations: cityGameTranslations(origin!, name),
+        city_slug: city.city_slug,
+        gps_enabled: preset.gpsEnabled,
+        duration_minutes: typeof shell.duration_minutes === "number" ? shell.duration_minutes : null,
+        farewell_text: typeof shell.farewell_text === "string" ? shell.farewell_text : "",
+        logo_url: typeof shell.logo_url === "string" ? shell.logo_url : null,
+        active_layers: [...preset.activeLayers],
+        runtime_profiles: (shell.runtime_profiles as StudioGame["runtime_profiles"]) ?? runtime_profiles,
+        feature_flags: (shell.feature_flags as Record<string, unknown>) ?? {},
+        logic_rules: Array.isArray(shell.logic_rules) ? shell.logic_rules : [],
+        status: "published",
+        published_version_number: 1,
+        layer1_pack_id: city.id,
+        layer2_pack_id: mission?.id ?? null,
+        layer3_pack_id: team?.id ?? null,
+        compose_recipe_id: ensured.id,
+        created_at: now,
+        updated_at: now,
+      };
+    });
+
+    if (rows.length > 0) {
+      await insertChunks(
+        (batch) => supabase.from("studio_games").insert(batch),
+        rows,
+      );
+    }
+
+    revalidatePacks();
+    return {
+      success: true,
+      data: {
+        createdCount: rows.length,
+        skippedCount: packs.filter((pack) => pack.city_id).length - missing.length,
+        remainingCount: Math.max(0, missing.length - rows.length),
+        originName: origin.name,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Spiele konnten nicht angelegt werden.",
+    };
+  }
+}
+
 async function getOwnedRecipe(
   supabase: AdminClient,
   orgId: string,
@@ -1852,28 +2292,27 @@ export async function listExistingComposeCities(input: {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
-    let query = supabase
-      .from("studio_games")
-      .select("layer1_pack_id")
-      .eq("organization_id", orgId)
-      .not("layer1_pack_id", "is", null);
-    if (input.layer2_pack_id) query = query.eq("layer2_pack_id", input.layer2_pack_id);
-    else query = query.is("layer2_pack_id", null);
-    if (input.layer3_pack_id) query = query.eq("layer3_pack_id", input.layer3_pack_id);
-    else query = query.is("layer3_pack_id", null);
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
+    const ids: string[] = [];
+    for (let from = 0; ; from += 1000) {
+      let query = supabase
+        .from("studio_games")
+        .select("layer1_pack_id")
+        .eq("organization_id", orgId)
+        .not("layer1_pack_id", "is", null);
+      if (input.layer2_pack_id) query = query.eq("layer2_pack_id", input.layer2_pack_id);
+      else query = query.is("layer2_pack_id", null);
+      if (input.layer3_pack_id) query = query.eq("layer3_pack_id", input.layer3_pack_id);
+      else query = query.is("layer3_pack_id", null);
+      const { data, error } = await query.order("id").range(from, from + 999);
+      if (error) throw new Error(error.message);
+      for (const row of data ?? []) {
+        if (typeof row.layer1_pack_id === "string") ids.push(row.layer1_pack_id);
+      }
+      if ((data ?? []).length < 1000) break;
+    }
     return {
       success: true,
-      data: {
-        layer1PackIds: [
-          ...new Set(
-            (data ?? [])
-              .map((row) => row.layer1_pack_id)
-              .filter((id): id is string => typeof id === "string"),
-          ),
-        ],
-      },
+      data: { layer1PackIds: [...new Set(ids)] },
     };
   } catch (error) {
     return {

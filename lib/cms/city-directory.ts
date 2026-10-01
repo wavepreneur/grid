@@ -13,6 +13,12 @@ export type DirectoryCity = {
   country: string;
 };
 
+export type DirectoryCountry = {
+  code: string;
+  name: string;
+  name_en: string | null;
+};
+
 export type ExitmaniaCityPayload = {
   id: string;
   slug: string;
@@ -62,4 +68,24 @@ export function mapCityRow(row: Record<string, unknown>): DirectoryCity {
 
 export function cityLabelDe(city: Pick<DirectoryCity, "name" | "slug">): string {
   return city.name.trim() || city.slug;
+}
+
+export function countryLabelDe(country: Pick<DirectoryCountry, "code" | "name">): string {
+  const name = country.name.trim();
+  return name ? `${name} (${country.code})` : country.code;
+}
+
+const COUNTRY_PRIORITY = new Map([
+  ["DE", 0],
+  ["AT", 1],
+  ["CH", 2],
+]);
+
+export function sortCountriesDeFirst(countries: DirectoryCountry[]): DirectoryCountry[] {
+  return [...countries].sort((a, b) => {
+    const pa = COUNTRY_PRIORITY.get(a.code) ?? 50;
+    const pb = COUNTRY_PRIORITY.get(b.code) ?? 50;
+    if (pa !== pb) return pa - pb;
+    return a.name.localeCompare(b.name, "de", { sensitivity: "base" });
+  });
 }

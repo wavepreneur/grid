@@ -25,7 +25,7 @@ export type PublishedStudioGameListItem = {
 
 export type ResolvedStudioBookingGame = {
   game: PublishedStudioGame;
-  versionId: string;
+  versionId: string | null;
 };
 
 type StudioGameRow = PublishedStudioGame & {
@@ -54,12 +54,16 @@ function assertBookable(game: StudioGameRow, label: string): void {
   if (game.is_template) {
     throw new Error(`Game "${label}" is a template and cannot be booked`);
   }
-  if (game.status !== "published" || game.published_version_number < 1) {
+  if (game.status !== "published") {
     throw new Error(`Game "${label}" is not published`);
   }
 }
 
-async function loadPublishedVersionId(gameId: string, versionNumber: number): Promise<string> {
+async function loadPublishedVersionId(
+  gameId: string,
+  versionNumber: number,
+): Promise<string | null> {
+  if (versionNumber < 1) return null;
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("studio_game_versions")
@@ -69,10 +73,7 @@ async function loadPublishedVersionId(gameId: string, versionNumber: number): Pr
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  if (!data) {
-    throw new Error(`Published version for game ${gameId} not found`);
-  }
-  return data.id as string;
+  return (data?.id as string | undefined) ?? null;
 }
 
 /** Resolve a published Studio game by slug or UUID for partner bookings. */

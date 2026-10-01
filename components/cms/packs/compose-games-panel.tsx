@@ -9,7 +9,9 @@ import {
   listExistingComposeCities,
   listLayerPacks,
   saveComposeRecipe,
+  seedComposeGamesForRecipe,
 } from "@/app/actions/cms/packs";
+import { publishDraftComposeGames } from "@/app/actions/cms/games";
 import { StudioModal } from "@/components/cms/shared/studio-modal";
 import { StudioButton, StudioError, StudioInput, StudioSuccess } from "@/components/cms/studio-ui";
 import {
@@ -190,35 +192,111 @@ export function ComposeGamesPanel() {
                   Noch kein Hauptspiel — das erste Spiel mit Spielinfo wird zur Quelle.
                 </p>
               )}
-              <StudioButton
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={archiving}
-                icon={<IconArchive size={16} />}
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      "Rezept archivieren? Bestehende Spiele bleiben. Neue Städte kannst du damit nicht mehr anlegen.",
-                    )
-                  ) {
-                    return;
-                  }
-                  startArchive(async () => {
-                    const result = await archiveComposeRecipe(selectedRecipe.id);
-                    if (!result.success) {
-                      setError(result.error);
+              <div className="flex flex-wrap items-center gap-2">
+                <StudioButton
+                  type="button"
+                  size="sm"
+                  disabled={archiving}
+                  onClick={() => {
+                    startArchive(async () => {
+                      setError(null);
+                      let created = 0;
+                      let skipped = 0;
+                      let originName = selectedRecipe.origin_game_name ?? "First Profiler München";
+                      for (;;) {
+                        const result = await seedComposeGamesForRecipe(selectedRecipe.id);
+                        if (!result.success) {
+                          setError(result.error);
+                          if (created > 0) {
+                            invalidate();
+                            invalidateGames();
+                          }
+                          return;
+                        }
+                        created += result.data?.createdCount ?? 0;
+                        skipped = result.data?.skippedCount ?? skipped;
+                        originName = result.data?.originName ?? originName;
+                        const remaining = result.data?.remainingCount ?? 0;
+                        setMessage(
+                          remaining > 0
+                            ? `${created} Spiele angelegt, ${remaining} fehlen noch (Vorlage ${originName}).`
+                            : created > 0
+                              ? `${created} Spiele angelegt (Vorlage ${originName}).`
+                              : `${skipped} Städte gibt es in diesem Rezept schon.`,
+                        );
+                        if (remaining === 0 || (result.data?.createdCount ?? 0) === 0) break;
+                      }
+                      invalidate();
+                      invalidateGames();
+                    });
+                  }}
+                >
+                  {archiving ? "Spiele werden angelegt…" : "Fehlende Städte anlegen"}
+                </StudioButton>
+                <StudioButton
+                  type="button"
+                  size="sm"
+                  disabled={archiving}
+                  onClick={() => {
+                    startArchive(async () => {
+                      setError(null);
+                      let published = 0;
+                      for (;;) {
+                        const result = await publishDraftComposeGames(selectedRecipe.id);
+                        if (!result.success) {
+                          setError(result.error);
+                          if (published > 0) invalidateGames();
+                          return;
+                        }
+                        published += result.data?.publishedCount ?? 0;
+                        const remaining = result.data?.remainingCount ?? 0;
+                        const failed = result.data?.failedCount ?? 0;
+                        if (failed > 0 && result.data?.errors?.length) {
+                          setError(result.data.errors[0] ?? "Veröffentlichen fehlgeschlagen.");
+                        }
+                        setMessage(
+                          remaining > 0
+                            ? `${published} Spiele veröffentlicht, ${remaining} Entwürfe fehlen noch.`
+                            : `${published} Spiele veröffentlicht.`,
+                        );
+                        if (remaining === 0 || (result.data?.publishedCount ?? 0) === 0) break;
+                      }
+                      invalidateGames();
+                    });
+                  }}
+                >
+                  {archiving ? "Wird veröffentlicht…" : "Entwürfe veröffentlichen"}
+                </StudioButton>
+                <StudioButton
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={archiving}
+                  icon={<IconArchive size={16} />}
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        "Rezept archivieren? Bestehende Spiele bleiben. Neue Städte kannst du damit nicht mehr anlegen.",
+                      )
+                    ) {
                       return;
                     }
-                    setRecipes((current) => current.filter((row) => row.id !== selectedRecipe.id));
-                    resetDraft();
-                    invalidate();
-                    setMessage("Rezept archiviert. Die bestehenden Spiele bleiben.");
-                  });
-                }}
-              >
-                {archiving ? "Archiviert…" : "Rezept archivieren"}
-              </StudioButton>
+                    startArchive(async () => {
+                      const result = await archiveComposeRecipe(selectedRecipe.id);
+                      if (!result.success) {
+                        setError(result.error);
+                        return;
+                      }
+                      setRecipes((current) => current.filter((row) => row.id !== selectedRecipe.id));
+                      resetDraft();
+                      invalidate();
+                      setMessage("Rezept archiviert. Die bestehenden Spiele bleiben.");
+                    });
+                  }}
+                >
+                  {archiving ? "Archiviert…" : "Rezept archivieren"}
+                </StudioButton>
+              </div>
             </div>
           ) : null}
 

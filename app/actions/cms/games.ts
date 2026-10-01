@@ -64,9 +64,8 @@ import {
 } from "@/lib/grid/stations";
 import { PUSHABLE_EVENT_STATUSES, withLastLivePushAt } from "@/lib/cms/live-push";
 import { pingTeamsContentUpdated } from "@/lib/grid/content-ping";
-import { withCityShellTranslations } from "@/lib/cms/city-shell-i18n";
-import { loadMergedGameTaskLinksForGame, addTaskToLayerPack, fetchPackItem, fetchPackItems, fillComposeShellIfEmpty, loadRecipeOriginContext, loadRecipeOriginGame, removeTaskFromLayerPack, reorderPackBackedGameTasks, savePackBackedGameLink } from "@/app/actions/cms/packs";
-import { gameUsesLayerPacks, isRecipeCityShell, mergePackLinksOntoGame, packItemToGameLink, parsePackLinkId } from "@/lib/cms/layer-packs";
+import { loadMergedGameTaskLinksForGame, addTaskToLayerPack, fetchPackItem, fillComposeShellIfEmpty, loadRecipeOriginContext, loadRecipeOriginGame, removeTaskFromLayerPack, reorderPackBackedGameTasks, savePackBackedGameLink } from "@/app/actions/cms/packs";
+import { gameUsesLayerPacks, isRecipeCityShell, packItemToGameLink, parsePackLinkId } from "@/lib/cms/layer-packs";
 import { localeCopyFromPatch, localeWritePackIds } from "@/lib/cms/studio-mutate";
 
 function normalizeGameRow(row: StudioGame): StudioGame {
@@ -82,60 +81,6 @@ function normalizeGameRow(row: StudioGame): StudioGame {
     layer3_pack_id: (row as StudioGame).layer3_pack_id ?? null,
     compose_recipe_id: (row as StudioGame).compose_recipe_id ?? null,
   };
-}
-
-function overlayCityShellCoverage(game: StudioGame, links: StudioGameTaskLink[]): StudioGame {
-  return withCityShellTranslations(game, links);
-}
-
-async function overlayCityShellCoverageOnListedGames(
-  supabase: ReturnType<typeof createAdminClient>,
-  orgId: string,
-  games: StudioGame[],
-): Promise<StudioGame[]> {
-  const { data: recipes, error } = await supabase
-    .from("studio_compose_recipes")
-    .select("origin_game_id")
-    .eq("organization_id", orgId);
-  if (error && !/origin_game_id|schema cache/i.test(error.message)) {
-    throw new Error(error.message);
-  }
-  const originIds = new Set(
-    (recipes ?? [])
-      .map((row) => (typeof row.origin_game_id === "string" ? row.origin_game_id : null))
-      .filter((id): id is string => Boolean(id)),
-  );
-  const shells = games.filter((game) => isRecipeCityShell(game, null, originIds.has(game.id)));
-  if (shells.length === 0) return games;
-
-  const packIds = [
-    ...new Set(
-      shells
-        .map((game) => game.layer1_pack_id)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  ];
-  const packsById = new Map<string, Awaited<ReturnType<typeof fetchPackItems>>>();
-  for (let index = 0; index < packIds.length; index += 25) {
-    const chunk = packIds.slice(index, index + 25);
-    const rows = await Promise.all(
-      chunk.map(async (id) => [id, await fetchPackItems(supabase, id)] as const),
-    );
-    for (const [id, items] of rows) packsById.set(id, items);
-  }
-
-  const nextById = new Map(games.map((game) => [game.id, game]));
-  for (const game of shells) {
-    const links = mergePackLinksOntoGame({
-      game,
-      legacyLinks: [],
-      packs: {
-        1: game.layer1_pack_id ? packsById.get(game.layer1_pack_id) : undefined,
-      },
-    });
-    nextById.set(game.id, overlayCityShellCoverage(game, links));
-  }
-  return games.map((game) => nextById.get(game.id) ?? game);
 }
 
 function quizCopyFromLayer1(quiz: NonNullable<ReturnType<typeof layer1OpenerQuiz>>) {
@@ -218,19 +163,23 @@ export async function listGames(): Promise<ActionResult<StudioGame[]>> {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
-    const { data, error } = await supabase
-      .from("studio_games")
-      .select("*")
-      .eq("organization_id", orgId)
-      .neq("is_template", true)
-      .order("updated_at", { ascending: false });
-
-    if (error) throw new Error(error.message);
-    const games = (data ?? []).map((row) => normalizeGameRow(row as StudioGame));
-    return {
-      success: true,
-      data: await overlayCityShellCoverageOnListedGames(supabase, orgId, games),
-    };
+    const games: StudioGame[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from("studio_games")
+        .select(
+          "id, organization_id, blueprint_id, slug, name, logo_url, description, language, translations, city_slug, duration_minutes, gps_enabled, farewell_text, feature_flags, logic_rules, active_layers, runtime_profiles, layer1_pack_id, layer2_pack_id, layer3_pack_id, compose_recipe_id, status, published_version_number, is_template, created_at, updated_at",
+        )
+        .eq("organization_id", orgId)
+        .neq("is_template", true)
+        .order("updated_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, from + 999);
+      if (error) throw new Error(error.message);
+      for (const row of data ?? []) games.push(normalizeGameRow(row as StudioGame));
+      if ((data ?? []).length < 1000) break;
+    }
+    return { success: true, data: games };
   } catch (error) {
     return {
       success: false,
@@ -1288,6 +1237,50 @@ export async function publishGame(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Game konnte nicht veröffentlicht werden.",
+    };
+  }
+}
+
+export async function publishDraftComposeGames(recipeId: string): Promise<
+  ActionResult<{
+    publishedCount: number;
+    remainingCount: number;
+    failedCount: number;
+    errors: string[];
+  }>
+> {
+  try {
+    const id = recipeId.trim();
+    if (!id) return { success: false, error: "Rezept fehlt." };
+
+    const supabase = createAdminClient();
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("studio_games")
+      .update({
+        status: "published",
+        published_version_number: 1,
+        updated_at: now,
+      })
+      .eq("compose_recipe_id", id)
+      .eq("is_template", false)
+      .eq("status", "draft")
+      .select("id");
+    if (error) throw new Error(error.message);
+
+    return {
+      success: true,
+      data: {
+        publishedCount: data?.length ?? 0,
+        remainingCount: 0,
+        failedCount: 0,
+        errors: [],
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Entwürfe konnten nicht veröffentlicht werden.",
     };
   }
 }

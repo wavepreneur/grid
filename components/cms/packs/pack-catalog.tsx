@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createLayerPack, deleteLayerPack, duplicateLayerPacks, updateLayerPack } from "@/app/actions/cms/packs";
+import { createLayerPack, deleteLayerPack, duplicateLayerPacks, relinkOrtPacksToExitmania, seedOrtPacksFromMunich, updateLayerPack } from "@/app/actions/cms/packs";
 import { ComposeGamesPanel } from "@/components/cms/packs/compose-games-panel";
 import { SplitGamePanel } from "@/components/cms/packs/split-game-panel";
 import { CitySearchSelect } from "@/components/cms/packs/city-search-select";
@@ -26,6 +26,8 @@ import { layerPackHintDe, layerPackTitleDe, type StudioLayerPack } from "@/lib/c
 import { useInvalidateStudioPacks, useStudioLayerPacks } from "@/lib/hooks/use-studio-packs";
 
 const LAYERS: StudioLayer[] = [1, 2, 3];
+const PAGE_SIZES = [20, 50, 100] as const;
+type PageSize = (typeof PAGE_SIZES)[number];
 
 type PackSort = "updated" | "stale" | "name" | "name-desc";
 
@@ -56,6 +58,18 @@ const SORT_OPTIONS: Array<StudioSortOption<PackSort>> = [
   },
 ];
 
+function layerCountLabel(layer: StudioLayer, count: number): string {
+  if (layer === 1) return count === 1 ? "1 Ort" : `${count} Orte`;
+  if (layer === 2) return count === 1 ? "1 Mission" : `${count} Missionen`;
+  return count === 1 ? "1 Team" : `${count} Teams`;
+}
+
+function packMatchesSearch(pack: StudioLayerPack, query: string): boolean {
+  if (!query) return true;
+  const hay = `${pack.name} ${pack.slug} ${pack.city_slug ?? ""}`.toLocaleLowerCase("de");
+  return hay.includes(query);
+}
+
 function sortPacks(list: StudioLayerPack[], sort: PackSort): StudioLayerPack[] {
   const next = [...list];
   switch (sort) {
@@ -81,7 +95,9 @@ export function PackCatalog() {
   const [layer, setLayer] = useState<StudioLayer>(1);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<PackSort>("updated");
-  const packsQuery = useStudioLayerPacks(layer, search);
+  const [pageSize, setPageSize] = useState<PageSize>(20);
+  const [page, setPage] = useState(1);
+  const packsQuery = useStudioLayerPacks(layer);
   const packs = packsQuery.data ?? [];
   const [name, setName] = useState("");
   const [city, setCity] = useState<DirectoryCity | null>(null);
@@ -95,7 +111,20 @@ export function PackCatalog() {
   const [deleteTarget, setDeleteTarget] = useState<StudioLayerPack | null>(null);
   const [extraOpen, setExtraOpen] = useState(false);
 
-  const sorted = useMemo(() => sortPacks(packs, sort), [packs, sort]);
+  const filtered = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase("de");
+    if (!query) return packs;
+    return packs.filter((pack) => packMatchesSearch(pack, query));
+  }, [packs, search]);
+  const sorted = useMemo(() => sortPacks(filtered, sort), [filtered, sort]);
+  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const visible = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sorted.slice(start, start + pageSize);
+  }, [sorted, currentPage, pageSize]);
+  const rangeStart = sorted.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(currentPage * pageSize, sorted.length);
 
   function handleCreate() {
     setError(null);
@@ -135,7 +164,11 @@ export function PackCatalog() {
       <section className="rounded-3xl bg-card p-5 shadow-soft">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Vorrat</p>
         <h2 className="mt-1 text-xl font-bold">Deine Bestandteile</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{layerPackHintDe(layer)}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {packsQuery.isPending && packs.length === 0
+            ? layerPackHintDe(layer)
+            : `${layerCountLabel(layer, packs.length)} hinterlegt. ${layerPackHintDe(layer)}`}
+        </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {LAYERS.map((id) => (
             <button
@@ -144,6 +177,7 @@ export function PackCatalog() {
               onClick={() => {
                 setLayer(id);
                 setSearch("");
+                setPage(1);
                 setName("");
                 setCity(null);
                 setPackKind("outdoor");
@@ -153,9 +187,79 @@ export function PackCatalog() {
               }`}
             >
               {layerPackTitleDe(id)}
+              {id === layer && !packsQuery.isPending ? (
+                <span className="ml-1.5 tabular-nums font-semibold opacity-80">{packs.length}</span>
+              ) : null}
             </button>
           ))}
         </div>
+        {layer === 1 ? (
+          <div className="mt-4 rounded-2xl bg-secondary/70 p-4">
+            <p className="text-sm font-bold">Orte aus Exitmania</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Vorlage ist München: für jede Exitmania-Stadt ein eigener Ort mit kopierten
+              Einstiegsaufgaben. Aachen, Frankfurt und München bleiben.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <StudioButton
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  setError(null);
+                  startTransition(async () => {
+                    let created = 0;
+                    let skipped = 0;
+                    let templateName = "München";
+                    for (;;) {
+                      const result = await seedOrtPacksFromMunich();
+                      if (!result.success) {
+                        setError(result.error);
+                        if (created > 0) invalidate();
+                        return;
+                      }
+                      created += result.data?.createdCount ?? 0;
+                      skipped = result.data?.skippedCount ?? skipped;
+                      templateName = result.data?.templateName ?? templateName;
+                      const remaining = result.data?.remainingCount ?? 0;
+                      setMessage(
+                        remaining > 0
+                          ? `${created} Orte angelegt, ${remaining} fehlen noch (Vorlage ${templateName}).`
+                          : `${created} Orte angelegt, ${skipped} schon vorhanden (Vorlage ${templateName}).`,
+                      );
+                      if (remaining === 0 || (result.data?.createdCount ?? 0) === 0) break;
+                    }
+                    invalidate();
+                  });
+                }}
+              >
+                {pending ? "Orte werden angelegt…" : "Fehlende Orte anlegen"}
+              </StudioButton>
+              <StudioButton
+                type="button"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => {
+                  setError(null);
+                  startTransition(async () => {
+                    const result = await relinkOrtPacksToExitmania();
+                    if (!result.success) {
+                      setError(result.error);
+                      return;
+                    }
+                    setMessage(
+                      `${result.data?.linkedCount ?? 0} Orte an Exitmania gekoppelt, ${result.data?.updatedCount ?? 0} aktualisiert${
+                        result.data?.unmatchedCount ? `, ${result.data.unmatchedCount} ohne Treffer` : ""
+                      }.`,
+                    );
+                    invalidate();
+                  });
+                }}
+              >
+                {pending ? "Koppeln…" : "Exitmania-Städte koppeln"}
+              </StudioButton>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-3xl bg-card p-4 shadow-soft">
@@ -163,7 +267,10 @@ export function PackCatalog() {
           <IconSearch className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             placeholder="Bestandteil suchen…"
             className={`${inputCls} mt-0 border-0 bg-secondary pl-11 shadow-none`}
           />
@@ -175,16 +282,51 @@ export function PackCatalog() {
                 ? "Deine benannten Orte. Im Rezept oben wählst du sie über Ort."
                 : "Die Namen, die du beim Aufteilen vergeben hast. Im Rezept oben wählst du sie über Mission oder Team."}
             </StudioHint>
+            {packs.length > 0 ? (
+              <p className="mt-2 text-sm font-semibold tabular-nums">
+                {search.trim()
+                  ? `${sorted.length} Treffer · ${layerCountLabel(layer, packs.length)} hinterlegt`
+                  : `${layerCountLabel(layer, packs.length)} hinterlegt`}
+              </p>
+            ) : null}
           </div>
-          <StudioSortMenu value={sort} options={SORT_OPTIONS} onChange={setSort} />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-full border border-border bg-card p-1 shadow-soft" role="group" aria-label="Einträge pro Seite">
+              {PAGE_SIZES.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => {
+                    setPageSize(size);
+                    setPage(1);
+                  }}
+                  className={`rounded-full px-3 py-1.5 text-xs font-bold tabular-nums ${
+                    pageSize === size ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+            <StudioSortMenu
+              value={sort}
+              options={SORT_OPTIONS}
+              onChange={(next) => {
+                setSort(next);
+                setPage(1);
+              }}
+            />
+          </div>
         </div>
         <div className="mt-3 space-y-2">
-          {packsQuery.isPending && sorted.length === 0 ? (
+          {packsQuery.isPending && packs.length === 0 ? (
             <p className="text-sm text-muted-foreground">Laden…</p>
           ) : sorted.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Noch kein Bestandteil. Teile zuerst ein Spiel.</p>
+            <p className="text-sm text-muted-foreground">
+              {search.trim() ? "Kein Treffer in der gesamten Liste." : "Noch kein Bestandteil. Teile zuerst ein Spiel."}
+            </p>
           ) : (
-            sorted.map((pack) => (
+            visible.map((pack) => (
               <PackCatalogRow
                 key={pack.id}
                 pack={pack}
@@ -211,6 +353,37 @@ export function PackCatalog() {
             ))
           )}
         </div>
+        {sorted.length > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold tabular-nums text-muted-foreground">
+              {rangeStart}–{rangeEnd} von {sorted.length}
+              {search.trim() ? ` Treffern · ${packs.length} hinterlegt` : ""}
+            </p>
+            <div className="flex items-center gap-2">
+              <StudioButton
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((value) => Math.max(1, value - 1))}
+              >
+                Zurück
+              </StudioButton>
+              <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+                Seite {currentPage} / {pageCount}
+              </span>
+              <StudioButton
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={currentPage >= pageCount}
+                onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
+              >
+                Weiter
+              </StudioButton>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <StudioDuplicateModal

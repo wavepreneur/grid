@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -100,6 +100,8 @@ type SourceFilter = "alle" | "quellen";
 type CreateMode = "compose" | "blank" | "template";
 
 const SURFACE_OPTIONS: ContentMode[] = ["outdoor", "indoor", "online"];
+const PAGE_SIZES = [20, 50, 100] as const;
+type PageSize = (typeof PAGE_SIZES)[number];
 
 function matchesTranslationFilter(
   game: StudioGame,
@@ -207,21 +209,6 @@ export function GameList({ initialGames, initialTemplates }: Props) {
     () => new Set(recipes.map((recipe) => recipe.origin_game_id).filter((id): id is string => Boolean(id))),
     [recipes],
   );
-  const gameIds = useMemo(() => games.map((g) => g.id), [games]);
-  const { data: liveMetaData } = useGamesLiveMeta(gameIds);
-  const liveMeta = Array.isArray(liveMetaData) ? liveMetaData : [];
-  const liveCountByGame = useMemo(
-    () => new Map(liveMeta.map((s) => [s.gameId, s.liveEvents?.length ?? 0])),
-    [liveMeta],
-  );
-  const gamesWithLive = useMemo(
-    () =>
-      games.map((game) => ({
-        ...game,
-        liveEventCount: liveCountByGame.get(game.id) ?? 0,
-      })),
-    [games, liveCountByGame],
-  );
   const [open, setOpen] = useState(false);
   const [createMode, setCreateMode] = useState<CreateMode>("blank");
   const [name, setName] = useState("");
@@ -250,10 +237,12 @@ export function GameList({ initialGames, initialTemplates }: Props) {
   const [translationTab, setTranslationTab] = useState<TranslationFilter>("alle");
   const [sourceTab, setSourceTab] = useState<SourceFilter>("alle");
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(20);
 
   const scopedGames = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return gamesWithLive.filter((g) => {
+    return games.filter((g) => {
       if (statusTab === "alle") {
         if (g.status === "archived") return false;
       } else if (g.status !== statusTab) {
@@ -272,7 +261,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
         (g.city_slug ?? "").toLowerCase().includes(q)
       );
     });
-  }, [gamesWithLive, statusTab, surfaceTab, sourceTab, originIds, query]);
+  }, [games, statusTab, surfaceTab, sourceTab, originIds, query]);
 
   const filteredGames = useMemo(
     () =>
@@ -312,10 +301,37 @@ export function GameList({ initialGames, initialTemplates }: Props) {
     [templates],
   );
 
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusTab, surfaceTab, sourceTab, languageTab, translationTab, sort, pageSize]);
+
+  const pageCount = Math.max(1, Math.ceil(sortedGames.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const rangeStart = sortedGames.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(sortedGames.length, currentPage * pageSize);
+  const visibleGames = useMemo(
+    () => sortedGames.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [sortedGames, currentPage, pageSize],
+  );
+  const visibleIds = useMemo(() => visibleGames.map((game) => game.id), [visibleGames]);
+  const { data: liveMetaData } = useGamesLiveMeta(visibleIds);
+  const liveCountByGame = useMemo(() => {
+    const liveMeta = Array.isArray(liveMetaData) ? liveMetaData : [];
+    return new Map(liveMeta.map((s) => [s.gameId, s.liveEvents?.length ?? 0]));
+  }, [liveMetaData]);
+  const visibleWithLive = useMemo(
+    () =>
+      visibleGames.map((game) => ({
+        ...game,
+        liveEventCount: liveCountByGame.get(game.id) ?? 0,
+      })),
+    [visibleGames, liveCountByGame],
+  );
+
   const allSelected =
-    sortedGames.length > 0 && sortedGames.every((g) => selectedIds.has(g.id));
+    visibleWithLive.length > 0 && visibleWithLive.every((g) => selectedIds.has(g.id));
   const someSelected =
-    sortedGames.some((g) => selectedIds.has(g.id)) && !allSelected;
+    visibleWithLive.some((g) => selectedIds.has(g.id)) && !allSelected;
 
   const blockedLive = deleteStatuses.filter((s) => s.liveEvents.length > 0);
   const blockedPools = deleteStatuses.filter((s) => s.activeTicketPools > 0);
@@ -402,7 +418,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
   }
 
   function toggleAll(checked: boolean) {
-    setSelectedIds(checked ? new Set(sortedGames.map((g) => g.id)) : new Set());
+    setSelectedIds(checked ? new Set(visibleWithLive.map((g) => g.id)) : new Set());
   }
 
   function toggleOne(id: string, checked: boolean) {
@@ -796,7 +812,10 @@ export function GameList({ initialGames, initialTemplates }: Props) {
           <IconSearch className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
             placeholder="Name, Stadt oder Spiel-Code…"
             className={`${inputCls} mt-0 border-0 bg-secondary pl-11 shadow-none`}
           />
@@ -890,7 +909,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
             ]}
           />
         </div>
-        {gamesWithLive.length > 0 && sortedGames.length > 0 ? (
+        {games.length > 0 && sortedGames.length > 0 ? (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
             <div className="flex items-center gap-3">
               <StudioSelectCheckbox
@@ -905,30 +924,80 @@ export function GameList({ initialGames, initialTemplates }: Props) {
                   : `${sortedGames.length} Spiele`}
               </span>
             </div>
-            <StudioSortMenu value={sort} options={SORT_OPTIONS} onChange={setSort} />
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex rounded-full border border-border bg-card p-1 shadow-soft" role="group" aria-label="Einträge pro Seite">
+                {PAGE_SIZES.map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => {
+                      setPageSize(size);
+                      setPage(1);
+                    }}
+                    className={`rounded-full px-3 py-1.5 text-xs font-bold tabular-nums ${
+                      pageSize === size ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+              <StudioSortMenu value={sort} options={SORT_OPTIONS} onChange={setSort} />
+            </div>
           </div>
         ) : null}
       </div>
 
       <section>
-        {gamesWithLive.length === 0 ? (
+        {games.length === 0 ? (
           <Empty>Noch keine Spiele. Lege oben ein neues an.</Empty>
         ) : sortedGames.length === 0 ? (
           <Empty>Keine Treffer für diese Filter.</Empty>
         ) : (
-          <ul className="space-y-3">
-            {sortedGames.map((game) => (
-              <GameRow
-                key={game.id}
-                game={game}
-                isOrigin={originIds.has(game.id)}
-                selected={selectedIds.has(game.id)}
-                onToggle={(checked) => toggleOne(game.id, checked)}
-                onDuplicate={() => openDuplicateModal([game.id])}
-                onDelete={() => openDeleteModal([game.id])}
-              />
-            ))}
-          </ul>
+          <>
+            <ul className="space-y-3">
+              {visibleWithLive.map((game) => (
+                <GameRow
+                  key={game.id}
+                  game={game}
+                  isOrigin={originIds.has(game.id)}
+                  selected={selectedIds.has(game.id)}
+                  onToggle={(checked) => toggleOne(game.id, checked)}
+                  onDuplicate={() => openDuplicateModal([game.id])}
+                  onDelete={() => openDeleteModal([game.id])}
+                />
+              ))}
+            </ul>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold tabular-nums text-muted-foreground">
+                {rangeStart}–{rangeEnd} von {sortedGames.length}
+                {query.trim() ? ` Treffern · ${games.length} hinterlegt` : ""}
+              </p>
+              <div className="flex items-center gap-2">
+                <StudioButton
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={currentPage <= 1}
+                  onClick={() => setPage((value) => Math.max(1, value - 1))}
+                >
+                  Zurück
+                </StudioButton>
+                <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+                  Seite {currentPage} / {pageCount}
+                </span>
+                <StudioButton
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={currentPage >= pageCount}
+                  onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
+                >
+                  Weiter
+                </StudioButton>
+              </div>
+            </div>
+          </>
         )}
       </section>
 

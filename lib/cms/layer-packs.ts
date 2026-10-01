@@ -21,9 +21,9 @@ import { randomStationAccessCode } from "@/lib/grid/stations";
 export const PACK_SLOT_MAX = 30;
 export const PACK_SEARCH_LIMIT = 40;
 export const COMPOSE_GAMES_MAX = 500;
-export const COMPOSE_L1_LIST_MAX = 500;
+export const COMPOSE_L1_LIST_MAX = 2000;
 export const DUPLICATE_PACKS_MAX = 100;
-export const CREATE_CITIES_MAX = 500;
+export const CREATE_CITIES_MAX = 2000;
 
 export type StudioLayerPack = {
   id: string;
@@ -437,4 +437,21 @@ export function composeGameName(cityLabel: string | null | undefined, missionNam
   const mission = (missionName ?? "").trim();
   if (city && mission) return `${mission} ${city}`;
   return city || mission || "Neues Spiel";
+}
+
+/** "First Profiler München" + Bochum → "First Profiler Bochum". */
+export function composeCityGameName(
+  originName: string | null | undefined,
+  cityLabel: string | null | undefined,
+): string {
+  const city = (cityLabel ?? "").trim();
+  const origin = (originName ?? "").trim();
+  if (!city && !origin) return "Neues Spiel";
+  if (!city) return origin;
+  if (!origin) return city;
+  const fromMunich = origin.replace(/\s+München\s*$/iu, ` ${city}`).trim();
+  if (fromMunich !== origin) return fromMunich;
+  const prefix = origin.replace(/\s+Game\s*$/iu, "").trim() || origin;
+  if (prefix.toLocaleLowerCase("de") === city.toLocaleLowerCase("de")) return city;
+  return `${prefix} ${city}`;
 }

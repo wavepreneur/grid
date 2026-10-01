@@ -16,7 +16,7 @@ import {
   updateLayerPack,
   updatePackItemTaskTitle,
 } from "@/app/actions/cms/packs";
-import { getDirectoryCity } from "@/app/actions/cms/cities";
+import { findDirectoryCityBySlugOrName, getDirectoryCity } from "@/app/actions/cms/cities";
 import { GpsWaypointPicker } from "@/components/cms/gps/gps-waypoint-picker";
 import { PackRouteOverview } from "@/components/cms/gps/pack-route-overview";
 import { CitySearchSelect } from "@/components/cms/packs/city-search-select";
@@ -64,11 +64,26 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
   }, [items]);
 
   useEffect(() => {
-    if (!initialPack.city_id) return;
-    void getDirectoryCity(initialPack.city_id).then((result) => {
-      if (result.success) setCity(result.data);
-    });
-  }, [initialPack.city_id]);
+    let cancelled = false;
+    void (async () => {
+      if (initialPack.city_id) {
+        const byId = await getDirectoryCity(initialPack.city_id);
+        if (!cancelled && byId.success && byId.data) {
+          setCity(byId.data);
+          setCityId(byId.data.id);
+          return;
+        }
+      }
+      const fallback = await findDirectoryCityBySlugOrName(initialPack.city_slug ?? "", initialPack.name);
+      if (!cancelled && fallback.success && fallback.data) {
+        setCity(fallback.data);
+        setCityId(fallback.data.id);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialPack.city_id, initialPack.city_slug, initialPack.name]);
 
   const usedTaskIds = useMemo(() => new Set(items.map((item) => item.task_id)), [items]);
 
@@ -157,7 +172,12 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
                   setCityId(next?.id ?? null);
                 }}
               />
-              {pack.city_slug ? (
+              {city ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Gekoppelt: {city.name} · {city.country}
+                  {city.slug ? ` · ${city.slug}` : ""}
+                </p>
+              ) : pack.city_slug ? (
                 <p className="mt-1 text-xs text-muted-foreground">Aktueller Slug (kann sich ändern): {pack.city_slug}</p>
               ) : null}
             </div>

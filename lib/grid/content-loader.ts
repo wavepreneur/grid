@@ -483,6 +483,48 @@ export async function loadResolvedEventContent(input: {
     }
   }
 
+  // Compose city games are bookable after a status flip. Play reads live packs
+  // so Ort GPS/quiz edits apply without storing a frozen snapshot.
+  if (contentConfig.cms_game_id) {
+    const live = await loadLiveStudioGameSnapshot(contentConfig.cms_game_id, playLocale);
+    if (live && live.levels.length > 0) {
+      const { game, levels, compiledLogic } = live;
+      const mergedConfig = mergeContentConfigWithBlueprint({
+        ...contentConfig,
+        blueprint_slug: game.gps_enabled ? "exitmania" : "tabbrain",
+        city_slug: game.city_slug ?? contentConfig.city_slug,
+        runtime_profiles: game.runtime_profiles ?? contentConfig.runtime_profiles,
+        content_mode: parseRuntimeProfiles(game.runtime_profiles).default_mode,
+      });
+      const blueprint = resolveBlueprint(mergedConfig);
+      const mergedLevels = applyBlueprintLevelConstraints(
+        mergeLevelOverrides(levels, routeOverride),
+        blueprint,
+      );
+      const blueprintFields = buildResolvedBlueprintFields(mergedConfig);
+
+      return withSurfaceFields(
+        {
+          templateSlug: `cms:${game.slug}:live`,
+          templateName: game.name,
+          city: game.city_slug,
+          levels: mergedLevels,
+          compiledLogic,
+          ...blueprintFields,
+          showLiveScore: contentConfig.show_live_score ?? true,
+          missionDurationMinutes:
+            contentConfig.mission_duration_minutes ?? game.duration_minutes ?? 90,
+          briefingText: game.description?.trim() || null,
+          ...parseGameHelpLinks(game.feature_flags),
+          followUpTrigger: parseFollowUpTrigger(game.feature_flags),
+          logoUrl: typeof game.logo_url === "string" && game.logo_url.trim() ? game.logo_url.trim() : null,
+        },
+        mergedConfig,
+        mergedLevels,
+      );
+    }
+  }
+
   const blueprint = resolveBlueprint(contentConfig);
   const citySlug = contentConfig.city_slug ?? blueprint.defaultContent.city_slug ?? DEFAULT_CITY_SLUG;
   const { contentMode } = resolveModeAndFallbacks(contentConfig);

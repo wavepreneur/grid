@@ -3,18 +3,20 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getLayerPack, listComposeRecipes, listLayerPacks } from "@/app/actions/cms/packs";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
+import { COMPOSE_L1_LIST_MAX } from "@/lib/cms/layer-packs";
 import type { StudioLayer } from "@/lib/cms/layer-model";
 import { queryKeys } from "@/lib/platform/query-keys";
 
-export function useStudioLayerPacks(layer: StudioLayer, search = "") {
+export function useStudioLayerPacks(layer: StudioLayer) {
   const { orgSlug } = useStudioShell();
   return useQuery({
-    queryKey: queryKeys.packs.list(orgSlug, layer, search),
+    queryKey: queryKeys.packs.list(orgSlug, layer),
     queryFn: async () => {
-      const result = await listLayerPacks({ layer, search, limit: layer === 1 ? 500 : 200 });
+      const result = await listLayerPacks({ layer, limit: layer === 1 ? COMPOSE_L1_LIST_MAX : 200 });
       if (!result.success) throw new Error(result.error);
       return result.data!;
     },
+    placeholderData: (previous) => previous,
   });
 }
 
