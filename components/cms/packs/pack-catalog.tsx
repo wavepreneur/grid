@@ -17,7 +17,8 @@ import {
   StudioLabel,
   StudioSuccess,
 } from "@/components/cms/studio-ui";
-import { IconCopy, IconPlus, IconSearch, IconTrash } from "@/components/cms/studio-icons";
+import { StudioSortMenu, type StudioSortOption } from "@/components/cms/shared/studio-sort-menu";
+import { IconAlpha, IconClock, IconCopy, IconPlus, IconSearch, IconTrash } from "@/components/cms/studio-icons";
 import { inputCls } from "@/components/cms/ui";
 import { cityLabelDe, type DirectoryCity } from "@/lib/cms/city-directory";
 import type { StudioLayer } from "@/lib/cms/layer-model";
@@ -26,11 +27,60 @@ import { useInvalidateStudioPacks, useStudioLayerPacks } from "@/lib/hooks/use-s
 
 const LAYERS: StudioLayer[] = [1, 2, 3];
 
+type PackSort = "updated" | "stale" | "name" | "name-desc";
+
+const SORT_OPTIONS: Array<StudioSortOption<PackSort>> = [
+  {
+    id: "updated",
+    label: "Zuletzt bearbeitet",
+    description: "Neueste Änderungen zuerst",
+    icon: <IconClock size={15} />,
+  },
+  {
+    id: "stale",
+    label: "Lange nicht bearbeitet",
+    description: "Älteste Änderungen zuerst",
+    icon: <IconClock size={15} />,
+  },
+  {
+    id: "name",
+    label: "Name (A–Z)",
+    description: "Alphabetisch nach Titel",
+    icon: <IconAlpha size={15} />,
+  },
+  {
+    id: "name-desc",
+    label: "Name (Z–A)",
+    description: "Alphabetisch rückwärts",
+    icon: <IconAlpha size={15} />,
+  },
+];
+
+function sortPacks(list: StudioLayerPack[], sort: PackSort): StudioLayerPack[] {
+  const next = [...list];
+  switch (sort) {
+    case "stale":
+      return next.sort(
+        (a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime(),
+      );
+    case "name":
+      return next.sort((a, b) => a.name.localeCompare(b.name, "de", { numeric: true, sensitivity: "base" }));
+    case "name-desc":
+      return next.sort((a, b) => b.name.localeCompare(a.name, "de", { numeric: true, sensitivity: "base" }));
+    case "updated":
+    default:
+      return next.sort(
+        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+      );
+  }
+}
+
 export function PackCatalog() {
   const router = useRouter();
   const invalidate = useInvalidateStudioPacks();
   const [layer, setLayer] = useState<StudioLayer>(1);
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<PackSort>("updated");
   const packsQuery = useStudioLayerPacks(layer, search);
   const packs = packsQuery.data ?? [];
   const [name, setName] = useState("");
@@ -45,10 +95,7 @@ export function PackCatalog() {
   const [deleteTarget, setDeleteTarget] = useState<StudioLayerPack | null>(null);
   const [extraOpen, setExtraOpen] = useState(false);
 
-  const sorted = useMemo(
-    () => [...packs].sort((a, b) => a.name.localeCompare(b.name, "de", { sensitivity: "base" })),
-    [packs],
-  );
+  const sorted = useMemo(() => sortPacks(packs, sort), [packs, sort]);
 
   function handleCreate() {
     setError(null);
@@ -121,11 +168,16 @@ export function PackCatalog() {
             className={`${inputCls} mt-0 border-0 bg-secondary pl-11 shadow-none`}
           />
         </div>
-        <StudioHint tone="info">
-          {layer === 1
-            ? "Deine benannten Orte. Im Rezept oben wählst du sie über Ort."
-            : "Die Namen, die du beim Aufteilen vergeben hast. Im Rezept oben wählst du sie über Mission oder Team."}
-        </StudioHint>
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-[16rem] flex-1">
+            <StudioHint tone="info">
+              {layer === 1
+                ? "Deine benannten Orte. Im Rezept oben wählst du sie über Ort."
+                : "Die Namen, die du beim Aufteilen vergeben hast. Im Rezept oben wählst du sie über Mission oder Team."}
+            </StudioHint>
+          </div>
+          <StudioSortMenu value={sort} options={SORT_OPTIONS} onChange={setSort} />
+        </div>
         <div className="mt-3 space-y-2">
           {packsQuery.isPending && sorted.length === 0 ? (
             <p className="text-sm text-muted-foreground">Laden…</p>
