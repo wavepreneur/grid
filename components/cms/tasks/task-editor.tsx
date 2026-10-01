@@ -164,7 +164,7 @@ export function TaskEditor({ task, returnTo }: Props) {
         {reach && reach.packCount > 0 ? (
           <StudioHint tone={reach.packCount > 1 || reach.gameCount > 1 ? "warn" : "info"}>
             {reach.packCount > 1 || reach.gameCount > 1
-              ? `Achtung: Du bearbeitest die Basis-Aufgabe. Das wirkt auf ${reach.packCount} Packs und ${reach.gameCount} Spiele. Orts-Text und GPS/Codes gehören ins Stadt-Pack, nicht hier.`
+              ? `Achtung: Du bearbeitest die Basis-Aufgabe. Das wirkt auf ${reach.packCount} Pack${reach.packCount === 1 ? "" : "s"} und ${reach.gameCount} Spiel${reach.gameCount === 1 ? "" : "e"}. Orts-Text und GPS/Codes gehören ins Stadt-Pack, nicht hier.`
               : "Diese Aufgabe hängt an einem Pack. GPS und Indoor-Codes bleiben am Stadt-Pack."}
           </StudioHint>
         ) : null}

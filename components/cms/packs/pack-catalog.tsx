@@ -170,8 +170,10 @@ export function PackCatalog() {
         extra={
           <p className="mt-3 text-sm text-slate-600">
             {layer === 1
-              ? "Teilt dieselben Aufgaben. GPS wird geleert, Indoor-Codes neu vergeben. Nur klonen, wenn das Rätsel wirklich ein anderes ist — das ist hier nicht der Default."
-              : "Mission und Team nicht kopieren, wenn du nur eine Stadt brauchst — im Spiel andocken."}
+              ? "Kopiert Ort plus Einstiegsaufgaben. GPS wird geleert, Codes neu. Dieselben Wegpunkte an ein anderes Spiel hängen — nicht duplizieren."
+              : layer === 2
+                ? "Kopiert Mission plus alle Aufgaben. Dieselbe Mission an ein anderes Spiel hängen — nicht duplizieren."
+                : "Kopiert Team plus alle Boni. Denselben Team-Teil an ein anderes Spiel hängen — nicht duplizieren."}
           </p>
         }
         onConfirm={(count) => {

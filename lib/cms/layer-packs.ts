@@ -144,12 +144,12 @@ export function layerPackTitleDe(layer: StudioLayer): string {
 
 export function layerPackHintDe(layer: StudioLayer): string {
   if (layer === 1) {
-    return "Outdoor: Exitmania-Stadt + GPS. Indoor: Quizzes mit Code im Gebäude. Entsteht beim Aufteilen eines getesteten Spiels oder durch Anhängen einer Stadt.";
+    return "Outdoor: Exitmania-Stadt + GPS. Duplizieren kopiert die Einstiegsaufgaben für die neue Stadt. An ein anderes Spiel hängen ohne Duplikat, wenn die Wegpunkte gleich bleiben.";
   }
   if (layer === 2) {
-    return "Die Mission aus einem getesteten Spiel — einmal benennen, dann in jedes Rezept legen.";
+    return "Die Mission. Duplizieren kopiert alle Aufgaben. An ein anderes Spiel hängen ohne Duplikat, wenn die Mission gleich bleibt.";
   }
-  return "Die Team-Dynamik aus demselben Spiel — einmal benennen, dann kombinieren.";
+  return "Die Team-Dynamik. Duplizieren kopiert alle Boni. An ein anderes Spiel hängen ohne Duplikat, wenn der Team-Teil gleich bleibt.";
 }
 
 export function mapStudioTaskRow(raw: Record<string, unknown>): StudioTask {

@@ -32,10 +32,11 @@ import {
   type StudioLayerPack,
   type StudioLayerPackItem,
 } from "@/lib/cms/layer-packs";
-import { slugifyStudio, type StudioGame, type StudioGameTaskLink } from "@/lib/cms/types";
+import { slugifyStudio, type StudioGame, type StudioGameTaskLink, type StudioTask } from "@/lib/cms/types";
+import { normalizeTaskContent } from "@/lib/cms/task-content";
 import { isUuid } from "@/lib/cms/city-directory";
 import { parseLinkLayer, parseLinkOverrides } from "@/lib/cms/game-link-config";
-import { surfaceToPreset } from "@/lib/cms/game-slots";
+import { surfaceToPreset, taskToOpenerArrivalQuiz } from "@/lib/cms/game-slots";
 import { seedCityShellTranslations } from "@/lib/cms/city-shell-i18n";
 import { parseGpsOverride, type GpsPin } from "@/lib/cms/gps-defaults";
 import { generateGameSlug } from "@/lib/grid/codes";
@@ -813,6 +814,142 @@ function parsePackItemStation(overrides: Record<string, unknown>): { code?: stri
   return { code: typeof code === "string" ? code : undefined };
 }
 
+async function ensureUniqueTaskSlug(
+  supabase: AdminClient,
+  organizationId: string,
+  name: string,
+): Promise<string> {
+  const base = slugifyStudio(name) || "aufgabe";
+  let candidate = base.slice(0, 64);
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const { data } = await supabase
+      .from("studio_tasks")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("slug", candidate)
+      .maybeSingle();
+    if (!data) return candidate;
+    candidate = `${base}-${attempt + 2}`.slice(0, 64);
+  }
+  return `${base}-${Date.now()}`.slice(0, 64);
+}
+
+async function cloneStudioTask(
+  supabase: AdminClient,
+  orgId: string,
+  taskId: string,
+  citySlug?: string | null,
+): Promise<{ id: string; title: string; description: string; content: StudioTask["content"] }> {
+  const { data, error } = await supabase.from("studio_tasks").select("*").eq("id", taskId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Aufgabe zum Kopieren nicht gefunden.");
+  const source = data as StudioTask;
+  const slug = await ensureUniqueTaskSlug(supabase, orgId, source.title);
+  const content = normalizeTaskContent(source.content);
+  const { data: inserted, error: insertError } = await supabase
+    .from("studio_tasks")
+    .insert({
+      organization_id: source.organization_id ?? orgId,
+      slug,
+      title: source.title,
+      description: source.description,
+      language: source.language,
+      city_slug: citySlug ?? source.city_slug,
+      game_type: source.game_type,
+      tags: source.tags ?? [],
+      content,
+      layer: source.layer ?? 1,
+      content_context: source.content_context ?? "any",
+      role_assignment: source.role_assignment ?? "team",
+      is_active: true,
+    })
+    .select("id")
+    .single();
+  if (insertError) throw new Error(insertError.message);
+  return {
+    id: String(inserted.id),
+    title: source.title,
+    description: source.description ?? "",
+    content,
+  };
+}
+
+async function cloneTaskIds(
+  supabase: AdminClient,
+  orgId: string,
+  taskIds: string[],
+  citySlug?: string | null,
+): Promise<{
+  idMap: Map<string, string>;
+  cloned: Map<string, { title: string; description: string; content: StudioTask["content"] }>;
+}> {
+  const idMap = new Map<string, string>();
+  const cloned = new Map<string, { title: string; description: string; content: StudioTask["content"] }>();
+  for (const taskId of [...new Set(taskIds.filter(Boolean))]) {
+    const copy = await cloneStudioTask(supabase, orgId, taskId, citySlug);
+    idMap.set(taskId, copy.id);
+    cloned.set(copy.id, copy);
+  }
+  return { idMap, cloned };
+}
+
+function remapPackItemTaskIds(
+  source: Record<string, unknown>,
+  idMap: Map<string, string>,
+  cloned: Map<string, { title: string; description: string; content: StudioTask["content"] }>,
+  freshCity = false,
+): Record<string, unknown> {
+  const next = freshCity ? sharedLayer1ItemOverrides(source) : { ...source };
+  for (const key of ["opener_task_id", "geo_task_id", "bonus_task_id"] as const) {
+    const current = next[key];
+    if (typeof current === "string" && idMap.has(current)) {
+      next[key] = idMap.get(current);
+    }
+  }
+  const trigger =
+    next.trigger && typeof next.trigger === "object" ? { ...(next.trigger as Record<string, unknown>) } : null;
+  if (trigger && typeof trigger.source_task_id === "string" && idMap.has(trigger.source_task_id)) {
+    trigger.source_task_id = idMap.get(trigger.source_task_id);
+    next.trigger = trigger;
+  }
+  if (Array.isArray(next.bonus_bindings)) {
+    next.bonus_bindings = next.bonus_bindings.map((binding) => {
+      if (!binding || typeof binding !== "object") return binding;
+      const row = { ...(binding as Record<string, unknown>) };
+      if (typeof row.task_id === "string" && idMap.has(row.task_id)) {
+        row.task_id = idMap.get(row.task_id);
+      }
+      return row;
+    });
+  }
+  const openerId = typeof next.opener_task_id === "string" ? next.opener_task_id : null;
+  const opener = openerId ? cloned.get(openerId) : null;
+  if (opener) {
+    const quiz = taskToOpenerArrivalQuiz(
+      {
+        title: opener.title,
+        description: opener.description,
+        content: opener.content,
+      },
+      typeof next.opener_points === "number" ? next.opener_points : null,
+    );
+    if (quiz) next.arrival_quiz = quiz;
+  }
+  return next;
+}
+
+function packItemTaskIds(items: StudioLayerPackItem[], layer: StudioLayer): string[] {
+  const ids: string[] = [];
+  for (const item of items) {
+    ids.push(item.task_id);
+    if (layer !== 1) continue;
+    const overrides = item.overrides as { opener_task_id?: unknown; geo_task_id?: unknown };
+    if (typeof overrides.opener_task_id === "string") ids.push(overrides.opener_task_id);
+    if (typeof overrides.geo_task_id === "string") ids.push(overrides.geo_task_id);
+  }
+  return ids;
+}
+
 async function duplicateOnePack(
   supabase: AdminClient,
   orgId: string,
@@ -845,18 +982,18 @@ async function duplicateOnePack(
   const items = await fetchPackItems(supabase, source.id);
 
   if (items.length > 0) {
-    const insertItems = [];
-    for (const [index, item] of items.entries()) {
-      insertItems.push({
-        pack_id: copy.id,
-        task_id: item.task_id,
-        sort_order: item.sort_order ?? index,
-        overrides:
-          source.layer === 1
-            ? sharedLayer1ItemOverrides(item.overrides)
-            : { ...item.overrides },
-      });
-    }
+    const { idMap, cloned } = await cloneTaskIds(
+      supabase,
+      orgId,
+      packItemTaskIds(items, source.layer),
+      citySlug,
+    );
+    const insertItems = items.map((item, index) => ({
+      pack_id: copy.id,
+      task_id: idMap.get(item.task_id) ?? item.task_id,
+      sort_order: item.sort_order ?? index,
+      overrides: remapPackItemTaskIds(item.overrides, idMap, cloned, source.layer === 1),
+    }));
     const { error: itemError } = await supabase.from("studio_layer_pack_items").insert(insertItems);
     if (itemError) throw new Error(itemError.message);
   }
@@ -895,6 +1032,110 @@ export async function duplicateLayerPacks(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Packs konnten nicht dupliziert werden.",
+    };
+  }
+}
+
+/** Clone shared pack tasks so a title save does not rewrite the source pack. */
+async function ownPackTasks(
+  packId: string,
+): Promise<ActionResult<{ pack: StudioLayerPack; items: StudioLayerPackItem[] }>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const pack = await getOwnedPack(supabase, orgId, packId);
+    if (!pack) return { success: false, error: "Pack nicht gefunden." };
+
+    const items = await fetchPackItems(supabase, pack.id);
+    if (items.length === 0) {
+      return { success: true, data: { pack, items } };
+    }
+
+    const { data: usage, error: usageError } = await supabase
+      .from("studio_layer_pack_items")
+      .select("task_id, pack_id")
+      .in("task_id", packItemTaskIds(items, pack.layer));
+    if (usageError) throw new Error(usageError.message);
+
+    const sharedIds = new Set<string>();
+    for (const row of usage ?? []) {
+      if ((row.pack_id as string) !== pack.id) sharedIds.add(row.task_id as string);
+    }
+    if (sharedIds.size === 0) {
+      return { success: true, data: { pack, items } };
+    }
+
+    const { idMap, cloned } = await cloneTaskIds(supabase, orgId, [...sharedIds], pack.city_slug);
+    for (const item of items) {
+      const nextTaskId = idMap.get(item.task_id) ?? item.task_id;
+      const overrides = remapPackItemTaskIds(item.overrides, idMap, cloned, false);
+      const { error } = await supabase
+        .from("studio_layer_pack_items")
+        .update({
+          task_id: nextTaskId,
+          overrides,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", item.id)
+        .eq("pack_id", pack.id);
+      if (error) throw new Error(error.message);
+    }
+
+    revalidatePacks();
+    const nextItems = await fetchPackItems(supabase, pack.id);
+    return { success: true, data: { pack, items: nextItems } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Aufgaben konnten nicht für diesen Bestandteil kopiert werden.",
+    };
+  }
+}
+
+export async function updatePackItemTaskTitle(
+  packId: string,
+  itemId: string,
+  title: string,
+): Promise<ActionResult<StudioLayerPackItem[]>> {
+  try {
+    const trimmed = title.trim();
+    if (!trimmed) return { success: false, error: "Bitte einen Aufgabennamen eingeben." };
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const pack = await getOwnedPack(supabase, orgId, packId);
+    if (!pack) return { success: false, error: "Pack nicht gefunden." };
+
+    const items = await fetchPackItems(supabase, pack.id);
+    const item = items.find((row) => row.id === itemId);
+    if (!item) return { success: false, error: "Stop nicht gefunden." };
+
+    const { count, error: countError } = await supabase
+      .from("studio_layer_pack_items")
+      .select("id", { count: "exact", head: true })
+      .eq("task_id", item.task_id)
+      .neq("pack_id", pack.id);
+    if (countError) throw new Error(countError.message);
+    let taskId = item.task_id;
+    if ((count ?? 0) > 0) {
+      const owned = await ownPackTasks(packId);
+      if (!owned.success) return { success: false, error: owned.error };
+      const ownedItem = owned.data?.items.find((row) => row.id === itemId);
+      if (!ownedItem) return { success: false, error: "Stop nach dem Kopieren nicht gefunden." };
+      taskId = ownedItem.task_id;
+    }
+
+    const { error } = await supabase
+      .from("studio_tasks")
+      .update({ title: trimmed, updated_at: new Date().toISOString() })
+      .eq("id", taskId)
+      .eq("organization_id", orgId);
+    if (error) throw new Error(error.message);
+
+    return { success: true, data: await fetchPackItems(supabase, pack.id) };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Name konnte nicht gespeichert werden.",
     };
   }
 }

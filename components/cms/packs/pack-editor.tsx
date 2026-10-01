@@ -14,6 +14,7 @@ import {
   updateLayer1ItemStation,
   updateLayer3Item,
   updateLayerPack,
+  updatePackItemTaskTitle,
 } from "@/app/actions/cms/packs";
 import { getDirectoryCity } from "@/app/actions/cms/cities";
 import { GpsWaypointPicker } from "@/components/cms/gps/gps-waypoint-picker";
@@ -48,6 +49,7 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [gpsOpenId, setGpsOpenId] = useState<string | null>(null);
   const [codeDrafts, setCodeDrafts] = useState<Record<string, string>>({});
+  const [titleDrafts, setTitleDrafts] = useState<Record<string, string>>({});
   const [reach, setReach] = useState<Record<string, { packCount: number; gameCount: number }>>({});
   const debounced = useDebouncedValue(search, 200);
   const { data: library = [] } = useTaskLibrarySearch(debounced);
@@ -176,10 +178,10 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {pack.layer === 1
-            ? "Reihenfolge und welche Aufgaben. Inhalt in Aufgaben. GPS und Stationscode hier — nach dem Teilen einer Stadt neu setzen, die Aufgabe bleibt geteilt."
+            ? "Ort duplizieren kopiert die Einstiegsaufgaben. Dann Name, Frage, GPS und Code hier überschreiben. Dieselben Wegpunkte an ein anderes Spiel hängen — nicht duplizieren."
             : pack.layer === 2
-              ? "Einmal pflegen, an jede Stadt andocken. Nicht kopieren."
-              : "Bonus und wann — einmal, für alle Städte."}
+              ? "Mission duplizieren kopiert alle Aufgaben. Anpassen, wenn du eine neue Mission brauchst. Dieselbe Mission an ein anderes Spiel hängen — nicht duplizieren."
+              : "Team duplizieren kopiert alle Boni. Anpassen, wenn du eine neue Team-Variante brauchst. Denselben Team-Teil an ein anderes Spiel hängen — nicht duplizieren."}
         </p>
         {pack.layer === 1 ? (
           <div className="mt-3">
@@ -239,9 +241,46 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
                   <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="font-semibold">{item.task.title}</p>
                     {pack.layer === 1 ? (
-                      <p className="text-xs text-muted-foreground">
+                      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                        <div>
+                          <StudioLabel>Name der Einstiegsaufgabe</StudioLabel>
+                          <StudioInput
+                            value={titleDrafts[item.id] ?? item.task.title}
+                            onChange={(e) =>
+                              setTitleDrafts((current) => ({ ...current, [item.id]: e.target.value }))
+                            }
+                          />
+                        </div>
+                        <StudioButton
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          disabled={pending}
+                          onClick={() => {
+                            startTransition(async () => {
+                              const result = await updatePackItemTaskTitle(
+                                pack.id,
+                                item.id,
+                                titleDrafts[item.id] ?? item.task.title,
+                              );
+                              if (!result.success) {
+                                setError(result.error);
+                                return;
+                              }
+                              setItems(result.data ?? items);
+                              setMessage("Name gespeichert.");
+                            });
+                          }}
+                        >
+                          Name speichern
+                        </StudioButton>
+                      </div>
+                    ) : (
+                      <p className="font-semibold">{item.task.title}</p>
+                    )}
+                    {pack.layer === 1 ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {gps
                           ? `${gps.lat.toFixed(4)}, ${gps.lng.toFixed(4)} · ${gps.radius_meters} m`
                           : "Noch keine Koordinaten"}
@@ -250,19 +289,22 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
                     ) : null}
                     {blast && blast.packCount > 1 ? (
                       <p className="mt-1 text-xs font-semibold text-amber-800">
-                        Achtung: Basis-Aufgabe — Änderung wirkt auf {blast.packCount} Packs
-                        {blast.gameCount > 0 ? ` / ${blast.gameCount} Spiele` : ""}.
+                        Hängt noch in {blast.packCount} Packs
+                        {blast.gameCount > 0
+                          ? ` / ${blast.gameCount} Spiel${blast.gameCount === 1 ? "" : "e"}`
+                          : ""}
+                        .
                       </p>
                     ) : pack.layer === 1 ? (
                       <p className="mt-1 text-xs text-muted-foreground">
-                        GPS und Code sind der Override für {pack.name}. Die Aufgabe selbst bleibt geteilt.
+                        Name und Fragen gehören zu {pack.name}. GPS und Code nur hier.
                       </p>
                     ) : null}
                     <Link
                       href={`/admin/tasks/${item.task_id}?returnTo=/admin/packs/${pack.id}`}
                       className="text-xs font-semibold text-primary underline-offset-2 hover:underline"
                     >
-                      In Aufgaben bearbeiten
+                      Frage und Antworten bearbeiten
                     </Link>
                   </div>
                   <div className="flex flex-wrap gap-2">
