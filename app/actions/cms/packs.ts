@@ -814,63 +814,122 @@ function parsePackItemStation(overrides: Record<string, unknown>): { code?: stri
   return { code: typeof code === "string" ? code : undefined };
 }
 
-async function ensureUniqueTaskSlug(
-  supabase: AdminClient,
-  organizationId: string,
-  name: string,
-): Promise<string> {
-  const base = slugifyStudio(name) || "aufgabe";
-  let candidate = base.slice(0, 64);
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    const { data } = await supabase
-      .from("studio_tasks")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("slug", candidate)
-      .maybeSingle();
-    if (!data) return candidate;
-    candidate = `${base}-${attempt + 2}`.slice(0, 64);
+const INSERT_CHUNK = 200;
+
+type ClonedTaskMeta = { title: string; description: string; content: StudioTask["content"] };
+
+function mintUniqueSlug(base: string, taken: Set<string>): string {
+  const root = (slugifyStudio(base) || "copy").slice(0, 48) || "copy";
+  let candidate = root.slice(0, 64);
+  let n = 2;
+  while (candidate.length < 2 || taken.has(candidate)) {
+    const suffix = `-${n}`;
+    candidate = `${root.slice(0, Math.max(2, 64 - suffix.length))}${suffix}`;
+    n += 1;
+    if (n > 20_000) {
+      candidate = `${root.slice(0, 40)}-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`.slice(0, 64);
+      break;
+    }
   }
-  return `${base}-${Date.now()}`.slice(0, 64);
+  taken.add(candidate);
+  return candidate;
 }
 
-async function cloneStudioTask(
+async function loadSlugPage(
+  query: PromiseLike<{ data: Array<{ slug?: string | null }> | null; error: { message: string } | null }>,
+  taken: Set<string>,
+): Promise<number> {
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  for (const row of data ?? []) {
+    if (typeof row.slug === "string" && row.slug) taken.add(row.slug);
+  }
+  return data?.length ?? 0;
+}
+
+async function loadTaskSlugs(supabase: AdminClient, orgId: string): Promise<Set<string>> {
+  const taken = new Set<string>();
+  const page = 1000;
+  for (let from = 0; ; from += page) {
+    const count = await loadSlugPage(
+      supabase.from("studio_tasks").select("slug").eq("organization_id", orgId).range(from, from + page - 1),
+      taken,
+    );
+    if (count < page) break;
+  }
+  return taken;
+}
+
+async function loadPackSlugs(
   supabase: AdminClient,
   orgId: string,
-  taskId: string,
+  layer: StudioLayer,
+): Promise<Set<string>> {
+  const taken = new Set<string>();
+  const page = 1000;
+  for (let from = 0; ; from += page) {
+    const count = await loadSlugPage(
+      supabase
+        .from("studio_layer_packs")
+        .select("slug")
+        .eq("organization_id", orgId)
+        .eq("layer", layer)
+        .range(from, from + page - 1),
+      taken,
+    );
+    if (count < page) break;
+  }
+  return taken;
+}
+
+async function insertChunks<T extends Record<string, unknown>>(
+  insert: (rows: T[]) => PromiseLike<{ error: { message: string } | null }>,
+  rows: T[],
+): Promise<void> {
+  for (let index = 0; index < rows.length; index += INSERT_CHUNK) {
+    const { error } = await insert(rows.slice(index, index + INSERT_CHUNK));
+    if (error) throw new Error(error.message);
+  }
+}
+
+async function loadSourceTasks(supabase: AdminClient, taskIds: string[]): Promise<Map<string, StudioTask>> {
+  const unique = [...new Set(taskIds.filter(Boolean))];
+  const map = new Map<string, StudioTask>();
+  for (let index = 0; index < unique.length; index += 80) {
+    const chunk = unique.slice(index, index + 80);
+    const { data, error } = await supabase.from("studio_tasks").select("*").in("id", chunk);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      const task = mapStudioTaskRow(row as Record<string, unknown>);
+      map.set(task.id, task);
+    }
+  }
+  return map;
+}
+
+function taskCloneInsert(
+  source: StudioTask,
+  orgId: string,
+  id: string,
+  slug: string,
   citySlug?: string | null,
-): Promise<{ id: string; title: string; description: string; content: StudioTask["content"] }> {
-  const { data, error } = await supabase.from("studio_tasks").select("*").eq("id", taskId).maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Aufgabe zum Kopieren nicht gefunden.");
-  const source = data as StudioTask;
-  const slug = await ensureUniqueTaskSlug(supabase, orgId, source.title);
+) {
   const content = normalizeTaskContent(source.content);
-  const { data: inserted, error: insertError } = await supabase
-    .from("studio_tasks")
-    .insert({
-      organization_id: source.organization_id ?? orgId,
-      slug,
-      title: source.title,
-      description: source.description,
-      language: source.language,
-      city_slug: citySlug ?? source.city_slug,
-      game_type: source.game_type,
-      tags: source.tags ?? [],
-      content,
-      layer: source.layer ?? 1,
-      content_context: source.content_context ?? "any",
-      role_assignment: source.role_assignment ?? "team",
-      is_active: true,
-    })
-    .select("id")
-    .single();
-  if (insertError) throw new Error(insertError.message);
   return {
-    id: String(inserted.id),
+    id,
+    organization_id: source.organization_id ?? orgId,
+    slug,
     title: source.title,
-    description: source.description ?? "",
+    description: source.description,
+    language: source.language,
+    city_slug: citySlug ?? source.city_slug,
+    game_type: source.game_type,
+    tags: source.tags ?? [],
     content,
+    layer: source.layer ?? 1,
+    content_context: source.content_context ?? "any",
+    role_assignment: source.role_assignment ?? "team",
+    is_active: true,
   };
 }
 
@@ -881,15 +940,26 @@ async function cloneTaskIds(
   citySlug?: string | null,
 ): Promise<{
   idMap: Map<string, string>;
-  cloned: Map<string, { title: string; description: string; content: StudioTask["content"] }>;
+  cloned: Map<string, ClonedTaskMeta>;
 }> {
+  const unique = [...new Set(taskIds.filter(Boolean))];
   const idMap = new Map<string, string>();
-  const cloned = new Map<string, { title: string; description: string; content: StudioTask["content"] }>();
-  for (const taskId of [...new Set(taskIds.filter(Boolean))]) {
-    const copy = await cloneStudioTask(supabase, orgId, taskId, citySlug);
-    idMap.set(taskId, copy.id);
-    cloned.set(copy.id, copy);
+  const cloned = new Map<string, ClonedTaskMeta>();
+  if (unique.length === 0) return { idMap, cloned };
+
+  const sources = await loadSourceTasks(supabase, unique);
+  const taken = await loadTaskSlugs(supabase, orgId);
+  const rows: ReturnType<typeof taskCloneInsert>[] = [];
+  for (const taskId of unique) {
+    const source = sources.get(taskId);
+    if (!source) throw new Error("Aufgabe zum Kopieren nicht gefunden.");
+    const id = crypto.randomUUID();
+    const row = taskCloneInsert(source, orgId, id, mintUniqueSlug(source.title, taken), citySlug);
+    rows.push(row);
+    idMap.set(taskId, id);
+    cloned.set(id, { title: source.title, description: source.description ?? "", content: row.content });
   }
+  await insertChunks((chunk) => supabase.from("studio_tasks").insert(chunk), rows);
   return { idMap, cloned };
 }
 
@@ -950,57 +1020,104 @@ function packItemTaskIds(items: StudioLayerPackItem[], layer: StudioLayer): stri
   return ids;
 }
 
-async function duplicateOnePack(
+type PackCopySpec = {
+  name: string;
+  city?: { id: string; slug: string } | null;
+};
+
+async function duplicatePackCopies(
   supabase: AdminClient,
   orgId: string,
   source: StudioLayerPack,
-  name: string,
-  city?: { id: string; slug: string } | null,
-): Promise<StudioLayerPack> {
-  const slug = await ensureUniquePackSlug(supabase, orgId, source.layer, name);
-  const cityId = source.layer === 1 ? city?.id ?? source.city_id : null;
-  const citySlug = source.layer === 1 ? city?.slug ?? source.city_slug : null;
-  const { data, error } = await supabase
-    .from("studio_layer_packs")
-    .insert({
+  copies: PackCopySpec[],
+): Promise<string[]> {
+  if (copies.length === 0) return [];
+
+  const items = await fetchPackItems(supabase, source.id);
+  const sourceTaskIds = packItemTaskIds(items, source.layer);
+  const sources = await loadSourceTasks(supabase, sourceTaskIds);
+  for (const taskId of [...new Set(sourceTaskIds)]) {
+    if (!sources.has(taskId)) throw new Error("Aufgabe zum Kopieren nicht gefunden.");
+  }
+
+  const [taskSlugs, packSlugs] = await Promise.all([
+    sourceTaskIds.length > 0 ? loadTaskSlugs(supabase, orgId) : Promise.resolve(new Set<string>()),
+    loadPackSlugs(supabase, orgId, source.layer),
+  ]);
+
+  const packRows: Array<{
+    id: string;
+    organization_id: string;
+    layer: StudioLayer;
+    slug: string;
+    name: string;
+    description: string;
+    city_id: string | null;
+    city_slug: string | null;
+    language: StudioLayerPack["language"];
+    translations: Record<string, unknown>;
+    slot_count: number;
+    created_from_pack_id: string;
+  }> = [];
+  const taskRows: ReturnType<typeof taskCloneInsert>[] = [];
+  const itemRows: Array<{
+    pack_id: string;
+    task_id: string;
+    sort_order: number;
+    overrides: Record<string, unknown>;
+  }> = [];
+  const createdIds: string[] = [];
+
+  for (const copy of copies) {
+    const packId = crypto.randomUUID();
+    const cityId = source.layer === 1 ? copy.city?.id ?? source.city_id : null;
+    const citySlug = source.layer === 1 ? copy.city?.slug ?? source.city_slug : null;
+    const idMap = new Map<string, string>();
+    const cloned = new Map<string, ClonedTaskMeta>();
+
+    for (const taskId of [...new Set(sourceTaskIds)]) {
+      const task = sources.get(taskId)!;
+      const newId = crypto.randomUUID();
+      const row = taskCloneInsert(task, orgId, newId, mintUniqueSlug(task.title, taskSlugs), citySlug);
+      taskRows.push(row);
+      idMap.set(taskId, newId);
+      cloned.set(newId, {
+        title: task.title,
+        description: task.description ?? "",
+        content: row.content,
+      });
+    }
+
+    packRows.push({
+      id: packId,
       organization_id: orgId,
       layer: source.layer,
-      slug,
-      name,
+      slug: mintUniqueSlug(copy.name, packSlugs),
+      name: copy.name,
       description: source.description,
       city_id: cityId,
       city_slug: citySlug,
       language: source.language,
       translations: source.translations,
-      slot_count: 0,
+      slot_count: items.length,
       created_from_pack_id: source.id,
-    })
-    .select("*")
-    .single();
-  if (error) throw new Error(error.message);
-  const copy = normalizeLayerPackRow(data as Record<string, unknown>);
-  const items = await fetchPackItems(supabase, source.id);
+    });
+    createdIds.push(packId);
 
-  if (items.length > 0) {
-    const { idMap, cloned } = await cloneTaskIds(
-      supabase,
-      orgId,
-      packItemTaskIds(items, source.layer),
-      citySlug,
-    );
-    const insertItems = items.map((item, index) => ({
-      pack_id: copy.id,
-      task_id: idMap.get(item.task_id) ?? item.task_id,
-      sort_order: item.sort_order ?? index,
-      overrides: remapPackItemTaskIds(item.overrides, idMap, cloned, source.layer === 1),
-    }));
-    const { error: itemError } = await supabase.from("studio_layer_pack_items").insert(insertItems);
-    if (itemError) throw new Error(itemError.message);
+    for (const [index, item] of items.entries()) {
+      itemRows.push({
+        pack_id: packId,
+        task_id: idMap.get(item.task_id) ?? item.task_id,
+        sort_order: item.sort_order ?? index,
+        overrides: remapPackItemTaskIds(item.overrides, idMap, cloned, source.layer === 1),
+      });
+    }
   }
 
-  await refreshPackSlotCount(supabase, copy.id);
-  const fresh = await getOwnedPack(supabase, orgId, copy.id);
-  return fresh ?? copy;
+  await insertChunks((chunk) => supabase.from("studio_tasks").insert(chunk), taskRows);
+  await insertChunks((chunk) => supabase.from("studio_layer_packs").insert(chunk), packRows);
+  await insertChunks((chunk) => supabase.from("studio_layer_pack_items").insert(chunk), itemRows);
+  return createdIds;
 }
 
 export async function duplicateLayerPacks(
@@ -1019,10 +1136,10 @@ export async function duplicateLayerPacks(
     for (const packId of uniqueIds) {
       const source = await getOwnedPack(supabase, orgId, packId);
       if (!source) continue;
-      for (let i = 1; i <= copies; i += 1) {
-        const copy = await duplicateOnePack(supabase, orgId, source, `COPY ${i} ${source.name}`);
-        createdIds.push(copy.id);
-      }
+      const specs = Array.from({ length: copies }, (_, index) => ({
+        name: `COPY ${index + 1} ${source.name}`,
+      }));
+      createdIds.push(...(await duplicatePackCopies(supabase, orgId, source, specs)));
     }
 
     if (createdIds.length === 0) return { success: false, error: "Keine Packs zum Duplizieren gefunden." };
@@ -1172,11 +1289,17 @@ export async function createLayer1PacksForCities(input: {
 
     const slots = Math.min(PACK_SLOT_MAX, Math.max(0, Math.floor(input.slot_count ?? template?.slot_count ?? 10)));
 
-    for (const city of cities) {
-      if (template) {
-        const copy = await duplicateOnePack(supabase, orgId, template, city.name, city);
-        createdIds.push(copy.id);
-      } else {
+    if (template) {
+      createdIds.push(
+        ...(await duplicatePackCopies(
+          supabase,
+          orgId,
+          template,
+          cities.map((city) => ({ name: city.name, city })),
+        )),
+      );
+    } else {
+      for (const city of cities) {
         const created = await createLayerPack({
           layer: 1,
           name: city.name,
