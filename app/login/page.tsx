@@ -15,7 +15,13 @@ export const metadata: Metadata = {
 
 function safeNext(value: string | string[] | undefined): string {
   const raw = Array.isArray(value) ? value[0] : value;
-  if (raw === "/account" || raw === "/exitmania" || (raw?.startsWith("/account/") ?? false) || (raw?.startsWith("/exitmania/") ?? false)) {
+  if (
+    typeof raw === "string" &&
+    (raw === "/account" ||
+      raw === "/exitmania" ||
+      raw.startsWith("/account/") ||
+      raw.startsWith("/exitmania/"))
+  ) {
     return raw;
   }
   return "/account";
