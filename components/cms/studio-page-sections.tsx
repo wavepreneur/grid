@@ -18,11 +18,7 @@ export function StudioGamesListSection() {
 
   const games = gamesQuery.data ?? [];
   const templates = templatesQuery.data ?? [];
-  const isInitialLoad =
-    (gamesQuery.isPending && games.length === 0) ||
-    (templatesQuery.isPending && templates.length === 0);
-
-  if (isInitialLoad) {
+  if (gamesQuery.isPending && games.length === 0) {
     return <StudioListSkeleton rows={5} />;
   }
 

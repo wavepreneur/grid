@@ -2347,12 +2347,10 @@ export async function listComposeRecipes(input?: {
       error = fallback.error;
     }
     if (error) throw new Error(error.message);
-    const recipes = await hydrateComposeRecipes(supabase, (data ?? []) as Record<string, unknown>[]);
-    const next: StudioComposeRecipe[] = [];
-    for (const recipe of recipes) {
-      next.push(await persistRecipeOrigin(supabase, orgId, recipe));
-    }
-    return { success: true, data: next };
+    return {
+      success: true,
+      data: await hydrateComposeRecipes(supabase, (data ?? []) as Record<string, unknown>[]),
+    };
   } catch (error) {
     return {
       success: false,

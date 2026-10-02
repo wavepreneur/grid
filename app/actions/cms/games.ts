@@ -159,6 +159,15 @@ function translationUnitsForGame(
   });
 }
 
+function slimListTranslations(raw: unknown) {
+  const parsed = parseTranslations(raw);
+  const slim: Record<string, { coverage?: { confirmed: number; total: number } }> = {};
+  for (const [key, copy] of Object.entries(parsed)) {
+    slim[key] = copy?.coverage ? { coverage: copy.coverage } : {};
+  }
+  return slim;
+}
+
 export async function listGames(): Promise<ActionResult<StudioGame[]>> {
   try {
     const orgId = await getStudioOrganizationId();
@@ -168,7 +177,7 @@ export async function listGames(): Promise<ActionResult<StudioGame[]>> {
       const { data, error } = await supabase
         .from("studio_games")
         .select(
-          "id, organization_id, blueprint_id, slug, name, logo_url, description, language, translations, city_slug, duration_minutes, gps_enabled, farewell_text, feature_flags, logic_rules, active_layers, runtime_profiles, layer1_pack_id, layer2_pack_id, layer3_pack_id, compose_recipe_id, status, published_version_number, is_template, created_at, updated_at",
+          "id, organization_id, slug, name, logo_url, language, translations, city_slug, runtime_profiles, layer1_pack_id, layer2_pack_id, layer3_pack_id, compose_recipe_id, status, published_version_number, is_template, created_at, updated_at",
         )
         .eq("organization_id", orgId)
         .neq("is_template", true)
@@ -176,7 +185,14 @@ export async function listGames(): Promise<ActionResult<StudioGame[]>> {
         .order("id", { ascending: true })
         .range(from, from + 999);
       if (error) throw new Error(error.message);
-      for (const row of data ?? []) games.push(normalizeGameRow(row as StudioGame));
+      for (const row of data ?? []) {
+        games.push(
+          normalizeGameRow({
+            ...(row as StudioGame),
+            translations: slimListTranslations((row as StudioGame).translations),
+          }),
+        );
+      }
       if ((data ?? []).length < 1000) break;
     }
     return { success: true, data: games };
