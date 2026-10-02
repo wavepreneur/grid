@@ -59,7 +59,6 @@ const PLANS = [
     id: "enterprise",
     name: "Enterprise",
     monthly: 2900,
-    custom: true,
     teams: "Up to 50,000 people",
     credit: "from €19 per team",
     blurb: "The whole organisation.",
@@ -120,7 +119,7 @@ export function GridPricing() {
                   {euro(plan.monthly)}
                 </p>
                 <p className="grid-plan-now">
-                  {plan.custom ? <span className="grid-plan-from">from</span> : null}
+                  {plan.id === "enterprise" ? <span className="grid-plan-from">from</span> : null}
                   {euro(price)}
                   <span className="grid-plan-cadence">/ month</span>
                 </p>
