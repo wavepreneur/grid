@@ -10,7 +10,10 @@ export const queryKeys = {
   },
   games: {
     all: ["grid", "studio", "games"] as const,
-    list: (orgSlug?: string) => [...queryKeys.games.all, "list", orgSlug ?? ""] as const,
+    list: (orgSlug?: string, filters?: Record<string, string | undefined>) =>
+      [...queryKeys.games.all, "list", orgSlug ?? "", filters ?? {}] as const,
+    picker: (orgSlug?: string, filters?: Record<string, string | undefined>) =>
+      [...queryKeys.games.all, "picker", orgSlug ?? "", filters ?? {}] as const,
     templates: (orgSlug?: string) =>
       [...queryKeys.games.all, "templates", orgSlug ?? ""] as const,
     liveMeta: (gameIds: string[]) =>

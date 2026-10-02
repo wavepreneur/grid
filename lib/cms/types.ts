@@ -185,6 +185,39 @@ export type StudioOrganization = {
   name: string;
 };
 
+export type GameListSort = "updated" | "created" | "name" | "status" | "language";
+
+export type GameFilterInput = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: "alle" | "draft" | "published" | "archived";
+  language?: StudioLanguage | "alle";
+  sourceIds?: string[];
+  sort?: GameListSort;
+};
+
+export type GameListPage = {
+  games: StudioGame[];
+  total: number;
+};
+
+export type StudioGamePickerItem = {
+  id: string;
+  name: string;
+  slug: string;
+  city_slug: string | null;
+  status: StudioGameStatus;
+  compose_recipe_id: string | null;
+  published_version_number: number;
+  is_template: boolean;
+  layer1_pack_id: string | null;
+  layer2_pack_id: string | null;
+  layer3_pack_id: string | null;
+};
+
+export type TaskListSort = "updated" | "created" | "name";
+
 export type TaskFilterInput = {
   organizationId?: string;
   language?: StudioLanguage | "";
@@ -193,6 +226,15 @@ export type TaskFilterInput = {
   layer?: StudioLayer | "";
   contentContext?: ContentContext | "";
   search?: string;
+  tag?: string;
+  page?: number;
+  pageSize?: number;
+  sort?: TaskListSort;
+};
+
+export type TaskListPage = {
+  tasks: StudioTask[];
+  total: number;
 };
 
 export const DEFAULT_TASK_CONTENT: StudioTaskContent = {

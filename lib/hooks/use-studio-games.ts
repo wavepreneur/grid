@@ -2,25 +2,63 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getGamesDeleteStatus } from "@/app/actions/cms/delete";
-import { listGames, listTemplates } from "@/app/actions/cms/games";
+import { listGames, listTemplates, searchStudioGames } from "@/app/actions/cms/games";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { queryKeys } from "@/lib/platform/query-keys";
-import type { StudioGame } from "@/lib/cms/types";
+import type { GameFilterInput, GameListPage, StudioGame } from "@/lib/cms/types";
 
-export function useStudioGamesList(initialGames: StudioGame[] = []) {
+export function gameListQueryKey(orgSlug: string, filters: GameFilterInput = {}) {
+  return queryKeys.games.list(orgSlug, {
+    page: String(filters.page ?? 1),
+    pageSize: String(filters.pageSize ?? 20),
+    search: filters.search ?? "",
+    status: filters.status ?? "alle",
+    language: filters.language ?? "alle",
+    source: filters.sourceIds?.join(",") ?? "",
+    sort: filters.sort ?? "updated",
+  });
+}
+
+export function useStudioGamesList(filters: GameFilterInput = {}) {
   const { orgSlug } = useStudioShell();
-  const hasSeed = initialGames.length > 0;
 
   return useQuery({
-    queryKey: queryKeys.games.list(orgSlug),
+    queryKey: gameListQueryKey(orgSlug, filters),
     queryFn: async () => {
-      const result = await listGames();
+      const result = await listGames(filters);
       if (!result.success) throw new Error(result.error);
       return result.data!;
     },
-    ...(hasSeed
-      ? { initialData: initialGames, initialDataUpdatedAt: Date.now() }
-      : {}),
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useStudioGamePicker(input: {
+  search?: string;
+  publishedOnly?: boolean;
+  excludeCompose?: boolean;
+  enabled?: boolean;
+}) {
+  const { orgSlug } = useStudioShell();
+  return useQuery({
+    queryKey: queryKeys.games.picker(orgSlug, {
+      search: input.search ?? "",
+      published: input.publishedOnly ? "1" : "",
+      excludeCompose: input.excludeCompose ? "1" : "",
+    }),
+    queryFn: async () => {
+      const result = await searchStudioGames({
+        search: input.search,
+        publishedOnly: input.publishedOnly,
+        excludeCompose: input.excludeCompose,
+        limit: 20,
+      });
+      if (!result.success) throw new Error(result.error);
+      return result.data!;
+    },
+    enabled: input.enabled !== false,
+    staleTime: 15_000,
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -64,15 +102,9 @@ export function useInvalidateStudioGames() {
 
 export function useRefreshStudioGamesList() {
   const queryClient = useQueryClient();
-  const { orgSlug } = useStudioShell();
   return async () => {
-    const [gamesResult, templatesResult] = await Promise.all([listGames(), listTemplates()]);
-    if (gamesResult.success && gamesResult.data) {
-      queryClient.setQueryData(queryKeys.games.list(orgSlug), gamesResult.data);
-    }
-    if (templatesResult.success && templatesResult.data) {
-      queryClient.setQueryData(queryKeys.games.templates(orgSlug), templatesResult.data);
-    }
-    void queryClient.invalidateQueries({ queryKey: queryKeys.games.all });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.games.all });
   };
 }
+
+export type { GameListPage };

@@ -16,6 +16,8 @@ import {
   DUPLICATE_PACKS_MAX,
   PACK_SEARCH_LIMIT,
   PACK_SLOT_MAX,
+  type LayerPackListPage,
+  type PackListSort,
   composeCityGameName,
   composeGameName,
   gameUsesLayerPacks,
@@ -292,6 +294,60 @@ export async function listLayerPacks(input: {
     return {
       success: true,
       data: rows.map((row) => normalizeLayerPackRow(row)),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Packs konnten nicht geladen werden.",
+    };
+  }
+}
+
+function packListOrder(sort: PackListSort | undefined): { column: string; ascending: boolean } {
+  if (sort === "stale") return { column: "updated_at", ascending: true };
+  if (sort === "name") return { column: "name", ascending: true };
+  if (sort === "name-desc") return { column: "name", ascending: false };
+  return { column: "updated_at", ascending: false };
+}
+
+export async function listLayerPacksPage(input: {
+  layer: StudioLayer;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+  sort?: PackListSort;
+}): Promise<ActionResult<LayerPackListPage>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const pageSize = Math.min(100, Math.max(1, input.pageSize ?? 20));
+    const page = Math.max(1, input.page ?? 1);
+    const from = (page - 1) * pageSize;
+    const order = packListOrder(input.sort);
+    const search = sanitizeIlike(input.search ?? "");
+    let query = supabase
+      .from("studio_layer_packs")
+      .select(
+        "id, organization_id, layer, slug, name, city_id, city_slug, slot_count, is_active, created_at, updated_at",
+        { count: "exact" },
+      )
+      .eq("organization_id", orgId)
+      .eq("layer", input.layer)
+      .eq("is_active", true);
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,city_slug.ilike.%${search}%,slug.ilike.%${search}%`);
+    }
+    const { data, error, count } = await query
+      .order(order.column, { ascending: order.ascending })
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+    return {
+      success: true,
+      data: {
+        packs: (data ?? []).map((row) => normalizeLayerPackRow(row as Record<string, unknown>)),
+        total: count ?? 0,
+      },
     };
   } catch (error) {
     return {

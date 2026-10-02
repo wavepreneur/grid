@@ -121,10 +121,19 @@ function prefetchForHref(
     return;
   }
   if (href === "/admin/games") {
+    const filters = { page: 1, pageSize: 20, search: "", status: "alle" as const, sort: "updated" as const };
     void queryClient.prefetchQuery({
-      queryKey: queryKeys.games.list(orgSlug),
+      queryKey: queryKeys.games.list(orgSlug, {
+        page: "1",
+        pageSize: "20",
+        search: "",
+        status: "alle",
+        language: "alle",
+        source: "",
+        sort: "updated",
+      }),
       queryFn: async () => {
-        const result = await listGames();
+        const result = await listGames(filters);
         if (!result.success) throw new Error(result.error);
         return result.data!;
       },
@@ -140,10 +149,17 @@ function prefetchForHref(
     return;
   }
   if (href === "/admin/tasks") {
+    const filters = { page: 1, pageSize: 20, search: "", tag: "", sort: "updated" as const };
     void queryClient.prefetchQuery({
-      queryKey: queryKeys.tasks.list(orgSlug),
+      queryKey: queryKeys.tasks.list(orgSlug, {
+        page: "1",
+        pageSize: "20",
+        search: "",
+        tag: "",
+        sort: "updated",
+      }),
       queryFn: async () => {
-        const result = await listTasks();
+        const result = await listTasks(filters);
         if (!result.success) throw new Error(result.error);
         return result.data!;
       },
@@ -152,10 +168,10 @@ function prefetchForHref(
   }
   if (href === "/admin/packs") {
     void queryClient.prefetchQuery({
-      queryKey: queryKeys.packs.list(orgSlug, 1, ""),
+      queryKey: queryKeys.packs.list(orgSlug, 1, ["", "1", "20", "updated"].join("|")),
       queryFn: async () => {
-        const { listLayerPacks } = await import("@/app/actions/cms/packs");
-        const result = await listLayerPacks({ layer: 1, limit: 40 });
+        const { listLayerPacksPage } = await import("@/app/actions/cms/packs");
+        const result = await listLayerPacksPage({ layer: 1, page: 1, pageSize: 20, sort: "updated" });
         if (!result.success) throw new Error(result.error);
         return result.data!;
       },

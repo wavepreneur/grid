@@ -42,6 +42,9 @@ import {
   useStudioGamesList,
   useStudioTemplates,
 } from "@/lib/hooks/use-studio-games";
+import { useDebouncedValue } from "@/lib/hooks/use-task-library-search";
+import type { GameFilterInput, GameListPage, StudioGame } from "@/lib/cms/types";
+import { StudioListSkeleton } from "@/components/cms/studio-list-skeletons";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { queryKeys } from "@/lib/platform/query-keys";
 import { prefetchStudioGame } from "@/lib/hooks/use-studio-game-detail";
@@ -83,7 +86,6 @@ import {
   StudioSelect,
   StudioSuccess,
 } from "@/components/cms/studio-ui";
-import type { StudioGame } from "@/lib/cms/types";
 import { parseRuntimeProfiles, type ContentMode } from "@/lib/cms/layer-model";
 import {
   surfaceDescriptionDe,
@@ -193,16 +195,14 @@ function sortGames<T extends StudioGame>(list: T[], sort: GameSort): T[] {
 }
 
 type Props = {
-  initialGames: StudioGame[];
-  initialTemplates: StudioGame[];
+  initialTemplates?: StudioGame[];
 };
 
-export function GameList({ initialGames, initialTemplates }: Props) {
+export function GameList({ initialTemplates = [] }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { orgSlug } = useStudioShell();
   const refreshGames = useRefreshStudioGamesList();
-  const { data: games = initialGames } = useStudioGamesList(initialGames);
   const { data: templates = initialTemplates } = useStudioTemplates(initialTemplates);
   const { data: recipes = [] } = useComposeRecipes();
   const originIds = useMemo(
@@ -239,80 +239,56 @@ export function GameList({ initialGames, initialTemplates }: Props) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(20);
-
-  const scopedGames = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return games.filter((g) => {
-      if (statusTab === "alle") {
-        if (g.status === "archived") return false;
-      } else if (g.status !== statusTab) {
-        return false;
-      }
-      if (surfaceTab !== "alle" && gameDefaultSurface(g) !== surfaceTab) {
-        return false;
-      }
-      if (sourceTab === "quellen" && !originIds.has(g.id)) {
-        return false;
-      }
-      if (!q) return true;
-      return (
-        g.name.toLowerCase().includes(q) ||
-        g.slug.toLowerCase().includes(q) ||
-        (g.city_slug ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [games, statusTab, surfaceTab, sourceTab, originIds, query]);
-
-  const filteredGames = useMemo(
-    () =>
-      scopedGames.filter((g) => matchesTranslationFilter(g, languageTab, translationTab)),
-    [scopedGames, languageTab, translationTab],
+  const search = useDebouncedValue(query, 250);
+  const listFilters = useMemo<GameFilterInput>(
+    () => ({
+      page,
+      pageSize,
+      search,
+      status: statusTab,
+      language: languageTab === "alle" ? "alle" : languageTab,
+      sourceIds: sourceTab === "quellen" ? [...originIds] : undefined,
+      sort,
+    }),
+    [page, pageSize, search, statusTab, languageTab, sourceTab, originIds, sort],
   );
+  const gamesQuery = useStudioGamesList(listFilters);
+  const games = gamesQuery.data?.games ?? [];
+  const total = gamesQuery.data?.total ?? 0;
 
+  const visibleGames = useMemo(
+    () =>
+      games.filter((game) => {
+        if (surfaceTab !== "alle" && gameDefaultSurface(game) !== surfaceTab) return false;
+        return matchesTranslationFilter(game, "alle", translationTab);
+      }),
+    [games, surfaceTab, translationTab],
+  );
   const languageCounts = useMemo(() => {
     const counts: Partial<Record<StudioLanguage, number>> = {};
     for (const locale of STUDIO_TAB_LOCALES) {
-      counts[locale] = scopedGames.filter((g) =>
-        matchesTranslationFilter(g, locale, translationTab),
-      ).length;
+      counts[locale] = games.filter((g) => matchesTranslationFilter(g, locale, translationTab)).length;
     }
     return counts;
-  }, [scopedGames, translationTab]);
-
-  const translationCounts = useMemo(() => {
-    return {
-      open: scopedGames.filter((g) => matchesTranslationFilter(g, languageTab, "open")).length,
-      started: scopedGames.filter((g) =>
-        matchesTranslationFilter(g, languageTab, "started"),
-      ).length,
-      done: scopedGames.filter((g) => matchesTranslationFilter(g, languageTab, "done")).length,
-    };
-  }, [scopedGames, languageTab]);
-
-  const sortedGames = useMemo(() => {
-    const sorted = sortGames(filteredGames, sort);
-    if (originIds.size === 0) return sorted;
-    const origins = sorted.filter((g) => originIds.has(g.id));
-    const rest = sorted.filter((g) => !originIds.has(g.id));
-    return [...origins, ...rest];
-  }, [filteredGames, sort, originIds]);
-  const sortedTemplates = useMemo(
-    () => sortGames(templates, "updated"),
-    [templates],
+  }, [games, translationTab]);
+  const translationCounts = useMemo(
+    () => ({
+      open: games.filter((g) => matchesTranslationFilter(g, languageTab, "open")).length,
+      started: games.filter((g) => matchesTranslationFilter(g, languageTab, "started")).length,
+      done: games.filter((g) => matchesTranslationFilter(g, languageTab, "done")).length,
+    }),
+    [games, languageTab],
   );
+  const sortedTemplates = useMemo(() => sortGames(templates, "updated"), [templates]);
 
   useEffect(() => {
     setPage(1);
-  }, [query, statusTab, surfaceTab, sourceTab, languageTab, translationTab, sort, pageSize]);
+  }, [search, statusTab, surfaceTab, sourceTab, languageTab, translationTab, sort, pageSize]);
 
-  const pageCount = Math.max(1, Math.ceil(sortedGames.length / pageSize));
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.min(page, pageCount);
-  const rangeStart = sortedGames.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const rangeEnd = Math.min(sortedGames.length, currentPage * pageSize);
-  const visibleGames = useMemo(
-    () => sortedGames.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [sortedGames, currentPage, pageSize],
-  );
+  const rangeStart = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(currentPage * pageSize, total);
   const visibleIds = useMemo(() => visibleGames.map((game) => game.id), [visibleGames]);
   const { data: liveMetaData } = useGamesLiveMeta(visibleIds);
   const liveCountByGame = useMemo(() => {
@@ -505,23 +481,32 @@ export function GameList({ initialGames, initialTemplates }: Props) {
     },
     onMutate: async ({ ids }) => {
       await Promise.all([
-        queryClient.cancelQueries({ queryKey: queryKeys.games.list(orgSlug) }),
+        queryClient.cancelQueries({ queryKey: queryKeys.games.all }),
         queryClient.cancelQueries({ queryKey: queryKeys.games.templates(orgSlug) }),
       ]);
 
-      const previousGames = queryClient.getQueryData<StudioGame[]>(queryKeys.games.list(orgSlug));
+      const previousLists = queryClient.getQueriesData<GameListPage>({
+        queryKey: [...queryKeys.games.all, "list"],
+      });
       const previousTemplates = queryClient.getQueryData<StudioGame[]>(
         queryKeys.games.templates(orgSlug),
       );
 
-      queryClient.setQueryData<StudioGame[]>(queryKeys.games.list(orgSlug), (old) =>
-        (old ?? []).filter((game) => !ids.includes(game.id)),
+      queryClient.setQueriesData<GameListPage>(
+        { queryKey: [...queryKeys.games.all, "list"] },
+        (old) =>
+          old?.games
+            ? {
+                games: old.games.filter((game) => !ids.includes(game.id)),
+                total: Math.max(0, old.total - ids.length),
+              }
+            : old,
       );
       queryClient.setQueryData<StudioGame[]>(queryKeys.games.templates(orgSlug), (old) =>
         (old ?? []).filter((game) => !ids.includes(game.id)),
       );
 
-      return { previousGames, previousTemplates };
+      return { previousLists, previousTemplates };
     },
     onSuccess: (data) => {
       setSelectedIds((prev) => {
@@ -549,8 +534,8 @@ export function GameList({ initialGames, initialTemplates }: Props) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.games.all });
     },
     onError: (err, _vars, context) => {
-      if (context?.previousGames) {
-        queryClient.setQueryData(queryKeys.games.list(orgSlug), context.previousGames);
+      for (const [key, data] of context?.previousLists ?? []) {
+        queryClient.setQueryData(key, data);
       }
       if (context?.previousTemplates) {
         queryClient.setQueryData(queryKeys.games.templates(orgSlug), context.previousTemplates);
@@ -909,7 +894,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
             ]}
           />
         </div>
-        {games.length > 0 && sortedGames.length > 0 ? (
+        {total > 0 ? (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
             <div className="flex items-center gap-3">
               <StudioSelectCheckbox
@@ -921,7 +906,7 @@ export function GameList({ initialGames, initialTemplates }: Props) {
               <span className="text-sm text-muted-foreground">
                 {selectedIds.size > 0
                   ? `${selectedIds.size} ausgewählt`
-                  : `${sortedGames.length} Spiele`}
+                  : `${total} Spiele`}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -949,9 +934,11 @@ export function GameList({ initialGames, initialTemplates }: Props) {
       </div>
 
       <section>
-        {games.length === 0 ? (
+        {gamesQuery.isPending && games.length === 0 ? (
+          <StudioListSkeleton rows={5} />
+        ) : total === 0 ? (
           <Empty>Noch keine Spiele. Lege oben ein neues an.</Empty>
-        ) : sortedGames.length === 0 ? (
+        ) : visibleGames.length === 0 ? (
           <Empty>Keine Treffer für diese Filter.</Empty>
         ) : (
           <>
@@ -970,8 +957,8 @@ export function GameList({ initialGames, initialTemplates }: Props) {
             </ul>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-semibold tabular-nums text-muted-foreground">
-                {rangeStart}–{rangeEnd} von {sortedGames.length}
-                {query.trim() ? ` Treffern · ${games.length} hinterlegt` : ""}
+                {rangeStart}–{rangeEnd} von {total}
+                {query.trim() ? " Treffern" : ""}
               </p>
               <div className="flex items-center gap-2">
                 <StudioButton

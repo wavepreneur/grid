@@ -12,6 +12,8 @@ import {
   type StudioTask,
   type StudioTaskContent,
   type TaskFilterInput,
+  type TaskListPage,
+  type TaskListSort,
 } from "@/lib/cms/types";
 import type { ActionResult } from "@/lib/grid/types";
 import { normalizeTaskContent } from "@/lib/cms/task-content";
@@ -81,34 +83,60 @@ async function writeRefreshedOpenerSnapshots(
   );
 }
 
-export async function listTasks(filters: TaskFilterInput = {}): Promise<ActionResult<StudioTask[]>> {
+function sanitizeTaskSearch(raw: string): string {
+  return raw.trim().replace(/[%_,()]/g, " ").replace(/\s+/g, " ").slice(0, 80);
+}
+
+function taskListOrder(sort: TaskListSort | undefined): { column: string; ascending: boolean } {
+  if (sort === "created") return { column: "created_at", ascending: false };
+  if (sort === "name") return { column: "title", ascending: true };
+  return { column: "updated_at", ascending: false };
+}
+
+export async function listTasks(
+  filters: TaskFilterInput = {},
+): Promise<ActionResult<TaskListPage>> {
   try {
     const orgId = filters.organizationId ?? (await getStudioOrganizationId());
     const supabase = createAdminClient();
+    const pageSize = Math.min(100, Math.max(1, filters.pageSize ?? 20));
+    const page = Math.max(1, filters.page ?? 1);
+    const from = (page - 1) * pageSize;
+    const order = taskListOrder(filters.sort);
     let query = supabase
       .from("studio_tasks")
-      .select("*")
+      .select(
+        "id, organization_id, slug, title, description, language, tags, layer, content_context, role_assignment, content, created_at, updated_at, is_active",
+        { count: "exact" },
+      )
       .eq("is_active", true)
-      .or(`organization_id.eq.${orgId},organization_id.is.null`)
-      .order("updated_at", { ascending: false });
+      .or(`organization_id.eq.${orgId},organization_id.is.null`);
 
     if (filters.language) query = query.eq("language", filters.language);
     if (filters.citySlug) query = query.eq("city_slug", filters.citySlug);
     if (filters.gameType) query = query.eq("game_type", filters.gameType);
-    if (filters.search?.trim()) {
-      const q = filters.search.trim();
-      query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,slug.ilike.%${q}%`);
-    }
-
     if (filters.layer) query = query.eq("layer", filters.layer);
     if (filters.contentContext) query = query.eq("content_context", filters.contentContext);
+    const tag = filters.tag?.trim();
+    if (tag) query = query.contains("tags", [tag]);
+    const search = sanitizeTaskSearch(filters.search ?? "");
+    if (search) {
+      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,slug.ilike.%${search}%`);
+    }
 
-    const { data, error } = await query.limit(200);
+    const { data, error, count } = await query
+      .order(order.column, { ascending: order.ascending })
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
     if (error) throw new Error(error.message);
 
-    const tasks = (data ?? []).map((row) => normalizeTaskRow(row as StudioTask));
-
-    return { success: true, data: tasks };
+    return {
+      success: true,
+      data: {
+        tasks: (data ?? []).map((row) => normalizeTaskRow(row as StudioTask)),
+        total: count ?? 0,
+      },
+    };
   } catch (error) {
     return {
       success: false,

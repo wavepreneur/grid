@@ -7,32 +7,15 @@ import { TaskLibrary } from "@/components/cms/tasks/task-library";
 import { TicketAccessPanel } from "@/components/cms/tickets/ticket-access-panel";
 import { StudioListSkeleton } from "@/components/cms/studio-list-skeletons";
 import { StudioError } from "@/components/cms/studio-ui";
-import { useStudioGamesList, useStudioTemplates } from "@/lib/hooks/use-studio-games";
-import { useStudioTasksList } from "@/lib/hooks/use-studio-tasks";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { queryKeys } from "@/lib/platform/query-keys";
 
 export function StudioGamesListSection() {
-  const gamesQuery = useStudioGamesList([]);
-  const templatesQuery = useStudioTemplates([]);
-
-  const games = gamesQuery.data ?? [];
-  const templates = templatesQuery.data ?? [];
-  if (gamesQuery.isPending && games.length === 0) {
-    return <StudioListSkeleton rows={5} />;
-  }
-
-  return <GameList initialGames={games} initialTemplates={templates} />;
+  return <GameList />;
 }
 
 export function StudioTasksListSection() {
-  const { data: tasks = [], isPending } = useStudioTasksList([]);
-
-  if (isPending && tasks.length === 0) {
-    return <StudioListSkeleton rows={6} />;
-  }
-
-  return <TaskLibrary initialTasks={tasks} />;
+  return <TaskLibrary />;
 }
 
 export function StudioTicketsSection() {
@@ -45,15 +28,9 @@ export function StudioTicketsSection() {
       return result.data!;
     },
   });
-  const gamesQuery = useStudioGamesList([]);
 
   const batches = batchesQuery.data ?? [];
-  const games = gamesQuery.data ?? [];
-  const isInitialLoad =
-    (batchesQuery.isPending && batches.length === 0) ||
-    (gamesQuery.isPending && games.length === 0);
-
-  if (isInitialLoad) {
+  if (batchesQuery.isPending && batches.length === 0) {
     return <StudioListSkeleton rows={4} />;
   }
 
@@ -67,10 +44,10 @@ export function StudioTicketsSection() {
               : "Tickets konnten nicht geladen werden."
           }
         />
-        <TicketAccessPanel batches={[]} games={games} />
+        <TicketAccessPanel batches={[]} />
       </div>
     );
   }
 
-  return <TicketAccessPanel batches={batches} games={games} />;
+  return <TicketAccessPanel batches={batches} />;
 }

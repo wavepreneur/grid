@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   deleteTasks,
@@ -34,18 +34,23 @@ import {
   StudioSuccess,
 } from "@/components/cms/studio-ui";
 import {
+  taskListQueryKey,
   useRefreshStudioTasksList,
   useStudioTasksList,
   useTasksUsageMeta,
   type TaskWithUsage,
 } from "@/lib/hooks/use-studio-tasks";
+import type { StudioTask, TaskListPage } from "@/lib/cms/types";
+import { useDebouncedValue, useTaskLibraryTags } from "@/lib/hooks/use-task-library-search";
+import { StudioListSkeleton } from "@/components/cms/studio-list-skeletons";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
 import { queryKeys } from "@/lib/platform/query-keys";
 import { prefetchStudioTask } from "@/lib/hooks/use-studio-task-detail";
-import type { StudioTask } from "@/lib/cms/types";
 
 type TaskSort = "updated" | "created" | "name" | "live";
+const PAGE_SIZES = [20, 50, 100] as const;
+type PageSize = (typeof PAGE_SIZES)[number];
 
 const SORT_OPTIONS: Array<StudioSortOption<TaskSort>> = [
   {
@@ -103,16 +108,54 @@ function sortTasks(list: TaskWithUsage[], sort: TaskSort): TaskWithUsage[] {
 }
 
 type Props = {
-  initialTasks: StudioTask[];
+  initialTasks?: StudioTask[];
 };
 
-export function TaskLibrary({ initialTasks }: Props) {
+export function TaskLibrary(_props: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { orgSlug } = useStudioShell();
   const { alert } = useStudioConfirm();
   const refreshTasks = useRefreshStudioTasksList();
-  const { data: rawTasks = initialTasks } = useStudioTasksList(initialTasks);
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get("q") ?? "");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(20);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteIds, setDeleteIds] = useState<string[]>([]);
+  const [deleteStatuses, setDeleteStatuses] = useState<TaskDeleteStatus[]>([]);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [duplicateIds, setDuplicateIds] = useState<string[]>([]);
+  const [sort, setSort] = useState<TaskSort>("updated");
+
+  const tagFilter = searchParams.get("tag") ?? "";
+  const liveFilter = searchParams.get("live") ?? "";
+  const debouncedSearch = useDebouncedValue(search, 250);
+  const serverSort = sort === "live" ? "updated" : sort;
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, tagFilter, sort, pageSize]);
+
+  const listFilters = useMemo(
+    () => ({
+      page,
+      pageSize,
+      search: debouncedSearch,
+      tag: tagFilter,
+      sort: serverSort,
+    }),
+    [page, pageSize, debouncedSearch, tagFilter, serverSort],
+  );
+  const { data: pageData, isPending } = useStudioTasksList(listFilters);
+  const rawTasks = pageData?.tasks ?? [];
+  const total = pageData?.total ?? 0;
+  const { data: tagIndex } = useTaskLibraryTags();
+  const allTags = tagIndex?.tags ?? [];
   const taskIds = useMemo(() => rawTasks.map((t) => t.id), [rawTasks]);
   const { data: usageMeta = [] } = useTasksUsageMeta(taskIds);
   const usageByTask = useMemo(
@@ -132,44 +175,20 @@ export function TaskLibrary({ initialTasks }: Props) {
       }),
     [rawTasks, usageByTask],
   );
-  const searchParams = useSearchParams();
-  const [search, setSearch] = useState(searchParams.get("q") ?? "");
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteIds, setDeleteIds] = useState<string[]>([]);
-  const [deleteStatuses, setDeleteStatuses] = useState<TaskDeleteStatus[]>([]);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [duplicateOpen, setDuplicateOpen] = useState(false);
-  const [duplicateIds, setDuplicateIds] = useState<string[]>([]);
-  const [sort, setSort] = useState<TaskSort>("updated");
-
-  const tagFilter = searchParams.get("tag") ?? "";
-  const liveFilter = searchParams.get("live") ?? "";
-
-  const allTags = useMemo(
-    () => [...new Set(tasks.flatMap((t) => t.tags ?? []))].sort(),
-    [tasks],
-  );
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return tasks.filter((task) => {
-      if (tagFilter && !task.tags.includes(tagFilter)) return false;
       if (liveFilter === "live" && task.publishedGameCount === 0) return false;
       if (liveFilter === "offline" && task.publishedGameCount > 0) return false;
-      if (!q) return true;
-      return (
-        task.title.toLowerCase().includes(q) ||
-        task.slug.includes(q) ||
-        task.description.toLowerCase().includes(q) ||
-        task.tags.some((tag) => tag.toLowerCase().includes(q))
-      );
+      return true;
     });
-  }, [tasks, search, tagFilter, liveFilter]);
+  }, [tasks, liveFilter]);
 
   const sortedTasks = useMemo(() => sortTasks(filtered, sort), [filtered, sort]);
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const rangeStart = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(total, currentPage * pageSize);
 
   const allSelected =
     sortedTasks.length > 0 && sortedTasks.every((t) => selectedIds.has(t.id));
@@ -258,12 +277,18 @@ export function TaskLibrary({ initialTasks }: Props) {
       return result.data!;
     },
     onMutate: async (ids) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.tasks.list(orgSlug) });
-      const previous = queryClient.getQueryData<StudioTask[]>(queryKeys.tasks.list(orgSlug));
-      queryClient.setQueryData<StudioTask[]>(queryKeys.tasks.list(orgSlug), (old) =>
-        (old ?? []).filter((task) => !ids.includes(task.id)),
+      const key = taskListQueryKey(orgSlug, listFilters);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<TaskListPage>(key);
+      queryClient.setQueryData<TaskListPage>(key, (old) =>
+        old
+          ? {
+              tasks: old.tasks.filter((task) => !ids.includes(task.id)),
+              total: Math.max(0, old.total - ids.length),
+            }
+          : old,
       );
-      return { previous };
+      return { previous, key };
     },
     onSuccess: (data, ids) => {
       setSelectedIds((prev) => {
@@ -291,8 +316,8 @@ export function TaskLibrary({ initialTasks }: Props) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
     },
     onError: (err, _ids, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(queryKeys.tasks.list(orgSlug), context.previous);
+      if (context?.previous && context.key) {
+        queryClient.setQueryData(context.key, context.previous);
       }
       setDeleteError(err instanceof Error ? err.message : "Löschen fehlgeschlagen.");
     },
@@ -421,9 +446,11 @@ export function TaskLibrary({ initialTasks }: Props) {
         ) : null}
       </div>
 
-      {sortedTasks.length === 0 ? (
+      {isPending && rawTasks.length === 0 ? (
+        <StudioListSkeleton rows={6} />
+      ) : sortedTasks.length === 0 ? (
         <Empty>
-          {tasks.length === 0
+          {total === 0
             ? "Keine Aufgabe gefunden. Lege oben eine neue an."
             : "Keine Treffer für diese Filter."}
         </Empty>
@@ -440,14 +467,33 @@ export function TaskLibrary({ initialTasks }: Props) {
               <span className="text-sm text-muted-foreground">
                 {selectedIds.size > 0
                   ? `${selectedIds.size} ausgewählt`
-                  : `${sortedTasks.length} Aufgaben`}
+                  : `${total} Aufgaben`}
               </span>
             </div>
-            <StudioSortMenu
-              value={sort}
-              options={SORT_OPTIONS}
-              onChange={setSort}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex rounded-full border border-border bg-card p-1 shadow-soft" role="group" aria-label="Einträge pro Seite">
+                {PAGE_SIZES.map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => {
+                      setPageSize(size);
+                      setPage(1);
+                    }}
+                    className={`rounded-full px-3 py-1.5 text-xs font-bold tabular-nums ${
+                      pageSize === size ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+              <StudioSortMenu
+                value={sort}
+                options={SORT_OPTIONS}
+                onChange={setSort}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -530,6 +576,35 @@ export function TaskLibrary({ initialTasks }: Props) {
                 </div>
               </article>
             ))}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold tabular-nums text-muted-foreground">
+              {rangeStart}–{rangeEnd} von {total}
+              {debouncedSearch.trim() || tagFilter ? " Treffern" : ""}
+            </p>
+            <div className="flex items-center gap-2">
+              <StudioButton
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((value) => Math.max(1, value - 1))}
+              >
+                Zurück
+              </StudioButton>
+              <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+                Seite {currentPage} / {pageCount}
+              </span>
+              <StudioButton
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={currentPage >= pageCount}
+                onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
+              >
+                Weiter
+              </StudioButton>
+            </div>
           </div>
         </>
       )}

@@ -22,6 +22,7 @@ export const PACK_SLOT_MAX = 30;
 export const PACK_SEARCH_LIMIT = 40;
 export const COMPOSE_GAMES_MAX = 500;
 export const COMPOSE_L1_LIST_MAX = 2000;
+export type PackListSort = "updated" | "stale" | "name" | "name-desc";
 export const DUPLICATE_PACKS_MAX = 100;
 export const CREATE_CITIES_MAX = 2000;
 
@@ -41,6 +42,11 @@ export type StudioLayerPack = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+};
+
+export type LayerPackListPage = {
+  packs: StudioLayerPack[];
+  total: number;
 };
 
 export type StudioLayerPackItem = {

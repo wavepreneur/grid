@@ -4,7 +4,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
 import {
   DEFAULT_TASK_CONTENT,
+  type GameFilterInput,
+  type GameListPage,
+  type GameListSort,
   type StudioGame,
+  type StudioGamePickerItem,
   type StudioGameTaskLink,
   type StudioTask,
   type UpdateGameInput,
@@ -168,38 +172,117 @@ function slimListTranslations(raw: unknown) {
   return slim;
 }
 
-export async function listGames(): Promise<ActionResult<StudioGame[]>> {
+function sanitizeGameSearch(raw: string): string {
+  return raw.trim().replace(/[%_,()]/g, " ").replace(/\s+/g, " ").slice(0, 80);
+}
+
+function gameListOrder(sort: GameListSort | undefined): { column: string; ascending: boolean } {
+  if (sort === "created") return { column: "created_at", ascending: false };
+  if (sort === "name") return { column: "name", ascending: true };
+  if (sort === "status") return { column: "status", ascending: true };
+  if (sort === "language") return { column: "language", ascending: true };
+  return { column: "updated_at", ascending: false };
+}
+
+export async function listGames(
+  filters: GameFilterInput = {},
+): Promise<ActionResult<GameListPage>> {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
-    const games: StudioGame[] = [];
-    for (let from = 0; ; from += 1000) {
-      const { data, error } = await supabase
-        .from("studio_games")
-        .select(
-          "id, organization_id, slug, name, logo_url, language, translations, city_slug, runtime_profiles, layer1_pack_id, layer2_pack_id, layer3_pack_id, compose_recipe_id, status, published_version_number, is_template, created_at, updated_at",
-        )
-        .eq("organization_id", orgId)
-        .neq("is_template", true)
-        .order("updated_at", { ascending: false })
-        .order("id", { ascending: true })
-        .range(from, from + 999);
-      if (error) throw new Error(error.message);
-      for (const row of data ?? []) {
-        games.push(
+    const pageSize = Math.min(100, Math.max(1, filters.pageSize ?? 20));
+    const page = Math.max(1, filters.page ?? 1);
+    const from = (page - 1) * pageSize;
+    const order = gameListOrder(filters.sort);
+    let query = supabase
+      .from("studio_games")
+      .select(
+        "id, organization_id, slug, name, logo_url, language, translations, city_slug, runtime_profiles, layer1_pack_id, layer2_pack_id, layer3_pack_id, compose_recipe_id, status, published_version_number, is_template, created_at, updated_at",
+        { count: "exact" },
+      )
+      .eq("organization_id", orgId)
+      .neq("is_template", true);
+
+    if (filters.status && filters.status !== "alle") {
+      query = query.eq("status", filters.status);
+    } else {
+      query = query.neq("status", "archived");
+    }
+    if (filters.language && filters.language !== "alle") {
+      query = query.eq("language", filters.language);
+    }
+    if (filters.sourceIds && filters.sourceIds.length > 0) {
+      query = query.in("id", filters.sourceIds.slice(0, 100));
+    }
+    const search = sanitizeGameSearch(filters.search ?? "");
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,slug.ilike.%${search}%,city_slug.ilike.%${search}%`);
+    }
+
+    const { data, error, count } = await query
+      .order(order.column, { ascending: order.ascending })
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+
+    return {
+      success: true,
+      data: {
+        games: (data ?? []).map((row) =>
           normalizeGameRow({
             ...(row as StudioGame),
             translations: slimListTranslations((row as StudioGame).translations),
           }),
-        );
-      }
-      if ((data ?? []).length < 1000) break;
-    }
-    return { success: true, data: games };
+        ),
+        total: count ?? 0,
+      },
+    };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Games konnten nicht geladen werden.",
+    };
+  }
+}
+
+export async function searchStudioGames(input: {
+  search?: string;
+  publishedOnly?: boolean;
+  excludeCompose?: boolean;
+  limit?: number;
+} = {}): Promise<ActionResult<StudioGamePickerItem[]>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const limit = Math.min(40, Math.max(1, input.limit ?? 20));
+    let query = supabase
+      .from("studio_games")
+      .select(
+        "id, name, slug, city_slug, status, compose_recipe_id, published_version_number, is_template, layer1_pack_id, layer2_pack_id, layer3_pack_id",
+      )
+      .eq("organization_id", orgId)
+      .neq("is_template", true)
+      .neq("status", "archived")
+      .order("updated_at", { ascending: false })
+      .order("id", { ascending: true })
+      .limit(limit);
+    if (input.publishedOnly) {
+      query = query.eq("status", "published");
+    }
+    if (input.excludeCompose) {
+      query = query.is("compose_recipe_id", null);
+    }
+    const search = sanitizeGameSearch(input.search ?? "");
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,slug.ilike.%${search}%,city_slug.ilike.%${search}%`);
+    }
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return { success: true, data: (data ?? []) as StudioGamePickerItem[] };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Spiele konnten nicht geladen werden.",
     };
   }
 }
@@ -209,11 +292,13 @@ export async function listTemplates(): Promise<ActionResult<StudioGame[]>> {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
     const { data, error } = await supabase
-      .from("studio_games")
-      .select("*")
-      .eq("organization_id", orgId)
-      .eq("is_template", true)
-      .order("updated_at", { ascending: false });
+        .from("studio_games")
+        .select(
+          "id, organization_id, slug, name, logo_url, language, translations, city_slug, runtime_profiles, layer1_pack_id, layer2_pack_id, layer3_pack_id, compose_recipe_id, status, published_version_number, is_template, created_at, updated_at",
+        )
+        .eq("organization_id", orgId)
+        .eq("is_template", true)
+        .order("updated_at", { ascending: false });
 
     if (error) throw new Error(error.message);
     return {

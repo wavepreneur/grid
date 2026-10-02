@@ -5,7 +5,7 @@ import { getTasksGameUsage } from "@/app/actions/cms/delete";
 import { listTasks } from "@/app/actions/cms/tasks";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { queryKeys } from "@/lib/platform/query-keys";
-import type { StudioTask } from "@/lib/cms/types";
+import type { StudioTask, TaskFilterInput, TaskListPage } from "@/lib/cms/types";
 
 export type TaskWithUsage = StudioTask & {
   liveGameCount: number;
@@ -13,21 +13,27 @@ export type TaskWithUsage = StudioTask & {
   gameLinkCount: number;
 };
 
-export function useStudioTasksList(initialTasks: StudioTask[] = []) {
+export function taskListQueryKey(orgSlug: string, filters: TaskFilterInput = {}) {
+  return queryKeys.tasks.list(orgSlug, {
+    page: String(filters.page ?? 1),
+    pageSize: String(filters.pageSize ?? 20),
+    search: filters.search ?? "",
+    tag: filters.tag ?? "",
+    sort: filters.sort ?? "updated",
+  });
+}
+
+export function useStudioTasksList(filters: TaskFilterInput = {}) {
   const { orgSlug } = useStudioShell();
-  const hasSeed = initialTasks.length > 0;
 
   return useQuery({
-    queryKey: queryKeys.tasks.list(orgSlug),
+    queryKey: taskListQueryKey(orgSlug, filters),
     queryFn: async () => {
-      const result = await listTasks();
+      const result = await listTasks(filters);
       if (!result.success) throw new Error(result.error);
       return result.data!;
     },
-    // Never seed an empty array — that marks the query "fresh" and skips the fetch.
-    ...(hasSeed
-      ? { initialData: initialTasks, initialDataUpdatedAt: Date.now() }
-      : {}),
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -54,12 +60,9 @@ export function useInvalidateStudioTasks() {
 
 export function useRefreshStudioTasksList() {
   const queryClient = useQueryClient();
-  const { orgSlug } = useStudioShell();
   return async () => {
-    const result = await listTasks();
-    if (result.success && result.data) {
-      queryClient.setQueryData(queryKeys.tasks.list(orgSlug), result.data);
-    }
-    void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
   };
 }
+
+export type { TaskListPage };

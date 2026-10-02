@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { getLayerPack, saveGameAsLayerPacks } from "@/app/actions/cms/packs";
+import { GameSearchSelect } from "@/components/cms/games/game-search-select";
 import { StudioButton, StudioError, StudioInput, StudioLabel, StudioSuccess } from "@/components/cms/studio-ui";
-import { IconSearch } from "@/components/cms/studio-icons";
-import { inputCls } from "@/components/cms/ui";
 import { gameUsesLayerPacks, layerPackLabelDe } from "@/lib/cms/layer-packs";
-import type { StudioGame } from "@/lib/cms/types";
-import { useInvalidateStudioGames, useStudioGamesList } from "@/lib/hooks/use-studio-games";
+import type { StudioGamePickerItem } from "@/lib/cms/types";
+import { useInvalidateStudioGames } from "@/lib/hooks/use-studio-games";
 import { useInvalidateStudioPacks } from "@/lib/hooks/use-studio-packs";
 
-function defaultPartNames(game: StudioGame) {
+function defaultPartNames(game: StudioGamePickerItem) {
   const city = game.city_slug
     ? game.city_slug
         .split("-")
@@ -26,47 +25,29 @@ function defaultPartNames(game: StudioGame) {
 }
 
 export function SplitGamePanel() {
-  const gamesQuery = useStudioGamesList();
   const invalidatePacks = useInvalidateStudioPacks();
   const invalidateGames = useInvalidateStudioGames();
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
-  const [gameId, setGameId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<StudioGamePickerItem | null>(null);
   const [layer1, setLayer1] = useState("");
   const [layer2, setLayer2] = useState("");
   const [layer3, setLayer3] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-
-  const sourceGames = useMemo(
-    () => (gamesQuery.data ?? []).filter((game) => !game.compose_recipe_id && game.status !== "archived"),
-    [gamesQuery.data],
-  );
-  const selected = sourceGames.find((game) => game.id === gameId) ?? null;
   const alreadySplit = selected ? gameUsesLayerPacks(selected) : false;
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase("de");
-    if (!needle) return sourceGames;
-    return sourceGames.filter((game) => {
-      const hay = `${game.name} ${game.slug} ${game.city_slug ?? ""}`.toLocaleLowerCase("de");
-      return hay.includes(needle);
-    });
-  }, [query, sourceGames]);
 
   useEffect(() => {
-    const game = sourceGames.find((row) => row.id === gameId);
-    if (!game) return;
-    const defaults = defaultPartNames(game);
+    if (!selected) return;
+    const defaults = defaultPartNames(selected);
     setLayer1(defaults.layer1);
     setLayer2(defaults.layer2);
     setLayer3(defaults.layer3);
-    if (!gameUsesLayerPacks(game)) return;
+    if (!gameUsesLayerPacks(selected)) return;
     let cancelled = false;
     void Promise.all([
-      game.layer1_pack_id ? getLayerPack(game.layer1_pack_id) : null,
-      game.layer2_pack_id ? getLayerPack(game.layer2_pack_id) : null,
-      game.layer3_pack_id ? getLayerPack(game.layer3_pack_id) : null,
+      selected.layer1_pack_id ? getLayerPack(selected.layer1_pack_id) : null,
+      selected.layer2_pack_id ? getLayerPack(selected.layer2_pack_id) : null,
+      selected.layer3_pack_id ? getLayerPack(selected.layer3_pack_id) : null,
     ]).then(([one, two, three]) => {
       if (cancelled) return;
       if (one?.success && one.data) setLayer1(one.data.pack.name);
@@ -76,15 +57,7 @@ export function SplitGamePanel() {
     return () => {
       cancelled = true;
     };
-  }, [gameId, sourceGames]);
-
-  function pickGame(game: StudioGame) {
-    setGameId(game.id);
-    setQuery(game.name);
-    setOpen(false);
-    setError(null);
-    setMessage(null);
-  }
+  }, [selected]);
 
   function split() {
     if (!selected) return;
@@ -133,57 +106,15 @@ export function SplitGamePanel() {
 
       <div className="relative mt-5 max-w-xl">
         <StudioLabel>Getestetes Spiel</StudioLabel>
-        {open ? (
-          <button
-            type="button"
-            aria-label="Liste schließen"
-            className="fixed inset-0 z-10 cursor-default"
-            onClick={() => setOpen(false)}
-          />
-        ) : null}
-        <div className="relative z-20">
-          <IconSearch className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setOpen(true);
-              if (selected && e.target.value !== selected.name) setGameId(null);
-            }}
-            onFocus={() => setOpen(true)}
-            placeholder="Spiel suchen…"
-            className={`${inputCls} mt-0 border-0 bg-secondary pl-11 shadow-none`}
-          />
-        </div>
-        {open ? (
-          <div className="absolute z-20 mt-2 max-h-72 w-full overflow-y-auto rounded-2xl bg-card p-2 shadow-soft">
-            {gamesQuery.isPending ? (
-              <p className="px-3 py-4 text-sm text-muted-foreground">Spiele laden…</p>
-            ) : filtered.length === 0 ? (
-              <p className="px-3 py-4 text-sm text-muted-foreground">
-                Kein passendes Spiel. Lege zuerst unter Spiele eine Mahlzeit an und teste sie.
-              </p>
-            ) : (
-              filtered.slice(0, 20).map((game) => (
-                <button
-                  key={game.id}
-                  type="button"
-                  onClick={() => pickGame(game)}
-                  className={`flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left ${
-                    game.id === gameId ? "bg-primary text-primary-foreground" : "hover:bg-secondary"
-                  }`}
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate font-semibold">{game.name}</span>
-                    <span className={`block text-xs ${game.id === gameId ? "opacity-80" : "text-muted-foreground"}`}>
-                      {gameUsesLayerPacks(game) ? "schon geteilt" : "komplett · bereit zum Teilen"}
-                    </span>
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-        ) : null}
+        <GameSearchSelect
+          value={selected}
+          onChange={setSelected}
+          excludeCompose
+          placeholder="Spiel suchen…"
+          hintFor={(game) =>
+            gameUsesLayerPacks(game) ? "schon geteilt" : "komplett · bereit zum Teilen"
+          }
+        />
       </div>
 
       {selected ? (

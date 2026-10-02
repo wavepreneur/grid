@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createLayerPack, deleteLayerPack, duplicateLayerPacks, relinkOrtPacksToExitmania, seedOrtPacksFromMunich, updateLayerPack } from "@/app/actions/cms/packs";
@@ -22,14 +22,16 @@ import { IconAlpha, IconClock, IconCopy, IconPlus, IconSearch, IconTrash } from 
 import { inputCls } from "@/components/cms/ui";
 import { cityLabelDe, type DirectoryCity } from "@/lib/cms/city-directory";
 import type { StudioLayer } from "@/lib/cms/layer-model";
-import { layerPackHintDe, layerPackTitleDe, type StudioLayerPack } from "@/lib/cms/layer-packs";
+import { layerPackHintDe, layerPackTitleDe, type PackListSort, type StudioLayerPack } from "@/lib/cms/layer-packs";
 import { useInvalidateStudioPacks, useStudioLayerPacks } from "@/lib/hooks/use-studio-packs";
+import { useDebouncedValue } from "@/lib/hooks/use-task-library-search";
+import { StudioListSkeleton } from "@/components/cms/studio-list-skeletons";
 
 const LAYERS: StudioLayer[] = [1, 2, 3];
 const PAGE_SIZES = [20, 50, 100] as const;
 type PageSize = (typeof PAGE_SIZES)[number];
 
-type PackSort = "updated" | "stale" | "name" | "name-desc";
+type PackSort = PackListSort;
 
 const SORT_OPTIONS: Array<StudioSortOption<PackSort>> = [
   {
@@ -64,31 +66,6 @@ function layerCountLabel(layer: StudioLayer, count: number): string {
   return count === 1 ? "1 Team" : `${count} Teams`;
 }
 
-function packMatchesSearch(pack: StudioLayerPack, query: string): boolean {
-  if (!query) return true;
-  const hay = `${pack.name} ${pack.slug} ${pack.city_slug ?? ""}`.toLocaleLowerCase("de");
-  return hay.includes(query);
-}
-
-function sortPacks(list: StudioLayerPack[], sort: PackSort): StudioLayerPack[] {
-  const next = [...list];
-  switch (sort) {
-    case "stale":
-      return next.sort(
-        (a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime(),
-      );
-    case "name":
-      return next.sort((a, b) => a.name.localeCompare(b.name, "de", { numeric: true, sensitivity: "base" }));
-    case "name-desc":
-      return next.sort((a, b) => b.name.localeCompare(a.name, "de", { numeric: true, sensitivity: "base" }));
-    case "updated":
-    default:
-      return next.sort(
-        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-      );
-  }
-}
-
 export function PackCatalog() {
   const router = useRouter();
   const invalidate = useInvalidateStudioPacks();
@@ -97,8 +74,16 @@ export function PackCatalog() {
   const [sort, setSort] = useState<PackSort>("updated");
   const [pageSize, setPageSize] = useState<PageSize>(20);
   const [page, setPage] = useState(1);
-  const packsQuery = useStudioLayerPacks(layer);
-  const packs = packsQuery.data ?? [];
+  const searchQuery = useDebouncedValue(search, 250);
+  const packsQuery = useStudioLayerPacks({
+    layer,
+    search: searchQuery,
+    page,
+    pageSize,
+    sort,
+  });
+  const packs = packsQuery.data?.packs ?? [];
+  const total = packsQuery.data?.total ?? 0;
   const [name, setName] = useState("");
   const [city, setCity] = useState<DirectoryCity | null>(null);
   const [packKind, setPackKind] = useState<"outdoor" | "indoor">("outdoor");
@@ -111,20 +96,13 @@ export function PackCatalog() {
   const [deleteTarget, setDeleteTarget] = useState<StudioLayerPack | null>(null);
   const [extraOpen, setExtraOpen] = useState(false);
 
-  const filtered = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase("de");
-    if (!query) return packs;
-    return packs.filter((pack) => packMatchesSearch(pack, query));
-  }, [packs, search]);
-  const sorted = useMemo(() => sortPacks(filtered, sort), [filtered, sort]);
-  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, sort, pageSize, layer]);
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.min(page, pageCount);
-  const visible = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return sorted.slice(start, start + pageSize);
-  }, [sorted, currentPage, pageSize]);
-  const rangeStart = sorted.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const rangeEnd = Math.min(currentPage * pageSize, sorted.length);
+  const rangeStart = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(currentPage * pageSize, total);
 
   function handleCreate() {
     setError(null);
@@ -167,7 +145,7 @@ export function PackCatalog() {
         <p className="mt-1 text-sm text-muted-foreground">
           {packsQuery.isPending && packs.length === 0
             ? layerPackHintDe(layer)
-            : `${layerCountLabel(layer, packs.length)} hinterlegt. ${layerPackHintDe(layer)}`}
+            : `${layerCountLabel(layer, total)} hinterlegt. ${layerPackHintDe(layer)}`}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {LAYERS.map((id) => (
@@ -188,7 +166,7 @@ export function PackCatalog() {
             >
               {layerPackTitleDe(id)}
               {id === layer && !packsQuery.isPending ? (
-                <span className="ml-1.5 tabular-nums font-semibold opacity-80">{packs.length}</span>
+                <span className="ml-1.5 tabular-nums font-semibold opacity-80">{total}</span>
               ) : null}
             </button>
           ))}
@@ -282,11 +260,11 @@ export function PackCatalog() {
                 ? "Deine benannten Orte. Im Rezept oben wählst du sie über Ort."
                 : "Die Namen, die du beim Aufteilen vergeben hast. Im Rezept oben wählst du sie über Mission oder Team."}
             </StudioHint>
-            {packs.length > 0 ? (
+            {total > 0 || search.trim() ? (
               <p className="mt-2 text-sm font-semibold tabular-nums">
                 {search.trim()
-                  ? `${sorted.length} Treffer · ${layerCountLabel(layer, packs.length)} hinterlegt`
-                  : `${layerCountLabel(layer, packs.length)} hinterlegt`}
+                  ? `${total} Treffer`
+                  : `${layerCountLabel(layer, total)} hinterlegt`}
               </p>
             ) : null}
           </div>
@@ -320,13 +298,13 @@ export function PackCatalog() {
         </div>
         <div className="mt-3 space-y-2">
           {packsQuery.isPending && packs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Laden…</p>
-          ) : sorted.length === 0 ? (
+            <StudioListSkeleton rows={4} />
+          ) : total === 0 ? (
             <p className="text-sm text-muted-foreground">
               {search.trim() ? "Kein Treffer in der gesamten Liste." : "Noch kein Bestandteil. Teile zuerst ein Spiel."}
             </p>
           ) : (
-            visible.map((pack) => (
+            packs.map((pack) => (
               <PackCatalogRow
                 key={pack.id}
                 pack={pack}
@@ -353,11 +331,11 @@ export function PackCatalog() {
             ))
           )}
         </div>
-        {sorted.length > 0 ? (
+        {total > 0 ? (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold tabular-nums text-muted-foreground">
-              {rangeStart}–{rangeEnd} von {sorted.length}
-              {search.trim() ? ` Treffern · ${packs.length} hinterlegt` : ""}
+              {rangeStart}–{rangeEnd} von {total}
+              {search.trim() ? " Treffern" : ""}
             </p>
             <div className="flex items-center gap-2">
               <StudioButton
@@ -435,14 +413,15 @@ export function PackCatalog() {
         }
         onConfirm={() => {
           if (!deleteTarget) return;
+          const id = deleteTarget.id;
+          setDeleteOpen(false);
+          setDeleteTarget(null);
           startTransition(async () => {
-            const result = await deleteLayerPack(deleteTarget.id);
+            const result = await deleteLayerPack(id);
             if (!result.success) {
               setError(result.error);
               return;
             }
-            setDeleteOpen(false);
-            setDeleteTarget(null);
             setMessage("Bestandteil gelöscht.");
             invalidate();
           });

@@ -1,18 +1,39 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getLayerPack, listComposeRecipes, listLayerPacks } from "@/app/actions/cms/packs";
+import { getLayerPack, listComposeRecipes, listLayerPacksPage } from "@/app/actions/cms/packs";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
-import { COMPOSE_L1_LIST_MAX } from "@/lib/cms/layer-packs";
+import type { PackListSort } from "@/lib/cms/layer-packs";
 import type { StudioLayer } from "@/lib/cms/layer-model";
 import { queryKeys } from "@/lib/platform/query-keys";
 
-export function useStudioLayerPacks(layer: StudioLayer) {
+export type PackListFilters = {
+  layer: StudioLayer;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+  sort?: PackListSort;
+};
+
+export function packListQueryKey(orgSlug: string, filters: PackListFilters) {
+  return queryKeys.packs.list(
+    orgSlug,
+    filters.layer,
+    [
+      filters.search ?? "",
+      String(filters.page ?? 1),
+      String(filters.pageSize ?? 20),
+      filters.sort ?? "updated",
+    ].join("|"),
+  );
+}
+
+export function useStudioLayerPacks(filters: PackListFilters) {
   const { orgSlug } = useStudioShell();
   return useQuery({
-    queryKey: queryKeys.packs.list(orgSlug, layer),
+    queryKey: packListQueryKey(orgSlug, filters),
     queryFn: async () => {
-      const result = await listLayerPacks({ layer, limit: layer === 1 ? COMPOSE_L1_LIST_MAX : 200 });
+      const result = await listLayerPacksPage(filters);
       if (!result.success) throw new Error(result.error);
       return result.data!;
     },

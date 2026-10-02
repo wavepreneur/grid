@@ -49,24 +49,16 @@ function uniqueIds(values: Array<string | null | undefined>): string[] {
   return [...new Set(values.filter((id): id is string => Boolean(id)))];
 }
 
-const ARCHIVE_RETENTION_DAYS = 30;
-
 export async function listAccessBatches(): Promise<ActionResult<StudioAccessBatchView[]>> {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
-    const cutoff = new Date(Date.now() - ARCHIVE_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
-
-    await supabase
-      .from("studio_access_codes")
-      .delete()
-      .eq("organization_id", orgId)
-      .eq("status", "revoked")
-      .lt("revoked_at", cutoff);
 
     const { data: batches, error } = await supabase
       .from("studio_access_batches")
-      .select("*")
+      .select(
+        "id, name, kind, game_id, event_id, max_activations, used_activations, players_per_team, valid_until, created_at",
+      )
       .eq("organization_id", orgId)
       .order("created_at", { ascending: false });
 
@@ -81,7 +73,9 @@ export async function listAccessBatches(): Promise<ActionResult<StudioAccessBatc
       await Promise.all([
         supabase
           .from("studio_access_codes")
-          .select("*")
+          .select(
+            "id, batch_id, code, kind, status, team_id, redeemed_at, last_joined_at, revoked_at, valid_from, valid_until",
+          )
           .in("batch_id", batchIds)
           .order("created_at", { ascending: true }),
         gameIds.length > 0

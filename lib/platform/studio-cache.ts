@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { queryKeys } from "@/lib/platform/query-keys";
-import type { StudioGame, StudioGameTaskLink, StudioTask, StudioTicketPool } from "@/lib/cms/types";
+import type { GameListPage, StudioGame, StudioGameTaskLink, StudioTask, StudioTicketPool } from "@/lib/cms/types";
 
 export function useStudioCache() {
   const queryClient = useQueryClient();
@@ -12,8 +12,15 @@ export function useStudioCache() {
   return {
     setGame(game: StudioGame) {
       queryClient.setQueryData(queryKeys.games.detail(game.id), game);
-      queryClient.setQueryData<StudioGame[]>(queryKeys.games.list(orgSlug), (old) =>
-        old?.map((entry) => (entry.id === game.id ? game : entry)),
+      queryClient.setQueriesData<GameListPage>(
+        { queryKey: [...queryKeys.games.all, "list"] },
+        (old) =>
+          old?.games
+            ? {
+                ...old,
+                games: old.games.map((entry) => (entry.id === game.id ? { ...entry, ...game } : entry)),
+              }
+            : old,
       );
       queryClient.setQueryData<StudioGame[]>(queryKeys.games.templates(orgSlug), (old) =>
         old?.map((entry) => (entry.id === game.id ? game : entry)),
@@ -24,8 +31,15 @@ export function useStudioCache() {
       queryClient.setQueryData<StudioGame>(queryKeys.games.detail(gameId), (old) =>
         old ? { ...old, ...patch } : old,
       );
-      queryClient.setQueryData<StudioGame[]>(queryKeys.games.list(orgSlug), (old) =>
-        old?.map((entry) => (entry.id === gameId ? { ...entry, ...patch } : entry)),
+      queryClient.setQueriesData<GameListPage>(
+        { queryKey: [...queryKeys.games.all, "list"] },
+        (old) =>
+          old?.games
+            ? {
+                ...old,
+                games: old.games.map((entry) => (entry.id === gameId ? { ...entry, ...patch } : entry)),
+              }
+            : old,
       );
       queryClient.setQueryData<StudioGame[]>(queryKeys.games.templates(orgSlug), (old) =>
         old?.map((entry) => (entry.id === gameId ? { ...entry, ...patch } : entry)),
@@ -51,8 +65,15 @@ export function useStudioCache() {
     removeGame(gameId: string) {
       queryClient.removeQueries({ queryKey: queryKeys.games.detail(gameId) });
       queryClient.removeQueries({ queryKey: queryKeys.games.taskLinks(gameId) });
-      queryClient.setQueryData<StudioGame[]>(queryKeys.games.list(orgSlug), (old) =>
-        old?.filter((entry) => entry.id !== gameId),
+      queryClient.setQueriesData<GameListPage>(
+        { queryKey: [...queryKeys.games.all, "list"] },
+        (old) =>
+          old?.games
+            ? {
+                games: old.games.filter((entry) => entry.id !== gameId),
+                total: Math.max(0, old.total - 1),
+              }
+            : old,
       );
       queryClient.setQueryData<StudioGame[]>(queryKeys.games.templates(orgSlug), (old) =>
         old?.filter((entry) => entry.id !== gameId),
@@ -61,14 +82,7 @@ export function useStudioCache() {
 
     setTask(task: StudioTask) {
       queryClient.setQueryData(queryKeys.tasks.detail(task.id), task);
-      queryClient.setQueryData<StudioTask[]>(queryKeys.tasks.list(orgSlug), (old) => {
-        if (!old) return old;
-        const index = old.findIndex((entry) => entry.id === task.id);
-        if (index === -1) return [task, ...old];
-        const next = [...old];
-        next[index] = task;
-        return next;
-      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
     },
 
     invalidateTasks() {

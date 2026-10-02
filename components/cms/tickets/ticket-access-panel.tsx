@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { GameSearchSelect } from "@/components/cms/games/game-search-select";
+import type { StudioGamePickerItem } from "@/lib/cms/types";
 import {
   appendAccessCodes,
   createAccessBatch,
@@ -20,13 +22,11 @@ import {
   StudioSectionTitle,
   StudioSelect,
 } from "@/components/cms/studio-ui";
-import type { StudioGame } from "@/lib/cms/types";
 import type { AccessStatus } from "@/lib/grid/access";
 import { formatTeamSeatPreview, splitTeamSeats } from "@/lib/grid/team-seats";
 
 type Props = {
   batches: StudioAccessBatchView[];
-  games: StudioGame[];
 };
 
 const STATUS_LABEL: Record<AccessStatus, string> = {
@@ -95,16 +95,13 @@ function downloadCsv(batch: StudioAccessBatchView) {
   URL.revokeObjectURL(url);
 }
 
-export function TicketAccessPanel({ batches, games }: Props) {
+export function TicketAccessPanel({ batches }: Props) {
   const cache = useStudioCache();
-  const published = useMemo(
-    () => games.filter((g) => !g.is_template && g.status === "published" && g.published_version_number > 0),
-    [games],
-  );
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [gameId, setGameId] = useState(published[0]?.id ?? "");
+  const [selectedGame, setSelectedGame] = useState<StudioGamePickerItem | null>(null);
+  const gameId = selectedGame?.id ?? "";
   const [name, setName] = useState("");
   const [kind, setKind] = useState<"team" | "event_pool">("team");
   const [teamCount, setTeamCount] = useState("3");
@@ -144,6 +141,7 @@ export function TicketAccessPanel({ batches, games }: Props) {
       }
       setOpen(false);
       setName("");
+      setSelectedGame(null);
       cache.invalidateTickets();
     });
   }
@@ -185,21 +183,19 @@ export function TicketAccessPanel({ batches, games }: Props) {
               <StudioError message={error} />
             </div>
           ) : null}
-          {published.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Veröffentliche zuerst ein Spiel. Entwürfe können keine Tickets bekommen.
-            </p>
-          ) : (
-            <div className="space-y-4">
+          <div className="space-y-4">
               <div>
                 <StudioLabel>Spiel</StudioLabel>
-                <StudioSelect value={gameId} onChange={(e) => setGameId(e.target.value)} required>
-                  {published.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </StudioSelect>
+                <GameSearchSelect
+                  value={selectedGame}
+                  onChange={setSelectedGame}
+                  publishedOnly
+                  placeholder="Veröffentlichtes Spiel suchen…"
+                  hintFor={(game) => game.slug}
+                />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Nur veröffentlichte Spiele. Entwürfe können keine Tickets bekommen.
+                </p>
               </div>
               <div>
                 <StudioLabel>Name</StudioLabel>
@@ -272,11 +268,10 @@ export function TicketAccessPanel({ batches, games }: Props) {
                 />
               </div>
             </div>
-          )}
           <div className="mt-6 flex flex-wrap gap-3">
             <StudioButton
               type="submit"
-              disabled={pending || published.length === 0 || (kind === "team" && !seatSplit.ok)}
+              disabled={pending || !gameId || (kind === "team" && !seatSplit.ok)}
               icon={<IconPlus size={16} />}
             >
               {pending ? "Erzeuge…" : "Codes erzeugen"}
