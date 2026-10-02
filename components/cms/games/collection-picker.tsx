@@ -32,8 +32,12 @@ export function CollectionPicker({
     setSaving(true);
     try {
       const result = await createStudioCollection({ name });
-      if (!result.success || !result.data) {
+      if (!result.success) {
         setError(result.error ?? "Collection konnte nicht erstellt werden.");
+        return;
+      }
+      if (!result.data) {
+        setError("Collection konnte nicht erstellt werden.");
         return;
       }
       onCreated?.(result.data);

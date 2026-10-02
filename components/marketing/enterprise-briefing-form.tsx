@@ -15,9 +15,10 @@ export function EnterpriseBriefingForm() {
     const email = String(form.get("email") ?? "");
     const company = String(form.get("organization") ?? "");
     const note = [
+      "Demo — no obligation",
       form.get("title"),
+      form.get("plan"),
       form.get("workforce"),
-      form.get("regions"),
       form.get("useCase"),
     ]
       .map((value) => String(value ?? "").trim())
@@ -25,7 +26,7 @@ export function EnterpriseBriefingForm() {
       .join(" · ");
     setError(null);
     startTransition(async () => {
-      const result = await submitGridDemoRequest({ name, email, company, note });
+      const result = await submitGridDemoRequest({ name, email, company, note, language: "en" });
       if (!result.success) {
         setError(result.error);
         return;
@@ -37,18 +38,12 @@ export function EnterpriseBriefingForm() {
   if (submitted) {
     return (
       <div
-        style={{
-          textAlign: "center",
-          padding: "48px 24px",
-          borderRadius: 16,
-          border: "1px solid rgba(0,229,255,0.2)",
-          background: "rgba(0,229,255,0.04)",
-        }}
+        className="grid-card"
+        style={{ textAlign: "center", padding: "48px 24px" }}
       >
-        <p style={{ fontSize: 18, fontWeight: 700, color: "#f0f4ff" }}>Access request received.</p>
-        <p style={{ marginTop: 12, fontSize: 14, color: "rgba(240,244,255,0.45)", lineHeight: 1.6 }}>
-          We review every request. If the fit is there, you hear from us within 24 hours — with
-          keys, not a checkout link.
+        <p style={{ fontSize: 20, fontWeight: 800 }}>We have it.</p>
+        <p className="grid-body" style={{ marginTop: 12 }}>
+          We reply within 24 hours.
         </p>
       </div>
     );
@@ -57,26 +52,20 @@ export function EnterpriseBriefingForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      style={{
-        display: "grid",
-        gap: 16,
-        padding: 32,
-        borderRadius: 16,
-        border: "1px solid rgba(0,229,255,0.15)",
-        background: "rgba(0,0,0,0.35)",
-      }}
+      className="grid-card"
+      style={{ display: "grid", gap: 16, padding: 32 }}
     >
       <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
         <label>
-          <span className="grid-input-label">Full Name *</span>
+          <span className="grid-input-label">Full name *</span>
           <input className="grid-input" name="name" required />
         </label>
         <label>
-          <span className="grid-input-label">Job Title *</span>
+          <span className="grid-input-label">Job title *</span>
           <input className="grid-input" name="title" required />
         </label>
         <label>
-          <span className="grid-input-label">Corporate Email *</span>
+          <span className="grid-input-label">Work email *</span>
           <input className="grid-input" type="email" name="email" required />
         </label>
         <label>
@@ -86,43 +75,43 @@ export function EnterpriseBriefingForm() {
       </div>
       <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
         <label>
-          <span className="grid-input-label">Global Workforce *</span>
-          <select className="grid-input" name="workforce" required defaultValue="">
-            <option value="" disabled>
-              Select headcount
-            </option>
-            <option>Under 500</option>
-            <option>500 – 2,000</option>
-            <option>2,000 – 5,000</option>
-            <option>5,000 – 20,000</option>
-            <option>20,000 – 50,000</option>
-            <option>50,000+</option>
-            <option>Partner / product team</option>
+          <span className="grid-input-label">Who will play</span>
+          <select className="grid-input" name="workforce" defaultValue="">
+            <option value="">Select a range</option>
+            <option>A few teams this quarter</option>
+            <option>Monthly rooms, under 100 people</option>
+            <option>Company-wide, 100–1,000</option>
+            <option>Several countries, 1,000+</option>
+            <option>Up to 50,000</option>
           </select>
         </label>
         <label>
-          <span className="grid-input-label">Active Countries / Regions</span>
-          <input className="grid-input" name="regions" placeholder="e.g. DACH, UK, Nordics" />
+          <span className="grid-input-label">Plan you have in mind</span>
+          <select className="grid-input" name="plan" defaultValue="">
+            <option value="">Not sure yet</option>
+            <option>Start — 3 teams / 4 people</option>
+            <option>Team — 12 teams / 8 people</option>
+            <option>Company — 50 teams / 10 people</option>
+            <option>Enterprise — up to 50,000</option>
+          </select>
         </label>
         <label>
-          <span className="grid-input-label">Primary Use Case</span>
+          <span className="grid-input-label">What you want to see</span>
           <select className="grid-input" name="useCase" defaultValue="">
-            <option value="">Select use case (optional)</option>
-            <option>City / on-site team event</option>
-            <option>Company-wide program</option>
-            <option>Our own page or Slack</option>
-            <option>We need proof the team did the work</option>
+            <option value="">Select (optional)</option>
+            <option>How we make a session yours</option>
+            <option>How people join</option>
+            <option>What leadership sees</option>
+            <option>We already played a public session</option>
             <option>Other</option>
           </select>
         </label>
       </div>
-      <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 12, color: "rgba(240,244,255,0.45)" }}>
+      <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "var(--grid-muted)" }}>
         <input type="checkbox" required style={{ marginTop: 3 }} />
         <span>I agree to be contacted by The GRID.</span>
       </label>
-      {error ? (
-        <p style={{ fontSize: 13, color: "#fda4af" }}>{error}</p>
-      ) : null}
+      {error ? <p style={{ fontSize: 13, color: "#b42318" }}>{error}</p> : null}
       <button
         type="submit"
         disabled={pending}
@@ -131,7 +120,7 @@ export function EnterpriseBriefingForm() {
       >
         {pending ? "Sending…" : "Talk to The GRID"}
       </button>
-      <p style={{ fontSize: 11, color: "rgba(240,244,255,0.35)" }}>
+      <p className="grid-body" style={{ fontSize: 12 }}>
         Access is granted · Response within 24 hours · Mutual NDA available
       </p>
     </form>

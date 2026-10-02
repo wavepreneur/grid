@@ -7,16 +7,18 @@ import { useLayoutEffect, useState, type ComponentType, type MouseEvent, type Re
 import type { LucideProps } from "lucide-react";
 import {
   Activity,
-  ArrowLeft,
   BarChart3,
   Code2,
   Layers,
   LayoutGrid,
+  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Puzzle,
   Ticket,
+  UserRound,
 } from "lucide-react";
+import { logoutPortal } from "@/app/actions/portal-login";
 import { OrgSwitcher } from "@/components/cms/org-switcher";
 import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
@@ -49,6 +51,13 @@ const NAV: NavItem[] = [
     note: "Alles auf einen Blick",
     icon: LayoutGrid,
     match: (p) => p === "/admin" || p === "/admin/",
+  },
+  {
+    href: "/admin/settings",
+    label: "Profil",
+    note: "Name, Email, Passwort",
+    icon: UserRound,
+    match: (p) => p.startsWith("/admin/settings"),
   },
   {
     href: "/admin/tasks",
@@ -359,9 +368,11 @@ export function StudioLayout({ children }: { children: ReactNode }) {
       <div className="lg:hidden">
         <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
           <p className="text-xl font-bold">GRID</p>
-          <Link href="/" className="text-sm font-semibold text-primary">
-            Spieleransicht
-          </Link>
+          <form action={logoutPortal}>
+            <button type="submit" className="text-sm font-semibold text-primary">
+              Logout
+            </button>
+          </form>
         </div>
         <div className="border-b border-border bg-card px-4 py-2.5">
           <OrgSwitcher
@@ -465,20 +476,18 @@ export function StudioLayout({ children }: { children: ReactNode }) {
               {!(hydrated && collapsed) ? (
                 <OrgSwitcher organizations={organizations} currentSlug={orgSlug} />
               ) : null}
-              <Link
-                href="/"
-                title="Zur Spieleransicht"
-                className={`tap-lift flex items-center rounded-2xl bg-secondary text-sm font-semibold ${
-                  hydrated && collapsed
-                    ? "h-11 w-11 justify-center"
-                    : "gap-2 px-3 py-3"
-                }`}
-              >
-                <ArrowLeft className="h-4 w-4" strokeWidth={2} />
-                {!(hydrated && collapsed) ? <span>Zur Spieleransicht</span> : (
-                  <span className="sr-only">Zur Spieleransicht</span>
-                )}
-              </Link>
+              <form action={logoutPortal} className="w-full">
+                <button
+                  type="submit"
+                  title="Logout"
+                  className={`tap-lift flex w-full items-center rounded-2xl bg-secondary text-sm font-semibold ${
+                    hydrated && collapsed ? "h-11 w-11 justify-center" : "gap-2 px-3 py-3"
+                  }`}
+                >
+                  <LogOut className="h-4 w-4" strokeWidth={2} />
+                  {!(hydrated && collapsed) ? <span>Logout</span> : <span className="sr-only">Logout</span>}
+                </button>
+              </form>
             </div>
           </div>
         </aside>

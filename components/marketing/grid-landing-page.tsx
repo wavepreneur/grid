@@ -1,96 +1,37 @@
-import fs from "fs";
-import path from "path";
 import Link from "next/link";
+import { MousePointerClick, Scale, Trophy } from "lucide-react";
 import { EnterpriseBriefingForm } from "@/components/marketing/enterprise-briefing-form";
-import { EuropeDeploymentMap } from "@/components/marketing/europe-deployment-map";
+import { GridBenefits } from "@/components/marketing/grid-benefits";
 import { GridFaq } from "@/components/marketing/grid-faq";
+import { GridHeroLive } from "@/components/marketing/grid-hero-live";
 import { GridHowItWorks } from "@/components/marketing/grid-how-it-works";
 import { GridMarketingFooter } from "@/components/marketing/grid-marketing-footer";
 import { GridNav } from "@/components/marketing/grid-nav";
+import { GridPricing } from "@/components/marketing/grid-pricing";
+import { GridReveal } from "@/components/marketing/grid-reveal";
 import "@/app/grid-marketing.css";
 
 const problems = [
   {
-    title: "Someone still has to run the back room",
-    text: "Codes, maps, who is stuck, who finished. If a person has to watch that, the event does not scale — and the cost sits on every booking.",
+    title: "A few clicks cannot start a thousand people",
+    text: "Self-guided team events for large groups still need a host, a briefing, and a week of setup. Nobody starts that on a Friday afternoon.",
+    icon: MousePointerClick,
   },
   {
     title: "Afterward you only have a winner",
-    text: "Most tools rank individuals. You get a photo and a high score. You do not know if the team understood the task, stalled, or never reached the place.",
+    text: "A photo. A high score. You do not learn if the team worked, where to improve, or how countries and departments actually play together.",
+    icon: Trophy,
   },
   {
-    title: "Street, building, and laptop are three products",
-    text: "Outdoor in one tool. Indoor in another. Online in a third. Ten people on Saturday and thousands over a year never live in the same system — so nothing adds up.",
+    title: "Scale and insight never meet",
+    text: "Tools that scale have no record. Tools with a record do not scale. The room of twelve is staffed. The room of a thousand is empty.",
+    icon: Scale,
   },
 ];
-
-const benefits = [
-  {
-    n: "01",
-    title: "The event starts when they open the link",
-    text: "No install. No account. No ticket to IT. You keep the budget that used to pay people to babysit software.",
-    accent: "#00e5ff",
-  },
-  {
-    n: "02",
-    title: "They play. You see the team.",
-    text: "It feels like a game. Afterward you see if the task landed, where the group broke, whether they were actually there, and if the roles you set held. That is something you can act on.",
-    accent: "#a78bfa",
-  },
-  {
-    n: "03",
-    title: "Ten people or fifty thousand. Same GRID.",
-    text: "Outdoor, indoor, or online. One event or a year-long program. You do not buy a new stack every time the group gets bigger.",
-    accent: "#00ff88",
-  },
-];
-
-const uses = [
-  {
-    n: "01",
-    id: "exitmania",
-    name: "Exitmania",
-    href: "https://exitmania.com",
-    external: true,
-    header: "Self-guided city events",
-    text: "Outdoor, indoor, or online. Up to ten per team, up to a hundred in one run. You book and get the mail on Exitmania. The GRID starts the room and shows whether the group actually did the route.",
-    cta: "exitmania.com",
-    accent: "#00e5ff",
-  },
-  {
-    n: "02",
-    id: "tabbrain",
-    name: "Tabbrain",
-    href: "https://tabbrain.com",
-    external: true,
-    header: "Company programs, year-round",
-    text: "Thousands over a year — not everyone at once. Teams of one to ten, one shared entry. Scores by country and department. You buy on Tabbrain. The GRID is the live room and the group record.",
-    cta: "tabbrain.com",
-    accent: "#a78bfa",
-  },
-  {
-    n: "03",
-    id: "partners",
-    name: "Partner pages",
-    href: "#access",
-    external: false,
-    header: "Your brand. The GRID underneath.",
-    text: "Your site, your questions, a short Pulse in Slack. You keep checkout and look. The GRID runs multiplayer and connects the data. Write us — we plug you in.",
-    cta: "Write to The GRID",
-    accent: "#00ff88",
-  },
-];
-
-function loadEuropeMapSvg(): string {
-  const filePath = path.join(process.cwd(), "public/europe-deployment-map.svg");
-  return fs.readFileSync(filePath, "utf8");
-}
 
 export function GridLandingPage() {
-  const europeMapSvg = loadEuropeMapSvg();
-
   return (
-    <div className="grid-marketing min-h-screen">
+    <div className="grid-marketing grid-marketing-studio min-h-screen">
       <GridNav />
 
       <main>
@@ -113,9 +54,9 @@ export function GridLandingPage() {
               position: "absolute",
               inset: 0,
               pointerEvents: "none",
-              opacity: 0.7,
+              opacity: 0.85,
               backgroundImage:
-                "linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px)",
+                "linear-gradient(oklch(0.46 0.093 178 / 0.05) 1px, transparent 1px), linear-gradient(90deg, oklch(0.46 0.093 178 / 0.05) 1px, transparent 1px)",
               backgroundSize: "44px 44px",
             }}
             aria-hidden
@@ -126,20 +67,18 @@ export function GridLandingPage() {
               inset: 0,
               pointerEvents: "none",
               background:
-                "radial-gradient(ellipse 70% 55% at 50% 42%, rgba(0,229,255,0.12) 0%, transparent 68%)",
+                "radial-gradient(ellipse 70% 55% at 50% 42%, oklch(0.46 0.093 178 / 0.1) 0%, transparent 68%)",
             }}
             aria-hidden
           />
           <div className="grid-hero-scan" aria-hidden />
+          <div className="grid-orb grid-orb-a" aria-hidden />
+          <div className="grid-orb grid-orb-b" aria-hidden />
+          <div className="grid-orb grid-orb-c" aria-hidden />
           <div style={{ position: "relative", zIndex: 1, maxWidth: 980 }}>
             <p
-              style={{
-                marginBottom: 18,
-                fontSize: "clamp(13px, 1.6vw, 15px)",
-                fontWeight: 800,
-                letterSpacing: "0.42em",
-                color: "#00e5ff",
-              }}
+              className="section-label"
+              style={{ letterSpacing: "0.42em", marginBottom: 18 }}
             >
               THE GRID
             </p>
@@ -153,30 +92,24 @@ export function GridLandingPage() {
                 lineHeight: 1.06,
               }}
             >
-              <span style={{ display: "block", color: "#f0f4ff" }}>They&apos;re playing in 60 seconds.</span>
-              <span
-                style={{
-                  display: "block",
-                  color: "#00e5ff",
-                  textShadow: "0 0 48px rgba(0,229,255,0.4)",
-                }}
-              >
-                No app. No login. No IT.
+              <span style={{ display: "block" }}>A battle starts in 60 seconds.</span>
+              <span style={{ display: "block", color: "var(--grid-cyan)" }}>
+                Two teams or a thousand.
               </span>
             </h1>
             <p
-              className="grid-hero-kicker"
+              className="grid-body"
               style={{
                 fontSize: "clamp(16px, 2.1vw, 21px)",
-                color: "rgba(240,244,255,0.78)",
                 maxWidth: 720,
                 lineHeight: 1.5,
                 margin: "0 auto 36px",
                 fontWeight: 600,
+                opacity: 0.78,
               }}
             >
-              The GRID is the live room for team events. Send a link. Every phone joins. When it
-              ends, you see how the group actually did — ten people or fifty thousand.
+              No app. No login. No IT. Send a link. Every phone joins.
+              When it ends, you see whether the team actually worked.
             </p>
 
             <div className="grid-hero-cta-row">
@@ -187,232 +120,190 @@ export function GridLandingPage() {
                 See how it works
               </Link>
             </div>
+            <GridHeroLive />
           </div>
         </section>
 
-        <section
-          id="problem"
-          className="grid-section"
-          style={{ background: "#0d0d16", borderTop: "1px solid rgba(0,229,255,0.12)" }}
-        >
+        <section id="problem" className="grid-section" style={{ background: "var(--grid-bg-elevated)" }}>
           <div className="grid-container">
-            <div style={{ textAlign: "center", marginBottom: 48, maxWidth: 720, marginInline: "auto" }}>
-              <span className="section-label">Why most team events stall</span>
-              <h2 className="grid-h2">
-                Hard to start.
-                <br />
-                <span style={{ color: "#00e5ff" }}>Useless when they end.</span>
-              </h2>
-            </div>
-            <div className="grid-product-grid">
-              {problems.map((item) => (
-                <article key={item.title} className="grid-card">
-                  <h3 style={{ fontSize: 17, fontWeight: 800, color: "#f0f4ff", marginBottom: 10 }}>
-                    {item.title}
-                  </h3>
-                  <p style={{ fontSize: 14, color: "rgba(240,244,255,0.5)", lineHeight: 1.65 }}>
-                    {item.text}
-                  </p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section
-          id="how"
-          className="grid-section grid-section-grid-bg"
-          style={{ borderTop: "1px solid rgba(0,229,255,0.12)" }}
-        >
-          <div className="grid-container">
-            <div style={{ textAlign: "center", marginBottom: 48, maxWidth: 740, marginInline: "auto" }}>
-              <span className="section-label">How The GRID works</span>
-              <h2 className="grid-h2">
-                You send a link.
-                <br />
-                <span style={{ color: "#00e5ff" }}>The GRID runs the room.</span>
-              </h2>
-              <p className="grid-body" style={{ marginTop: 20 }}>
-                Outdoor, indoor, or online — one system. Nobody creates an account. Nobody watches
-                a map for you. After play you read the group, not a list of high-scorers.
-              </p>
-            </div>
-            <GridHowItWorks />
-          </div>
-        </section>
-
-        <section
-          id="benefits"
-          className="grid-section"
-          style={{ background: "#0d0d16", borderTop: "1px solid rgba(0,229,255,0.12)" }}
-        >
-          <div className="grid-container">
-            <div style={{ textAlign: "center", marginBottom: 48, maxWidth: 720, marginInline: "auto" }}>
-              <span className="section-label">What you get</span>
-              <h2 className="grid-h2">
-                An event that starts itself.
-                <br />
-                <span style={{ color: "#00e5ff" }}>A team you can actually read.</span>
-              </h2>
-            </div>
-            <div className="grid-product-grid">
-              {benefits.map((item) => (
-                <article
-                  key={item.n}
-                  className="grid-card grid-product-card"
-                  style={{
-                    borderColor: `${item.accent}40`,
-                    background: `linear-gradient(165deg, ${item.accent}12 0%, rgba(13,13,22,0.95) 55%)`,
-                  }}
-                >
-                  <span className="grid-product-index" style={{ color: item.accent }}>
-                    {item.n}
-                  </span>
-                  <h2 className="grid-product-header">{item.title}</h2>
-                  <p className="grid-product-copy">{item.text}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section
-          id="now"
-          className="grid-section grid-section-grid-bg"
-          style={{ borderTop: "1px solid rgba(0,229,255,0.12)" }}
-        >
-          <div className="grid-container">
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-                gap: 64,
-                alignItems: "center",
-                marginBottom: 64,
-              }}
-            >
-              <div>
-                <span className="section-label">Why this exists now</span>
-                <h2 className="grid-h2" style={{ marginBottom: 24 }}>
-                  You cannot put a host
+            <GridReveal>
+              <div style={{ textAlign: "center", marginBottom: 48, maxWidth: 720, marginInline: "auto" }}>
+                <span className="section-label">Why most team events stall</span>
+                <h2 className="grid-h2">
+                  Hard to start.
                   <br />
-                  <span style={{ color: "#00e5ff" }}>in every team.</span>
+                  <span style={{ color: "var(--grid-cyan)" }}>Empty when they end.</span>
                 </h2>
-                <div className="grid-accent-line grid-accent-line-cyan" />
-                <p className="grid-body" style={{ marginBottom: 16 }}>
-                  Phones no longer need an app to play together. Companies will not staff a
-                  facilitator for every group. And a photo after the off-site is not proof that
-                  the team did the work.
-                </p>
-                <p className="grid-body">
-                  The GRID is the live room underneath: street, building, or browser. One to fifty
-                  thousand. The record is the group.
+              </div>
+            </GridReveal>
+            <div className="grid-product-grid">
+              {problems.map((item, index) => {
+                const Icon = item.icon;
+                return (
+                  <GridReveal key={item.title} delay={index * 90}>
+                    <article className="grid-card grid-problem-card">
+                      <span className="grid-benefit-icon" aria-hidden>
+                        <Icon size={22} strokeWidth={1.75} />
+                      </span>
+                      <h3 className="grid-product-header" style={{ fontSize: 20 }}>
+                        {item.title}
+                      </h3>
+                      <p className="grid-product-copy">{item.text}</p>
+                    </article>
+                  </GridReveal>
+                );
+              })}
+            </div>
+            <GridReveal delay={200}>
+              <p className="grid-body" style={{ marginTop: 36, textAlign: "center", maxWidth: 560, marginInline: "auto" }}>
+                The GRID closes that gap. Simple to run. Strong at scale.
+                The record goes past the game.
+              </p>
+            </GridReveal>
+          </div>
+        </section>
+
+        <section id="how" className="grid-section grid-section-grid-bg">
+          <div className="grid-container">
+            <GridReveal>
+              <div style={{ textAlign: "center", marginBottom: 48, maxWidth: 740, marginInline: "auto" }}>
+                <span className="section-label">How The GRID works</span>
+                <h2 className="grid-h2">
+                  You send a link.
+                  <br />
+                  <span style={{ color: "var(--grid-cyan)" }}>The GRID runs the room.</span>
+                </h2>
+                <p className="grid-body" style={{ marginTop: 20 }}>
+                  No host. No accounts. Up to two hours — one team or thousands.
+                  After play you read the group: if it worked, and where to get better.
                 </p>
               </div>
-              <EuropeDeploymentMap svgMarkup={europeMapSvg} />
-            </div>
+            </GridReveal>
+            <GridReveal delay={80}>
+              <GridHowItWorks />
+            </GridReveal>
+          </div>
+        </section>
 
-            <div
-              id="runs"
-              style={{
-                textAlign: "center",
-                marginBottom: 40,
-                maxWidth: 680,
-                marginInline: "auto",
-                scrollMarginTop: 88,
-              }}
-            >
-              <span className="section-label">Where The GRID runs</span>
-              <h2 className="grid-h2" style={{ fontSize: "clamp(24px, 3vw, 36px)" }}>
-                Same room.
+        <section id="benefits" className="grid-section grid-benefits-section">
+          <div className="grid-container">
+            <GridReveal>
+              <div style={{ textAlign: "center", marginBottom: 48, maxWidth: 720, marginInline: "auto" }}>
+                <span className="section-label">What you get</span>
+                <h2 className="grid-h2">
+                  One link.
+                  <br />
+                  <span style={{ color: "var(--grid-cyan)" }}>Fifty thousand people.</span>
+                </h2>
+              </div>
+            </GridReveal>
+            <GridBenefits />
+          </div>
+        </section>
+
+        <section id="now" className="grid-section grid-section-grid-bg">
+          <div className="grid-container" style={{ maxWidth: 800, textAlign: "center" }}>
+            <GridReveal>
+              <span className="section-label">The gap</span>
+              <h2 className="grid-h2" style={{ marginBottom: 24 }}>
+                Where else do thousands
                 <br />
-                <span style={{ color: "#00e5ff" }}>Three ways in.</span>
+                <span style={{ color: "var(--grid-cyan)" }}>spend two hours — with no host?</span>
               </h2>
-            </div>
-            <div className="grid-product-grid">
-              {uses.map((item) => (
+              <p className="grid-body" style={{ marginBottom: 16 }}>
+                And leave you with something the business can use. Not a photo.
+                Whether teams work. Where to improve. Across countries and departments.
+              </p>
+              <p className="grid-body">
+                That room did not exist. The GRID is that room.
+                Easy to run. Built to scale. The results go past the game.
+              </p>
+            </GridReveal>
+          </div>
+        </section>
+
+        <section id="try" className="grid-section" style={{ background: "var(--grid-bg-elevated)" }}>
+          <div className="grid-container">
+            <GridReveal>
+            <div className="grid-card grid-try-card" style={{ padding: "clamp(28px, 5vw, 48px)", maxWidth: 800, marginInline: "auto" }}>
+              <span className="section-label">The proof</span>
+              <h2 className="grid-h2" style={{ marginBottom: 16 }}>
+                Exitmania already runs
+                <br />
+                <span style={{ color: "var(--grid-cyan)" }}>one team — or thousands.</span>
+              </h2>
+              <p className="grid-body" style={{ marginBottom: 28, maxWidth: 560 }}>
+                Book an outdoor game in the city you choose, an indoor game, or an online
+                game. Start with one team. Feel the join, the play, the end.
+                Same room The GRID keeps for the company.
+              </p>
+              <div className="grid-hero-cta-row" style={{ justifyContent: "flex-start" }}>
                 <a
-                  key={item.id}
-                  id={item.id}
-                  href={item.href}
-                  {...(item.external
-                    ? { target: "_blank", rel: "noopener noreferrer" }
-                    : {})}
-                  className="grid-card grid-product-card"
-                  style={{
-                    borderColor: `${item.accent}40`,
-                    background: `linear-gradient(165deg, ${item.accent}12 0%, rgba(13,13,22,0.95) 55%)`,
-                    scrollMarginTop: 88,
-                    textDecoration: "none",
-                    color: "inherit",
-                  }}
+                  href="https://exitmania.com"
+                  className="grid-cta"
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                  <span className="grid-product-index" style={{ color: item.accent }}>
-                    {item.n}
-                  </span>
-                  <p className="grid-product-name">{item.name}</p>
-                  <h2 className="grid-product-header">{item.header}</h2>
-                  <p className="grid-product-copy">{item.text}</p>
-                  <p
-                    style={{
-                      marginTop: "auto",
-                      paddingTop: 16,
-                      fontSize: 13,
-                      fontWeight: 700,
-                      letterSpacing: "0.06em",
-                      color: item.accent,
-                    }}
-                  >
-                    {item.cta} →
-                  </p>
+                  Play a session
                 </a>
-              ))}
+                <Link href="#access" className="grid-cta-outline">
+                  Or talk to The GRID
+                </Link>
+              </div>
             </div>
+            </GridReveal>
           </div>
         </section>
 
-        <section
-          id="faq"
-          className="grid-section"
-          style={{ background: "#0d0d16", borderTop: "1px solid rgba(0,229,255,0.12)" }}
-        >
+        <section id="pricing" className="grid-section grid-section-grid-bg">
           <div className="grid-container">
-            <div style={{ textAlign: "center", marginBottom: 40, maxWidth: 640, marginInline: "auto" }}>
-              <span className="section-label">Questions</span>
-              <h2 className="grid-h2">
-                Straight answers.
-              </h2>
-            </div>
-            <GridFaq />
+            <GridReveal>
+              <div style={{ textAlign: "center", marginBottom: 48, maxWidth: 720, marginInline: "auto" }}>
+                <span className="section-label">Plans</span>
+                <h2 className="grid-h2">
+                  Pay monthly. Save 20% yearly.
+                  <br />
+                  <span style={{ color: "var(--grid-cyan)" }}>Try a live event first.</span>
+                </h2>
+              </div>
+            </GridReveal>
+            <GridReveal delay={80}>
+              <GridPricing />
+            </GridReveal>
           </div>
         </section>
 
-        <section
-          id="access"
-          className="grid-section"
-          style={{ borderTop: "1px solid rgba(0,229,255,0.12)" }}
-        >
+        <section id="faq" className="grid-section" style={{ background: "var(--grid-bg-elevated)" }}>
           <div className="grid-container">
+            <GridReveal>
+              <div style={{ textAlign: "center", marginBottom: 40, maxWidth: 640, marginInline: "auto" }}>
+                <span className="section-label">Questions</span>
+                <h2 className="grid-h2">Straight answers.</h2>
+              </div>
+            </GridReveal>
+            <GridReveal delay={60}>
+              <GridFaq />
+            </GridReveal>
+          </div>
+        </section>
+
+        <section id="access" className="grid-section">
+          <div className="grid-container" style={{ maxWidth: 880 }}>
+            <GridReveal>
             <div style={{ textAlign: "center", marginBottom: 40 }}>
               <span className="section-label">Get in</span>
               <h2 className="grid-h2" style={{ marginBottom: 16 }}>
                 If you run team events,
                 <br />
-                <span style={{ color: "#00e5ff" }}>talk to The GRID.</span>
+                <span style={{ color: "var(--grid-cyan)" }}>talk to The GRID.</span>
               </h2>
-              <p
-                style={{
-                  fontSize: 16,
-                  color: "rgba(240,244,255,0.5)",
-                  lineHeight: 1.65,
-                  maxWidth: 560,
-                  margin: "0 auto",
-                }}
-              >
-                Players never land on this page. You do. We reply within 24 hours.
+              <p className="grid-body" style={{ maxWidth: 560, margin: "0 auto" }}>
+                Players never land on this page. You do. Twenty minutes, no commitment.
+                We reply within 24 hours.
               </p>
             </div>
             <EnterpriseBriefingForm />
+            </GridReveal>
           </div>
         </section>
       </main>

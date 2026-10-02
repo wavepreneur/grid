@@ -17,35 +17,11 @@ export function GridNav() {
   }, []);
 
   return (
-    <nav
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 100,
-        background: scrolled ? "rgba(4, 4, 8, 0.92)" : "transparent",
-        backdropFilter: scrolled ? "blur(12px)" : "none",
-        borderBottom: scrolled ? "1px solid rgba(0,229,255,0.12)" : "1px solid transparent",
-        transition: "all 0.3s ease",
-        padding: "0 24px",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          height: 64,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <Link href="/#hero" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
+    <nav className={`grid-site-nav${scrolled ? " is-scrolled" : ""}`}>
+      <div className="grid-site-nav-inner">
+        <Link href="/#hero" className="grid-brand">
           <GridLogo />
-          <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: "0.22em", color: "#00e5ff" }}>
-            THE GRID
-          </span>
+          <span className="grid-brand-name">THE GRID</span>
         </Link>
         <div className="hidden-mobile" style={{ display: "flex", alignItems: "center", gap: 22 }}>
           <a href="/#problem" className="grid-nav-link">
@@ -57,8 +33,8 @@ export function GridNav() {
           <a href="/#benefits" className="grid-nav-link">
             Benefits
           </a>
-          <a href="/#runs" className="grid-nav-link">
-            Where it runs
+          <a href="/#pricing" className="grid-nav-link">
+            Plans
           </a>
           <a href="/#faq" className="grid-nav-link">
             FAQ

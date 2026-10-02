@@ -7,19 +7,27 @@ const FAQS = [
   },
   {
     q: "Is this another quiz game?",
-    a: "No. The GRID is the live room — outdoor, indoor, or online. Your site or your booking page can sell the event. The GRID runs the play and shows how the group did, not who clicked fastest.",
+    a: "No. The GRID is the live room. Your people join, play, and leave a record of the group — not who clicked fastest.",
+  },
+  {
+    q: "Do we have to build a game?",
+    a: "No. You bring the facts — names, questions, a look, or a JSON file. Intelligence writes the room. Five minutes or twenty hours.",
   },
   {
     q: "We already use a host or a facilitator.",
-    a: "Keep them for a room of twelve. The GRID is for the events you cannot staff: a hundred people in a city, or thousands over a year, without someone watching a map.",
+    a: "Keep them for a room of twelve. The GRID is for the events you cannot staff: two hours, thousands of people, no one in the room — and a record when it ends.",
   },
   {
-    q: "Can it handle a small team and a huge company?",
-    a: "Yes. Same link, same roles, up to ten per team. One afternoon or a year-long program. Outdoor, indoor, or online. The room does not change.",
+    q: "What do we pay for?",
+    a: "A monthly subscription. Choose yearly and you keep paying every month — 20% less, for twelve months. Credits are extra: one credit is one team, one session. Unused credits wait. You can test a live event in Start before you take a plan.",
   },
   {
     q: "What do we see when it is over?",
-    a: "Whether the team understood the task, where they stalled, if they were actually on site, and whether the roles you set held. Not a list of individual high-scorers.",
+    a: "Whether the team worked. Where to improve. How countries and departments actually play together. Anonymized. On the group, not the person. The game was the room. The record is the point.",
+  },
+  {
+    q: "Can we feel it before a company plan?",
+    a: "Yes. Book one team on Exitmania — outdoor in a city, indoor, or online. Same room. One team today. Thousands when you are ready.",
   },
   {
     q: "Will this land on IT’s desk?",

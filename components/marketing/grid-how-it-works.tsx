@@ -11,17 +11,17 @@ const STEPS = [
   {
     n: "02",
     title: "Play",
-    text: "It feels like a game. GPS, stations, quizzes, live sync. People do not notice they are being measured.",
+    text: "It feels like a game. Quizzes, live sync. People do not notice they are being measured.",
   },
   {
     n: "03",
     title: "Connect",
-    text: "In the background GRID ties place, role, attempt, and time into one group record.",
+    text: "In the background GRID ties role, attempt, and time into one group record.",
   },
   {
     n: "04",
     title: "Read",
-    text: "After the event you see the team — not a leaderboard of individuals.",
+    text: "You see if the team worked, and where to get better — across countries and departments.",
   },
 ] as const;
 
@@ -33,7 +33,7 @@ const DEVICES = [
 
 const INTEL = [
   "Task 3 misread",
-  "Waypoint 2 confirmed",
+  "Team 4 joined",
   "Hint on bonus",
   "Ops · DE",
 ] as const;
@@ -115,7 +115,7 @@ export function GridHowItWorks() {
                 <span className="grid-how-screen-label">
                   {read ? "Group closed" : connected ? "Signal tied" : playing ? "In play" : "Waiting"}
                 </span>
-                <span className="grid-how-score">{read ? "Team" : playing ? "—" : "—"}</span>
+                <span className="grid-how-score">{read ? "Team" : "—"}</span>
               </div>
             </article>
           ))}

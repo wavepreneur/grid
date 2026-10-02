@@ -795,3 +795,763 @@
     animation: none;
   }
 }
+
+.grid-marketing .grid-site-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  transition: background 0.3s ease, border-color 0.3s ease, backdrop-filter 0.3s ease;
+  padding: 0 24px;
+}
+
+.grid-marketing .grid-site-nav.is-scrolled {
+  background: rgba(4, 4, 8, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom-color: rgba(0, 229, 255, 0.12);
+}
+
+.grid-marketing .grid-site-nav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.grid-marketing .grid-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.grid-marketing .grid-brand-name {
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 0.22em;
+  color: #00e5ff;
+}
+
+.grid-marketing .grid-site-footer {
+  border-top: 1px solid rgba(0, 229, 255, 0.12);
+  padding: 48px 24px;
+  background: #040408;
+}
+
+/* Studio-aligned company landing — does not change /status */
+.grid-marketing-studio {
+  --grid-cyan: oklch(0.46 0.093 178);
+  --grid-green: oklch(0.66 0.15 150);
+  --grid-text: oklch(0.24 0.035 175);
+  --grid-muted: oklch(0.45 0.02 175);
+  --grid-muted-faint: oklch(0.7 0.015 95);
+  --grid-bg: oklch(0.975 0.012 90);
+  --grid-bg-elevated: #ffffff;
+  --grid-card: #ffffff;
+  --grid-border: oklch(0.9 0.016 95);
+  --grid-border-strong: oklch(0.46 0.093 178 / 0.28);
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  background: var(--grid-bg);
+  color: var(--grid-text);
+}
+
+.grid-marketing-studio .grid-h1,
+.grid-marketing-studio .grid-h2,
+.grid-marketing-studio .grid-product-header,
+.grid-marketing-studio .grid-how-step-title,
+.grid-marketing-studio .grid-faq-q,
+.grid-marketing-studio .grid-brand-name {
+  font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+}
+
+.grid-marketing-studio .grid-h1,
+.grid-marketing-studio .grid-h2 {
+  letter-spacing: -0.03em;
+  color: var(--grid-text);
+}
+
+.grid-marketing-studio .section-label {
+  color: var(--grid-cyan);
+  border-color: oklch(0.46 0.093 178 / 0.2);
+  background: oklch(0.46 0.093 178 / 0.08);
+}
+
+.grid-marketing-studio .grid-cta {
+  background: oklch(0.46 0.093 178);
+  color: oklch(0.985 0.01 90);
+  border-radius: 1.25rem;
+  text-transform: none;
+  letter-spacing: 0;
+  animation: none;
+  box-shadow: 0 12px 28px oklch(0.46 0.093 178 / 0.18);
+}
+
+.grid-marketing-studio .grid-cta-outline {
+  color: oklch(0.38 0.07 178);
+  border-color: oklch(0.46 0.093 178 / 0.28);
+  border-radius: 1.25rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.grid-marketing-studio .grid-cta-outline:hover {
+  background: oklch(0.46 0.093 178 / 0.08);
+}
+
+.grid-marketing-studio .grid-nav-link {
+  color: oklch(0.4 0.02 175);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+
+.grid-marketing-studio .grid-nav-link:hover {
+  color: oklch(0.38 0.07 178);
+}
+
+.grid-marketing-studio .grid-site-nav.is-scrolled {
+  background: oklch(0.975 0.012 90 / 0.92);
+  border-bottom-color: oklch(0.9 0.016 95);
+}
+
+.grid-marketing-studio .grid-brand-name {
+  letter-spacing: 0.12em;
+  color: oklch(0.24 0.035 175);
+}
+
+.grid-marketing-studio .grid-logo-mark {
+  border-color: oklch(0.46 0.093 178) !important;
+}
+
+.grid-marketing-studio .grid-logo-mark > div {
+  background: oklch(0.46 0.093 178) !important;
+}
+
+.grid-marketing-studio .grid-card,
+.grid-marketing-studio .grid-how-step-btn,
+.grid-marketing-studio .grid-faq-item,
+.grid-marketing-studio .grid-how-stage,
+.grid-marketing-studio .grid-how-device {
+  background: #fff;
+  border-color: oklch(0.9 0.016 95);
+  border-radius: 1.5rem;
+  box-shadow: 0 10px 30px oklch(0.24 0.02 175 / 0.04);
+}
+
+.grid-marketing-studio .grid-card:hover,
+.grid-marketing-studio .grid-how-step.is-active .grid-how-step-btn {
+  border-color: oklch(0.46 0.093 178 / 0.35);
+  box-shadow: 0 16px 36px oklch(0.24 0.02 175 / 0.08);
+  transform: translateY(-2px);
+}
+
+.grid-marketing-studio .grid-how-step.is-active .grid-how-step-btn {
+  background: oklch(0.46 0.093 178 / 0.06);
+}
+
+.grid-marketing-studio .grid-how-stage {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, oklch(0.46 0.093 178 / 0.08), transparent 60%),
+    #fff;
+}
+
+.grid-marketing-studio .grid-how-code,
+.grid-marketing-studio .grid-how-metrics span {
+  color: oklch(0.38 0.07 178);
+  border-color: oklch(0.46 0.093 178 / 0.2);
+  background: oklch(0.46 0.093 178 / 0.07);
+}
+
+.grid-marketing-studio .grid-how-device-name,
+.grid-marketing-studio .grid-product-header,
+.grid-marketing-studio .grid-faq-q,
+.grid-marketing-studio .grid-how-step-title {
+  color: var(--grid-text);
+}
+
+.grid-marketing-studio .grid-how-device-meta,
+.grid-marketing-studio .grid-product-copy,
+.grid-marketing-studio .grid-faq-a,
+.grid-marketing-studio .grid-how-step-text,
+.grid-marketing-studio .grid-how-screen-label,
+.grid-marketing-studio .grid-how-kicker {
+  color: var(--grid-muted);
+}
+
+.grid-marketing-studio .grid-how-screen {
+  background: oklch(0.97 0.012 90);
+  border-color: oklch(0.9 0.016 95);
+}
+
+.grid-marketing-studio .grid-how-score,
+.grid-marketing-studio .grid-how-step-n,
+.grid-marketing-studio .grid-product-index {
+  color: oklch(0.38 0.07 178);
+}
+
+.grid-marketing-studio .grid-how-device.is-live {
+  border-color: oklch(0.66 0.15 150 / 0.4);
+}
+
+.grid-marketing-studio .grid-how-live.is-on {
+  color: oklch(0.45 0.12 150);
+}
+
+.grid-marketing-studio .grid-input {
+  border-radius: 1rem;
+  border-color: oklch(0.9 0.016 95);
+  background: oklch(0.985 0.008 90);
+  color: var(--grid-text);
+}
+
+.grid-marketing-studio .grid-input:focus {
+  border-color: oklch(0.46 0.093 178 / 0.5);
+  box-shadow: 0 0 0 3px oklch(0.46 0.093 178 / 0.12);
+}
+
+.grid-marketing-studio .grid-site-footer {
+  background: #fff;
+  border-top-color: oklch(0.9 0.016 95);
+}
+
+.grid-marketing-studio .grid-footer-dev {
+  color: oklch(0.55 0.02 175);
+}
+
+.grid-marketing-studio .grid-hero-scan {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    oklch(0.46 0.093 178 / 0.06) 50%,
+    transparent 100%
+  );
+}
+
+.grid-marketing-studio .grid-section-grid-bg::before {
+  background-image:
+    linear-gradient(oklch(0.46 0.093 178 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.46 0.093 178 / 0.05) 1px, transparent 1px);
+}
+
+.grid-marketing-studio .grid-plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding-top: 36px;
+}
+
+.grid-marketing-studio .grid-plan.is-featured {
+  border-color: oklch(0.46 0.093 178 / 0.4);
+  box-shadow: 0 18px 40px oklch(0.24 0.02 175 / 0.08);
+}
+
+.grid-marketing .grid-plan-pick {
+  position: absolute;
+  top: 14px;
+  left: 24px;
+  right: 24px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--grid-cyan);
+}
+
+.grid-marketing .grid-plan-eyebrow {
+  min-height: 18px;
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--grid-muted);
+}
+
+.grid-marketing .grid-plan-name {
+  min-height: 32px;
+  margin-bottom: 10px;
+}
+
+.grid-marketing .grid-plan-price-block {
+  display: grid;
+  grid-template-rows: 22px 40px 24px;
+  align-items: end;
+}
+
+.grid-marketing-studio .grid-plan-price,
+.grid-marketing .grid-plan-now {
+  font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--grid-text);
+}
+
+.grid-marketing .grid-plan-now {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.grid-marketing .grid-plan-from {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--grid-muted);
+}
+
+.grid-marketing .grid-plan-was {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 22px;
+  color: var(--grid-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+.grid-marketing .grid-plan-was.is-empty {
+  visibility: hidden;
+}
+
+.grid-marketing .grid-plan-cadence {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--grid-muted);
+  white-space: nowrap;
+}
+
+.grid-marketing .grid-plan-teams {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 24px;
+  color: var(--grid-cyan);
+}
+
+.grid-marketing .grid-plan-blurb {
+  min-height: 48px;
+  margin-top: 12px;
+}
+
+.grid-marketing-studio .grid-plan-list {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.grid-marketing-studio .grid-plan-list li {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--grid-muted);
+}
+
+.grid-marketing-studio .grid-price-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+@media (max-width: 980px) {
+  .grid-marketing-studio .grid-price-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .grid-marketing-studio .grid-price-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.grid-marketing .grid-bill-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 0 auto 36px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--grid-muted);
+}
+
+.grid-marketing .grid-bill-toggle span.is-on {
+  color: var(--grid-text);
+}
+
+.grid-marketing .grid-bill-toggle em {
+  font-style: normal;
+  color: var(--grid-cyan);
+  margin-left: 4px;
+}
+
+.grid-marketing .grid-bill-switch {
+  width: 52px;
+  height: 30px;
+  padding: 3px;
+  border: none;
+  border-radius: 999px;
+  background: oklch(0.46 0.093 178 / 0.18);
+  cursor: pointer;
+  transition: background 0.25s ease;
+}
+
+.grid-marketing .grid-bill-switch.is-yearly {
+  background: oklch(0.46 0.093 178);
+}
+
+.grid-marketing .grid-bill-knob {
+  display: block;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px oklch(0.24 0.02 175 / 0.18);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.grid-marketing .grid-bill-switch.is-yearly .grid-bill-knob {
+  transform: translateX(22px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grid-marketing .grid-bill-knob {
+    transition: none;
+  }
+}
+
+.grid-marketing .grid-reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.grid-marketing .grid-reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+.grid-marketing .grid-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(48px);
+  z-index: 0;
+}
+
+.grid-marketing .grid-orb-a {
+  width: 280px;
+  height: 280px;
+  top: 10%;
+  left: 6%;
+  background: oklch(0.46 0.093 178 / 0.2);
+  animation: grid-orb-float 14s ease-in-out infinite;
+}
+
+.grid-marketing .grid-orb-b {
+  width: 220px;
+  height: 220px;
+  right: 8%;
+  bottom: 18%;
+  background: oklch(0.66 0.15 150 / 0.16);
+  animation: grid-orb-float 18s ease-in-out infinite reverse;
+}
+
+.grid-marketing .grid-orb-c {
+  width: 160px;
+  height: 160px;
+  left: 42%;
+  top: 18%;
+  background: oklch(0.72 0.08 90 / 0.28);
+  animation: grid-orb-float 11s ease-in-out infinite 1.4s;
+}
+
+@keyframes grid-orb-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(18px, -24px, 0);
+  }
+}
+
+.grid-marketing .grid-hero-live {
+  margin: 48px auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 22px 28px;
+  max-width: 560px;
+  padding: 18px 22px;
+  border-radius: 1.5rem;
+  border: 1px solid var(--grid-border);
+  background: color-mix(in oklch, var(--grid-bg-elevated) 82%, white);
+  box-shadow: 0 16px 40px oklch(0.24 0.02 175 / 0.06);
+  backdrop-filter: blur(10px);
+}
+
+.grid-marketing .grid-hero-live-ring {
+  position: relative;
+  width: 88px;
+  height: 88px;
+}
+
+.grid-marketing .grid-hero-live-ring svg {
+  transform: rotate(-90deg);
+}
+
+.grid-marketing .grid-hero-live-track,
+.grid-marketing .grid-hero-live-progress {
+  fill: none;
+  stroke-width: 6;
+}
+
+.grid-marketing .grid-hero-live-track {
+  stroke: oklch(0.46 0.093 178 / 0.12);
+}
+
+.grid-marketing .grid-hero-live-progress {
+  stroke: var(--grid-cyan);
+  stroke-linecap: round;
+  stroke-dasharray: 239;
+  transition: stroke-dashoffset 0.9s linear;
+}
+
+.grid-marketing .grid-hero-live-count {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.grid-marketing .grid-hero-live-count strong {
+  font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.grid-marketing .grid-hero-live-count span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--grid-muted);
+}
+
+.grid-marketing .grid-hero-live-copy {
+  text-align: left;
+}
+
+.grid-marketing .grid-hero-live-kicker {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--grid-cyan);
+}
+
+.grid-marketing .grid-hero-live-teams {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.grid-marketing .grid-hero-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: oklch(0.66 0.15 150);
+  box-shadow: 0 0 0 0 oklch(0.66 0.15 150 / 0.5);
+  animation: grid-live-blink 1.6s ease-in-out infinite;
+}
+
+.grid-marketing .grid-hero-live-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.grid-marketing .grid-hero-live-pills span {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--grid-cyan);
+  background: oklch(0.46 0.093 178 / 0.08);
+  border: 1px solid oklch(0.46 0.093 178 / 0.16);
+}
+
+.grid-marketing .grid-benefits-section {
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 0%, oklch(0.46 0.093 178 / 0.08), transparent 60%),
+    var(--grid-bg-elevated);
+}
+
+.grid-marketing .grid-benefit-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+}
+
+.grid-marketing .grid-benefit {
+  position: relative;
+  overflow: hidden;
+  grid-column: span 4;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transform: translateY(22px);
+}
+
+.grid-marketing .grid-benefit.is-wide {
+  grid-column: span 8;
+}
+
+.grid-marketing .grid-benefit-grid.is-in .grid-benefit {
+  animation: grid-benefit-in 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.grid-marketing .grid-benefit.is-featured {
+  background:
+    linear-gradient(165deg, oklch(0.46 0.093 178 / 0.1) 0%, #fff 55%);
+}
+
+.grid-marketing .grid-benefit-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.grid-marketing .grid-benefit-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  color: oklch(0.38 0.07 178);
+  background: oklch(0.46 0.093 178 / 0.1);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), background 0.25s ease;
+}
+
+.grid-marketing .grid-benefit:hover .grid-benefit-icon,
+.grid-marketing .grid-problem-card:hover .grid-benefit-icon {
+  transform: translateY(-3px) rotate(-6deg) scale(1.06);
+  background: oklch(0.46 0.093 178 / 0.16);
+}
+
+.grid-marketing .grid-benefit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, oklch(1 0 0 / 0.45), transparent 65%);
+  transform: translateX(-140%);
+}
+
+.grid-marketing .grid-benefit:hover::after {
+  animation: grid-shine 0.85s ease;
+}
+
+.grid-marketing .grid-benefit-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.grid-marketing .grid-problem-card {
+  min-height: 100%;
+}
+
+.grid-marketing .grid-problem-card .grid-benefit-icon {
+  margin-bottom: 16px;
+}
+
+.grid-marketing .grid-try-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.grid-marketing .grid-try-card::before {
+  content: "";
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  right: -40px;
+  top: -50px;
+  border-radius: 50%;
+  background: oklch(0.46 0.093 178 / 0.12);
+  filter: blur(12px);
+  animation: grid-orb-float 10s ease-in-out infinite;
+}
+
+@keyframes grid-benefit-in {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes grid-shine {
+  to {
+    transform: translateX(140%);
+  }
+}
+
+@media (max-width: 860px) {
+  .grid-marketing .grid-benefit,
+  .grid-marketing .grid-benefit.is-wide {
+    grid-column: span 12;
+    min-height: 0;
+  }
+
+  .grid-marketing .grid-hero-live-copy {
+    text-align: center;
+  }
+
+  .grid-marketing .grid-hero-live-teams {
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grid-marketing .grid-reveal,
+  .grid-marketing .grid-benefit,
+  .grid-marketing .grid-orb,
+  .grid-marketing .grid-hero-live-dot,
+  .grid-marketing .grid-try-card::before,
+  .grid-marketing .grid-benefit:hover .grid-benefit-icon {
+    animation: none;
+    transform: none;
+    opacity: 1;
+    transition: none;
+  }
+
+  .grid-marketing .grid-benefit::after {
+    display: none;
+  }
+}
