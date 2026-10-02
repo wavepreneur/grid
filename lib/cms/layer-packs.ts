@@ -264,6 +264,7 @@ export type StudioComposeRecipe = {
   language: StudioLanguage;
   origin_game_id: string | null;
   origin_game_name: string | null;
+  collection_id: string | null;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
@@ -285,6 +286,7 @@ export function normalizeComposeRecipeRow(
     language: parseStudioLanguage(row.language),
     origin_game_id: originId,
     origin_game_name: originName?.trim() || null,
+    collection_id: typeof row.collection_id === "string" ? row.collection_id : null,
     archived_at: typeof row.archived_at === "string" ? row.archived_at : null,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),

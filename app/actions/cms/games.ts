@@ -71,6 +71,7 @@ import { pingTeamsContentUpdated } from "@/lib/grid/content-ping";
 import { loadMergedGameTaskLinksForGame, addTaskToLayerPack, fetchPackItem, fillComposeShellIfEmpty, loadRecipeOriginContext, loadRecipeOriginGame, removeTaskFromLayerPack, reorderPackBackedGameTasks, savePackBackedGameLink } from "@/app/actions/cms/packs";
 import { gameUsesLayerPacks, isRecipeCityShell, packItemToGameLink, parsePackLinkId } from "@/lib/cms/layer-packs";
 import { localeCopyFromPatch, localeWritePackIds } from "@/lib/cms/studio-mutate";
+import { getOwnedCollection } from "@/app/actions/cms/collections";
 
 function normalizeGameRow(row: StudioGame): StudioGame {
   return {
@@ -84,6 +85,7 @@ function normalizeGameRow(row: StudioGame): StudioGame {
     layer2_pack_id: (row as StudioGame).layer2_pack_id ?? null,
     layer3_pack_id: (row as StudioGame).layer3_pack_id ?? null,
     compose_recipe_id: (row as StudioGame).compose_recipe_id ?? null,
+    collection_id: (row as StudioGame).collection_id ?? null,
   };
 }
 
@@ -197,11 +199,17 @@ export async function listGames(
     let query = supabase
       .from("studio_games")
       .select(
-        "id, organization_id, slug, name, logo_url, language, translations, city_slug, runtime_profiles, layer1_pack_id, layer2_pack_id, layer3_pack_id, compose_recipe_id, status, published_version_number, is_template, created_at, updated_at",
+        "id, organization_id, slug, name, logo_url, language, translations, city_slug, runtime_profiles, layer1_pack_id, layer2_pack_id, layer3_pack_id, compose_recipe_id, collection_id, status, published_version_number, is_template, created_at, updated_at",
         { count: "exact" },
       )
       .eq("organization_id", orgId)
       .neq("is_template", true);
+
+    if (filters.collectionId === "none") {
+      query = query.is("collection_id", null);
+    } else if (filters.collectionId) {
+      query = query.eq("collection_id", filters.collectionId);
+    }
 
     if (filters.status && filters.status !== "alle") {
       query = query.eq("status", filters.status);
@@ -294,7 +302,7 @@ export async function listTemplates(): Promise<ActionResult<StudioGame[]>> {
     const { data, error } = await supabase
         .from("studio_games")
         .select(
-          "id, organization_id, slug, name, logo_url, language, translations, city_slug, runtime_profiles, layer1_pack_id, layer2_pack_id, layer3_pack_id, compose_recipe_id, status, published_version_number, is_template, created_at, updated_at",
+          "id, organization_id, slug, name, logo_url, language, translations, city_slug, runtime_profiles, layer1_pack_id, layer2_pack_id, layer3_pack_id, compose_recipe_id, collection_id, status, published_version_number, is_template, created_at, updated_at",
         )
         .eq("organization_id", orgId)
         .eq("is_template", true)
@@ -321,6 +329,7 @@ export type CreateGameInput = {
   layer1_pack_id?: string | null;
   layer2_pack_id?: string | null;
   layer3_pack_id?: string | null;
+  collection_id?: string | null;
 };
 
 async function ensureUniqueGameSlug(
@@ -345,6 +354,12 @@ export async function createGame(input: CreateGameInput): Promise<ActionResult<S
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
     const slug = await ensureUniqueGameSlug(supabase, orgId);
+    const collectionId = input.collection_id
+      ? (await getOwnedCollection(supabase, orgId, input.collection_id))?.id ?? null
+      : null;
+    if (input.collection_id && !collectionId) {
+      return { success: false, error: "Collection nicht gefunden." };
+    }
 
     const surface: ContentMode =
       input.surface === "indoor" || input.surface === "online" || input.surface === "outdoor"
@@ -372,6 +387,7 @@ export async function createGame(input: CreateGameInput): Promise<ActionResult<S
       feature_flags: {},
       logic_rules: [],
       status: "draft" as const,
+      collection_id: collectionId,
       ...(input.layer1_pack_id || input.layer2_pack_id || input.layer3_pack_id
         ? {
             layer1_pack_id: input.layer1_pack_id ?? null,
@@ -1618,6 +1634,7 @@ export async function removeGameTemplate(gameId: string): Promise<ActionResult<S
 export type CreateGameFromTemplateInput = {
   templateId: string;
   name: string;
+  collection_id?: string | null;
 };
 
 export async function createGameFromTemplate(
@@ -1640,12 +1657,17 @@ export async function createGameFromTemplate(
 
     if (fetchError) throw new Error(fetchError.message);
     if (!template) return { success: false, error: "Vorlage nicht gefunden." };
+    if (input.collection_id) {
+      const collection = await getOwnedCollection(supabase, orgId, input.collection_id);
+      if (!collection) return { success: false, error: "Collection nicht gefunden." };
+    }
 
     const copy = await copyGameWithLinks(
       supabase,
       orgId,
       normalizeGameRow(template as StudioGame),
       name,
+      input.collection_id,
     );
     return { success: true, data: copy };
   } catch (error) {
@@ -1666,6 +1688,7 @@ async function copyGameWithLinks(
   orgId: string,
   source: StudioGame,
   name: string,
+  collectionId?: string | null,
 ): Promise<StudioGame> {
   const slug = await ensureUniqueGameSlug(supabase, orgId);
 
@@ -1698,6 +1721,8 @@ async function copyGameWithLinks(
       is_template: false,
       status: "draft",
       published_version_number: 0,
+      collection_id:
+        collectionId !== undefined ? collectionId : source.collection_id ?? null,
     })
     .select("*")
     .single();

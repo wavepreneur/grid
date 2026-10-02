@@ -147,6 +147,8 @@ export type StudioGame = {
   layer3_pack_id: string | null;
   /** Recipe that composed this thin game, if any. */
   compose_recipe_id?: string | null;
+  /** Product family (First Profiler, later titles). */
+  collection_id?: string | null;
   status: StudioGameStatus;
   published_version_number: number;
   is_template: boolean;
@@ -194,6 +196,7 @@ export type GameFilterInput = {
   status?: "alle" | "draft" | "published" | "archived";
   language?: StudioLanguage | "alle";
   sourceIds?: string[];
+  collectionId?: string | "none";
   sort?: GameListSort;
 };
 

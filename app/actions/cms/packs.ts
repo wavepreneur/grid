@@ -36,6 +36,7 @@ import {
   type StudioLayerPackItem,
 } from "@/lib/cms/layer-packs";
 import { slugifyStudio, type StudioGame, type StudioGameTaskLink, type StudioTask } from "@/lib/cms/types";
+import { getOwnedCollection } from "@/app/actions/cms/collections";
 import { normalizeTaskContent } from "@/lib/cms/task-content";
 import { isUuid } from "@/lib/cms/city-directory";
 import { syncExitmaniaCityDirectory } from "@/app/actions/cms/cities";
@@ -1925,6 +1926,7 @@ export async function composeGamesFromPacks(input: {
   layer3_pack_id?: string | null;
   layer1_pack_ids?: string[];
   recipe_id?: string | null;
+  collection_id?: string | null;
 }): Promise<ActionResult<{ createdIds: string[]; createdCount: number; skippedCount: number }>> {
   try {
     const orgId = await getStudioOrganizationId();
@@ -1963,6 +1965,12 @@ export async function composeGamesFromPacks(input: {
       if (recipe.archived_at) {
         return { success: false, error: "Dieses Rezept ist archiviert. Neue Spiele legt du damit nicht mehr an." };
       }
+    }
+    let collectionId = input.collection_id ?? recipe?.collection_id ?? null;
+    if (collectionId) {
+      const collection = await getOwnedCollection(supabase, orgId, collectionId);
+      if (!collection) return { success: false, error: "Collection nicht gefunden." };
+      collectionId = collection.id;
     }
 
     const origin = await findComposeShellSource(
@@ -2069,6 +2077,7 @@ export async function composeGamesFromPacks(input: {
         layer2_pack_id: mission?.id ?? null,
         layer3_pack_id: team?.id ?? null,
         compose_recipe_id: recipeId,
+        collection_id: collectionId,
       });
       const links = mergePackLinksOntoGame({
         game: draft,
@@ -2104,6 +2113,7 @@ export async function composeGamesFromPacks(input: {
           layer2_pack_id: mission?.id ?? null,
           layer3_pack_id: team?.id ?? null,
           compose_recipe_id: recipeId,
+          collection_id: collectionId,
         })
         .select("id")
         .single();
@@ -2296,6 +2306,7 @@ export async function seedComposeGamesForRecipe(recipeId: string): Promise<
         layer2_pack_id: mission?.id ?? null,
         layer3_pack_id: team?.id ?? null,
         compose_recipe_id: ensured.id,
+        collection_id: ensured.collection_id,
         created_at: now,
         updated_at: now,
       };
@@ -2423,6 +2434,7 @@ export async function saveComposeRecipe(input: {
   surface?: "outdoor" | "indoor" | "online";
   language?: StudioLanguage;
   origin_game_id?: string | null;
+  collection_id?: string | null;
 }): Promise<ActionResult<StudioComposeRecipe>> {
   try {
     const orgId = await getStudioOrganizationId();
@@ -2439,6 +2451,15 @@ export async function saveComposeRecipe(input: {
       updated_at: new Date().toISOString(),
     };
     if (input.origin_game_id !== undefined) payload.origin_game_id = input.origin_game_id;
+    if (input.collection_id !== undefined) {
+      if (input.collection_id) {
+        const collection = await getOwnedCollection(supabase, orgId, input.collection_id);
+        if (!collection) return { success: false, error: "Collection nicht gefunden." };
+        payload.collection_id = collection.id;
+      } else {
+        payload.collection_id = null;
+      }
+    }
     if (input.id) {
       const existing = await getOwnedRecipe(supabase, orgId, input.id);
       if (!existing) return { success: false, error: "Rezept nicht gefunden." };
@@ -2621,6 +2642,7 @@ function composeDraftGame(input: {
   layer2_pack_id: string | null;
   layer3_pack_id: string | null;
   compose_recipe_id: string | null;
+  collection_id?: string | null;
 }): StudioGame {
   return {
     id: "compose-draft",
@@ -2644,6 +2666,7 @@ function composeDraftGame(input: {
     layer2_pack_id: input.layer2_pack_id,
     layer3_pack_id: input.layer3_pack_id,
     compose_recipe_id: input.compose_recipe_id,
+    collection_id: input.collection_id ?? null,
     status: "draft",
     published_version_number: 0,
     is_template: false,
@@ -2659,6 +2682,7 @@ function asStudioGame(row: Record<string, unknown>): StudioGame {
     layer2_pack_id: (row.layer2_pack_id as string | null) ?? null,
     layer3_pack_id: (row.layer3_pack_id as string | null) ?? null,
     compose_recipe_id: (row.compose_recipe_id as string | null) ?? null,
+    collection_id: (row.collection_id as string | null) ?? null,
   };
 }
 

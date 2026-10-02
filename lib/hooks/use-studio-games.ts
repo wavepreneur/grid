@@ -15,6 +15,7 @@ export function gameListQueryKey(orgSlug: string, filters: GameFilterInput = {})
     status: filters.status ?? "alle",
     language: filters.language ?? "alle",
     source: filters.sourceIds?.join(",") ?? "",
+    collection: filters.collectionId ?? "",
     sort: filters.sort ?? "updated",
   });
 }

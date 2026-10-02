@@ -34,7 +34,12 @@ import {
   isLocaleStartedIncomplete,
   localeCoverageMap,
 } from "@/lib/cms/game-i18n";
+import { CollectionPicker } from "@/components/cms/games/collection-picker";
 import { GameLanguageCell } from "@/components/cms/games/game-language-cell";
+import {
+  useInvalidateStudioCollections,
+  useStudioCollections,
+} from "@/lib/hooks/use-studio-collections";
 import type { GameDeleteStatus } from "@/lib/cms/delete-status";
 import {
   useGamesLiveMeta,
@@ -205,6 +210,10 @@ export function GameList({ initialTemplates = [] }: Props) {
   const refreshGames = useRefreshStudioGamesList();
   const { data: templates = initialTemplates } = useStudioTemplates(initialTemplates);
   const { data: recipes = [] } = useComposeRecipes();
+  const collectionsQuery = useStudioCollections();
+  const invalidateCollections = useInvalidateStudioCollections();
+  const collectionOverview = collectionsQuery.data;
+  const collections = collectionOverview?.collections ?? [];
   const originIds = useMemo(
     () => new Set(recipes.map((recipe) => recipe.origin_game_id).filter((id): id is string => Boolean(id))),
     [recipes],
@@ -236,6 +245,9 @@ export function GameList({ initialTemplates = [] }: Props) {
   const [languageTab, setLanguageTab] = useState<LanguageFilter>("alle");
   const [translationTab, setTranslationTab] = useState<TranslationFilter>("alle");
   const [sourceTab, setSourceTab] = useState<SourceFilter>("alle");
+  const [collectionTab, setCollectionTab] = useState<string>("alle");
+  const [listView, setListView] = useState<"games" | "cities">("games");
+  const [collectionId, setCollectionId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(20);
@@ -248,9 +260,11 @@ export function GameList({ initialTemplates = [] }: Props) {
       status: statusTab,
       language: languageTab === "alle" ? "alle" : languageTab,
       sourceIds: sourceTab === "quellen" ? [...originIds] : undefined,
+      collectionId:
+        collectionTab === "alle" ? undefined : collectionTab === "none" ? "none" : collectionTab,
       sort,
     }),
-    [page, pageSize, search, statusTab, languageTab, sourceTab, originIds, sort],
+    [page, pageSize, search, statusTab, languageTab, sourceTab, originIds, collectionTab, sort],
   );
   const gamesQuery = useStudioGamesList(listFilters);
   const games = gamesQuery.data?.games ?? [];
@@ -280,10 +294,55 @@ export function GameList({ initialTemplates = [] }: Props) {
     [games, languageTab],
   );
   const sortedTemplates = useMemo(() => sortGames(templates, "updated"), [templates]);
+  const selectedCollection =
+    collectionTab !== "alle" && collectionTab !== "none"
+      ? collections.find((collection) => collection.id === collectionTab) ?? null
+      : null;
+  const cityRows = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    const matches = (citySlug: string) =>
+      !needle || citySlug.toLowerCase().includes(needle.replace(/\s+/g, "-")) || citySlug.toLowerCase().includes(needle);
+
+    if (collectionTab === "none") {
+      return (collectionOverview?.unassignedCityCounts ?? []).filter((row) => matches(row.citySlug));
+    }
+    if (selectedCollection) {
+      return selectedCollection.cityCounts.filter((row) => matches(row.citySlug));
+    }
+    const byCity = new Map<string, { citySlug: string; gameCount: number; parts: string[] }>();
+    for (const collection of collections) {
+      for (const row of collection.cityCounts) {
+        const current = byCity.get(row.citySlug) ?? { citySlug: row.citySlug, gameCount: 0, parts: [] };
+        current.gameCount += row.gameCount;
+        current.parts.push(`${collection.name} ${row.gameCount}×`);
+        byCity.set(row.citySlug, current);
+      }
+    }
+    for (const row of collectionOverview?.unassignedCityCounts ?? []) {
+      const current = byCity.get(row.citySlug) ?? { citySlug: row.citySlug, gameCount: 0, parts: [] };
+      current.gameCount += row.gameCount;
+      current.parts.push(`Ohne Collection ${row.gameCount}×`);
+      byCity.set(row.citySlug, current);
+    }
+    return [...byCity.values()]
+      .filter((row) => matches(row.citySlug))
+      .sort((a, b) => b.gameCount - a.gameCount || a.citySlug.localeCompare(b.citySlug, "de"));
+  }, [collectionOverview, collectionTab, collections, search, selectedCollection]);
+  const cityTotal = cityRows.length;
+  const cityPageCount = Math.max(1, Math.ceil(cityTotal / pageSize));
+  const cityPage = Math.min(page, cityPageCount);
+  const visibleCityRows = cityRows.slice((cityPage - 1) * pageSize, cityPage * pageSize);
+  const collectionById = useMemo(
+    () => new Map(collections.map((collection) => [collection.id, collection])),
+    [collections],
+  );
+  const allCollectionGameCount =
+    collections.reduce((sum, collection) => sum + collection.gameCount, 0) +
+    (collectionOverview?.unassignedGameCount ?? 0);
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusTab, surfaceTab, sourceTab, languageTab, translationTab, sort, pageSize]);
+  }, [search, statusTab, surfaceTab, sourceTab, languageTab, translationTab, sort, pageSize, collectionTab, listView]);
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.min(page, pageCount);
@@ -324,6 +383,7 @@ export function GameList({ initialTemplates = [] }: Props) {
     setLayer3PackId(null);
     setLayer1Label("");
     setLayer2Label("");
+    setCollectionId(collections[0]?.id ?? null);
     setError(null);
   }
 
@@ -340,6 +400,7 @@ export function GameList({ initialTemplates = [] }: Props) {
           layer1_pack_id: layer1PackId,
           layer2_pack_id: layer2PackId,
           layer3_pack_id: layer3PackId,
+          collection_id: collectionId,
         });
         if (!result.success) {
           setError(result.error);
@@ -352,6 +413,7 @@ export function GameList({ initialTemplates = [] }: Props) {
         }
         setOpen(false);
         await refreshGames();
+        invalidateCollections();
         router.push(`/admin/games/${createdId}`);
         return;
       }
@@ -361,7 +423,7 @@ export function GameList({ initialTemplates = [] }: Props) {
           setError("Bitte eine Vorlage auswählen.");
           return;
         }
-        const result = await createGameFromTemplate({ templateId, name });
+        const result = await createGameFromTemplate({ templateId, name, collection_id: collectionId });
         if (!result.success) {
           setError(result.error);
           return;
@@ -372,11 +434,12 @@ export function GameList({ initialTemplates = [] }: Props) {
         }
         setOpen(false);
         await refreshGames();
+        invalidateCollections();
         router.push(`/admin/games/${result.data.id}`);
         return;
       }
 
-      const result = await createGame({ name, surface });
+      const result = await createGame({ name, surface, collection_id: collectionId });
       if (!result.success) {
         setError(result.error);
         return;
@@ -387,6 +450,7 @@ export function GameList({ initialTemplates = [] }: Props) {
       }
       setOpen(false);
       await refreshGames();
+      invalidateCollections();
       router.push(`/admin/games/${result.data.id}`);
     } finally {
       setCreating(false);
@@ -753,6 +817,13 @@ export function GameList({ initialTemplates = [] }: Props) {
               />
             </div>
 
+            <CollectionPicker
+              value={collectionId}
+              collections={collections}
+              onChange={setCollectionId}
+              onCreated={() => invalidateCollections()}
+            />
+
             {createMode === "template" ? (
               <div>
                 <StudioLabel hint="Aufgaben, Layer, Logik und Einstellungen werden übernommen">
@@ -806,6 +877,43 @@ export function GameList({ initialTemplates = [] }: Props) {
           />
         </div>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <FilterTrack
+            aria-label="Collection"
+            value={collectionTab}
+            onChange={setCollectionTab}
+            options={[
+              { id: "alle", label: "Alle Collections", count: allCollectionGameCount },
+              ...collections.map((collection) => ({
+                id: collection.id,
+                label: collection.name,
+                count: collection.gameCount,
+                title: `${collection.gameCount} Spiele in ${collection.cityCount} Städten`,
+              })),
+              ...(collectionOverview && collectionOverview.unassignedGameCount > 0
+                ? [
+                    {
+                      id: "none",
+                      label: "Ohne Collection",
+                      count: collectionOverview.unassignedGameCount,
+                    },
+                  ]
+                : []),
+            ]}
+          />
+          <FilterTrack
+            aria-label="Ansicht"
+            value={listView}
+            onChange={setListView}
+            options={[
+              { id: "games", label: "Spiele" },
+              {
+                id: "cities",
+                label: "Städte",
+                count: cityTotal,
+                title: "Wie oft welches Spiel in einer Stadt vorkommt",
+              },
+            ]}
+          />
           <FilterTrack
             aria-label="Status"
             value={statusTab}
@@ -894,19 +1002,27 @@ export function GameList({ initialTemplates = [] }: Props) {
             ]}
           />
         </div>
-        {total > 0 ? (
+        {(listView === "cities" ? cityTotal > 0 : total > 0) ? (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
             <div className="flex items-center gap-3">
-              <StudioSelectCheckbox
-                checked={allSelected}
-                indeterminate={someSelected}
-                onChange={toggleAll}
-                label="Alle auf dieser Seite auswählen"
-              />
+              {listView === "games" ? (
+                <StudioSelectCheckbox
+                  checked={allSelected}
+                  indeterminate={someSelected}
+                  onChange={toggleAll}
+                  label="Alle auf dieser Seite auswählen"
+                />
+              ) : null}
               <span className="text-sm text-muted-foreground">
-                {selectedIds.size > 0
-                  ? `${selectedIds.size} ausgewählt`
-                  : `${total} Spiele`}
+                {listView === "cities"
+                  ? selectedCollection
+                    ? `${selectedCollection.gameCount} Spiele in ${cityTotal} Städten`
+                    : collectionTab === "none"
+                      ? `${collectionOverview?.unassignedGameCount ?? 0} Spiele in ${cityTotal} Städten`
+                      : `${allCollectionGameCount} Spiele in ${cityTotal} Städten`
+                  : selectedIds.size > 0
+                    ? `${selectedIds.size} ausgewählt`
+                    : `${total} Spiele`}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -934,7 +1050,75 @@ export function GameList({ initialTemplates = [] }: Props) {
       </div>
 
       <section>
-        {gamesQuery.isPending && games.length === 0 ? (
+        {listView === "cities" ? (
+          cityTotal === 0 ? (
+            <Empty>Keine Städte für diese Collection.</Empty>
+          ) : (
+            <>
+              <ul className="space-y-2">
+                {visibleCityRows.map((row) => (
+                  <li key={row.citySlug}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuery(row.citySlug === "ohne-stadt" ? "" : row.citySlug);
+                        setListView("games");
+                        setPage(1);
+                      }}
+                      className="tap-lift flex w-full items-center justify-between gap-3 rounded-2xl bg-card px-4 py-3 text-left shadow-soft"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-bold">
+                          {row.citySlug === "ohne-stadt" ? "Ohne Stadt" : row.citySlug}
+                        </span>
+                        {"parts" in row && Array.isArray(row.parts) && row.parts.length > 0 ? (
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {row.parts.join(" · ")}
+                          </span>
+                        ) : selectedCollection ? (
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {selectedCollection.name}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="shrink-0 text-sm font-bold tabular-nums">
+                        {row.gameCount}×
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold tabular-nums text-muted-foreground">
+                  {(cityPage - 1) * pageSize + 1}–{Math.min(cityPage * pageSize, cityTotal)} von {cityTotal} Städten
+                </p>
+                <div className="flex items-center gap-2">
+                  <StudioButton
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={cityPage <= 1}
+                    onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  >
+                    Zurück
+                  </StudioButton>
+                  <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+                    Seite {cityPage} / {cityPageCount}
+                  </span>
+                  <StudioButton
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={cityPage >= cityPageCount}
+                    onClick={() => setPage((value) => Math.min(cityPageCount, value + 1))}
+                  >
+                    Weiter
+                  </StudioButton>
+                </div>
+              </div>
+            </>
+          )
+        ) : gamesQuery.isPending && games.length === 0 ? (
           <StudioListSkeleton rows={5} />
         ) : total === 0 ? (
           <Empty>Noch keine Spiele. Lege oben ein neues an.</Empty>
@@ -947,6 +1131,9 @@ export function GameList({ initialTemplates = [] }: Props) {
                 <GameRow
                   key={game.id}
                   game={game}
+                  collectionName={
+                    game.collection_id ? collectionById.get(game.collection_id)?.name ?? null : null
+                  }
                   isOrigin={originIds.has(game.id)}
                   selected={selectedIds.has(game.id)}
                   onToggle={(checked) => toggleOne(game.id, checked)}
@@ -1210,6 +1397,7 @@ function formatListDate(iso: string): string {
 
 function GameRow({
   game,
+  collectionName,
   isOrigin,
   selected,
   onToggle,
@@ -1217,6 +1405,7 @@ function GameRow({
   onDelete,
 }: {
   game: GameWithLive;
+  collectionName: string | null;
   isOrigin: boolean;
   selected: boolean;
   onToggle: (checked: boolean) => void;
@@ -1289,6 +1478,11 @@ function GameRow({
                     <h2 className="text-base font-bold leading-snug text-foreground sm:text-lg">
                       {game.name}
                     </h2>
+                    {collectionName ? (
+                      <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                        {collectionName}
+                      </span>
+                    ) : null}
                     {isOrigin ? (
                       <span
                         className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-800"

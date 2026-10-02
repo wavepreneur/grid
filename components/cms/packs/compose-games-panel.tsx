@@ -25,6 +25,11 @@ import {
   IconUsers,
 } from "@/components/cms/studio-icons";
 import { COMPOSE_GAMES_MAX, type StudioComposeRecipe, type StudioLayerPack } from "@/lib/cms/layer-packs";
+import { CollectionPicker } from "@/components/cms/games/collection-picker";
+import {
+  useInvalidateStudioCollections,
+  useStudioCollections,
+} from "@/lib/hooks/use-studio-collections";
 import { useInvalidateStudioPacks } from "@/lib/hooks/use-studio-packs";
 import { useInvalidateStudioGames } from "@/lib/hooks/use-studio-games";
 
@@ -34,6 +39,9 @@ type OpenLayer = 1 | 2 | 3 | null;
 export function ComposeGamesPanel() {
   const invalidate = useInvalidateStudioPacks();
   const invalidateGames = useInvalidateStudioGames();
+  const invalidateCollections = useInvalidateStudioCollections();
+  const { data: collectionOverview } = useStudioCollections();
+  const collections = collectionOverview?.collections ?? [];
   const [recipes, setRecipes] = useState<StudioComposeRecipe[]>([]);
   const [recipeId, setRecipeId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -43,6 +51,7 @@ export function ComposeGamesPanel() {
   const [layer2Name, setLayer2Name] = useState("Mission wählen");
   const [layer3Name, setLayer3Name] = useState("Team wählen");
   const [surface, setSurface] = useState<Surface>("outdoor");
+  const [collectionId, setCollectionId] = useState<string | null>(null);
   const [openLayer, setOpenLayer] = useState<OpenLayer>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -61,6 +70,7 @@ export function ComposeGamesPanel() {
     setLayer2Name("Mission wählen");
     setLayer3Name("Team wählen");
     setSurface("outdoor");
+    setCollectionId(collections[0]?.id ?? null);
   }
 
   function selectRecipe(recipe: StudioComposeRecipe) {
@@ -72,6 +82,7 @@ export function ComposeGamesPanel() {
     setSurface(recipe.surface === "indoor" ? "indoor" : "outdoor");
     setLayer2Name(recipe.layer2_pack_id ? "Mission" : "Mission wählen");
     setLayer3Name(recipe.layer3_pack_id ? "Team" : "Team wählen");
+    setCollectionId(recipe.collection_id);
     void resolvePackName(2, recipe.layer2_pack_id).then((name) => {
       if (name) setLayer2Name(name);
     });
@@ -113,6 +124,9 @@ export function ComposeGamesPanel() {
               <p className="text-sm font-bold">{recipe.name}</p>
               <p className={`mt-0.5 text-[11px] font-semibold ${selected ? "opacity-80" : "text-muted-foreground"}`}>
                 {recipe.surface === "indoor" ? "Indoor" : "Outdoor"}
+                {recipe.collection_id
+                  ? ` · ${collections.find((row) => row.id === recipe.collection_id)?.name ?? "Collection"}`
+                  : ""}
                 {recipe.origin_game_name ? ` · ${recipe.origin_game_name}` : ""}
               </p>
             </button>
@@ -159,6 +173,15 @@ export function ComposeGamesPanel() {
                 placeholder="z. B. Standard Game B2C"
               />
             </div>
+            <div className="min-w-[16rem] flex-1">
+              <CollectionPicker
+                value={collectionId}
+                collections={collections}
+                onChange={setCollectionId}
+                onCreated={() => invalidateCollections()}
+                hint="Neue Städte-Spiele landen in dieser Collection"
+              />
+            </div>
             <div className="flex rounded-2xl bg-secondary p-1">
               {(["outdoor", "indoor"] as const).map((mode) => (
                 <button
@@ -200,11 +223,26 @@ export function ComposeGamesPanel() {
                   onClick={() => {
                     startArchive(async () => {
                       setError(null);
+                      const saved = await saveComposeRecipe({
+                        id: selectedRecipe.id,
+                        name: recipeName.trim() || selectedRecipe.name,
+                        layer2_pack_id: layer2,
+                        layer3_pack_id: layer3,
+                        surface,
+                        collection_id: collectionId,
+                      });
+                      if (!saved.success) {
+                        setError(saved.error);
+                        return;
+                      }
+                      setRecipes((current) =>
+                        current.map((row) => (row.id === saved.data.id ? saved.data : row)),
+                      );
                       let created = 0;
                       let skipped = 0;
-                      let originName = selectedRecipe.origin_game_name ?? "First Profiler München";
+                      let originName = saved.data.origin_game_name ?? "First Profiler München";
                       for (;;) {
-                        const result = await seedComposeGamesForRecipe(selectedRecipe.id);
+                        const result = await seedComposeGamesForRecipe(saved.data.id);
                         if (!result.success) {
                           setError(result.error);
                           if (created > 0) {
@@ -351,6 +389,7 @@ export function ComposeGamesPanel() {
           surface={surface}
           recipeId={recipeId}
           recipeName={recipeName}
+          collectionId={collectionId}
           onError={setError}
           onCreated={(created, skipped, savedRecipe) => {
             setOpenLayer(null);
@@ -541,6 +580,7 @@ function CityComposeModal({
   surface,
   recipeId,
   recipeName,
+  collectionId,
   onError,
   onCreated,
 }: {
@@ -553,6 +593,7 @@ function CityComposeModal({
   surface: Surface;
   recipeId: string | null;
   recipeName: string;
+  collectionId: string | null;
   onError: (message: string | null) => void;
   onCreated: (
     created: number,
@@ -612,6 +653,7 @@ function CityComposeModal({
                   layer2_pack_id: layer2Id,
                   layer3_pack_id: layer3Id,
                   surface,
+                  collection_id: collectionId,
                 });
                 if (!saved.success) {
                   onError(saved.error);

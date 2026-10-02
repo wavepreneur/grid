@@ -8,6 +8,11 @@ export const queryKeys = {
     dashboard: (orgSlug?: string) =>
       [...queryKeys.studio.all, "dashboard", orgSlug ?? ""] as const,
   },
+  collections: {
+    all: ["grid", "studio", "collections"] as const,
+    list: (orgSlug?: string) =>
+      [...queryKeys.collections.all, "list", orgSlug ?? ""] as const,
+  },
   games: {
     all: ["grid", "studio", "games"] as const,
     list: (orgSlug?: string, filters?: Record<string, string | undefined>) =>
