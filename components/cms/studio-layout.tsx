@@ -3,7 +3,7 @@
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, type ComponentType, type MouseEvent, type ReactNode } from "react";
+import { useLayoutEffect, useState, type ComponentType, type MouseEvent, type ReactNode } from "react";
 import type { LucideProps } from "lucide-react";
 import {
   Activity,
@@ -332,7 +332,7 @@ export function StudioLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     try {
       setCollapsed(window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1");
     } catch {
@@ -386,9 +386,9 @@ export function StudioLayout({ children }: { children: ReactNode }) {
 
       <div className="mx-auto flex min-h-screen w-full max-w-[100rem]">
         <aside
-          className={`studio-sidebar hidden shrink-0 border-r border-border bg-card transition-[width] duration-200 ease-out lg:block ${
-            hydrated && collapsed ? "w-[4.5rem]" : "w-[17rem]"
-          }`}
+          className={`studio-sidebar hidden shrink-0 border-r border-border bg-card lg:block ${
+            hydrated ? "transition-[width] duration-200 ease-out" : ""
+          } ${hydrated && collapsed ? "w-[4.5rem]" : "w-[17rem]"}`}
         >
           <div
             className={`sticky top-0 flex h-screen flex-col ${

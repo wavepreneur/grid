@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IconSearch } from "@/components/cms/studio-icons";
 import { inputCls } from "@/components/cms/ui";
+import { listenOutsidePointer } from "@/lib/hooks/use-outside-pointer";
 import { useDebouncedValue } from "@/lib/hooks/use-task-library-search";
 import { useStudioGamePicker } from "@/lib/hooks/use-studio-games";
 import { gameUsesLayerPacks } from "@/lib/cms/layer-packs";
@@ -27,6 +28,7 @@ export function GameSearchSelect({
 }: Props) {
   const [query, setQuery] = useState(value?.name ?? "");
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const search = useDebouncedValue(query, 200);
   const picker = useStudioGamePicker({
     search: open ? search : value?.name === query ? "" : search,
@@ -40,6 +42,11 @@ export function GameSearchSelect({
     if (value && !open) setQuery(value.name);
   }, [value, open]);
 
+  useEffect(() => {
+    if (!open) return;
+    return listenOutsidePointer(rootRef.current, () => setOpen(false));
+  }, [open]);
+
   function pick(game: StudioGamePickerItem) {
     onChange(game);
     setQuery(game.name);
@@ -47,15 +54,7 @@ export function GameSearchSelect({
   }
 
   return (
-    <div className="relative">
-      {open ? (
-        <button
-          type="button"
-          aria-label="Liste schließen"
-          className="fixed inset-0 z-10 cursor-default"
-          onClick={() => setOpen(false)}
-        />
-      ) : null}
+    <div ref={rootRef} className="relative">
       <div className="relative z-20">
         <IconSearch className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
@@ -81,6 +80,7 @@ export function GameSearchSelect({
               <button
                 key={game.id}
                 type="button"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => pick(game)}
                 className={`flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left ${
                   game.id === value?.id ? "bg-primary text-primary-foreground" : "hover:bg-secondary"

@@ -14,6 +14,7 @@ import {
   type SelectHTMLAttributes,
 } from "react";
 import { IconCheck, IconChevronDown } from "@/components/cms/studio-icons";
+import { listenOutsidePointer } from "@/lib/hooks/use-outside-pointer";
 
 export type StudioListboxOption = {
   value: string;
@@ -109,10 +110,6 @@ export function StudioListbox({
     if (!open) return;
     setHighlight(selectedIndex);
 
-    function onPointer(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-
     function onKey(event: globalThis.KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -149,10 +146,10 @@ export function StudioListbox({
       if (event.key === "Tab") setOpen(false);
     }
 
-    document.addEventListener("pointerdown", onPointer);
+    const stopOutside = listenOutsidePointer(rootRef.current, () => setOpen(false));
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("pointerdown", onPointer);
+      stopOutside();
       document.removeEventListener("keydown", onKey);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1249,7 +1249,7 @@ function GameRow({
 
   return (
     <li
-      className={`rounded-2xl shadow-soft [content-visibility:auto] [contain-intrinsic-size:auto_8.5rem] ${
+      className={`rounded-2xl shadow-soft ${
         selected ? "bg-primary/5 ring-1 ring-primary/20" : "bg-card"
       }`}
     >

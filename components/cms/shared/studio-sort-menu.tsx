@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { IconCheck, IconChevronDown, IconSort } from "@/components/cms/studio-icons";
+import { listenOutsidePointer } from "@/lib/hooks/use-outside-pointer";
 
 export type StudioSortOption<T extends string = string> = {
   id: T;
@@ -54,10 +55,6 @@ export function StudioSortMenu<T extends string>({
 
     setHighlight(selectedIndex);
 
-    function onPointer(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-
     function onKey(event: globalThis.KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -96,10 +93,10 @@ export function StudioSortMenu<T extends string>({
       }
     }
 
-    document.addEventListener("pointerdown", onPointer);
+    const stopOutside = listenOutsidePointer(rootRef.current, () => setOpen(false));
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("pointerdown", onPointer);
+      stopOutside();
       document.removeEventListener("keydown", onKey);
     };
     // choose reads current onChange/options; re-bind when the menu opens or options change.
