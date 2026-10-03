@@ -650,16 +650,20 @@ export function PlayMoreSheet({
 export function PlayMoreTrigger({
   onClick,
   language,
+  highlight = false,
 }: {
   onClick: () => void;
   language?: string | null;
+  highlight?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-label={playUi(language).menu.moreAria}
       onClick={onClick}
-      className="tap-lift flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--cg-primary)] text-[var(--cg-primary-fg)] shadow-[var(--cg-shadow-lift)] ring-2 ring-[var(--cg-bg)]"
+      className={`tap-lift flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--cg-primary)] text-[var(--cg-primary-fg)] shadow-[var(--cg-shadow-lift)] ring-2 ring-[var(--cg-bg)] ${
+        highlight ? "cg-menu-pulse" : ""
+      }`}
     >
       <MoreHorizontal className="h-6 w-6" strokeWidth={2.75} />
     </button>

@@ -691,6 +691,8 @@ export function PlayBonusView({
 
       <MediaModal
         tile={activeTile}
+        tiles={tiles}
+        onSelectTile={setActiveTile}
         onClose={() => setActiveTile(null)}
         language={language}
         scoring={bonus.scoring}

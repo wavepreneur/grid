@@ -488,6 +488,12 @@ export type PlayUiCopy = {
     whatsWrong: string;
     keepSolving: string;
   };
+  menuTour: {
+    title: string;
+    body: string;
+    start: string;
+    pointer: string;
+  };
   transition: {
     keyFits: string;
     bonusReady: string;
@@ -512,6 +518,8 @@ export type PlayUiCopy = {
     many: (n: number) => string;
     tapOpen: string;
     swipeOrTap: string;
+    switchAria: string;
+    lookAtAll: string;
     soloMedia: string;
     hintsAria: string;
     hintBadge: string;
@@ -1347,6 +1355,12 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       whatsWrong: "Was ist los?",
       keepSolving: "Weiter rätseln",
     },
+    menuTour: {
+      title: "Oben rechts: euer Menü",
+      body: "Wallet, Regeln und Hilfe liegen hinter den drei Punkten. Einmal merken — dann geht’s auf die Karte.",
+      start: "Zur Karte",
+      pointer: "Hier tippen",
+    },
     transition: {
       keyFits: "Schlüssel passt",
       bonusReady: "Bonus steht bereit",
@@ -1370,7 +1384,9 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       one: "Rätselkachel",
       many: (n) => `${n} Rätselkacheln`,
       tapOpen: "Antippen zum Öffnen",
-      swipeOrTap: "Wischen oder antippen",
+      swipeOrTap: "Alle Kacheln ansehen — dann lösen",
+      switchAria: "Andere Kachel öffnen",
+      lookAtAll: "Wechsle oben zwischen den Kacheln",
       soloMedia: "Solo-Modus: Du siehst alle Medien auf deinem Gerät.",
       hintsAria: "Hinweise und Medien",
       hintBadge: "Tipp",
@@ -2158,6 +2174,12 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       whatsWrong: "What’s wrong?",
       keepSolving: "Keep solving",
     },
+    menuTour: {
+      title: "Top right: your menu",
+      body: "Wallet, rules and help live behind the three dots. Remember that — then the map is yours.",
+      start: "To the map",
+      pointer: "Tap here",
+    },
     transition: {
       keyFits: "Key fits",
       bonusReady: "Bonus is ready",
@@ -2181,7 +2203,9 @@ const PLAY_UI: Record<PlayUiLang, PlayUiCopy> = {
       one: "Puzzle tile",
       many: (n) => `${n} puzzle tiles`,
       tapOpen: "Tap to open",
-      swipeOrTap: "Swipe or tap",
+      swipeOrTap: "Look at every tile — then solve",
+      switchAria: "Open another tile",
+      lookAtAll: "Switch tiles up here",
       soloMedia: "Solo mode: you see all media on your device.",
       hintsAria: "Hints and media",
       hintBadge: "Hint",

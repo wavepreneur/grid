@@ -145,6 +145,8 @@ export function ExitmaniaLevelView({
 
       <MediaModal
         tile={activeTile}
+        tiles={tiles}
+        onSelectTile={setActiveTile}
         onClose={() => setActiveTile(null)}
         purchasedHints={purchasedHints}
         score={score}

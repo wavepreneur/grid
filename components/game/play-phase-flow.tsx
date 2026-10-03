@@ -13,6 +13,7 @@ import {
   type PlayMorePanel,
 } from "@/components/game/play-more-sheet";
 import { PlayHelpNudge } from "@/components/game/play-help-nudge";
+import { PlayMenuTour } from "@/components/game/play-menu-tour";
 import { PlayQuizView } from "@/components/game/play-quiz-view";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
 import { levelAllowsSkip, levelHasUnusedTileHint } from "@/lib/grid/play-help";
@@ -38,6 +39,11 @@ import {
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 import { visibleWalletNotes } from "@/lib/grid/wallet";
 import { playUi } from "@/lib/grid/play-ui";
+import {
+  menuTourStorageKey,
+  readMenuTourSeen,
+  writeMenuTourSeen,
+} from "@/lib/grid/offline-state";
 import {
   resolveCaptureBrandStamp,
   type CaptureBrandStamp,
@@ -220,6 +226,25 @@ export function PlayPhaseFlow({
 
   const prevPhaseRef = useRef(phase);
   const [unlockGate, setUnlockGate] = useState(false);
+  const [menuTour, setMenuTour] = useState<"unknown" | "show" | "done">("unknown");
+  const tourKey = menuTourStorageKey({
+    inviteCode: inviteCode ?? "",
+    joinCode,
+    playerId: myPlayerId,
+  });
+
+  useEffect(() => {
+    if (!inviteCode) {
+      setMenuTour("done");
+      return;
+    }
+    setMenuTour(readMenuTourSeen(tourKey) ? "done" : "show");
+  }, [inviteCode, tourKey]);
+
+  function dismissMenuTour() {
+    writeMenuTourSeen(tourKey);
+    setMenuTour("done");
+  }
 
   // After quiz → level: short key-unlock interstitial on every device.
   useEffect(() => {
@@ -235,11 +260,15 @@ export function PlayPhaseFlow({
 
   useEffect(() => {
     function openMenu() {
+      if (menuTour === "show") {
+        writeMenuTourSeen(tourKey);
+        setMenuTour("done");
+      }
       onMorePanel("menu");
     }
     window.addEventListener("grid:open-play-menu", openMenu);
     return () => window.removeEventListener("grid:open-play-menu", openMenu);
-  }, [onMorePanel]);
+  }, [onMorePanel, menuTour, tourKey]);
 
   useEffect(() => {
     scrollPlayToTop();
@@ -247,13 +276,25 @@ export function PlayPhaseFlow({
     return () => window.clearTimeout(t);
   }, [phase, activeLevel, unlockGate]);
 
+  const showMenuTour = menuTour === "show" && phase === "hub" && !paused && !morePanel;
+  const openPlayMenu = () => {
+    if (menuTour === "show") dismissMenuTour();
+    onMorePanel("menu");
+  };
+
   const chrome = showChrome ? (
     <div className="space-y-2.5 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] sm:space-y-3 sm:pb-3 sm:pt-[max(1.25rem,env(safe-area-inset-top))]">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <CityTeamBar teamName={teamName} meName={myName} meRoleLabel={myRoleLabel} compact />
         </div>
-        <PlayMoreTrigger onClick={() => onMorePanel("menu")} language={eventContent.language} />
+        <span className={showMenuTour ? "relative z-[1901]" : undefined}>
+          <PlayMoreTrigger
+            onClick={openPlayMenu}
+            language={eventContent.language}
+            highlight={showMenuTour}
+          />
+        </span>
       </div>
       <CityStatusHud
         mode={mode}
@@ -267,7 +308,7 @@ export function PlayPhaseFlow({
   ) : (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-end px-4 pt-[max(0.5rem,env(safe-area-inset-top))]">
       <span className="pointer-events-auto">
-        <PlayMoreTrigger onClick={() => onMorePanel("menu")} language={eventContent.language} />
+        <PlayMoreTrigger onClick={openPlayMenu} language={eventContent.language} />
       </span>
     </div>
   );
@@ -516,6 +557,13 @@ export function PlayPhaseFlow({
       <>
         {chrome}
         {sheets}
+        {showMenuTour ? (
+          <PlayMenuTour
+            mode={mode}
+            language={eventContent.language}
+            onDismiss={dismissMenuTour}
+          />
+        ) : null}
         {pendingRoleHint ? (
           <p
             className="px-4 pb-2 text-center text-xs font-semibold text-[var(--cg-muted)]"

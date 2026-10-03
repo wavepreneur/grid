@@ -49,3 +49,32 @@ export function writeLocalPaused(key: string, paused: boolean): void {
     /* ignore quota / private mode */
   }
 }
+
+const MENU_TOUR_PREFIX = "grid:menu-tour:";
+
+/** First-start menu pointer — once per device / event / player. */
+export function menuTourStorageKey(input: {
+  inviteCode: string;
+  joinCode?: string;
+  playerId?: string | null;
+}): string {
+  return `${MENU_TOUR_PREFIX}${input.inviteCode}:${input.joinCode ?? ""}:${input.playerId ?? "device"}`;
+}
+
+export function readMenuTourSeen(key: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function writeMenuTourSeen(key: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, "1");
+  } catch {
+    /* ignore quota / private mode */
+  }
+}

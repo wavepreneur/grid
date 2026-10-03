@@ -4,6 +4,12 @@ import { useEffect, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { playUi } from "@/lib/grid/play-ui";
 
+export type MediaSheetTab = {
+  id: string;
+  label: string;
+  coverUrl?: string;
+};
+
 type ContentMediaSheetProps = {
   open: boolean;
   title: string;
@@ -14,6 +20,10 @@ type ContentMediaSheetProps = {
   tipSlot?: ReactNode;
   /** Live scoring / countdown — stays visible while the tile is open. */
   headerSlot?: ReactNode;
+  /** Sibling tiles — switch without closing the sheet. */
+  tabs?: MediaSheetTab[];
+  activeTabId?: string;
+  onSelectTab?: (id: string) => void;
   /** Override empty-state copy when no mediaUrl. */
   emptyMessage?: string;
   language?: string | null;
@@ -31,6 +41,9 @@ export function ContentMediaSheet({
   onClose,
   tipSlot,
   headerSlot,
+  tabs = [],
+  activeTabId,
+  onSelectTab,
   emptyMessage,
   language,
 }: ContentMediaSheetProps) {
@@ -74,9 +87,17 @@ export function ContentMediaSheet({
           <X className="h-5 w-5" strokeWidth={2.5} />
         </button>
 
-        {headerSlot ? (
-          <div className="shrink-0 border-b border-[var(--cg-border)] bg-[var(--cg-bg)] px-3 pb-2.5 pt-[max(0.75rem,env(safe-area-inset-top))] pr-[max(3.75rem,calc(env(safe-area-inset-right)+3.25rem))]">
+        {headerSlot || tabs.length > 1 ? (
+          <div className="shrink-0 space-y-2 border-b border-[var(--cg-border)] bg-[var(--cg-bg)] px-3 pb-2.5 pt-[max(0.75rem,env(safe-area-inset-top))] pr-[max(3.75rem,calc(env(safe-area-inset-right)+3.25rem))]">
             {headerSlot}
+            {tabs.length > 1 && onSelectTab ? (
+              <MediaSheetTabs
+                tabs={tabs}
+                activeId={activeTabId ?? tabs[0]?.id}
+                onSelect={onSelectTab}
+                language={language}
+              />
+            ) : null}
           </div>
         ) : null}
 
@@ -85,12 +106,14 @@ export function ContentMediaSheet({
             isImage ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
+                key={mediaUrl}
                 src={mediaUrl}
                 alt={title}
                 className="h-full w-full object-contain"
               />
             ) : (
               <iframe
+                key={mediaUrl}
                 src={mediaUrl}
                 title={title}
                 className="h-full w-full border-0"
@@ -118,6 +141,63 @@ export function ContentMediaSheet({
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function MediaSheetTabs({
+  tabs,
+  activeId,
+  onSelect,
+  language,
+}: {
+  tabs: MediaSheetTab[];
+  activeId: string;
+  onSelect: (id: string) => void;
+  language?: string | null;
+}) {
+  const t = playUi(language);
+  return (
+    <div
+      role="tablist"
+      aria-label={t.tiles.switchAria}
+      className="flex min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {tabs.map((tab, index) => {
+        const active = tab.id === activeId;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onSelect(tab.id)}
+            className={`cg-tap-lift flex h-11 min-w-0 shrink-0 items-center gap-2 rounded-full px-2.5 text-left ${
+              active
+                ? "bg-[var(--cg-primary)] text-[var(--cg-primary-fg)] shadow-[var(--cg-shadow-soft)]"
+                : "bg-[var(--cg-secondary)] text-[var(--cg-fg)]"
+            }`}
+          >
+            {tab.coverUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={tab.coverUrl}
+                alt=""
+                className="h-7 w-7 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <span
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${
+                  active ? "bg-[var(--cg-primary-fg)]/20" : "bg-[var(--cg-card)]"
+                }`}
+              >
+                {index + 1}
+              </span>
+            )}
+            <span className="max-w-[7.5rem] truncate text-xs font-extrabold">{tab.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

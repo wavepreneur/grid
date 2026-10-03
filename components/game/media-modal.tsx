@@ -15,6 +15,8 @@ import { playTileTypeLabel, playUi } from "@/lib/grid/play-ui";
 
 type MediaModalProps = {
   tile: LevelContentTile | null;
+  tiles?: LevelContentTile[];
+  onSelectTile?: (tile: LevelContentTile) => void;
   onClose: () => void;
   purchasedHints?: Record<string, PurchasedTileHint>;
   score?: number;
@@ -29,6 +31,8 @@ type MediaModalProps = {
 
 export function MediaModal({
   tile,
+  tiles = [],
+  onSelectTile,
   onClose,
   purchasedHints = {},
   isPending = false,
@@ -102,6 +106,24 @@ export function MediaModal({
         onClose={onClose}
         tipSlot={tipSlot}
         language={language}
+        tabs={
+          tiles.length > 1
+            ? tiles.map((item) => ({
+                id: item.id,
+                label: item.label ?? playTileTypeLabel(item.type, language),
+                coverUrl: item.cover_image_url,
+              }))
+            : undefined
+        }
+        activeTabId={tile.id}
+        onSelectTab={
+          onSelectTile
+            ? (id) => {
+                const next = tiles.find((item) => item.id === id);
+                if (next) onSelectTile(next);
+              }
+            : undefined
+        }
         headerSlot={
           scoring && hasLiveLevelScoring(scoring) ? (
             <LevelScoringBar

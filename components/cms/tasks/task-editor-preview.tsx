@@ -218,6 +218,17 @@ export function TaskEditorPreview({ title, description, content }: Props) {
         mediaType={openTile?.media_type}
         mediaUrl={openTile?.media_url}
         onClose={() => setOpenTileId(null)}
+        tabs={
+          tiles.length > 1
+            ? tiles.map((tile, index) => ({
+                id: tile.id,
+                label: tile.label?.trim() || mediaLabel(tile.media_type) || `Kachel ${index + 1}`,
+                coverUrl: tile.cover_image_url?.trim() || undefined,
+              }))
+            : undefined
+        }
+        activeTabId={openTile?.id}
+        onSelectTab={setOpenTileId}
         headerSlot={
           scoring.countdown_seconds && scoring.countdown_seconds > 0 ? (
             <LevelScoringBar
