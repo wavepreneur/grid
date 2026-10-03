@@ -141,7 +141,7 @@ export function TaskEditor({ task, returnTo }: Props) {
       // Stay on the editor after save — remounting the same route wipes local form feel.
       // Only navigate when creating a brand-new task (no id yet).
       if (!task?.id) {
-        router.push(returnTo ?? `/admin/tasks/${result.data!.id}`);
+        router.push(returnTo ?? `/app/tasks/${result.data!.id}`);
       }
     });
   }
@@ -511,17 +511,17 @@ export function TaskEditor({ task, returnTo }: Props) {
               <TaskDuplicateButton
                 taskId={task.id}
                 taskTitle={task.title}
-                listPath={returnTo ?? "/admin/tasks"}
+                listPath={returnTo ?? "/app/tasks"}
               />
               <TaskDeleteButton
                 taskId={task.id}
                 taskTitle={task.title}
-                redirectTo={returnTo ?? "/admin/tasks"}
+                redirectTo={returnTo ?? "/app/tasks"}
               />
             </>
           ) : null}
           <Link
-            href={returnTo ?? "/admin/tasks"}
+            href={returnTo ?? "/app/tasks"}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
           >
             {returnTo ? (

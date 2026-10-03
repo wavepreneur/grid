@@ -171,7 +171,7 @@ export function GameTaskBoard({ gameId, links: initialLinks, libraryTasks }: Pro
           {available.length === 0 ? (
             <p className="text-sm text-[var(--grid-muted)]">
               Keine passenden Tasks.{" "}
-              <Link href="/admin/tasks/new" className="text-[var(--grid-accent)] underline">
+              <Link href="/app/tasks/new" className="text-[var(--grid-accent)] underline">
                 Neu erstellen
               </Link>
             </p>

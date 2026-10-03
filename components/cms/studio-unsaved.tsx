@@ -34,7 +34,7 @@ export function StudioUnsavedProvider({ children }: { children: ReactNode }) {
   // Navigation away from detail routes clears the flag.
   useEffect(() => {
     const onEditor =
-      pathname.startsWith("/admin/tasks/") || pathname.startsWith("/admin/games/");
+      pathname.startsWith("/app/tasks/") || pathname.startsWith("/app/games/");
     if (!onEditor) setIsDirty(false);
   }, [pathname]);
 

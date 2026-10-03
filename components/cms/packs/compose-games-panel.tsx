@@ -202,7 +202,7 @@ export function ComposeGamesPanel() {
             <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-secondary/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               {selectedRecipe.origin_game_id ? (
                 <Link
-                  href={`/admin/games/${selectedRecipe.origin_game_id}`}
+                  href={`/app/games/${selectedRecipe.origin_game_id}`}
                   className="inline-flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground hover:text-primary"
                 >
                   <IconStar size={16} className="fill-amber-500 text-amber-500" />

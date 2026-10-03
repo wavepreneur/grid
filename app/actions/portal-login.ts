@@ -2,7 +2,11 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { portalCredentialsMatch } from "@/lib/marketing/portal-credentials";
+import {
+  bindStudioOrganization,
+  clearStudioOrganizationCookies,
+} from "@/app/actions/cms/organizations";
+import { findMatchingPortalAccount } from "@/lib/marketing/portal-credentials";
 import {
   PORTAL_COOKIE,
   portalCookieOptions,
@@ -26,12 +30,19 @@ export async function loginPortal(
     return { success: false, error: "Email and password are required." };
   }
 
-  if (!(await portalCredentialsMatch(email, password))) {
+  const account = await findMatchingPortalAccount(email, password);
+  if (!account) {
     await sleep(FAIL_DELAY_MS);
     return { success: false, error: "Email or password is wrong." };
   }
 
-  const token = await signPortalSession(email.trim().toLowerCase());
+  const bound = await bindStudioOrganization(account.orgSlug);
+  if (!bound.success) {
+    await sleep(FAIL_DELAY_MS);
+    return { success: false, error: "This login has no project yet." };
+  }
+
+  const token = await signPortalSession(account.email, account.orgSlug);
   const jar = await cookies();
   jar.set(PORTAL_COOKIE, token, portalCookieOptions());
   return { success: true };
@@ -40,5 +51,6 @@ export async function loginPortal(
 export async function logoutPortal(): Promise<void> {
   const jar = await cookies();
   jar.set(PORTAL_COOKIE, "", { ...portalCookieOptions(), maxAge: 0 });
+  await clearStudioOrganizationCookies();
   redirect("/");
 }

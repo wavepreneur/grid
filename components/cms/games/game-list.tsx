@@ -414,7 +414,7 @@ export function GameList({ initialTemplates = [] }: Props) {
         setOpen(false);
         await refreshGames();
         invalidateCollections();
-        router.push(`/admin/games/${createdId}`);
+        router.push(`/app/games/${createdId}`);
         return;
       }
 
@@ -435,7 +435,7 @@ export function GameList({ initialTemplates = [] }: Props) {
         setOpen(false);
         await refreshGames();
         invalidateCollections();
-        router.push(`/admin/games/${result.data.id}`);
+        router.push(`/app/games/${result.data.id}`);
         return;
       }
 
@@ -451,7 +451,7 @@ export function GameList({ initialTemplates = [] }: Props) {
       setOpen(false);
       await refreshGames();
       invalidateCollections();
-      router.push(`/admin/games/${result.data.id}`);
+      router.push(`/app/games/${result.data.id}`);
     } finally {
       setCreating(false);
     }
@@ -1192,7 +1192,7 @@ export function GameList({ initialTemplates = [] }: Props) {
                 className="flex flex-wrap items-center gap-3 rounded-2xl bg-card p-3 shadow-soft"
               >
                 <Link
-                  href={`/admin/games/${template.id}`}
+                  href={`/app/games/${template.id}`}
                   className="group flex min-w-0 flex-1 flex-wrap items-center justify-between gap-4"
                 >
                   <div className="flex min-w-0 items-center gap-3">
@@ -1378,7 +1378,7 @@ function GameLanguageBadges({ game }: { game: StudioGame }) {
         void addGameLocale(game.id, language).then((result) => {
           setAdding(false);
           if (!result.success) return;
-          router.push(`/admin/games/${game.id}?lang=${language}`);
+          router.push(`/app/games/${game.id}?lang=${language}`);
           void refreshGames();
         });
       }}
@@ -1420,7 +1420,7 @@ function GameRow({
   const surface = gameDefaultSurface(game);
   const surfaceChip = surfaceLabelDe(surface);
   const city = game.city_slug?.trim() || "";
-  const openHref = `/admin/games/${game.id}`;
+  const openHref = `/app/games/${game.id}`;
 
   function prefetch() {
     void prefetchStudioGame(queryClient, game.id);

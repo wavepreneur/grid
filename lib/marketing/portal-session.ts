@@ -3,8 +3,12 @@ import { SignJWT, jwtVerify } from "jose";
 export const PORTAL_COOKIE = "grid_portal";
 export const PORTAL_TTL_SECONDS = 60 * 60 * 24 * 7;
 
+export type PortalRole = "owner" | "admin" | "member";
+
 export type PortalSession = {
   email: string;
+  orgSlug: string;
+  role: PortalRole;
 };
 
 function getPortalSecret(): Uint8Array {
@@ -16,8 +20,12 @@ function getPortalSecret(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-export async function signPortalSession(email: string): Promise<string> {
-  return new SignJWT({ email, typ: "grid_portal" })
+export async function signPortalSession(
+  email: string,
+  orgSlug: string,
+  role: PortalRole = "owner",
+): Promise<string> {
+  return new SignJWT({ email, orgSlug, role, typ: "grid_portal" })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${PORTAL_TTL_SECONDS}s`)
@@ -29,7 +37,15 @@ export async function verifyPortalSession(token?: string): Promise<PortalSession
   try {
     const { payload } = await jwtVerify(token, getPortalSecret());
     if (payload.typ !== "grid_portal" || typeof payload.email !== "string") return null;
-    return { email: payload.email };
+    const orgSlug =
+      typeof payload.orgSlug === "string" && payload.orgSlug.trim()
+        ? payload.orgSlug.trim()
+        : "exitmania";
+    const role =
+      payload.role === "admin" || payload.role === "member" || payload.role === "owner"
+        ? payload.role
+        : "owner";
+    return { email: payload.email, orgSlug, role };
   } catch {
     return null;
   }

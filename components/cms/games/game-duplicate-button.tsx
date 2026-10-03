@@ -17,7 +17,7 @@ type Props = {
 
 export function GameDuplicateButton({
   gameId,
-  listPath = "/admin/games",
+  listPath = "/app/games",
   className,
 }: Props) {
   const router = useRouter();
@@ -40,7 +40,7 @@ export function GameDuplicateButton({
       setOpen(false);
 
       if (createdIds.length === 1) {
-        router.push(`/admin/games/${createdIds[0]}`);
+        router.push(`/app/games/${createdIds[0]}`);
       } else {
         router.push(listPath);
       }

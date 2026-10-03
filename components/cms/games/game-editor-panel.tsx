@@ -298,7 +298,7 @@ export function GameEditorPanel({
       }
       setMessage('Als Vorlage gespeichert.');
       cache.invalidateGame(game.id);
-      router.push("/admin/games#vorlagen");
+      router.push("/app/games#vorlagen");
     });
   }
 
@@ -325,7 +325,7 @@ export function GameEditorPanel({
       }
       cache.setGame(result.data!);
       setGame(toEditorState(result.data!));
-      router.push(`/admin/games/${game.id}?lang=${language}`);
+      router.push(`/app/games/${game.id}?lang=${language}`);
     });
   }
 
@@ -444,7 +444,7 @@ export function GameEditorPanel({
               <button
                 type="button"
                 className="ml-1 font-semibold text-primary underline-offset-2 hover:underline"
-                onClick={() => router.push(`/admin/games/${origin.id}`)}
+                onClick={() => router.push(`/app/games/${origin.id}`)}
               >
                 Ursprung öffnen
               </button>

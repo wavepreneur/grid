@@ -200,7 +200,7 @@ export function TaskLibrary(_props: Props) {
     const params = new URLSearchParams(searchParams.toString());
     if (value) params.set(key, value);
     else params.delete(key);
-    router.push(`/admin/tasks?${params.toString()}`);
+    router.push(`/app/tasks?${params.toString()}`);
   }
 
   function toggleAll(checked: boolean) {
@@ -437,7 +437,7 @@ export function TaskLibrary(_props: Props) {
             type="button"
             onClick={() => {
               setSearch("");
-              router.push("/admin/tasks");
+              router.push("/app/tasks");
             }}
             className="text-sm font-bold text-primary"
           >
@@ -547,7 +547,7 @@ export function TaskLibrary(_props: Props) {
 
                 <div className="flex flex-wrap gap-2">
                   <Link
-                    href={`/admin/tasks/${task.id}`}
+                    href={`/app/tasks/${task.id}`}
                     prefetch
                     onMouseEnter={() => prefetchTask(task.id)}
                     onFocus={() => prefetchTask(task.id)}

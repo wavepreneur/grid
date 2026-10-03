@@ -19,19 +19,19 @@ import { queryKeys } from "@/lib/platform/query-keys";
 
 const areas = [
   {
-    href: "/admin/tasks",
+    href: "/app/tasks",
     icon: IconPuzzle,
     name: "Zutaten",
     text: "Rätsel einmal anlegen — der Vorrat für jedes Spiel.",
   },
   {
-    href: "/admin/games",
+    href: "/app/games",
     icon: IconGamepad,
     name: "Spiele",
     text: "Eine Mahlzeit kochen, testen und abschmecken.",
   },
   {
-    href: "/admin/packs",
+    href: "/app/packs",
     icon: IconLayers,
     name: "Rezepte",
     text: "Spiel teilen, benennen, mit Städten zu neuen Spielen kombinieren.",
@@ -93,19 +93,19 @@ export function StudioOverviewSection() {
               step={1}
               title="Zutaten sammeln"
               text="Rätsel in den Vorrat — je mehr, desto besser."
-              href="/admin/tasks"
+              href="/app/tasks"
             />
             <WorkflowRow
               step={2}
               title="Ein Spiel kochen"
               text="Vollständig bauen, testen, abschmecken."
-              href="/admin/games"
+              href="/app/games"
             />
             <WorkflowRow
               step={3}
               title="Rezept kombinieren"
               text="Teilen, benennen, mit Städten neue Spiele erzeugen."
-              href="/admin/packs"
+              href="/app/packs"
             />
           </ul>
         </Panel>
@@ -113,7 +113,7 @@ export function StudioOverviewSection() {
         <Panel
           title="Wichtig zu wissen"
           action={
-            <Link href="/admin/games" className="text-sm font-bold text-primary">
+            <Link href="/app/games" className="text-sm font-bold text-primary">
               Zu den Spielen
             </Link>
           }

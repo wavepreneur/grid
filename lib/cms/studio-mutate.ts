@@ -4,7 +4,7 @@ import { parseConfirmed } from "@/lib/cms/game-i18n";
 /**
  * Studio CMS writes are patches.
  *
- * Catalog pages (`/admin/games`, `/admin/tasks`, `/admin/packs`) load through
+ * Catalog pages (`/app/games`, `/app/tasks`, `/app/packs`) load through
  * React Query. `revalidatePath` on those routes blocks the mutation and does
  * not update the client cache — so field saves must not call it.
  *

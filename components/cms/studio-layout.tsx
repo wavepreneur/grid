@@ -30,6 +30,7 @@ import { listAccessBatches } from "@/app/actions/cms/access";
 import { getStudioDashboardStats } from "@/app/actions/cms/tickets";
 import { getWorkforceDashboard } from "@/app/actions/data";
 import { queryKeys } from "@/lib/platform/query-keys";
+import { appPaths } from "@/lib/platform/app-paths";
 
 const SIDEBAR_COLLAPSED_KEY = "grid.studio.sidebarCollapsed";
 
@@ -46,70 +47,70 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   {
-    href: "/admin",
+    href: appPaths.home,
     label: "Übersicht",
     note: "Alles auf einen Blick",
     icon: LayoutGrid,
-    match: (p) => p === "/admin" || p === "/admin/",
+    match: (p) => p === appPaths.home || p === `${appPaths.home}/`,
   },
   {
-    href: "/admin/settings",
+    href: appPaths.settings,
     label: "Profil",
     note: "Name, Email, Passwort",
     icon: UserRound,
-    match: (p) => p.startsWith("/admin/settings"),
+    match: (p) => p.startsWith(appPaths.settings),
   },
   {
-    href: "/admin/tasks",
+    href: appPaths.tasks,
     label: "1. Zutaten",
     note: "Rätsel-Vorrat",
     icon: Puzzle,
     group: "GRID Studio",
-    match: (p) => p.startsWith("/admin/tasks"),
+    match: (p) => p.startsWith(appPaths.tasks),
   },
   {
-    href: "/admin/games",
+    href: appPaths.games,
     label: "2. Spiele",
     note: "Eine Mahlzeit testen",
     icon: LayoutGrid,
-    match: (p) => p.startsWith("/admin/games"),
+    match: (p) => p.startsWith(appPaths.games),
   },
   {
-    href: "/admin/packs",
+    href: appPaths.packs,
     label: "3. Rezepte",
     note: "Teilen und kombinieren",
     icon: Layers,
-    match: (p) => p.startsWith("/admin/packs"),
+    match: (p) => p.startsWith(appPaths.packs),
   },
   {
-    href: "/admin/tickets",
+    href: appPaths.tickets,
     label: "Tickets",
     note: "Zugänge & Aktivierungen",
     icon: Ticket,
-    match: (p) => p.startsWith("/admin/tickets"),
+    match: (p) => p.startsWith(appPaths.tickets),
   },
   {
-    href: "/cockpit",
+    href: appPaths.cockpit,
     label: "GRID Cockpit",
     note: "Self-Healing · 0 % Eingriff",
     icon: Activity,
     group: "Autonomer Betrieb",
-    match: (p) => p.startsWith("/cockpit"),
+    match: (p) => p.startsWith(appPaths.cockpit),
   },
   {
-    href: "/data",
+    href: appPaths.data,
     label: "GRID Data",
     note: "Indizes & Benchmarks",
     icon: BarChart3,
-    match: (p) => p.startsWith("/data"),
+    match: (p) => p.startsWith(appPaths.data),
   },
   {
-    href: "/admin/dev",
+    href: appPaths.dev,
     label: "Entwicklung",
     note: "Debug & Tools",
     icon: Code2,
     group: "Intern",
-    match: (p) => p.startsWith("/admin/dev"),
+    match: (p) => p.startsWith(appPaths.dev),
   },
 ];
 
@@ -118,7 +119,7 @@ function prefetchForHref(
   href: string,
   orgSlug: string,
 ) {
-  if (href === "/admin") {
+  if (href === appPaths.home) {
     void queryClient.prefetchQuery({
       queryKey: queryKeys.studio.dashboard(orgSlug),
       queryFn: async () => {
@@ -129,7 +130,7 @@ function prefetchForHref(
     });
     return;
   }
-  if (href === "/admin/games") {
+  if (href === appPaths.games) {
     const filters = { page: 1, pageSize: 20, search: "", status: "alle" as const, sort: "updated" as const };
     void queryClient.prefetchQuery({
       queryKey: queryKeys.games.list(orgSlug, {
@@ -157,7 +158,7 @@ function prefetchForHref(
     });
     return;
   }
-  if (href === "/admin/tasks") {
+  if (href === appPaths.tasks) {
     const filters = { page: 1, pageSize: 20, search: "", tag: "", sort: "updated" as const };
     void queryClient.prefetchQuery({
       queryKey: queryKeys.tasks.list(orgSlug, {
@@ -175,7 +176,7 @@ function prefetchForHref(
     });
     return;
   }
-  if (href === "/admin/packs") {
+  if (href === appPaths.packs) {
     void queryClient.prefetchQuery({
       queryKey: queryKeys.packs.list(orgSlug, 1, ["", "1", "20", "updated"].join("|")),
       queryFn: async () => {
@@ -187,7 +188,7 @@ function prefetchForHref(
     });
     return;
   }
-  if (href === "/admin/tickets") {
+  if (href === appPaths.tickets) {
     void queryClient.prefetchQuery({
       queryKey: queryKeys.tickets.list(orgSlug),
       queryFn: async () => {
@@ -243,8 +244,8 @@ function StudioNavLink({
   const Icon = item.icon;
 
   const leavingEditor =
-    (item.href === "/admin/tasks" && pathname.startsWith("/admin/tasks/")) ||
-    (item.href === "/admin/games" && pathname.startsWith("/admin/games/"));
+    (item.href === appPaths.tasks && pathname.startsWith(`${appPaths.tasks}/`)) ||
+    (item.href === appPaths.games && pathname.startsWith(`${appPaths.games}/`));
 
   async function guardLeave(event: MouseEvent<HTMLAnchorElement>) {
     if (!leavingEditor || !isDirty) return;
@@ -338,6 +339,7 @@ function NavPendingDot({ active }: { active: boolean }) {
 export function StudioLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { organizations, orgSlug } = useStudioShell();
+  const currentProject = organizations.find((org) => org.slug === orgSlug);
   const [collapsed, setCollapsed] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
@@ -367,7 +369,12 @@ export function StudioLayout({ children }: { children: ReactNode }) {
       {/* Mobile top + pills */}
       <div className="lg:hidden">
         <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
-          <p className="text-xl font-bold">GRID</p>
+          <div className="min-w-0">
+            <p className="text-xl font-bold">GRID</p>
+            {currentProject ? (
+              <p className="truncate text-xs font-semibold text-primary">{currentProject.name}</p>
+            ) : null}
+          </div>
           <form action={logoutPortal}>
             <button type="submit" className="text-sm font-semibold text-primary">
               Logout
@@ -412,7 +419,7 @@ export function StudioLayout({ children }: { children: ReactNode }) {
               }`}
             >
               <Link
-                href="/admin"
+                href={appPaths.home}
                 className={hydrated && collapsed ? "block text-center" : "min-w-0 flex-1"}
                 title="GRID Backoffice"
               >
@@ -424,6 +431,9 @@ export function StudioLayout({ children }: { children: ReactNode }) {
                       Backoffice
                     </p>
                     <p className="text-2xl font-bold">GRID</p>
+                    {currentProject ? (
+                      <p className="truncate text-sm font-semibold text-primary">{currentProject.name}</p>
+                    ) : null}
                   </>
                 )}
               </Link>

@@ -13,7 +13,7 @@ export const GRID_PRODUCTS: GridProductMeta[] = [
     id: "studio",
     label: "Studio",
     description: "Spiele, Aufgaben und Tickets erstellen",
-    href: "/admin",
+    href: "/app",
     available: true,
   },
   {

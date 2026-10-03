@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { GridMarketingFooter } from "@/components/marketing/grid-marketing-footer";
 import { GridNav } from "@/components/marketing/grid-nav";
 import { PortalLoginForm } from "@/components/marketing/portal-login-form";
+import { safePortalNext } from "@/lib/marketing/portal-paths";
 import { PORTAL_COOKIE, verifyPortalSession } from "@/lib/marketing/portal-session";
 import "@/app/grid-marketing.css";
 
@@ -13,27 +14,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function safeNext(value: string | string[] | undefined): string {
-  const raw = Array.isArray(value) ? value[0] : value;
-  if (
-    typeof raw === "string" &&
-    (raw === "/account" ||
-      raw === "/exitmania" ||
-      raw.startsWith("/account/") ||
-      raw.startsWith("/exitmania/"))
-  ) {
-    return raw;
-  }
-  return "/account";
-}
-
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ next?: string | string[] }>;
 }) {
   const params = await searchParams;
-  const nextPath = safeNext(params.next);
+  const nextPath = safePortalNext(params.next);
   const token = (await cookies()).get(PORTAL_COOKIE)?.value;
   if (await verifyPortalSession(token)) {
     redirect(nextPath);

@@ -17,7 +17,7 @@ type Props = {
 
 export function TaskDuplicateButton({
   taskId,
-  listPath = "/admin/tasks",
+  listPath = "/app/tasks",
   className,
 }: Props) {
   const router = useRouter();
@@ -40,7 +40,7 @@ export function TaskDuplicateButton({
       setOpen(false);
 
       if (createdIds.length === 1) {
-        router.push(`/admin/tasks/${createdIds[0]}`);
+        router.push(`/app/tasks/${createdIds[0]}`);
       } else {
         router.push(listPath);
       }

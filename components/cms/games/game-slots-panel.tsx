@@ -699,7 +699,7 @@ export function GameSlotsPanel({
                       Bedingungen
                     </StudioButton>
                     <Link
-                      href={`/admin/tasks/${slot.levelLink.task_id}?returnTo=/admin/games/${gameId}`}
+                      href={`/app/tasks/${slot.levelLink.task_id}?returnTo=/app/games/${gameId}`}
                       className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50"
                     >
                       Aufgabe <IconArrowRight size={14} />
@@ -848,7 +848,7 @@ export function GameSlotsPanel({
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <Link
-                          href={`/admin/tasks/${openerTaskId}?returnTo=/admin/games/${gameId}`}
+                          href={`/app/tasks/${openerTaskId}?returnTo=/app/games/${gameId}`}
                           className="text-sm font-medium text-teal-700 underline-offset-2 hover:underline"
                         >
                           Im Pool bearbeiten

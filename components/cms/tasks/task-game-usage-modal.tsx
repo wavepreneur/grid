@@ -110,7 +110,7 @@ export function TaskGameUsageButton({
             {usage.games.map((game) => (
               <Link
                 key={game.linkId}
-                href={`/admin/games/${game.gameId}`}
+                href={`/app/games/${game.gameId}`}
                 onClick={() => setOpen(false)}
                 className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 transition hover:border-teal-200 hover:bg-teal-50/40"
               >
@@ -174,7 +174,7 @@ export function TaskGameUsageList({
       {games.map((game) => (
         <li key={game.linkId}>
           <Link
-            href={`/admin/games/${game.gameId}`}
+            href={`/app/games/${game.gameId}`}
             className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm transition hover:border-teal-200 hover:bg-teal-50/50"
           >
             <span className="font-medium text-slate-800">

@@ -1,16 +1,30 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { firstNameFrom, getPortalProfile, savePortalProfile } from "@/lib/marketing/portal-profile";
+import {
+  findPortalAccountByEmail,
+  firstNameFrom,
+  getPortalProfile,
+  savePortalProfile,
+} from "@/lib/marketing/portal-profile";
 import { portalCredentialsMatch } from "@/lib/marketing/portal-credentials";
-import { PORTAL_COOKIE, portalCookieOptions, signPortalSession } from "@/lib/marketing/portal-session";
+import { PORTAL_COOKIE, portalCookieOptions, signPortalSession, verifyPortalSession } from "@/lib/marketing/portal-session";
 
-export async function getPortalProfilePublic(): Promise<{ name: string; email: string; firstName: string }> {
-  const profile = await getPortalProfile();
+export async function getPortalProfilePublic(): Promise<{
+  name: string;
+  email: string;
+  firstName: string;
+  orgSlug: string;
+}> {
+  const token = (await cookies()).get(PORTAL_COOKIE)?.value;
+  const session = await verifyPortalSession(token);
+  const profile =
+    (session ? await findPortalAccountByEmail(session.email) : null) ?? (await getPortalProfile());
   return {
     name: profile.name,
     email: profile.email,
     firstName: firstNameFrom(profile.name),
+    orgSlug: session?.orgSlug ?? profile.orgSlug,
   };
 }
 
@@ -31,19 +45,23 @@ export async function updatePortalProfile(formData: FormData): Promise<
     return { success: false, error: "Passwörter stimmen nicht überein." };
   }
 
-  const current = await getPortalProfile();
+  const token = (await cookies()).get(PORTAL_COOKIE)?.value;
+  const session = await verifyPortalSession(token);
+  const current =
+    (session ? await findPortalAccountByEmail(session.email) : null) ?? (await getPortalProfile());
   const next = {
     name,
     email,
     password: password || current.password,
+    orgSlug: current.orgSlug,
   };
   if (!next.password) return { success: false, error: "Passwort fehlt." };
 
-  await savePortalProfile(next);
+  await savePortalProfile(next, current.email);
 
   if (await portalCredentialsMatch(email, next.password)) {
     const jar = await cookies();
-    jar.set(PORTAL_COOKIE, await signPortalSession(email), portalCookieOptions());
+    jar.set(PORTAL_COOKIE, await signPortalSession(email, next.orgSlug), portalCookieOptions());
   }
 
   return { success: true, firstName: firstNameFrom(name) };

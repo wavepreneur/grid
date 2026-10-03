@@ -9,6 +9,7 @@ import { StudioListbox } from "@/components/cms/shared/studio-listbox";
 import { useStudioUnsaved } from "@/components/cms/studio-unsaved";
 import { IconBuilding } from "@/components/cms/studio-icons";
 import { queryKeys } from "@/lib/platform/query-keys";
+import { appPaths } from "@/lib/platform/app-paths";
 import type { StudioOrganization } from "@/lib/cms/types";
 
 type Props = {
@@ -19,8 +20,8 @@ type Props = {
 
 /** Detail/Neu-Routen gehören zum alten Projekt — nach Switch auf die Liste. */
 function listPathAfterOrgSwitch(pathname: string): string | null {
-  if (pathname.startsWith("/admin/tasks/")) return "/admin/tasks";
-  if (pathname.startsWith("/admin/games/")) return "/admin/games";
+  if (pathname.startsWith(`${appPaths.tasks}/`)) return appPaths.tasks;
+  if (pathname.startsWith(`${appPaths.games}/`)) return appPaths.games;
   return null;
 }
 

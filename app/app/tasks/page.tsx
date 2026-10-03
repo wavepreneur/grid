@@ -10,7 +10,7 @@ export default function AdminTasksPage() {
       title="Zutaten"
       description="Hier sammelst du den Vorrat. Je mehr Rätsel, desto schneller entstehen später neue Spiele. Inhalt bleibt hier — Spiele und Rezepte greifen nur darauf zu."
       actions={
-        <StudioLinkButton href="/admin/tasks/new" icon={<IconPlus size={16} />}>
+        <StudioLinkButton href="/app/tasks/new" icon={<IconPlus size={16} />}>
           Neue Zutat
         </StudioLinkButton>
       }

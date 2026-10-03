@@ -65,7 +65,7 @@ export function GameCompositionPanel({ game, onGameChange }: Props) {
       ) : null}
       {!packed ? (
         <div className="mt-4">
-          <StudioLinkButton href="/admin/packs" variant="secondary">
+          <StudioLinkButton href="/app/packs" variant="secondary">
             Unter Rezepte aufteilen und benennen
           </StudioLinkButton>
         </div>
@@ -89,14 +89,14 @@ export function GameCompositionPanel({ game, onGameChange }: Props) {
               </div>
               {current ? (
                 <Link
-                  href={`/admin/packs/${current}`}
+                  href={`/app/packs/${current}`}
                   className="mt-2 inline-block text-xs font-semibold text-primary underline-offset-2 hover:underline"
                 >
                   Bestandteil öffnen
                 </Link>
               ) : (
                 <Link
-                  href="/admin/packs"
+                  href="/app/packs"
                   className="mt-2 inline-block text-xs font-semibold text-primary underline-offset-2 hover:underline"
                 >
                   Unter Rezepte aufteilen

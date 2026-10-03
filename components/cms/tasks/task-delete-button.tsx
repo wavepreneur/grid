@@ -23,7 +23,7 @@ type Props = {
 export function TaskDeleteButton({
   taskId,
   taskTitle: _taskTitle,
-  redirectTo = "/admin/tasks",
+  redirectTo = "/app/tasks",
   className,
 }: Props) {
   const router = useRouter();

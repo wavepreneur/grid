@@ -119,7 +119,7 @@ export function PackCatalog() {
       setName("");
       setCity(null);
       invalidate();
-      router.push(`/admin/packs/${result.data.id}`);
+      router.push(`/app/packs/${result.data.id}`);
     });
   }
 
@@ -391,7 +391,7 @@ export function PackCatalog() {
             setMessage(`${result.data?.createdCount ?? 0} Bestandteil(e) angelegt.`);
             invalidate();
             const id = result.data?.createdIds[0];
-            if (id && (result.data?.createdCount ?? 0) === 1) router.push(`/admin/packs/${id}`);
+            if (id && (result.data?.createdCount ?? 0) === 1) router.push(`/app/packs/${id}`);
           });
         }}
       />
@@ -569,7 +569,7 @@ function PackCatalogRow({
             {pack.name}
           </button>
         )}
-        <Link href={`/admin/packs/${pack.id}`} className="text-xs text-muted-foreground hover:underline">
+        <Link href={`/app/packs/${pack.id}`} className="text-xs text-muted-foreground hover:underline">
           Öffnen · {pack.city_slug ? pack.city_slug : "geteilt"} · {pack.slot_count} Stops
         </Link>
       </div>

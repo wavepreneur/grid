@@ -10,7 +10,7 @@ export default function AdminPacksPage() {
       title="Rezepte"
       description="Ein getestetes Spiel aufteilen, die drei Teile benennen, dann Mission und Team mit Städten zu neuen Spielen kombinieren."
       actions={
-        <StudioLinkButton href="/admin/games" variant="ghost" icon={<IconGamepad size={16} />}>
+        <StudioLinkButton href="/app/games" variant="ghost" icon={<IconGamepad size={16} />}>
           Zu den Spielen
         </StudioLinkButton>
       }

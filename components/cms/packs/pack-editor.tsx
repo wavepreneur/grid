@@ -333,7 +333,7 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
                       </p>
                     ) : null}
                     <Link
-                      href={`/admin/tasks/${item.task_id}?returnTo=/admin/packs/${pack.id}`}
+                      href={`/app/tasks/${item.task_id}?returnTo=/app/packs/${pack.id}`}
                       className="text-xs font-semibold text-primary underline-offset-2 hover:underline"
                     >
                       Frage und Antworten bearbeiten
@@ -531,7 +531,7 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
               return;
             }
             invalidate();
-            router.push("/admin/packs");
+            router.push("/app/packs");
           });
         }}
       />

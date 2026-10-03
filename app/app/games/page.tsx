@@ -10,7 +10,7 @@ export default function AdminGamesPage() {
       title="Spiele"
       description="Hier kochst du eine Mahlzeit: ein vollständiges Spiel bauen, testen, abschmecken. Wenn es sitzt, teilst du es unter Rezepte in Ort, Mission und Team."
       actions={
-        <StudioLinkButton href="/admin/packs" variant="ghost" icon={<IconPuzzle size={16} />}>
+        <StudioLinkButton href="/app/packs" variant="ghost" icon={<IconPuzzle size={16} />}>
           Zu den Rezepten
         </StudioLinkButton>
       }

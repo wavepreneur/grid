@@ -9,7 +9,7 @@ export const maturityLegend: { status: Maturity; label: string }[] = [
 
 export const gridStudioTracker = [
   {
-    claim: "GRID Studio admin (/admin): tasks, games, templates, tickets",
+    claim: "GRID workspace (/app): tasks, games, templates, tickets",
     status: "beta" as Maturity,
   },
   {

@@ -169,7 +169,7 @@ export function TaskLinkModal({
                 Bedingung speichern
               </StudioButton>
             ) : null}
-            <Link href={`/admin/tasks/${link.task_id}?returnTo=${returnTo}`}>
+            <Link href={`/app/tasks/${link.task_id}?returnTo=${returnTo}`}>
               <StudioButton type="button" variant="secondary" icon={<IconEdit size={14} />}>
                 Aufgaben-Inhalt bearbeiten
               </StudioButton>

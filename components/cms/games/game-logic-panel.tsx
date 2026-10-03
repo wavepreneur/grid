@@ -264,7 +264,7 @@ export function GameLogicPanel({
             Logik-Vorschau
           </StudioButton>
           <Link
-            href="/admin/tasks"
+            href="/app/tasks"
             className="inline-flex items-center text-sm font-medium text-teal-600 hover:text-teal-700"
           >
             Aufgaben-Bibliothek öffnen →
@@ -284,7 +284,7 @@ export function GameLogicPanel({
         missionLinks={grouped[2]}
         allLinks={links}
         getLinkGps={getLinkGps}
-        returnTo={encodeURIComponent(`/admin/games/${gameId}`)}
+        returnTo={encodeURIComponent(`/app/games/${gameId}`)}
         pending={pending}
         onClose={() => setSelectedLink(null)}
         onUpdated={(link) => {

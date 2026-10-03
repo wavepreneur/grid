@@ -6,9 +6,25 @@ import { createClient } from "@/lib/supabase/server";
 import type { StudioOrganization } from "@/lib/cms/types";
 import type { ActionResult } from "@/lib/grid/types";
 import { ADMIN_CAPABILITIES } from "@/lib/cms/org-roles";
+import { PORTAL_COOKIE, verifyPortalSession } from "@/lib/marketing/portal-session";
 
 const ORG_COOKIE = "grid_studio_org";
 const ORG_ID_COOKIE = "grid_studio_org_id";
+
+function orgCookieOptions() {
+  return {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax" as const,
+    maxAge: 60 * 60 * 24 * 365,
+  };
+}
+
+async function getPortalOrgSlug(): Promise<string | null> {
+  const jar = await cookies();
+  const session = await verifyPortalSession(jar.get(PORTAL_COOKIE)?.value);
+  return session?.orgSlug ?? null;
+}
 
 async function getSessionUserId(): Promise<string | null> {
   try {
@@ -24,6 +40,18 @@ async function getSessionUserId(): Promise<string | null> {
 export async function listOrganizations(): Promise<ActionResult<StudioOrganization[]>> {
   try {
     const supabase = createAdminClient();
+    const portalOrgSlug = await getPortalOrgSlug();
+
+    if (portalOrgSlug) {
+      const { data, error } = await supabase
+        .from("organizations")
+        .select("id, slug, name")
+        .eq("slug", portalOrgSlug)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return { success: true, data: data ? ([data] as StudioOrganization[]) : [] };
+    }
+
     const userId = await getSessionUserId();
 
     if (userId) {
@@ -70,30 +98,31 @@ export async function listOrganizations(): Promise<ActionResult<StudioOrganizati
 export async function getStudioOrganizationId(): Promise<string> {
   const cookieStore = await cookies();
   const cachedId = cookieStore.get(ORG_ID_COOKIE)?.value;
-  const slugCookie = cookieStore.get(ORG_COOKIE)?.value ?? "exitmania";
+  const portalOrgSlug = await getPortalOrgSlug();
+  const slugCookie = portalOrgSlug ?? cookieStore.get(ORG_COOKIE)?.value;
 
   const supabase = createAdminClient();
 
-  // Prefer slug as source of truth; keep id cookie in sync (avoids stale id after switch)
-  const { data, error } = await supabase
-    .from("organizations")
-    .select("id")
-    .eq("slug", slugCookie)
-    .maybeSingle();
+  if (slugCookie) {
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("id")
+      .eq("slug", slugCookie)
+      .maybeSingle();
 
-  if (!error && data?.id) {
-    if (cachedId !== data.id) {
-      cookieStore.set(ORG_ID_COOKIE, data.id, {
-        path: "/",
-        httpOnly: true,
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24 * 365,
-      });
+    if (!error && data?.id) {
+      if (cachedId !== data.id) {
+        cookieStore.set(ORG_ID_COOKIE, data.id, orgCookieOptions());
+      }
+      return data.id;
     }
-    return data.id;
   }
 
-  if (cachedId) return cachedId;
+  if (cachedId && !portalOrgSlug) return cachedId;
+
+  if (portalOrgSlug) {
+    throw new Error("Kein Projekt für diesen Zugang gefunden.");
+  }
 
   const { data: fallback } = await supabase
     .from("organizations")
@@ -101,12 +130,7 @@ export async function getStudioOrganizationId(): Promise<string> {
     .eq("slug", "exitmania")
     .maybeSingle();
   if (!fallback?.id) throw new Error("Keine Organisation gefunden.");
-  cookieStore.set(ORG_ID_COOKIE, fallback.id, {
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 365,
-  });
+  cookieStore.set(ORG_ID_COOKIE, fallback.id, orgCookieOptions());
   return fallback.id;
 }
 
@@ -121,6 +145,11 @@ export async function setStudioOrganization(slug: string): Promise<ActionResult<
 
     if (error) throw new Error(error.message);
     if (!data) return { success: false, error: "Organisation nicht gefunden." };
+
+    const portalOrgSlug = await getPortalOrgSlug();
+    if (portalOrgSlug && portalOrgSlug !== data.slug) {
+      return { success: false, error: "Kein Zugriff auf dieses Projekt." };
+    }
 
     const userId = await getSessionUserId();
     if (userId) {
@@ -143,18 +172,8 @@ export async function setStudioOrganization(slug: string): Promise<ActionResult<
     }
 
     const cookieStore = await cookies();
-    cookieStore.set(ORG_COOKIE, data.slug, {
-      path: "/",
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 365,
-    });
-    cookieStore.set(ORG_ID_COOKIE, data.id, {
-      path: "/",
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 365,
-    });
+    cookieStore.set(ORG_COOKIE, data.slug, orgCookieOptions());
+    cookieStore.set(ORG_ID_COOKIE, data.id, orgCookieOptions());
 
     return { success: true, data: { slug: data.slug } };
   } catch (error) {
@@ -167,7 +186,40 @@ export async function setStudioOrganization(slug: string): Promise<ActionResult<
 
 export async function getStudioOrganizationSlug(): Promise<string> {
   const cookieStore = await cookies();
-  return cookieStore.get(ORG_COOKIE)?.value ?? "exitmania";
+  const portalOrgSlug = await getPortalOrgSlug();
+  return portalOrgSlug ?? cookieStore.get(ORG_COOKIE)?.value ?? "exitmania";
+}
+
+export async function bindStudioOrganization(
+  slug: string,
+): Promise<ActionResult<{ slug: string; name: string }>> {
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("id, slug, name")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!data) return { success: false, error: "Organisation nicht gefunden." };
+
+    const cookieStore = await cookies();
+    cookieStore.set(ORG_COOKIE, data.slug, orgCookieOptions());
+    cookieStore.set(ORG_ID_COOKIE, data.id, orgCookieOptions());
+    return { success: true, data: { slug: data.slug, name: data.name } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Organisation konnte nicht gesetzt werden.",
+    };
+  }
+}
+
+export async function clearStudioOrganizationCookies(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.set(ORG_COOKIE, "", { ...orgCookieOptions(), maxAge: 0 });
+  cookieStore.set(ORG_ID_COOKIE, "", { ...orgCookieOptions(), maxAge: 0 });
 }
 
 /**

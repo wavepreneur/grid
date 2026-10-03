@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
+import { APP_HOME } from "@/lib/platform/app-paths";
 
-export default function ExitmaniaPage() {
-  redirect("/account");
+export default function LegacyExitmania() {
+  redirect(APP_HOME);
 }

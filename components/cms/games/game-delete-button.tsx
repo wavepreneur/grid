@@ -23,7 +23,7 @@ type Props = {
 export function GameDeleteButton({
   gameId,
   gameName,
-  redirectTo = "/admin/games",
+  redirectTo = "/app/games",
   className,
 }: Props) {
   const router = useRouter();

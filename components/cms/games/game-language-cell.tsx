@@ -58,7 +58,7 @@ export function GameLanguageCell({
           return (
             <Link
               key={language}
-              href={`/admin/games/${gameId}?lang=${language}`}
+              href={`/app/games/${gameId}?lang=${language}`}
               title={
                 isSource
                   ? `${label} · Ausgangssprache`
