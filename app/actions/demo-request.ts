@@ -1,7 +1,8 @@
 "use server";
 
-import { DEFAULT_HR_RECAP_EMAIL } from "@/lib/grid/flywheel";
 import type { ActionResult } from "@/lib/grid/types";
+
+const GRID_BRIEFING_TO = "dk@kineticpillar.co";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -52,7 +53,7 @@ export async function submitGridDemoRequest(input: {
       },
       body: JSON.stringify({
         from,
-        to: [DEFAULT_HR_RECAP_EMAIL],
+        to: [GRID_BRIEFING_TO],
         reply_to: email,
         subject: `GRID Demo: ${company}`,
         html,

@@ -4,23 +4,14 @@ export function GridMarketingFooter() {
   return (
     <footer className="grid-site-footer">
       <div className="grid-container">
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "space-between",
-            gap: 32,
-          }}
-        >
-          <div>
+        <div className="grid-footer-top">
+          <div className="grid-footer-brand">
             <p className="grid-brand-name">THE GRID</p>
-            <p className="grid-body" style={{ marginTop: 12, maxWidth: 400, fontSize: 14 }}>
-              A battle starts in 60 seconds.
-              <br />
-              Two teams or a thousand.
+            <p className="grid-footer-tag">
+              A battle starts in 60 seconds. Two teams or a thousand.
             </p>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13 }}>
+          <nav className="grid-footer-nav" aria-label="Footer">
             <Link href="/#access" className="grid-nav-link">
               Talk to The GRID
             </Link>
@@ -31,21 +22,26 @@ export function GridMarketingFooter() {
               Customer Login
             </Link>
             <Link href="/status" className="grid-footer-dev">
-              STATUS DEV
+              Status
             </Link>
-          </div>
+          </nav>
         </div>
-        <p
-          className="grid-body"
-          style={{
-            marginTop: 32,
-            paddingTop: 24,
-            borderTop: "1px solid var(--grid-border)",
-            fontSize: 12,
-          }}
-        >
-          The GRID is a product of Kinetic Pillar OÜ.
-        </p>
+
+        <div className="grid-footer-legal">
+          <p className="grid-footer-copy">
+            © 2026 Kinetic Pillar OÜ
+            <span>·</span>
+            All rights reserved.
+          </p>
+          <p className="grid-footer-vertical">A Vertical of Kinetic Pillar Infrastructure</p>
+          <p className="grid-footer-meta">
+            <span>Tallinn, Estonia</span>
+            <span>·</span>
+            <span>Remote-first</span>
+            <span>·</span>
+            <span>Built for adventure.</span>
+          </p>
+        </div>
       </div>
     </footer>
   );

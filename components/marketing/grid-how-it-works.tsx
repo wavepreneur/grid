@@ -5,38 +5,45 @@ import { useEffect, useState } from "react";
 const STEPS = [
   {
     n: "01",
-    title: "Start",
-    text: "A link, a name, a role. The team is in within seconds — no accounts, no one in a back room.",
+    title: "Roles pull",
+    text: "Teams land. Roles lock. They start working on each other — not on a host.",
   },
   {
     n: "02",
     title: "Play",
-    text: "It feels like a game. Quizzes, live sync. People do not notice they are being measured.",
+    text: "It feels like a game. Underneath, every role, attempt, and stall is kept.",
   },
   {
     n: "03",
-    title: "Connect",
-    text: "In the background GRID ties role, attempt, and time into one group record.",
+    title: "Depth",
+    text: "No coach can watch this many people at once. No coach can go this far into the data.",
   },
   {
     n: "04",
-    title: "Read",
-    text: "You see if the team worked, and where to get better — across countries and departments.",
+    title: "Ready",
+    text: "Seconds after the last move, the record is there. Who worked. Where it broke. What Monday needs.",
   },
 ] as const;
 
-const DEVICES = [
-  { id: "lead", label: "Lead", device: "Laptop", role: "Navigator" },
-  { id: "mobile", label: "Mobile", device: "Phone", role: "Solver" },
-  { id: "tablet", label: "Tablet", device: "Tablet", role: "Briefing" },
+const ROLES = [
+  { id: "nav", label: "Lead", device: "Laptop", role: "Navigator", finding: "Carried the brief", mark: "Lead" },
+  { id: "sol", label: "Field", device: "Phone", role: "Solver", finding: "Stalled · task 3", mark: "Hold" },
+  { id: "spot", label: "HQ", device: "Tablet", role: "Spotter", finding: "Hint unused", mark: "Gap" },
 ] as const;
 
 const INTEL = [
-  "Task 3 misread",
-  "Team 4 joined",
-  "Hint on bonus",
-  "Ops · DE",
+  "Ops stalled on task 3",
+  "Navigator carried Team 12",
+  "APAC finished first",
+  "41% unused the hint",
 ] as const;
+
+function screenFor(step: number, finding: string): { label: string; score: string } {
+  if (step >= 3) return { label: finding, score: "Read" };
+  if (step >= 2) return { label: "Watched", score: "12k" };
+  if (step >= 1) return { label: "Pulling", score: "Live" };
+  return { label: "Waiting", score: "—" };
+}
 
 export function GridHowItWorks() {
   const [step, setStep] = useState(0);
@@ -49,14 +56,13 @@ export function GridHowItWorks() {
     }
     const id = window.setInterval(() => {
       setStep((current) => (current + 1) % STEPS.length);
-    }, 2800);
+    }, 3200);
     return () => window.clearInterval(id);
   }, []);
 
-  const started = step >= 0;
   const playing = step >= 1;
-  const connected = step >= 2;
-  const read = step >= 3;
+  const deep = step >= 2;
+  const ready = step >= 3;
 
   return (
     <div className="grid-how">
@@ -80,55 +86,54 @@ export function GridHowItWorks() {
       </ol>
 
       <div className="grid-how-stage" aria-live="polite">
-        <div className={`grid-how-codes${started ? " is-on" : ""}`}>
-          <p className="grid-how-kicker">Team in</p>
+        <div className="grid-how-codes is-on">
+          <p className="grid-how-kicker">Roles in the room</p>
           <div className="grid-how-code-row">
-            {["K7M2QP", "N4H9WL", "B2TX8R"].map((code, index) => (
-              <span
-                key={code}
-                className="grid-how-code"
-                style={{ animationDelay: `${index * 0.12}s` }}
-              >
-                {code}
+            {ROLES.map((item, index) => (
+              <span key={item.id} className="grid-how-code" style={{ animationDelay: `${index * 0.12}s` }}>
+                {item.role}
               </span>
             ))}
           </div>
         </div>
 
         <div className="grid-how-devices">
-          {DEVICES.map((device, index) => (
-            <article
-              key={device.id}
-              className={`grid-how-device${playing ? " is-live" : ""}${read ? " is-solved" : ""}`}
-              style={{ animationDelay: `${index * 0.15}s` }}
-            >
-              <div className="grid-how-device-top">
-                <span className="grid-how-device-name">{device.label}</span>
-                <span className={`grid-how-live${playing ? " is-on" : ""}`}>
-                  {playing ? "Live" : "Idle"}
-                </span>
-              </div>
-              <p className="grid-how-device-meta">
-                {device.device} · {device.role}
-              </p>
-              <div className="grid-how-screen">
-                <span className="grid-how-screen-label">
-                  {read ? "Group closed" : connected ? "Signal tied" : playing ? "In play" : "Waiting"}
-                </span>
-                <span className="grid-how-score">{read ? "Team" : "—"}</span>
-              </div>
-            </article>
-          ))}
+          {ROLES.map((device, index) => {
+            const screen = screenFor(step, device.finding);
+            return (
+              <article
+                key={device.id}
+                className={`grid-how-device${playing ? " is-live" : ""}${ready ? " is-solved" : ""}`}
+                style={{ animationDelay: `${index * 0.15}s` }}
+              >
+                <div className="grid-how-device-top">
+                  <span className="grid-how-device-name">{device.label}</span>
+                  <span className={`grid-how-live${playing ? " is-on" : ""}`}>
+                    {ready ? "Read" : playing ? "Live" : "Idle"}
+                  </span>
+                </div>
+                <p className="grid-how-device-meta">
+                  {device.device} · {device.role}
+                </p>
+                <div className="grid-how-screen">
+                  <span className="grid-how-screen-label">{screen.label}</span>
+                  <span className="grid-how-score">{screen.score}</span>
+                </div>
+              </article>
+            );
+          })}
         </div>
 
-        <div className={`grid-how-data${connected ? " is-on" : ""}`}>
-          <p className="grid-how-kicker">Team intelligence</p>
+        <div className={`grid-how-data${deep ? " is-on" : ""}`}>
+          <p className="grid-how-kicker">What no host can see</p>
           <div className="grid-how-metrics">
             {INTEL.map((item) => (
               <span key={item}>{item}</span>
             ))}
           </div>
         </div>
+
+        <p className={`grid-how-ready${ready ? " is-on" : ""}`}>Record ready · 8 seconds</p>
       </div>
     </div>
   );

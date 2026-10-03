@@ -33,6 +33,9 @@ export function GridNav() {
           <a href="/#benefits" className="grid-nav-link">
             Benefits
           </a>
+          <a href="/#try" className="grid-nav-link">
+            The proof
+          </a>
           <a href="/#pricing" className="grid-nav-link">
             Plans
           </a>

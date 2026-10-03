@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MousePointerClick, Scale, Trophy } from "lucide-react";
+import { Camera, Smartphone, Users } from "lucide-react";
 import { EnterpriseBriefingForm } from "@/components/marketing/enterprise-briefing-form";
 import { GridBenefits } from "@/components/marketing/grid-benefits";
 import { GridFaq } from "@/components/marketing/grid-faq";
@@ -13,19 +13,19 @@ import "@/app/grid-marketing.css";
 
 const problems = [
   {
-    title: "A few clicks cannot start a thousand people",
-    text: "Self-guided team events for large groups still need a host, a briefing, and a week of setup. Nobody starts that on a Friday afternoon.",
-    icon: MousePointerClick,
+    title: "No one can just start.",
+    text: "Today you need a host, a tool, an app IT will not install. Phone-only people sit out. Laptop-only people sit out. The room never opens.",
+    icon: Smartphone,
   },
   {
-    title: "Afterward you only have a winner",
-    text: "A photo. A high score. You do not learn if the team worked, where to improve, or how countries and departments actually play together.",
-    icon: Trophy,
+    title: "Fun. Then a photo.",
+    text: "Today nobody learns how the team works. The booker leaves with nothing for Monday.",
+    icon: Camera,
   },
   {
-    title: "Scale and insight never meet",
-    text: "Tools that scale have no record. Tools with a record do not scale. The room of twelve is staffed. The room of a thousand is empty.",
-    icon: Scale,
+    title: "Two people. Or fifty thousand.",
+    text: "Today you pick twelve, or you pick scale. Nothing does both. Nothing is yours to shape.",
+    icon: Users,
   },
 ];
 
@@ -44,9 +44,9 @@ export function GridLandingPage() {
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            padding: "120px 24px 80px",
+            padding: "108px 24px 64px",
             textAlign: "center",
-            overflow: "hidden",
+            overflow: "visible",
           }}
         >
           <div
@@ -128,11 +128,11 @@ export function GridLandingPage() {
           <div className="grid-container">
             <GridReveal>
               <div style={{ textAlign: "center", marginBottom: 48, maxWidth: 720, marginInline: "auto" }}>
-                <span className="section-label">Why most team events stall</span>
+                <span className="section-label">Why The GRID exists</span>
                 <h2 className="grid-h2">
-                  Hard to start.
+                  Team events still fail.
                   <br />
-                  <span style={{ color: "var(--grid-cyan)" }}>Empty when they end.</span>
+                  <span style={{ color: "var(--grid-cyan)" }}>That is the gap.</span>
                 </h2>
               </div>
             </GridReveal>
@@ -156,8 +156,8 @@ export function GridLandingPage() {
             </div>
             <GridReveal delay={200}>
               <p className="grid-body" style={{ marginTop: 36, textAlign: "center", maxWidth: 560, marginInline: "auto" }}>
-                The GRID closes that gap. Simple to run. Strong at scale.
-                The record goes past the game.
+                So we built The GRID. A link. Any device.
+                Two people or fifty thousand. A record you can use.
               </p>
             </GridReveal>
           </div>
@@ -169,13 +169,14 @@ export function GridLandingPage() {
               <div style={{ textAlign: "center", marginBottom: 48, maxWidth: 740, marginInline: "auto" }}>
                 <span className="section-label">How The GRID works</span>
                 <h2 className="grid-h2">
-                  You send a link.
+                  They play.
                   <br />
-                  <span style={{ color: "var(--grid-cyan)" }}>The GRID runs the room.</span>
+                  <span style={{ color: "var(--grid-cyan)" }}>You get what no host can see.</span>
                 </h2>
                 <p className="grid-body" style={{ marginTop: 20 }}>
-                  No host. No accounts. Up to two hours — one team or thousands.
-                  After play you read the group: if it worked, and where to get better.
+                  Roles pull on each other. Every attempt is kept. A coach cannot
+                  watch this many people — and cannot go this deep. Seconds after
+                  the last move, the record is already there.
                 </p>
               </div>
             </GridReveal>
@@ -225,32 +226,67 @@ export function GridLandingPage() {
         <section id="try" className="grid-section" style={{ background: "var(--grid-bg-elevated)" }}>
           <div className="grid-container">
             <GridReveal>
-            <div className="grid-card grid-try-card" style={{ padding: "clamp(28px, 5vw, 48px)", maxWidth: 800, marginInline: "auto" }}>
-              <span className="section-label">The proof</span>
-              <h2 className="grid-h2" style={{ marginBottom: 16 }}>
-                Exitmania already runs
-                <br />
-                <span style={{ color: "var(--grid-cyan)" }}>one team — or thousands.</span>
-              </h2>
-              <p className="grid-body" style={{ marginBottom: 28, maxWidth: 560 }}>
-                Book an outdoor game in the city you choose, an indoor game, or an online
-                game. Start with one team. Feel the join, the play, the end.
-                Same room The GRID keeps for the company.
-              </p>
-              <div className="grid-hero-cta-row" style={{ justifyContent: "flex-start" }}>
-                <a
-                  href="https://exitmania.com"
-                  className="grid-cta"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Play a session
-                </a>
-                <Link href="#access" className="grid-cta-outline">
-                  Or talk to The GRID
-                </Link>
+              <div className="grid-try">
+                <span className="section-label">The proof</span>
+                <h2 className="grid-h2">
+                  Exitmania already runs
+                  <br />
+                  <span style={{ color: "var(--grid-cyan)" }}>one team — or thousands.</span>
+                </h2>
+                <p className="grid-body">
+                  Book a game and play today. Outdoor in the city you pick,
+                  indoor, or online. Same room The GRID keeps for the company.
+                </p>
+
+                <div className="grid-try-surfaces">
+                  <a
+                    href="https://exitmania.com"
+                    className="grid-try-surface"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <strong>Outdoor</strong>
+                    <span>A city. A route. Your phones.</span>
+                  </a>
+                  <a
+                    href="https://exitmania.com"
+                    className="grid-try-surface"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <strong>Indoor</strong>
+                    <span>Stations. Codes. One building.</span>
+                  </a>
+                  <a
+                    href="https://exitmania.com"
+                    className="grid-try-surface"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <strong>Online</strong>
+                    <span>Same room. Anywhere.</span>
+                  </a>
+                </div>
+
+                <p className="grid-try-price">
+                  From <strong>€9.90</strong> per person
+                  <span>1,900+ cities · start after booking</span>
+                </p>
+
+                <div className="grid-hero-cta-row">
+                  <a
+                    href="https://exitmania.com"
+                    className="grid-cta"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Play a session
+                  </a>
+                  <Link href="#access" className="grid-cta-outline">
+                    Or talk to The GRID
+                  </Link>
+                </div>
               </div>
-            </div>
             </GridReveal>
           </div>
         </section>
