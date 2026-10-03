@@ -34,7 +34,7 @@ import {
   withLinkLocale,
 } from "@/lib/cms/game-i18n";
 import { translateUnitsNative } from "@/lib/cms/gemini-translate";
-import { generateGameSlug } from "@/lib/grid/codes";
+import { generateGameSlug, isCityDerivedGameCode, mintStableGameCode } from "@/lib/grid/codes";
 import {
   DEFAULT_RUNTIME_PROFILES,
   buildLayerSnapshotMeta,
@@ -2260,4 +2260,107 @@ export async function listGameStationCodes(
       error: error instanceof Error ? error.message : "Codes konnten nicht geladen werden.",
     };
   }
+}
+
+export async function repairDerivedGameCodes(): Promise<
+  ActionResult<{ repaired: number; exitmaniaUpdated: number }>
+> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const taken = new Set<string>();
+    const derived: Array<{ id: string; slug: string; city_slug: string | null }> = [];
+
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from("studio_games")
+        .select("id, slug, city_slug")
+        .eq("organization_id", orgId)
+        .eq("is_template", false)
+        .order("id")
+        .range(from, from + 999);
+      if (error) throw new Error(error.message);
+      const rows = data ?? [];
+      for (const row of rows) {
+        const slug = typeof row.slug === "string" ? row.slug : "";
+        if (slug) taken.add(slug);
+        if (isCityDerivedGameCode(slug)) {
+          derived.push({
+            id: String(row.id),
+            slug,
+            city_slug: typeof row.city_slug === "string" ? row.city_slug : null,
+          });
+        }
+      }
+      if (rows.length < 1000) break;
+    }
+
+    const remaps: Array<{ from: string; to: string; city_slug: string | null }> = [];
+    const now = new Date().toISOString();
+    for (const game of derived) {
+      const next = mintStableGameCode(taken);
+      const { error } = await supabase
+        .from("studio_games")
+        .update({ slug: next, updated_at: now })
+        .eq("id", game.id)
+        .eq("organization_id", orgId);
+      if (error) throw new Error(error.message);
+      remaps.push({ from: game.slug, to: next, city_slug: game.city_slug });
+    }
+
+    const remapByOld = new Map(remaps.map((row) => [row.from, row.to]));
+    const { data: events, error: eventError } = await supabase
+      .from("events")
+      .select("id, content_config")
+      .filter("content_config->>content_pack_slug", "like", "fp-%");
+    if (eventError) throw new Error(eventError.message);
+    for (const event of events ?? []) {
+      const current =
+        event.content_config && typeof event.content_config === "object"
+          ? (event.content_config as Record<string, unknown>)
+          : {};
+      const old = typeof current.content_pack_slug === "string" ? current.content_pack_slug : "";
+      const next = remapByOld.get(old);
+      if (!next) continue;
+      const { error } = await supabase
+        .from("events")
+        .update({ content_config: { ...current, content_pack_slug: next } })
+        .eq("id", event.id);
+      if (error) throw new Error(error.message);
+    }
+
+    let exitmaniaUpdated = 0;
+    if (remaps.length > 0) {
+      exitmaniaUpdated = await pushGameCodesToExitmania(remaps);
+    }
+
+    return { success: true, data: { repaired: remaps.length, exitmaniaUpdated } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Spiel-Codes konnten nicht korrigiert werden.",
+    };
+  }
+}
+
+async function pushGameCodesToExitmania(
+  remaps: Array<{ from: string; to: string; city_slug: string | null }>,
+): Promise<number> {
+  const base = (process.env.EXITMANIA_APP_URL ?? "").trim().replace(/\/$/, "");
+  const apiKey = process.env.GRID_BOOKING_API_KEY?.trim();
+  if (!base || !apiKey) return 0;
+  const response = await fetch(`${base}/api/internal/grid/game-codes`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-grid-api-key": apiKey,
+    },
+    body: JSON.stringify({ remaps }),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error("Exitmania hat die Spiel-Codes nicht übernommen.");
+  }
+  const json = (await response.json()) as { updated?: number };
+  return typeof json.updated === "number" ? json.updated : 0;
 }

@@ -1,4 +1,5 @@
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const STABLE_GAME_CODE_RE = /^[abcdefghjkmnpqrstuvwxyz23456789]{10}$/;
 
 export function generateInviteCode(length = 8): string {
   return generateCode(length);
@@ -7,6 +8,26 @@ export function generateInviteCode(length = 8): string {
 /** Stable partner key for studio_games.slug — never derived from the title. */
 export function generateGameSlug(length = 10): string {
   return generateCode(length).toLowerCase();
+}
+
+export function isStableGameCode(value: string): boolean {
+  return STABLE_GAME_CODE_RE.test(value.trim().toLowerCase());
+}
+
+/** Seed leftover: `fp-wolfenbuttel` instead of `hew9geeus2`. */
+export function isCityDerivedGameCode(value: string): boolean {
+  return value.trim().toLowerCase().startsWith("fp-");
+}
+
+export function mintStableGameCode(taken: Set<string>): string {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const candidate = generateGameSlug();
+    if (!taken.has(candidate)) {
+      taken.add(candidate);
+      return candidate;
+    }
+  }
+  throw new Error("Spiel-Code konnte nicht erzeugt werden.");
 }
 
 export function generateJoinCode(length = 6): string {

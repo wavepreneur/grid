@@ -44,7 +44,7 @@ import { parseLinkLayer, parseLinkOverrides } from "@/lib/cms/game-link-config";
 import { surfaceToPreset, taskToOpenerArrivalQuiz } from "@/lib/cms/game-slots";
 import { seedCityShellTranslations } from "@/lib/cms/city-shell-i18n";
 import { parseGpsOverride, type GpsPin } from "@/lib/cms/gps-defaults";
-import { generateGameSlug } from "@/lib/grid/codes";
+import { generateGameSlug, mintStableGameCode } from "@/lib/grid/codes";
 import { parseCustomerStationCode, randomStationAccessCode } from "@/lib/grid/stations";
 import type { ActionResult } from "@/lib/grid/types";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -2286,7 +2286,7 @@ export async function seedComposeGamesForRecipe(recipeId: string): Promise<
         id: crypto.randomUUID(),
         organization_id: orgId,
         blueprint_id: origin!.blueprint_id ?? null,
-        slug: mintUniqueSlug(`fp-${city.city_slug || city.slug}`, slugs),
+        slug: mintStableGameCode(slugs),
         name,
         description: typeof shell.description === "string" ? shell.description : "",
         language,

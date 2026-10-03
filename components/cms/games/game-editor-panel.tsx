@@ -481,8 +481,8 @@ export function GameEditorPanel({
               {game.city_slug ? <CopySlugChip label="Stadt-Slug" value={game.city_slug} /> : null}
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              Der Spiel-Code ändert sich nicht, wenn du den Titel umbenennst. Stadt-Slug kannst du
-              pro Buchung tauschen — eine Mission, viele Städte.
+              Der Spiel-Code ist die Wahrheit — Buchstaben und Zahlen, unabhängig von Titel und
+              Stadt. Stadt-Slug kannst du pro Buchung tauschen.
             </p>
           </div>
 
