@@ -29,13 +29,13 @@ import {
 } from "@/components/cms/studio-ui";
 import { buildGameSlots, type GameSlot } from "@/lib/cms/game-slots";
 import {
-  groupLinksByLayerOnLink,
   parseLinkLayer,
   parseLinkOverrides,
   parseMissionUnlock,
   roleLabelShort,
   type MissionUnlock,
 } from "@/lib/cms/game-link-config";
+import type { TaskLibraryItem } from "@/app/actions/cms/tasks";
 import { useDebouncedValue, useTaskLibrarySearch, useTaskLibraryTags } from "@/lib/hooks/use-task-library-search";
 import { useStudioCache } from "@/lib/platform/studio-cache";
 import type { ContentMode, RoleAssignment } from "@/lib/cms/layer-model";
@@ -92,6 +92,111 @@ function extendTagIndex(
     tags: [...unique].sort((a, b) => a.localeCompare(b, "de", { sensitivity: "base" })),
     sets,
   };
+}
+
+function PickedPoolTask({
+  title,
+  taskId,
+  gameId,
+  onClear,
+}: {
+  title: string;
+  taskId: string;
+  gameId: string;
+  onClear: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-card px-4 py-3">
+      <p className="text-sm font-semibold text-foreground">{title}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Link
+          href={`/app/tasks/${taskId}?returnTo=/app/games/${gameId}`}
+          className="text-sm font-medium text-teal-700 underline-offset-2 hover:underline"
+        >
+          Im Pool bearbeiten
+        </Link>
+        <button
+          type="button"
+          className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+          onClick={onClear}
+        >
+          Andere wählen
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PoolTaskPicker({
+  label,
+  search,
+  onSearch,
+  placeholder,
+  tagIndex,
+  selectedTags,
+  onTagsChange,
+  tasks,
+  empty,
+  onPick,
+  meta,
+}: {
+  label: string;
+  search: string;
+  onSearch: (value: string) => void;
+  placeholder: string;
+  tagIndex: { tags: string[]; sets: string[][] };
+  selectedTags: string[];
+  onTagsChange: (tags: string[]) => void;
+  tasks: TaskLibraryItem[];
+  empty: string;
+  onPick: (task: TaskLibraryItem) => void;
+  meta?: (task: TaskLibraryItem) => string;
+}) {
+  return (
+    <div className="space-y-2">
+      <StudioLabel>{label}</StudioLabel>
+      <StudioInput
+        value={search}
+        onChange={(e) => onSearch(e.target.value)}
+        placeholder={placeholder}
+      />
+      <PoolTagFilters
+        tags={tagIndex.tags}
+        sets={tagIndex.sets}
+        selected={selectedTags}
+        onChange={onTagsChange}
+      />
+      <div className="max-h-44 space-y-1 overflow-y-auto rounded-2xl border border-border bg-card p-2">
+        {tasks.length === 0 ? (
+          <p className="px-2 py-3 text-xs text-muted-foreground">{empty}</p>
+        ) : (
+          tasks.map((task) => (
+            <button
+              key={task.id}
+              type="button"
+              onClick={() => onPick(task)}
+              className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-secondary"
+            >
+              <span className="min-w-0 flex-1 truncate font-medium">{task.title}</span>
+              <span className="flex shrink-0 items-center gap-1.5">
+                {task.tags.slice(0, 1).map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
+                  >
+                    {tag}
+                  </span>
+                ))}
+                {meta ? (
+                  <span className="text-xs text-muted-foreground">{meta(task)}</span>
+                ) : null}
+              </span>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
 }
 
 function PoolTagFilters({
@@ -203,6 +308,9 @@ export function GameSlotsPanel({
   const [openerTitle, setOpenerTitle] = useState("");
   const [quizPoints, setQuizPoints] = useState(0);
   const [openerSearch, setOpenerSearch] = useState("");
+  const [bonusSearch, setBonusSearch] = useState("");
+  const [bonusTags, setBonusTags] = useState<string[]>([]);
+  const [bonusTitles, setBonusTitles] = useState<Record<string, string>>({});
   const [bonusBindings, setBonusBindings] = useState<BonusBinding[]>([]);
   const [visibleTo, setVisibleTo] = useState<RoleAssignment>("team");
   const [endsGame, setEndsGame] = useState(false);
@@ -227,6 +335,8 @@ export function GameSlotsPanel({
     quizOnly: true,
     tags: openerTags,
   });
+  const debouncedBonus = useDebouncedValue(bonusSearch, 200);
+  const { data: bonusLibrary = [] } = useTaskLibrarySearch(debouncedBonus, { tags: bonusTags });
   const poolTagIndex = useMemo(
     () => extendTagIndex(libraryTagIndex, library),
     [libraryTagIndex, library],
@@ -234,6 +344,10 @@ export function GameSlotsPanel({
   const openerTagIndex = useMemo(
     () => extendTagIndex(libraryTagIndex, quizLibrary),
     [libraryTagIndex, quizLibrary],
+  );
+  const bonusTagIndex = useMemo(
+    () => extendTagIndex(libraryTagIndex, bonusLibrary),
+    [libraryTagIndex, bonusLibrary],
   );
 
   useEffect(() => {
@@ -243,8 +357,6 @@ export function GameSlotsPanel({
   }, [gameId, initialLinks.map((link) => `${link.id}:${link.sort_order}`).join("|")]);
 
   const slots = useMemo(() => buildGameSlots(links), [links]);
-  const grouped = useMemo(() => groupLinksByLayerOnLink(links), [links]);
-  const bonusCandidates = grouped[3];
 
   const activationHint =
     surface === "outdoor"
@@ -292,7 +404,10 @@ export function GameSlotsPanel({
     setOpenerTitle(slot.quiz?.title ?? "");
     setQuizPoints(slot.quiz?.points ?? overrides.opener_points ?? 0);
     setOpenerSearch("");
-    setBonusBindings(
+    setOpenerTags([]);
+    setBonusSearch("");
+    setBonusTags([]);
+    const nextBindings =
       slot.bonusBindings.length > 0
         ? slot.bonusBindings
         : slot.bonusLink
@@ -308,8 +423,16 @@ export function GameSlotsPanel({
                 when: { type: "immediate" },
               },
             ]
-          : [],
-    );
+          : [];
+    const titles: Record<string, string> = {};
+    for (const binding of nextBindings) {
+      const linked =
+        slot.bonusLinks.find((link) => link.task_id === binding.task_id) ??
+        (slot.bonusLink?.task_id === binding.task_id ? slot.bonusLink : null);
+      if (linked?.task.title) titles[binding.task_id] = linked.task.title;
+    }
+    setBonusTitles(titles);
+    setBonusBindings(nextBindings);
     setVisibleTo(
       overrides.visible_to === "alpha" ||
         overrides.visible_to === "beta" ||
@@ -866,81 +989,34 @@ export function GameSlotsPanel({
               {quizEnabled ? (
                 <div className="mt-4 space-y-4">
                   {openerTaskId ? (
-                    <div className="rounded-2xl border border-border bg-card px-4 py-3">
-                      <p className="text-sm font-semibold text-foreground">
-                        {openerTitle || "Quiz-Aufgabe gewählt"}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <Link
-                          href={`/app/tasks/${openerTaskId}?returnTo=/app/games/${gameId}`}
-                          className="text-sm font-medium text-teal-700 underline-offset-2 hover:underline"
-                        >
-                          Im Pool bearbeiten
-                        </Link>
-                        <button
-                          type="button"
-                          className="text-sm text-muted-foreground underline-offset-2 hover:underline"
-                          onClick={() => {
-                            setOpenerTaskId("");
-                            setOpenerTitle("");
-                          }}
-                        >
-                          Andere wählen
-                        </button>
-                      </div>
-                    </div>
+                    <PickedPoolTask
+                      title={openerTitle || "Quiz-Aufgabe gewählt"}
+                      taskId={openerTaskId}
+                      gameId={gameId}
+                      onClear={() => {
+                        setOpenerTaskId("");
+                        setOpenerTitle("");
+                      }}
+                    />
                   ) : (
-                    <div className="space-y-2">
-                      <StudioLabel>Quiz-Aufgabe aus dem Pool</StudioLabel>
-                      <StudioInput
-                        value={openerSearch}
-                        onChange={(e) => setOpenerSearch(e.target.value)}
-                        placeholder="Suchen (nur Multiple Choice)…"
-                      />
-                      <PoolTagFilters
-                        tags={openerTagIndex.tags}
-                        sets={openerTagIndex.sets}
-                        selected={openerTags}
-                        onChange={setOpenerTags}
-                      />
-                      <div className="max-h-44 space-y-1 overflow-y-auto rounded-2xl border border-border bg-card p-2">
-                        {quizLibrary.length === 0 ? (
-                          <p className="px-2 py-3 text-xs text-muted-foreground">
-                            Keine Quiz-Aufgabe gefunden. Lege im Pool eine Aufgabe mit Antworttyp
-                            „Auswahl“ an (Titel, Bild, Beschreibung, Side-Fact).
-                          </p>
-                        ) : (
-                          quizLibrary.map((task) => (
-                            <button
-                              key={task.id}
-                              type="button"
-                              onClick={() => {
-                                setOpenerTaskId(task.id);
-                                setOpenerTitle(task.title);
-                              }}
-                              className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-secondary"
-                            >
-                              <span className="min-w-0 flex-1 truncate font-medium">
-                                {task.title}
-                              </span>
-                              <span className="flex shrink-0 items-center gap-1.5">
-                                {task.tags.slice(0, 1).map((tag) => (
-                                  <span
-                                    key={tag}
-                                    className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                                <span className="text-xs text-muted-foreground">
-                                  {task.answer_type === "multi_choice" ? "Mehrfach" : "MC"}
-                                </span>
-                              </span>
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    </div>
+                    <PoolTaskPicker
+                      label="Quiz-Aufgabe aus dem Pool"
+                      search={openerSearch}
+                      onSearch={setOpenerSearch}
+                      placeholder="Suchen (nur Multiple Choice)…"
+                      tagIndex={openerTagIndex}
+                      selectedTags={openerTags}
+                      onTagsChange={setOpenerTags}
+                      tasks={quizLibrary}
+                      empty="Keine Quiz-Aufgabe gefunden. Lege im Pool eine Aufgabe mit Antworttyp „Auswahl“ an (Titel, Bild, Beschreibung, Side-Fact)."
+                      onPick={(task) => {
+                        setOpenerTaskId(task.id);
+                        setOpenerTitle(task.title);
+                      }}
+                      meta={(task) =>
+                        task.answer_type === "multi_choice" ? "Mehrfach" : "MC"
+                      }
+                    />
                   )}
 
                   <div className="max-w-xs">
@@ -1217,7 +1293,7 @@ export function GameSlotsPanel({
                     setBonusBindings((prev) => [
                       ...prev,
                       {
-                        task_id: bonusCandidates[0]?.task_id ?? library[0]?.id ?? "",
+                        task_id: "",
                         role: "team",
                         when: { type: "immediate" },
                       },
@@ -1263,30 +1339,45 @@ export function GameSlotsPanel({
                       </div>
 
                       <div>
-                        <StudioLabel>Inhalt</StudioLabel>
-                        <StudioSelect
-                          value={binding.task_id}
-                          onChange={(e) => {
-                            const task_id = e.target.value;
-                            setBonusBindings((prev) =>
-                              prev.map((b, i) => (i === index ? { ...b, task_id } : b)),
-                            );
-                          }}
-                        >
-                          <option value="">Aufgabe wählen…</option>
-                          {bonusCandidates.map((b) => (
-                            <option key={b.task_id} value={b.task_id}>
-                              {b.task.title}
-                            </option>
-                          ))}
-                          {library
-                            .filter((t) => !bonusCandidates.some((b) => b.task_id === t.id))
-                            .map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.title} (Pool)
-                              </option>
-                            ))}
-                        </StudioSelect>
+                        {binding.task_id ? (
+                          <PickedPoolTask
+                            title={
+                              bonusTitles[binding.task_id] ??
+                              links.find((link) => link.task_id === binding.task_id)?.task
+                                .title ??
+                              "Aufgabe gewählt"
+                            }
+                            taskId={binding.task_id}
+                            gameId={gameId}
+                            onClear={() =>
+                              setBonusBindings((prev) =>
+                                prev.map((b, i) => (i === index ? { ...b, task_id: "" } : b)),
+                              )
+                            }
+                          />
+                        ) : (
+                          <PoolTaskPicker
+                            label="Inhalt — Aufgabe aus dem Pool"
+                            search={bonusSearch}
+                            onSearch={setBonusSearch}
+                            placeholder="Suchen…"
+                            tagIndex={bonusTagIndex}
+                            selectedTags={bonusTags}
+                            onTagsChange={setBonusTags}
+                            tasks={bonusLibrary.filter(
+                              (task) => task.id !== editSlot.levelLink.task_id,
+                            )}
+                            empty="Keine Aufgabe gefunden. Anderes Schlagwort oder im Pool anlegen."
+                            onPick={(task) => {
+                              setBonusTitles((prev) => ({ ...prev, [task.id]: task.title }));
+                              setBonusBindings((prev) =>
+                                prev.map((b, i) =>
+                                  i === index ? { ...b, task_id: task.id } : b,
+                                ),
+                              );
+                            }}
+                          />
+                        )}
                       </div>
 
                       <div>
