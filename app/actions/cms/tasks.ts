@@ -158,23 +158,31 @@ export type TaskLibraryTagIndex = {
   sets: string[][];
 };
 
+const TASK_TAG_PAGE = 1000;
+const TASK_TAG_SCAN_MAX = 50_000;
+
 /** Distinct tags plus per-task sets (for AND-filters in Studio pickers). */
 export async function listTaskLibraryTags(): Promise<ActionResult<TaskLibraryTagIndex>> {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
-    const { data, error } = await supabase
-      .from("studio_tasks")
-      .select("tags")
-      .eq("is_active", true)
-      .or(`organization_id.eq.${orgId},organization_id.is.null`)
-      .limit(2000);
-
-    if (error) throw new Error(error.message);
+    const rows: Array<{ tags: string[] | null }> = [];
+    for (let from = 0; from < TASK_TAG_SCAN_MAX; from += TASK_TAG_PAGE) {
+      const { data, error } = await supabase
+        .from("studio_tasks")
+        .select("tags")
+        .eq("is_active", true)
+        .or(`organization_id.eq.${orgId},organization_id.is.null`)
+        .order("id", { ascending: true })
+        .range(from, from + TASK_TAG_PAGE - 1);
+      if (error) throw new Error(error.message);
+      rows.push(...((data ?? []) as Array<{ tags: string[] | null }>));
+      if ((data ?? []).length < TASK_TAG_PAGE) break;
+    }
 
     const unique = new Set<string>();
     const sets: string[][] = [];
-    for (const row of data ?? []) {
+    for (const row of rows) {
       const taskTags = [
         ...new Set(
           ((row.tags as string[] | null) ?? []).map((tag) => tag.trim()).filter(Boolean),

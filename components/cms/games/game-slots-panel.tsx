@@ -76,6 +76,24 @@ function remainingPoolTags(sets: string[][], selected: string[]) {
   return [...next].sort((a, b) => a.localeCompare(b, "de", { sensitivity: "base" }));
 }
 
+function extendTagIndex(
+  index: { tags: string[]; sets: string[][] } | undefined,
+  tasks: Array<{ tags: string[] }>,
+) {
+  const unique = new Set(index?.tags ?? []);
+  const sets = [...(index?.sets ?? [])];
+  for (const task of tasks) {
+    const taskTags = [...new Set((task.tags ?? []).map((tag) => tag.trim()).filter(Boolean))];
+    if (taskTags.length === 0) continue;
+    sets.push(taskTags);
+    for (const tag of taskTags) unique.add(tag);
+  }
+  return {
+    tags: [...unique].sort((a, b) => a.localeCompare(b, "de", { sensitivity: "base" })),
+    sets,
+  };
+}
+
 function PoolTagFilters({
   tags,
   sets,
@@ -204,13 +222,19 @@ export function GameSlotsPanel({
   const debounced = useDebouncedValue(search, 200);
   const debouncedOpener = useDebouncedValue(openerSearch, 200);
   const { data: libraryTagIndex } = useTaskLibraryTags();
-  const libraryTags = libraryTagIndex?.tags ?? [];
-  const libraryTagSets = libraryTagIndex?.sets ?? [];
   const { data: library = [] } = useTaskLibrarySearch(debounced, { tags: poolTags });
   const { data: quizLibrary = [] } = useTaskLibrarySearch(debouncedOpener, {
     quizOnly: true,
     tags: openerTags,
   });
+  const poolTagIndex = useMemo(
+    () => extendTagIndex(libraryTagIndex, library),
+    [libraryTagIndex, library],
+  );
+  const openerTagIndex = useMemo(
+    () => extendTagIndex(libraryTagIndex, quizLibrary),
+    [libraryTagIndex, quizLibrary],
+  );
 
   useEffect(() => {
     setLinks(initialLinks);
@@ -748,8 +772,8 @@ export function GameSlotsPanel({
         </div>
 
         <PoolTagFilters
-          tags={libraryTags}
-          sets={libraryTagSets}
+          tags={poolTagIndex.tags}
+          sets={poolTagIndex.sets}
           selected={poolTags}
           onChange={(next) => {
             setPoolTags(next);
@@ -874,8 +898,8 @@ export function GameSlotsPanel({
                         placeholder="Suchen (nur Multiple Choice)…"
                       />
                       <PoolTagFilters
-                        tags={libraryTags}
-                        sets={libraryTagSets}
+                        tags={openerTagIndex.tags}
+                        sets={openerTagIndex.sets}
                         selected={openerTags}
                         onChange={setOpenerTags}
                       />

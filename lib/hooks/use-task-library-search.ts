@@ -44,7 +44,8 @@ export function useTaskLibraryTags() {
       if (!result.success) throw new Error(result.error);
       return result.data!;
     },
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchOnMount: "always",
   });
 }
 
