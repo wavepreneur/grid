@@ -526,6 +526,16 @@ export async function updateGame(input: UpdateGameInput): Promise<ActionResult<S
     if (input.layer1_pack_id !== undefined) payload.layer1_pack_id = input.layer1_pack_id;
     if (input.layer2_pack_id !== undefined) payload.layer2_pack_id = input.layer2_pack_id;
     if (input.layer3_pack_id !== undefined) payload.layer3_pack_id = input.layer3_pack_id;
+    if (input.collection_id !== undefined) {
+      if (input.collection_id) {
+        const orgId = await getStudioOrganizationId();
+        const collection = await getOwnedCollection(supabase, orgId, input.collection_id);
+        if (!collection) return { success: false, error: "Collection nicht gefunden." };
+        payload.collection_id = collection.id;
+      } else {
+        payload.collection_id = null;
+      }
+    }
 
     if (input.layer1_pack_id) {
       const { data: cityPack } = await supabase

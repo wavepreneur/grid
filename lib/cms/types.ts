@@ -280,6 +280,7 @@ export type UpdateGameInput = {
   layer1_pack_id?: string | null;
   layer2_pack_id?: string | null;
   layer3_pack_id?: string | null;
+  collection_id?: string | null;
 };
 
 export { DEFAULT_RUNTIME_PROFILES };

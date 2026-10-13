@@ -70,7 +70,7 @@ export function ComposeGamesPanel() {
     setLayer2Name("Mission wählen");
     setLayer3Name("Team wählen");
     setSurface("outdoor");
-    setCollectionId(collections[0]?.id ?? null);
+    setCollectionId(null);
   }
 
   function selectRecipe(recipe: StudioComposeRecipe) {

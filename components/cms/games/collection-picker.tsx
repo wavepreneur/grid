@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createStudioCollection } from "@/app/actions/cms/collections";
 import { StudioButton, StudioInput, StudioLabel } from "@/components/cms/studio-ui";
 import { StudioSelect } from "@/components/cms/shared/studio-listbox";
@@ -25,9 +25,14 @@ export function CollectionPicker({
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<StudioCollection[]>([]);
 
-  async function handleCreate(event: React.FormEvent) {
-    event.preventDefault();
+  const options = useMemo(() => {
+    const seen = new Set(collections.map((collection) => collection.id));
+    return [...collections, ...created.filter((collection) => !seen.has(collection.id))];
+  }, [collections, created]);
+
+  async function handleCreate() {
     setError(null);
     setSaving(true);
     try {
@@ -40,6 +45,7 @@ export function CollectionPicker({
         setError("Collection konnte nicht erstellt werden.");
         return;
       }
+      setCreated((current) => [...current, result.data!]);
       onCreated?.(result.data);
       onChange(result.data.id);
       setName("");
@@ -65,7 +71,7 @@ export function CollectionPicker({
         }}
       >
         <option value="">Keine Collection</option>
-        {collections.map((collection) => (
+        {options.map((collection) => (
           <option key={collection.id} value={collection.id}>
             {collection.name}
           </option>
@@ -73,17 +79,24 @@ export function CollectionPicker({
         <option value="__new">Neue Collection…</option>
       </StudioSelect>
       {creating ? (
-        <form onSubmit={handleCreate} className="mt-2 flex flex-wrap items-end gap-2">
+        <div className="mt-2 flex flex-wrap items-end gap-2">
           <div className="min-w-[12rem] flex-1">
             <StudioInput
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="z. B. First Profiler"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void handleCreate();
+                }
+              }}
+              placeholder="z. B. KIRA"
               required
               minLength={2}
             />
           </div>
-          <StudioButton type="submit" size="sm" disabled={saving}>
+          <StudioButton type="button" size="sm" disabled={saving} onClick={() => void handleCreate()}>
             {saving ? "Wird angelegt…" : "Anlegen"}
           </StudioButton>
           <StudioButton
@@ -98,7 +111,7 @@ export function CollectionPicker({
           >
             Abbrechen
           </StudioButton>
-        </form>
+        </div>
       ) : null}
       {error ? <p className="mt-1 text-xs font-semibold text-destructive">{error}</p> : null}
     </div>

@@ -23,6 +23,11 @@ import { GameSlotsPanel } from "@/components/cms/games/game-slots-panel";
 import { GameDeleteButton } from "@/components/cms/games/game-delete-button";
 import { GameDuplicateButton } from "@/components/cms/games/game-duplicate-button";
 import { GameLivePushButton } from "@/components/cms/games/game-live-push-button";
+import { CollectionPicker } from "@/components/cms/games/collection-picker";
+import {
+  useInvalidateStudioCollections,
+  useStudioCollections,
+} from "@/lib/hooks/use-studio-collections";
 import { RecipeCityTranslatePanel } from "@/components/cms/games/recipe-city-translate-panel";
 import { ImageUploadField } from "@/components/cms/shared/image-upload-field";
 import { useStudioCache } from "@/lib/platform/studio-cache";
@@ -140,6 +145,9 @@ export function GameEditorPanel({
   const router = useRouter();
   const cache = useStudioCache();
   const invalidatePacks = useInvalidateStudioPacks();
+  const { data: collectionOverview } = useStudioCollections();
+  const invalidateCollections = useInvalidateStudioCollections();
+  const collections = collectionOverview?.collections ?? [];
   const [game, setGame] = useState<GameEditorState>(() => toEditorState(initialGame));
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -194,6 +202,7 @@ export function GameEditorPanel({
         gps_enabled: game.gps_enabled,
         farewell_text: game.farewell_text,
         logo_url: game.logo_url,
+        collection_id: game.collection_id ?? null,
         feature_flags: game.feature_flags ?? {},
         runtime_profiles: parseRuntimeProfiles(game.runtime_profiles),
       }),
@@ -208,7 +217,12 @@ export function GameEditorPanel({
     startTransition(async () => {
       const result = await updateGame(
         recipeBound
-          ? { id: game.id, name: game.name, city_slug: game.city_slug }
+          ? {
+              id: game.id,
+              name: game.name,
+              city_slug: game.city_slug,
+              collection_id: game.collection_id ?? null,
+            }
           : {
               id: game.id,
               name: game.name,
@@ -219,6 +233,7 @@ export function GameEditorPanel({
               gps_enabled: game.gps_enabled,
               farewell_text: game.farewell_text,
               logo_url: game.logo_url,
+              collection_id: game.collection_id ?? null,
               feature_flags: game.feature_flags ?? {},
               runtime_profiles: parseRuntimeProfiles(game.runtime_profiles),
             },
@@ -240,10 +255,12 @@ export function GameEditorPanel({
           gps_enabled: next.gps_enabled,
           farewell_text: next.farewell_text,
           logo_url: next.logo_url,
+          collection_id: next.collection_id ?? null,
           feature_flags: next.feature_flags ?? {},
           runtime_profiles: parseRuntimeProfiles(next.runtime_profiles),
         }),
       );
+      invalidateCollections();
       setMessage("Spiel gespeichert.");
     });
   }
@@ -282,6 +299,7 @@ export function GameEditorPanel({
           gps_enabled: nextGame.gps_enabled,
           farewell_text: nextGame.farewell_text,
           logo_url: nextGame.logo_url,
+          collection_id: nextGame.collection_id ?? null,
           runtime_profiles: parseRuntimeProfiles(nextGame.runtime_profiles),
         }),
       );
@@ -493,6 +511,14 @@ export function GameEditorPanel({
                 value={game.name}
                 onChange={(e) => setGame({ ...game, name: e.target.value })}
                 required
+              />
+            </div>
+            <div className="md:col-span-2">
+              <CollectionPicker
+                value={game.collection_id ?? null}
+                collections={collections}
+                onChange={(collection_id) => setGame({ ...game, collection_id })}
+                onCreated={() => invalidateCollections()}
               />
             </div>
             <div className="md:col-span-2">

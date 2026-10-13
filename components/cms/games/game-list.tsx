@@ -383,7 +383,9 @@ export function GameList({ initialTemplates = [] }: Props) {
     setLayer3PackId(null);
     setLayer1Label("");
     setLayer2Label("");
-    setCollectionId(collections[0]?.id ?? null);
+    setCollectionId(
+      collectionTab !== "alle" && collectionTab !== "none" ? collectionTab : null,
+    );
     setError(null);
   }
 
