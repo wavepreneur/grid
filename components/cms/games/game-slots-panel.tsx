@@ -407,7 +407,7 @@ export function GameSlotsPanel({
     setOpenerTags([]);
     setBonusSearch("");
     setBonusTags([]);
-    const nextBindings =
+    const nextBindings: BonusBinding[] =
       slot.bonusBindings.length > 0
         ? slot.bonusBindings
         : slot.bonusLink
@@ -420,7 +420,7 @@ export function GameSlotsPanel({
                     ? r
                     : "gamma";
                 })(),
-                when: { type: "immediate" },
+                when: { type: "immediate" as const },
               },
             ]
           : [];
