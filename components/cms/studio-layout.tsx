@@ -65,7 +65,7 @@ const NAV: NavItem[] = [
     label: "1. Zutaten",
     note: "Rätsel-Vorrat",
     icon: Puzzle,
-    group: "GRID Studio",
+    group: "Tells Studio",
     match: (p) => p.startsWith(appPaths.tasks),
   },
   {
@@ -91,7 +91,7 @@ const NAV: NavItem[] = [
   },
   {
     href: appPaths.cockpit,
-    label: "GRID Cockpit",
+    label: "Tells Cockpit",
     note: "Self-Healing · 0 % Eingriff",
     icon: Activity,
     group: "Autonomer Betrieb",
@@ -99,7 +99,7 @@ const NAV: NavItem[] = [
   },
   {
     href: appPaths.data,
-    label: "GRID Data",
+    label: "Tells Data",
     note: "Indizes & Benchmarks",
     icon: BarChart3,
     match: (p) => p.startsWith(appPaths.data),
@@ -370,7 +370,7 @@ export function StudioLayout({ children }: { children: ReactNode }) {
       <div className="lg:hidden">
         <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
           <div className="min-w-0">
-            <p className="text-xl font-bold">GRID</p>
+            <p className="text-xl font-bold">Tells</p>
             {currentProject ? (
               <p className="truncate text-xs font-semibold text-primary">{currentProject.name}</p>
             ) : null}
@@ -421,16 +421,16 @@ export function StudioLayout({ children }: { children: ReactNode }) {
               <Link
                 href={appPaths.home}
                 className={hydrated && collapsed ? "block text-center" : "min-w-0 flex-1"}
-                title="GRID Backoffice"
+                title="Tells Backoffice"
               >
                 {hydrated && collapsed ? (
-                  <p className="text-lg font-bold leading-none">G</p>
+                  <p className="text-lg font-bold leading-none">T</p>
                 ) : (
                   <>
                     <p className="text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground">
                       Backoffice
                     </p>
-                    <p className="text-2xl font-bold">GRID</p>
+                    <p className="text-2xl font-bold">Tells</p>
                     {currentProject ? (
                       <p className="truncate text-sm font-semibold text-primary">{currentProject.name}</p>
                     ) : null}

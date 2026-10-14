@@ -16,7 +16,7 @@ export function StudioPage({
   title,
   description,
   actions,
-  eyebrow = "GRID Studio",
+  eyebrow = "Tells Studio",
 }: Props) {
   return (
     <div className="flex min-h-0 flex-1 flex-col px-4 py-6 sm:px-8 sm:py-8">

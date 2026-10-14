@@ -155,7 +155,7 @@ export function HealthEngineDashboard() {
   return (
     <StudioPage
       eyebrow="Autonome Health-Engine"
-      title="GRID Cockpit"
+      title="Tells Cockpit"
       description="Technik heilt sich selbst. Menschliche Störungen (Warten, falsche Antworten) bekommen im Spiel einen Klick-Hebel. Hier steht, was wirklich live ist — nicht die Roadmap als Fakt."
     >
       {isPending ? (
@@ -399,7 +399,7 @@ export function HealthEngineDashboard() {
                 )}
               </Panel>
 
-              <Panel title="Telemetrie-Strom" subtitle="Rohsignal — fließt direkt in GRID Data.">
+              <Panel title="Telemetrie-Strom" subtitle="Rohsignal — fließt direkt in Tells Data.">
                 {telemetry.length === 0 ? (
                   <Empty>Noch keine Solve-Events in den letzten 24 Stunden.</Empty>
                 ) : (

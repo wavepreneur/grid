@@ -16,7 +16,7 @@ const RAW_SIGNALS = [
   { label: "Lösungszeiten", text: "Vom Öffnen der Aufgabe bis zur belastbaren Entscheidung." },
   { label: "Fehlversuche", text: "Anzahl falscher Eingaben unter Druck." },
   { label: "Tippnutzung", text: "Werden Tipps früh, spät oder gar nicht gekauft?" },
-  { label: "Tempo vs. GRID-Feld", text: "Schwankung gegenüber der Pilot-Baseline — kein gelieferter Branchenschnitt." },
+  { label: "Tempo vs. Tells-Feld", text: "Schwankung gegenüber der Pilot-Baseline — kein gelieferter Branchenschnitt." },
   { label: "Rollenverteilung", text: "Anteil der Lösungen je Alpha, Beta, Gamma." },
   { label: "Ausdauer", text: "Recovery und Trefferquote bis zum Finale." },
 ];
@@ -61,7 +61,7 @@ export function WorkforceDashboard() {
   if (error || !data) {
     return (
       <p className="text-sm text-destructive">
-        {error instanceof Error ? error.message : "GRID Data konnte nicht geladen werden."}
+        {error instanceof Error ? error.message : "Tells Data konnte nicht geladen werden."}
       </p>
     );
   }
@@ -92,7 +92,7 @@ export function WorkforceDashboard() {
 
       <Panel
         title="B2B-Performance-Indizes"
-        subtitle="Aus Roh-Telemetrie berechnet, gegen das GRID-Feld gestellt — kein gelieferter Branchenschnitt."
+        subtitle="Aus Roh-Telemetrie berechnet, gegen das Tells-Feld gestellt — kein gelieferter Branchenschnitt."
       >
         <div className="grid gap-2 sm:grid-cols-3">
           {PERFORMANCE_INDEXES.map((index) => (
@@ -102,7 +102,7 @@ export function WorkforceDashboard() {
               </p>
               <p className="mt-1 text-sm text-muted-foreground">{index.text}</p>
               <p className="mt-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                GRID-Feld {data.fieldBaseline[index.key]}
+                Tells-Feld {data.fieldBaseline[index.key]}
               </p>
             </div>
           ))}
@@ -126,7 +126,7 @@ export function WorkforceDashboard() {
                   <Chip tone="bg-primary/12 text-primary">{event.teamCount} Teams</Chip>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Vergleich gegen GRID-Feld, nicht gegen eine Branche.
+                  Vergleich gegen Tells-Feld, nicht gegen eine Branche.
                 </p>
                 <div className="mt-3 space-y-3">
                   {PERFORMANCE_INDEXES.map((index) => {
@@ -158,7 +158,7 @@ export function WorkforceDashboard() {
         )}
       </Panel>
 
-      <Panel title="Woraus GRID Data rechnet" subtitle="Rohsignale aus dem Spielverlauf — automatisch erhoben.">
+      <Panel title="Woraus Tells Data rechnet" subtitle="Rohsignale aus dem Spielverlauf — automatisch erhoben.">
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {RAW_SIGNALS.map((row) => (
             <div key={row.label} className="rounded-2xl bg-secondary px-4 py-3">
@@ -256,7 +256,7 @@ function TeamBenchmarkPanel({
                     val === null ? "text-muted-foreground" : d >= 0 ? "text-success" : "text-destructive"
                   }`}
                 >
-                  {val === null ? "zu wenig Telemetrie" : `${delta(d)} vs. GRID-Feld ${baseline[index.key]}`}
+                  {val === null ? "zu wenig Telemetrie" : `${delta(d)} vs. Tells-Feld ${baseline[index.key]}`}
                 </p>
                 <div className="mt-2">
                   <Bar
@@ -310,7 +310,7 @@ function TeamBenchmarkPanel({
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             Folge-Trigger (Micro-Pulse / Slack) liegen im Spiel-Snapshot in Studio. Billing und
-            Ausspielung bleiben bei Exitmania bzw. Tabbrain — GRID speichert nur die Kopplung.
+            Ausspielung bleiben bei Exitmania bzw. Tabbrain — Tells speichert nur die Kopplung.
           </p>
         </div>
       </div>

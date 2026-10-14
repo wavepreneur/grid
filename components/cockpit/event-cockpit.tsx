@@ -203,7 +203,7 @@ export function EventCockpit({ inviteCode }: EventCockpitProps) {
         <Stat label="Code" value={snapshot.invite_code} />
       </div>
 
-      <Panel title="Einstieg" subtitle="Spieler, Beamer und GRID Data — ohne neuen Write-Path.">
+      <Panel title="Einstieg" subtitle="Spieler, Beamer und Tells Data — ohne neuen Write-Path.">
         <p className="text-sm text-muted-foreground">
           Spieler-Einstieg:{" "}
           <CockpitLink href={eventPath(snapshot.invite_code)}>

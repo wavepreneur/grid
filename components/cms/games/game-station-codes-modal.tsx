@@ -95,7 +95,7 @@ function printDocument(gameName: string, cards: GameStationCodeCard[]): string {
     .map(
       (card) => `
       <article class="card">
-        <p class="kicker">GRID Indoor · Station ${card.index}</p>
+        <p class="kicker">Tells Indoor · Station ${card.index}</p>
         <p class="title">${escapeHtml(card.title)}</p>
         <p class="code">${escapeHtml(card.code)}</p>
         <p class="game">${escapeHtml(gameName)}</p>

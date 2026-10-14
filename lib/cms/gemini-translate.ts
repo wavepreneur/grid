@@ -149,7 +149,7 @@ export async function translateUnitsNative(input: {
   const key = apiKey();
   if (!key) {
     throw new Error(
-      "Kein Gemini-Key. In GRID GOOGLE_AI_API_KEY oder GEMINI_API_KEY setzen (lokal und auf Vercel).",
+      "Kein Gemini-Key. Lokal und auf Vercel GOOGLE_AI_API_KEY oder GEMINI_API_KEY setzen.",
     );
   }
   if (input.units.length === 0) return {};

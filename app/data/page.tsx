@@ -5,7 +5,7 @@ export default function DataHomePage() {
   return (
     <StudioPage
       eyebrow="Echtzeit-Analytics"
-      title="GRID Data"
+      title="Tells Data"
       description="Jede Eingabe, jede Lösungszeit und jeder Fehlversuch fließt in die Index-Berechnung. Direkt bei Spielende steht das Benchmark-Dashboard bereit — ohne manuelle Reports."
     >
       <WorkforceDashboard />

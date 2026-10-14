@@ -6,7 +6,7 @@ import { IconPlus } from "@/components/cms/studio-icons";
 export default function AdminTasksPage() {
   return (
     <StudioPage
-      eyebrow="GRID Studio · Schritt 1"
+      eyebrow="Tells Studio · Schritt 1"
       title="Zutaten"
       description="Hier sammelst du den Vorrat. Je mehr Rätsel, desto schneller entstehen später neue Spiele. Inhalt bleibt hier — Spiele und Rezepte greifen nur darauf zu."
       actions={

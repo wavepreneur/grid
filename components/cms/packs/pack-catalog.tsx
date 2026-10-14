@@ -466,7 +466,7 @@ export function PackCatalog() {
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               {layer === 1 && packKind === "outdoor" ? (
                 <div>
-                  <StudioLabel hint="Live-Suche in Exitmania. GRID speichert die Stadt nicht neu.">
+                  <StudioLabel hint="Live-Suche in Exitmania. Tells speichert die Stadt nicht neu.">
                     Exitmania-Stadt
                   </StudioLabel>
                   <CitySearchSelect

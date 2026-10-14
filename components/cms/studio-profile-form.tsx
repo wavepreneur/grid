@@ -31,7 +31,7 @@ export function StudioProfileForm({ name, email }: { name: string; email: string
 
   return (
     <div className="space-y-6">
-    <Panel title="Dein Profil" subtitle="So spricht dich The GRID an — und so meldest du dich an.">
+    <Panel title="Dein Profil" subtitle="So spricht dich Tells an — und so meldest du dich an.">
       <form onSubmit={handleSubmit} className="grid max-w-xl gap-4">
         <Field label="Name">
           <input className={inputCls} name="name" defaultValue={name} required autoComplete="name" />

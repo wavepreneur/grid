@@ -614,7 +614,7 @@ export function GameEditorPanel({
               <section className="rounded-3xl bg-secondary/60 p-4 sm:p-5">
                 <p className="text-base font-bold text-foreground">Folge-Trigger</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Absicht für später — GRID spielt noch nichts aus. Speichern + Publish legt die
+                  Absicht für später — Tells spielt noch nichts aus. Speichern + Publish legt die
                   Kopplung im Snapshot ab. Dispatch (Pulse-REST, Slack/Teams) kommt in einem eigenen
                   Schritt. Billing bleibt Exitmania oder Tabbrain.
                 </p>
@@ -764,7 +764,7 @@ export function GameEditorPanel({
                         }}
                       />
                       <p className="mt-1.5 text-xs text-muted-foreground">
-                        Kein Checkout in GRID. Der Link zeigt auf den Commerce-Partner.
+                        Kein Checkout in Tells. Der Link zeigt auf den Commerce-Partner.
                       </p>
                     </div>
                   </div>

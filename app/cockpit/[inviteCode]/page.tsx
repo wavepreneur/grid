@@ -21,7 +21,7 @@ export default async function CockpitPage({ params }: CockpitPageProps) {
   return (
     <BackofficeFrame>
       <StudioPage
-        eyebrow="GRID Cockpit"
+        eyebrow="Tells Cockpit"
         title={event.title}
         description="Live-Übersicht für Event-Leiter: Teams, Health-Engine und Legacy-GPS. Der Beamer bleibt ohne Sidebar unter /show."
       >

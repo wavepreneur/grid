@@ -12,7 +12,7 @@ export function ProductNav({ active, compact = false }: Props) {
   return (
     <nav
       className={`flex gap-1 rounded-2xl bg-secondary p-1 ${compact ? "w-full" : ""}`}
-      aria-label="GRID Produkte"
+      aria-label="Tells Produkte"
     >
       {GRID_PRODUCTS.map((product) => {
         const isActive = product.id === active;
@@ -30,7 +30,7 @@ export function ProductNav({ active, compact = false }: Props) {
             }`}
             title={product.description}
           >
-            GRID {product.label}
+            Tells {product.label}
           </Link>
         );
       })}

@@ -161,7 +161,7 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
           </div>
           {pack.layer === 1 ? (
             <div>
-              <StudioLabel hint="Nur aus Exitmania. Leer = Indoor-Pack ohne Stadt. GRID legt keine Städte an.">
+              <StudioLabel hint="Nur aus Exitmania. Leer = Indoor-Pack ohne Stadt. Tells legt keine Städte an.">
                 Exitmania-Stadt
               </StudioLabel>
               <CitySearchSelect

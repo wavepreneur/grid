@@ -170,7 +170,7 @@ export async function getWorkforceDashboard(): Promise<ActionResult<WorkforceDas
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "GRID Data konnte nicht geladen werden.",
+      error: error instanceof Error ? error.message : "Tells Data konnte nicht geladen werden.",
     };
   }
 }
