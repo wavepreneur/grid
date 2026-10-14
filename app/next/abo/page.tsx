@@ -14,10 +14,10 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   const { lang } = await searchParams;
   const english = playUiLang(lang) === "en";
   return {
-    title: english ? "Next step: GRID subscription" : "Nächster Schritt: GRID Abo",
+    title: english ? "Next step: Tells" : "Nächster Schritt: Tells",
     description: english
-      ? "How GRID turns today’s event into your own company game — with a demo slot."
-      : "Wie GRID aus dem heutigen Event ein eigenes Firmen-Spiel macht — mit Demo-Termin.",
+      ? "How Tells turns today’s event into your own company game — with a demo slot."
+      : "Wie Tells aus dem heutigen Event ein eigenes Firmen-Spiel macht — mit Demo-Termin.",
     robots: { index: false, follow: false },
   };
 }

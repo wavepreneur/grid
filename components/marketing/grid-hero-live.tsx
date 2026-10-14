@@ -1,47 +1,49 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Laptop, Smartphone, Tablet } from "lucide-react";
 
 const PHASES = [
-  { id: "lead", ms: 2400, line: "The team lead opens the link." },
-  { id: "members", ms: 2600, line: "Her team is in. Same second." },
-  { id: "roles", ms: 3400, line: "Roles lock. The names follow the company — or the game." },
-  { id: "parallel", ms: 2800, line: "Every team. Same event. Worldwide." },
-  { id: "start", ms: 3000, line: "Up to 50,000 people. The battle starts." },
+  { id: "join", ms: 2200 },
+  { id: "roles", ms: 2000 },
+  { id: "tell-wait", ms: 2600 },
+  { id: "tell-fail", ms: 2600 },
+  { id: "tell-mix", ms: 3200 },
 ] as const;
 
-const PEOPLE = [
-  { name: "Maya", device: "laptop" as const, lead: true },
-  { name: "Jan", device: "phone" as const, lead: false },
-  { name: "Lea", device: "tablet" as const, lead: false },
-  { name: "Ken", device: "phone" as const, lead: false },
-];
-
-const ROLE_PACKS = [
-  { hint: "This game", roles: ["Navigator", "Solver", "Spotter", "Runner"] },
-  { hint: "Your company", roles: ["Captain", "Analyst", "Field", "HQ"] },
-  { hint: "Your teams", roles: ["Ops", "R&D", "Sales", "Lead"] },
+const PLAYERS = [
+  { name: "Maya", role: "Navigator", beat: "decides" },
+  { name: "Jan", role: "Solver", beat: "types" },
+  { name: "Lea", role: "Spotter", beat: "waits" },
 ] as const;
 
-const CITIES = ["Berlin", "Tokyo", "New York", "São Paulo", "Lagos", "Sydney"] as const;
+const TELLS = [
+  {
+    id: "wait",
+    phase: 2,
+    text: "Spotter role waited 48s on average for input",
+  },
+  {
+    id: "fail",
+    phase: 3,
+    text: "Task 4 failed in 3 of 5 teams: topic not understood",
+  },
+  {
+    id: "mix",
+    phase: 4,
+    text: "Mixed-department teams solved 31% faster",
+  },
+] as const;
 
-function DeviceIcon({ device }: { device: (typeof PEOPLE)[number]["device"] }) {
-  const Icon = device === "laptop" ? Laptop : device === "tablet" ? Tablet : Smartphone;
-  return <Icon size={13} strokeWidth={2.2} aria-hidden />;
-}
-
-function peopleCount(phase: number, packTick: number): number {
-  if (phase <= 0) return 1;
-  if (phase === 1) return 4;
-  if (phase === 2) return 4;
-  if (phase === 3) return 240 + packTick * 80;
-  return 50_000;
+function formatClock(seconds: number) {
+  const safe = Math.max(0, seconds);
+  const mm = String(Math.floor(safe / 60)).padStart(2, "0");
+  const ss = String(safe % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
 }
 
 export function GridHeroLive() {
-  const [phase, setPhase] = useState(0);
-  const [pack, setPack] = useState(0);
+  const [phase, setPhase] = useState(2);
+  const [seconds, setSeconds] = useState(48);
   const [reduce, setReduce] = useState(false);
 
   useEffect(() => {
@@ -49,121 +51,110 @@ export function GridHeroLive() {
     if (media.matches) {
       setReduce(true);
       setPhase(PHASES.length - 1);
-      setPack(1);
+      setSeconds(48);
       return;
     }
 
     let cancelled = false;
-    let phaseIndex = 0;
+    let phaseIndex = 2;
     let timer = 0;
-    const phaseRef = { current: 0 };
 
     const advance = () => {
       if (cancelled) return;
       timer = window.setTimeout(() => {
         phaseIndex = (phaseIndex + 1) % PHASES.length;
-        phaseRef.current = phaseIndex;
         setPhase(phaseIndex);
-        if (phaseIndex === 0) setPack(0);
+        if (phaseIndex === 0) setSeconds(12);
+        if (phaseIndex === 2) setSeconds(48);
         advance();
       }, PHASES[phaseIndex].ms);
     };
 
     advance();
-    const packs = window.setInterval(() => {
-      if (phaseRef.current >= 2) {
-        setPack((current) => (current + 1) % ROLE_PACKS.length);
-      }
-    }, 1400);
+    const clock = window.setInterval(() => {
+      setSeconds((current) => current + 1);
+    }, 1000);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
-      window.clearInterval(packs);
+      window.clearInterval(clock);
     };
   }, []);
 
-  const current = PHASES[phase];
-  const rolesOn = reduce || phase >= 2;
-  const membersOn = reduce || phase >= 1;
-  const worldOn = reduce || phase >= 3;
+  const rolesOn = reduce || phase >= 1;
   const liveOn = reduce || phase >= 4;
-  const rolePack = ROLE_PACKS[rolesOn ? pack : 0];
-  const count = reduce ? 50_000 : peopleCount(phase, pack);
+  const shownTells = reduce ? TELLS.length : Math.max(2, TELLS.filter((item) => phase >= item.phase).length);
+  const clock = reduce ? 48 : Math.min(seconds, 59);
 
   return (
     <div className={`grid-hero-live${liveOn ? " is-live" : ""}`}>
-      <div className="grid-hero-live-top">
-        <p className="grid-hero-live-kicker">
-          <span className="grid-hero-live-dot" />
-          Live event
-        </p>
-        <p className="grid-hero-live-line" aria-live="polite">
-          {current.line}
-        </p>
-      </div>
+      <div className="grid-hero-split">
+        <section className="grid-hero-pane" aria-label="Live play">
+          <div className="grid-hero-pane-top">
+            <p className="grid-hero-live-kicker">
+              <span className="grid-hero-live-dot" />
+              Live play
+            </p>
+            <p className="grid-hero-timer" aria-live="polite">
+              {formatClock(clock)}
+            </p>
+          </div>
 
-      <ul className="grid-hero-live-people">
-        {PEOPLE.map((person, index) => {
-          const visible = person.lead || membersOn;
-          return (
-            <li
-              key={person.name}
-              className={`grid-hero-live-person${visible ? " is-in" : " is-wait"}${person.lead ? " is-lead" : ""}`}
-              style={{ transitionDelay: `${index * 90}ms` }}
-            >
-              <span className="grid-hero-live-avatar">{person.name.slice(0, 1)}</span>
-              <span className="grid-hero-live-who">
-                <strong>{person.name}</strong>
-                <em>
-                  <DeviceIcon device={person.device} />
-                  {person.lead ? "Lead · laptop" : person.device}
-                </em>
-              </span>
-              <span className={`grid-hero-live-role${rolesOn ? " is-on" : ""}`}>
-                {rolesOn ? rolePack.roles[index] : "…"}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+          <ul className="grid-hero-play-list">
+            {PLAYERS.map((person, index) => {
+              const inPlay = reduce || phase >= 0;
+              const waiting = person.beat === "waits" && (reduce || phase >= 2);
+              return (
+                <li
+                  key={person.name}
+                  className={`grid-hero-play-row${inPlay ? " is-in" : " is-wait"}${waiting ? " is-hot" : ""}`}
+                  style={{ transitionDelay: `${index * 90}ms` }}
+                >
+                  <span className="grid-hero-live-avatar">{person.name.slice(0, 1)}</span>
+                  <span className="grid-hero-live-who">
+                    <strong>{person.name}</strong>
+                    <em>{waiting ? "waiting" : person.beat}</em>
+                  </span>
+                  <span className={`grid-hero-live-role${rolesOn ? " is-on" : ""}`}>
+                    {rolesOn ? person.role : "…"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
 
-      <p className={`grid-hero-live-roleshift${rolesOn ? " is-on" : ""}`}>
-        {rolesOn ? (
-          <>
-            Roles right now: <strong>{rolePack.hint}</strong>
-            <span> — they change with the company or the game.</span>
-          </>
-        ) : (
-          "Roles wait for the team."
-        )}
-      </p>
+        <section className="grid-hero-pane is-tells" aria-label="Live tells">
+          <div className="grid-hero-pane-top">
+            <p className="grid-hero-live-kicker">
+              <span className="grid-hero-live-dot" />
+              Live tells
+            </p>
+            <p className={`grid-hero-live-go${shownTells > 0 ? " is-on" : ""}`}>
+              {liveOn ? "Reading" : shownTells > 0 ? "Live" : "Watching"}
+            </p>
+          </div>
 
-      <ul className={`grid-hero-live-world${worldOn ? " is-on" : ""}`}>
-        {CITIES.map((city, index) => (
-          <li key={city} style={{ transitionDelay: `${index * 70}ms` }}>
-            {city}
-          </li>
-        ))}
-      </ul>
-
-      <div className="grid-hero-live-foot">
-        <p className="grid-hero-live-countline">
-          <strong>{count.toLocaleString("en-US")}</strong>
-          <span>{count === 1 ? "person in" : "people in"}</span>
-        </p>
-        <div className="grid-hero-live-pills">
-          <span>
-            <Smartphone size={12} strokeWidth={2.2} aria-hidden /> Phone
-          </span>
-          <span>
-            <Laptop size={12} strokeWidth={2.2} aria-hidden /> Laptop
-          </span>
-          <span>
-            <Tablet size={12} strokeWidth={2.2} aria-hidden /> Tablet
-          </span>
-        </div>
-        <p className={`grid-hero-live-go${liveOn ? " is-on" : ""}`}>Battle live</p>
+          <ul className="grid-tell-list" aria-live="polite">
+            {TELLS.map((item, index) => {
+              const visible = reduce || index < shownTells;
+              if (!visible) return null;
+              return (
+                <li
+                  key={item.id}
+                  className="grid-tell-row is-in"
+                  style={{ animationDelay: `${index * 80}ms` }}
+                >
+                  <span className="grid-tell-bolt" aria-hidden>
+                    ⚡
+                  </span>
+                  <span>{item.text}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       </div>
     </div>
   );

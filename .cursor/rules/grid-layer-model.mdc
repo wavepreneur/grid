@@ -29,7 +29,7 @@ If the feature does not serve Layer 1 city scaling, Layer 2 global mission, Laye
 
 ## Play surfaces
 
-outdoor (GPS) · indoor (stations+codes) · online (Tabbrain). Phases: Hub → Quiz → Level → Bonus. Dual fallback via `allowed_fallbacks`. See `lib/grid/play-surface.ts`, `frontend_idee/`.
+outdoor (GPS) · indoor (stations+codes) · online (GRID pulse / later 15-min). Phases: Hub → Quiz → Level → Bonus. Dual fallback via `allowed_fallbacks`. See `lib/grid/play-surface.ts`, `frontend_idee/`.
 
 ## Game profiles
 
@@ -41,8 +41,8 @@ Presets: full, city_explorer, indoor_escape, mission/online, micro_pulse.
 
 - Loquiz clone features (Rogain/Open/Match as primary UX) unless runtime engine supports them
 - Generic task library features without layer assignment
-- Partner self-service game builder
-- Checkout/commerce in GRID
+- Partner/customer Loquiz-style game builder (customer Studio = overwrites on templates only)
+- Impulse checkout/Paddle for Exitmania SKUs in GRID (GRID may later sell year-abo + credit bundles)
 
 ## Key paths
 

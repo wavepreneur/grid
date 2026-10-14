@@ -19,35 +19,28 @@ export function GridNav() {
   return (
     <nav className={`grid-site-nav${scrolled ? " is-scrolled" : ""}`}>
       <div className="grid-site-nav-inner">
-        <Link href="/#hero" className="grid-brand">
-          <GridLogo />
-          <span className="grid-brand-name">THE GRID</span>
+        <Link href="/#hero" className="grid-brand" aria-label="Tells">
+          <GridLogo height={36} priority />
         </Link>
         <div className="hidden-mobile" style={{ display: "flex", alignItems: "center", gap: 22 }}>
-          <a href="/#problem" className="grid-nav-link">
-            The problem
-          </a>
           <a href="/#how" className="grid-nav-link">
             How it works
           </a>
-          <a href="/#benefits" className="grid-nav-link">
-            Benefits
-          </a>
-          <a href="/#try" className="grid-nav-link">
-            The proof
+          <a href="/#see" className="grid-nav-link">
+            What you see
           </a>
           <a href="/#pricing" className="grid-nav-link">
-            Plans
+            Pricing
           </a>
           <a href="/#faq" className="grid-nav-link">
             FAQ
           </a>
           <Link href={ACCESS_HREF} className="grid-cta grid-cta-sm">
-            Talk to The GRID
+            Run a session
           </Link>
         </div>
         <Link href={ACCESS_HREF} className="grid-cta grid-cta-sm grid-nav-mobile-cta">
-          Talk to The GRID
+          Run a session
         </Link>
       </div>
     </nav>

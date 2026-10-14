@@ -4,13 +4,13 @@ Next.js engine repo. Read `node_modules/next/dist/docs/` for Next.js 16 conventi
 
 ## Ecosystem (read first for integration)
 
-**[`docs/EXITMANIA_GRID_INTEGRATION.md`](docs/EXITMANIA_GRID_INTEGRATION.md)** — Exitmania + Tabbrain + GRID boundaries, Loquiz replacement, API contract.
+**[`docs/EXITMANIA_GRID_INTEGRATION.md`](docs/EXITMANIA_GRID_INTEGRATION.md)** — Exitmania + GRID boundaries, Loquiz replacement, API contract. Tabbrain is discarded.
 
 **[`docs/ACCESS_SCOPE_AND_PARTNER_API.md`](docs/ACCESS_SCOPE_AND_PARTNER_API.md)** — Loquiz scope/tickets analysis → GRID access batches, publish rules, partner API (Exitmania/Tabbrain).
 
 **[`docs/GRID_LAYER_MODEL.md`](docs/GRID_LAYER_MODEL.md)** — Layer-first content architecture (mandatory before Studio CMS work).
 
-Rules: `.cursor/rules/ecosystem-exitmania-tabbrain.mdc`, `.cursor/rules/grid-layer-model.mdc`
+Rules: `.cursor/rules/product-direction.mdc`, `.cursor/rules/ecosystem-exitmania-tabbrain.mdc`, `.cursor/rules/grid-layer-model.mdc`
 
 ## This repo owns
 
@@ -18,14 +18,13 @@ Rules: `.cursor/rules/ecosystem-exitmania-tabbrain.mdc`, `.cursor/rules/grid-lay
 - Content loader: `global_levels`, `local_waypoints`, `route_override`, blueprints
 - **Layer model:** Layer 1 (geo), Layer 2 (mission), Layer 3 (roles/bonus) — composable game profiles
 - GRID Studio: layer profile, task layer assignment, publish snapshots with `layer_profile`
-- `POST /api/v1/bookings` — session provisioning for Exitmania/Tabbrain
+- `POST /api/v1/bookings` — session provisioning for Exitmania (later also GRID customer Studio)
 - Operator cockpit `/cockpit/{code}`
 
 ## This repo does NOT own
 
-- Checkout, Paddle, city SEO pages (Exitmania)
-- Enterprise org billing (Tabbrain, future)
-- Loquiz-style multi-partner game builder platform
+- Checkout, Paddle, city SEO pages, impulse teamevents (Exitmania)
+- Loquiz-style multi-partner game builder (customer Studio = template overwrites only)
 
 ## Key paths
 

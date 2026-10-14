@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { GridLandingPage } from "@/components/marketing/grid-landing-page";
 
 export const metadata: Metadata = {
-  title: "The GRID | A battle starts in 60 seconds",
+  title: "Tells | Don’t ask your team. Let it tell.",
   description:
-    "A live battle in 60 seconds — two teams or a thousand. No app. No login. No IT. Send a link. When it ends, you see how the group actually did.",
+    "Play-based team intelligence. Surveys hear what people say. Tells sees what teams do — bottlenecks, roles, and whether the topic landed.",
   openGraph: {
-    title: "The GRID — A battle starts in 60 seconds",
-    description: "Two teams or a thousand. No app. No login. No IT.",
+    title: "Tells — Don’t ask your team. Let it tell.",
+    description: "Play-based team intelligence. Your team plays. You see how it works.",
   },
 };
 

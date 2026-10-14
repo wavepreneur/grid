@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GridLogo } from "@/components/marketing/grid-logo";
 
 export function GridMarketingFooter() {
   return (
@@ -6,14 +7,14 @@ export function GridMarketingFooter() {
       <div className="grid-container">
         <div className="grid-footer-top">
           <div className="grid-footer-brand">
-            <p className="grid-brand-name">THE GRID</p>
+            <GridLogo height={40} />
             <p className="grid-footer-tag">
-              A battle starts in 60 seconds. Two teams or a thousand.
+              Play-based team intelligence.
             </p>
           </div>
           <nav className="grid-footer-nav" aria-label="Footer">
             <Link href="/#access" className="grid-nav-link">
-              Talk to The GRID
+              Run a session
             </Link>
             <a href="https://exitmania.com" className="grid-nav-link" target="_blank" rel="noopener noreferrer">
               Play a session
@@ -29,17 +30,15 @@ export function GridMarketingFooter() {
 
         <div className="grid-footer-legal">
           <p className="grid-footer-copy">
-            © 2026 Kinetic Pillar OÜ
+            Tells is a product of Kinetic Pillar Infrastructure OÜ
             <span>·</span>
-            All rights reserved.
+            © 2026
           </p>
-          <p className="grid-footer-vertical">A Vertical of Kinetic Pillar Infrastructure</p>
+          <p className="grid-footer-vertical">Kinetic Pillar Infrastructure OÜ</p>
           <p className="grid-footer-meta">
             <span>Tallinn, Estonia</span>
             <span>·</span>
             <span>Remote-first</span>
-            <span>·</span>
-            <span>Built for adventure.</span>
           </p>
         </div>
       </div>

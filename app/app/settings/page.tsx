@@ -9,7 +9,7 @@ export default async function StudioSettingsPage() {
     <StudioPage
       eyebrow="Profil"
       title={`Hey ${profile.firstName}`}
-      description="Name, Email und Passwort — das ist dein Zugang zu The GRID."
+      description="Name, Email und Passwort — das ist dein Zugang zu Tells."
     >
       <StudioProfileForm name={profile.name} email={profile.email} />
     </StudioPage>

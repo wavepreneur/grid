@@ -10,10 +10,13 @@ const PLANS = [
     monthly: 149,
     teams: "3 teams at once",
     credit: "€49 per team",
+    perTeam: 49,
+    peoplePerTeam: 4,
+    maxTeams: 3,
     blurb: "Try a live event first. Then the room is yours.",
     featured: false,
-    cta: "Try a live event",
-    href: "#try",
+    cta: "Run a session",
+    href: "#access",
     points: [
       "Test a live event before you subscribe",
       "Up to 4 people per team",
@@ -27,15 +30,18 @@ const PLANS = [
     monthly: 399,
     teams: "12 teams at once",
     credit: "€39 per team",
+    perTeam: 39,
+    peoplePerTeam: 8,
+    maxTeams: 12,
     blurb: "The company rhythm.",
     featured: true,
-    cta: "Talk to The GRID",
+    cta: "Get Team",
     href: "#access",
     points: [
       "Up to 8 people per team",
       "Everything in Start",
       "Scores by country and department",
-      "Someone there if a room stalls",
+      "Live support if a session stalls",
     ],
   },
   {
@@ -44,9 +50,12 @@ const PLANS = [
     monthly: 990,
     teams: "50 teams at once",
     credit: "€29 per team",
+    perTeam: 29,
+    peoplePerTeam: 10,
+    maxTeams: 50,
     blurb: "Many rooms. One place.",
     featured: false,
-    cta: "Talk to The GRID",
+    cta: "Get Company",
     href: "#access",
     points: [
       "Up to 10 people per team",
@@ -61,12 +70,15 @@ const PLANS = [
     monthly: 2900,
     teams: "Up to 50,000 people",
     credit: "from €19 per team",
+    perTeam: 19,
+    peoplePerTeam: 12,
+    maxTeams: 4167,
     blurb: "The whole organisation.",
     featured: false,
-    cta: "Talk about Enterprise",
+    cta: "Talk to us",
     href: "#access",
     points: [
-      "Groups of 12",
+      "Up to 12 people per team",
       "Your onboarding",
       "Security review and NDA",
       "A named contact",
@@ -74,12 +86,30 @@ const PLANS = [
   },
 ] as const;
 
+type PlanId = (typeof PLANS)[number]["id"];
+
+function planById(id: PlanId) {
+  return PLANS.find((plan) => plan.id === id) ?? PLANS[1];
+}
+
+function teamCount(people: number, peoplePerTeam: number) {
+  return Math.max(1, Math.ceil(Math.max(2, people) / peoplePerTeam));
+}
+
 function euro(value: number) {
   return `€${value.toLocaleString("en-US")}`;
 }
 
 export function GridPricing() {
   const [yearly, setYearly] = useState(true);
+  const [people, setPeople] = useState(40);
+  const [planId, setPlanId] = useState<PlanId>("team");
+  const [teams, setTeams] = useState(5);
+  const calc = planById(planId);
+  const planPrice = yearly ? Math.round(calc.monthly * 0.8) : calc.monthly;
+  const sessionPrice = teams * calc.perTeam;
+  const over = teams > calc.maxTeams;
+  const better = over ? PLANS.find((plan) => plan.maxTeams >= teams) : null;
 
   return (
     <div>
@@ -110,18 +140,16 @@ export function GridPricing() {
               {plan.featured ? (
                 <p className="grid-plan-pick">Most teams pick this</p>
               ) : null}
-              <p className="grid-plan-eyebrow">
-                {plan.id === "start" ? "Try first" : plan.id === "enterprise" ? "Talk to us" : "Studio + credits"}
-              </p>
+              {plan.id === "start" ? <p className="grid-plan-eyebrow">Try first</p> : <p className="grid-plan-eyebrow is-empty" />}
               <h3 className="grid-product-header grid-plan-name">{plan.name}</h3>
               <div className="grid-plan-price-block">
-                <p className={`grid-plan-was${yearly ? "" : " is-empty"}`}>
-                  {euro(plan.monthly)}
-                </p>
                 <p className="grid-plan-now">
                   {plan.id === "enterprise" ? <span className="grid-plan-from">from</span> : null}
                   {euro(price)}
                   <span className="grid-plan-cadence">/ month</span>
+                </p>
+                <p className="grid-plan-term">
+                  {yearly ? "12-month term" : "Cancel monthly"}
                 </p>
                 <p className="grid-plan-teams">{plan.teams}</p>
               </div>
@@ -145,9 +173,110 @@ export function GridPricing() {
           );
         })}
       </div>
-      <p className="grid-body" style={{ marginTop: 28, maxWidth: 640, marginInline: "auto", textAlign: "center" }}>
-        Yearly is a 12-month plan, billed every month — 20% less. Credits are extra: one credit is one team, one session.
-        Start with a live event before you take a plan.
+      <aside className="grid-price-example">
+        <p className="grid-price-example-kicker">Your session</p>
+        <p className="grid-price-example-title">What would it cost?</p>
+        <p className="grid-price-example-meta">Change the numbers. The total updates.</p>
+        <div className="grid-price-calc">
+          <label>
+            People
+            <input
+              className="grid-input"
+              type="number"
+              min={2}
+              max={50000}
+              inputMode="numeric"
+              value={people || ""}
+              onChange={(event) => {
+                const raw = event.target.value;
+                if (raw === "") {
+                  setPeople(0);
+                  return;
+                }
+                const next = Math.min(50000, Math.max(0, Math.round(Number(raw)) || 0));
+                setPeople(next);
+                if (next >= 2) setTeams(teamCount(next, calc.peoplePerTeam));
+              }}
+            />
+          </label>
+          <label>
+            Plan
+            <select
+              className="grid-input"
+              value={planId}
+              onChange={(event) => {
+                const nextId = event.target.value as PlanId;
+                const nextPlan = planById(nextId);
+                setPlanId(nextId);
+                setTeams(teamCount(people, nextPlan.peoplePerTeam));
+              }}
+            >
+              {PLANS.map((plan) => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Teams
+            <input
+              className="grid-input"
+              type="number"
+              min={1}
+              inputMode="numeric"
+              value={teams || ""}
+              onChange={(event) => {
+                const raw = event.target.value;
+                if (raw === "") {
+                  setTeams(0);
+                  return;
+                }
+                setTeams(Math.max(0, Math.round(Number(raw)) || 0));
+              }}
+            />
+          </label>
+        </div>
+        <dl className="grid-price-breakdown">
+          <div>
+            <dt>{calc.name} plan</dt>
+            <dd>
+              {calc.id === "enterprise" ? "from " : ""}
+              {euro(planPrice)}
+              <span>/ month</span>
+            </dd>
+          </div>
+          <div>
+            <dt>
+              {teams} {teams === 1 ? "team" : "teams"} in this session
+            </dt>
+            <dd>
+              {calc.id === "enterprise" ? "from " : ""}
+              {euro(sessionPrice)}
+              <span>{euro(calc.perTeam)} each</span>
+            </dd>
+          </div>
+          <div className="is-total">
+            <dt>You pay this month</dt>
+            <dd>
+              {calc.id === "enterprise" ? "from " : ""}
+              {euro(planPrice + sessionPrice)}
+            </dd>
+          </div>
+        </dl>
+        {over ? (
+          <p className="grid-price-example-note">
+            {calc.name} runs {calc.maxTeams} teams at once. This session needs {teams}.
+            {better ? ` ${better.name} covers that.` : ""}
+          </p>
+        ) : (
+          <p className="grid-price-example-note">
+            Up to {calc.peoplePerTeam} people per team · {calc.maxTeams} teams at once
+          </p>
+        )}
+      </aside>
+      <p className="grid-body" style={{ marginTop: 16, maxWidth: 520, marginInline: "auto", textAlign: "center" }}>
+        Yearly is billed every month at the lower rate, with a 12-month term. Monthly can be cancelled each month.
       </p>
     </div>
   );

@@ -5,64 +5,43 @@ import { useEffect, useState } from "react";
 const STEPS = [
   {
     n: "01",
-    title: "Roles pull",
-    text: "Teams land. Roles lock. They start working on each other — not on a host.",
+    title: "Drop in your content",
+    text: "Onboarding, product training, values, compliance, strategy. Paste it in and confirm. Tells builds it into the game. No designer, no agency.",
   },
   {
     n: "02",
-    title: "Play",
-    text: "It feels like a game. Underneath, every role, attempt, and stall is kept.",
+    title: "Share one link",
+    text: "Teams join from any device in seconds. Roles lock automatically. You decide whether Navigator, Solver or Spotter gets the next task.",
   },
   {
     n: "03",
-    title: "Depth",
-    text: "No coach can watch this many people at once. No coach can go this far into the data.",
-  },
-  {
-    n: "04",
-    title: "Ready",
-    text: "Seconds after the last move, the record is there. Who worked. Where it broke. What Monday needs.",
+    title: "Read the tells",
+    text: "The report is ready seconds after the last task. Strengths, gaps, open questions. Ready for Monday.",
   },
 ] as const;
 
-const ROLES = [
-  { id: "nav", label: "Lead", device: "Laptop", role: "Navigator", finding: "Carried the brief", mark: "Lead" },
-  { id: "sol", label: "Field", device: "Phone", role: "Solver", finding: "Stalled · task 3", mark: "Hold" },
-  { id: "spot", label: "HQ", device: "Tablet", role: "Spotter", finding: "Hint unused", mark: "Gap" },
+const DROPS = ["Onboarding.pdf", "Values · Q1–Q4", "Strategy brief"] as const;
+const ROLES = ["Navigator", "Solver", "Spotter"] as const;
+const TELLS = [
+  "Spotter waited 48s",
+  "Task 4 missed · 3/5",
+  "Mixed teams +31%",
 ] as const;
-
-const INTEL = [
-  "Ops stalled on task 3",
-  "Navigator carried Team 12",
-  "APAC finished first",
-  "41% unused the hint",
-] as const;
-
-function screenFor(step: number, finding: string): { label: string; score: string } {
-  if (step >= 3) return { label: finding, score: "Read" };
-  if (step >= 2) return { label: "Watched", score: "12k" };
-  if (step >= 1) return { label: "Pulling", score: "Live" };
-  return { label: "Waiting", score: "—" };
-}
 
 export function GridHowItWorks() {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(2);
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) {
-      setStep(3);
-      return;
-    }
+    if (reduce) return;
     const id = window.setInterval(() => {
       setStep((current) => (current + 1) % STEPS.length);
-    }, 3200);
+    }, 3400);
     return () => window.clearInterval(id);
   }, []);
 
-  const playing = step >= 1;
-  const deep = step >= 2;
-  const ready = step >= 3;
+  const sharing = true;
+  const reading = true;
 
   return (
     <div className="grid-how">
@@ -87,53 +66,50 @@ export function GridHowItWorks() {
 
       <div className="grid-how-stage" aria-live="polite">
         <div className="grid-how-codes is-on">
-          <p className="grid-how-kicker">Roles in the room</p>
+          <p className="grid-how-kicker">Your content</p>
           <div className="grid-how-code-row">
-            {ROLES.map((item, index) => (
-              <span key={item.id} className="grid-how-code" style={{ animationDelay: `${index * 0.12}s` }}>
-                {item.role}
+            {DROPS.map((item, index) => (
+              <span key={item} className="grid-how-code" style={{ animationDelay: `${index * 0.12}s` }}>
+                {item}
               </span>
             ))}
           </div>
         </div>
 
         <div className="grid-how-devices">
-          {ROLES.map((device, index) => {
-            const screen = screenFor(step, device.finding);
-            return (
-              <article
-                key={device.id}
-                className={`grid-how-device${playing ? " is-live" : ""}${ready ? " is-solved" : ""}`}
-                style={{ animationDelay: `${index * 0.15}s` }}
-              >
-                <div className="grid-how-device-top">
-                  <span className="grid-how-device-name">{device.label}</span>
-                  <span className={`grid-how-live${playing ? " is-on" : ""}`}>
-                    {ready ? "Read" : playing ? "Live" : "Idle"}
-                  </span>
-                </div>
-                <p className="grid-how-device-meta">
-                  {device.device} · {device.role}
-                </p>
-                <div className="grid-how-screen">
-                  <span className="grid-how-screen-label">{screen.label}</span>
-                  <span className="grid-how-score">{screen.score}</span>
-                </div>
-              </article>
-            );
-          })}
+          {ROLES.map((role, index) => (
+            <article
+              key={role}
+              className={`grid-how-device${sharing ? " is-live" : ""}${reading ? " is-solved" : ""}`}
+              style={{ animationDelay: `${index * 0.15}s` }}
+            >
+              <div className="grid-how-device-top">
+                <span className="grid-how-device-name">{role}</span>
+                <span className={`grid-how-live${sharing ? " is-on" : ""}`}>
+                  {reading ? "Read" : sharing ? "Live" : "Idle"}
+                </span>
+              </div>
+              <p className="grid-how-device-meta">{sharing ? "One link · any device" : "Waiting for the link"}</p>
+              <div className="grid-how-screen">
+                <span className="grid-how-screen-label">
+                  {reading ? TELLS[index] : sharing ? "Playing" : "Content in"}
+                </span>
+                <span className="grid-how-score">{reading ? "Tell" : sharing ? "Go" : "—"}</span>
+              </div>
+            </article>
+          ))}
         </div>
 
-        <div className={`grid-how-data${deep ? " is-on" : ""}`}>
-          <p className="grid-how-kicker">What no host can see</p>
+        <div className="grid-how-data is-on">
+          <p className="grid-how-kicker">The tells</p>
           <div className="grid-how-metrics">
-            {INTEL.map((item) => (
+            {TELLS.map((item) => (
               <span key={item}>{item}</span>
             ))}
           </div>
         </div>
 
-        <p className={`grid-how-ready${ready ? " is-on" : ""}`}>Record ready · 8 seconds</p>
+        <p className="grid-how-ready is-on">Report ready · 8 seconds</p>
       </div>
     </div>
   );

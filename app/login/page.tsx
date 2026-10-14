@@ -10,7 +10,7 @@ import { PORTAL_COOKIE, verifyPortalSession } from "@/lib/marketing/portal-sessi
 import "@/app/grid-marketing.css";
 
 export const metadata: Metadata = {
-  title: "The GRID | Customer Login",
+  title: "Tells | Customer Login",
   robots: { index: false, follow: false },
 };
 
@@ -43,7 +43,7 @@ export default async function LoginPage({
           <PortalLoginForm nextPath={nextPath} />
           <p className="grid-body" style={{ marginTop: 20, textAlign: "center", fontSize: 13 }}>
             <Link href="/" className="grid-nav-link">
-              Back to The GRID
+              Back to Tells
             </Link>
           </p>
         </div>
