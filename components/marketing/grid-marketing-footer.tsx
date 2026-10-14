@@ -8,9 +8,7 @@ export function GridMarketingFooter() {
         <div className="grid-footer-top">
           <div className="grid-footer-brand">
             <GridLogo height={40} />
-            <p className="grid-footer-tag">
-              Play-based team intelligence.
-            </p>
+            <p className="grid-footer-tag">Play-based team intelligence.</p>
           </div>
           <nav className="grid-footer-nav" aria-label="Footer">
             <Link href="/#access" className="grid-nav-link">
@@ -22,6 +20,9 @@ export function GridMarketingFooter() {
             <Link href="/login" className="grid-nav-link">
               Customer Login
             </Link>
+            <Link href="/imprint" className="grid-nav-link">
+              Imprint
+            </Link>
             <Link href="/status" className="grid-footer-dev">
               Status
             </Link>
@@ -30,15 +31,17 @@ export function GridMarketingFooter() {
 
         <div className="grid-footer-legal">
           <p className="grid-footer-copy">
-            Tells is a product of Kinetic Pillar Infrastructure OÜ
+            © 2026 Kinetic Pillar OÜ
             <span>·</span>
-            © 2026
+            All rights reserved.
           </p>
-          <p className="grid-footer-vertical">Kinetic Pillar Infrastructure OÜ</p>
+          <p className="grid-footer-vertical">A vertical of Kinetic Pillar Infrastructure</p>
           <p className="grid-footer-meta">
             <span>Tallinn, Estonia</span>
             <span>·</span>
             <span>Remote-first</span>
+            <span>·</span>
+            <span>Play-based team intelligence.</span>
           </p>
         </div>
       </div>

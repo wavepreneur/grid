@@ -997,6 +997,128 @@
   opacity: 0.45;
 }
 
+.grid-marketing .grid-imprint {
+  padding: 120px 24px 72px;
+}
+
+.grid-marketing .grid-imprint-hero {
+  max-width: 640px;
+  margin: 0 auto 40px;
+  text-align: center;
+}
+
+.grid-marketing .grid-imprint-hero .grid-h2 {
+  margin: 8px 0 12px;
+}
+
+.grid-marketing .grid-imprint-card {
+  margin-bottom: 20px;
+}
+
+.grid-marketing .grid-imprint-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.grid-marketing .grid-imprint-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 20px 0 8px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.grid-marketing .grid-imprint-card h3:first-child {
+  margin-top: 0;
+}
+
+.grid-marketing .grid-imprint-brand {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--grid-cyan);
+}
+
+.grid-marketing .grid-imprint-company {
+  display: block;
+  width: 100%;
+  margin: 4px 0 28px;
+  font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.grid-marketing .grid-imprint-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px 32px;
+}
+
+.grid-marketing .grid-imprint-card p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--grid-text);
+}
+
+.grid-marketing .grid-imprint-sub {
+  display: block;
+  margin: 16px 0 6px;
+  font-size: 15px;
+}
+
+.grid-marketing .grid-imprint-card small {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--grid-muted);
+}
+
+.grid-marketing .grid-imprint-card a {
+  color: oklch(0.38 0.07 178);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.grid-marketing .grid-imprint-card a svg {
+  display: inline;
+  margin-left: 6px;
+  vertical-align: -2px;
+}
+
+.grid-marketing .grid-imprint-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.grid-marketing .grid-imprint-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--grid-muted);
+}
+
+.grid-marketing .grid-imprint-list li + li {
+  margin-top: 6px;
+}
+
+@media (max-width: 760px) {
+  .grid-marketing .grid-imprint-grid,
+  .grid-marketing .grid-imprint-split {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Studio-aligned company landing — does not change /status */
 .grid-marketing-studio {
   --grid-cyan: oklch(0.46 0.093 178);
