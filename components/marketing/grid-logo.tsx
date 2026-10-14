@@ -11,8 +11,8 @@ export function GridLogo({
     <Image
       src="/marketing/tells-logo.png"
       alt="Tells"
-      width={500}
-      height={211}
+      width={742}
+      height={295}
       className="grid-logo-wordmark"
       style={{ height, width: "auto" }}
       priority={priority}
