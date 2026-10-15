@@ -24,7 +24,7 @@ export default async function TellsGatePage({
         <GridLogo height={40} priority className="grid-gate-logo" />
         <p className="section-label">Play-based team intelligence</p>
         <h1 className="grid-gate-headline">
-          <span>Don’t ask your&nbsp;team.</span>
+          <span>Don’t ask your team.</span>
           <span>Let it tell.</span>
         </h1>
         <TellsGateForm nextPath={safeGateNext(params.next)} />

@@ -3221,6 +3221,15 @@
     letter-spacing: 0.12em;
   }
 
+  .grid-marketing .grid-gate-headline {
+    font-size: clamp(1.75rem, 8.2vw, 2.25rem);
+    word-spacing: 0.04em;
+  }
+
+  .grid-marketing .grid-gate-headline span:first-child {
+    white-space: nowrap;
+  }
+
   .grid-marketing .grid-gate-form {
     width: min(100%, 280px);
   }
