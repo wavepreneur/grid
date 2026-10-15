@@ -3022,3 +3022,213 @@
     display: none;
   }
 }
+
+.grid-marketing.grid-gate {
+  --gate-space: 24px;
+  --gate-space-lg: 40px;
+  --gate-control: 48px;
+  --gate-form: 300px;
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 100dvh;
+  padding: max(48px, env(safe-area-inset-top)) 24px max(48px, env(safe-area-inset-bottom));
+  overflow-x: hidden;
+  overflow-y: auto;
+  isolation: isolate;
+}
+
+.grid-marketing .grid-gate-grid,
+.grid-marketing .grid-gate-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.grid-marketing .grid-gate-grid {
+  background-image:
+    linear-gradient(oklch(0.46 0.093 178 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.46 0.093 178 / 0.045) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 64% 52% at 50% 46%, #000 28%, transparent 74%);
+}
+
+.grid-marketing .grid-gate-glow {
+  background: radial-gradient(
+    ellipse 48% 34% at 50% 44%,
+    oklch(0.46 0.093 178 / 0.14) 0%,
+    transparent 70%
+  );
+}
+
+.grid-marketing .grid-gate-main {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: min(100%, 640px);
+}
+
+.grid-marketing .grid-gate-logo {
+  display: block;
+  height: 40px !important;
+  width: auto !important;
+  max-width: none !important;
+}
+
+.grid-marketing .grid-gate-main .section-label {
+  margin: var(--gate-space) 0 0;
+  padding: 6px 14px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.16em;
+}
+
+.grid-marketing .grid-gate-headline {
+  margin: var(--gate-space) 0 0;
+  font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(2.5rem, 2rem + 2.4vw, 3.75rem);
+  font-weight: 700;
+  line-height: 1.14;
+  letter-spacing: -0.02em;
+  word-spacing: 0.08em;
+  font-kerning: normal;
+}
+
+.grid-marketing .grid-gate-headline span {
+  display: block;
+}
+
+.grid-marketing .grid-gate-headline span:last-child {
+  color: var(--grid-cyan);
+}
+
+.grid-marketing .grid-gate-form {
+  display: grid;
+  justify-items: center;
+  width: min(100%, var(--gate-form));
+  margin: var(--gate-space-lg) 0 0;
+}
+
+.grid-marketing .grid-gate-unlock {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: var(--gate-control);
+  padding: 4px;
+  background: #fff;
+  border: 1px solid oklch(0.46 0.093 178 / 0.14);
+  border-radius: 999px;
+  box-shadow: 0 10px 28px oklch(0.24 0.02 175 / 0.06);
+}
+
+.grid-marketing .grid-gate-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.grid-marketing .grid-gate-field input {
+  display: block;
+  width: 100%;
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--grid-text);
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 40px;
+  text-align: center;
+  letter-spacing: 0.28em;
+  box-shadow: none;
+}
+
+.grid-marketing .grid-gate-field input::placeholder {
+  letter-spacing: 0.32em;
+  color: oklch(0.8 0.008 95);
+}
+
+.grid-marketing .grid-gate-field input:focus {
+  outline: none;
+}
+
+.grid-marketing .grid-gate-unlock:focus-within {
+  border-color: oklch(0.46 0.093 178 / 0.42);
+  box-shadow:
+    0 0 0 4px oklch(0.46 0.093 178 / 0.1),
+    0 10px 28px oklch(0.24 0.02 175 / 0.06);
+}
+
+.grid-marketing .grid-gate-enter {
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: oklch(0.46 0.093 178);
+  color: oklch(0.985 0.01 90);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 40px;
+  cursor: pointer;
+}
+
+.grid-marketing .grid-gate-enter:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.grid-marketing .grid-gate-error {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.3;
+  color: #b42318;
+}
+
+.grid-marketing .grid-gate .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .grid-marketing.grid-gate {
+    --gate-space: 20px;
+    --gate-space-lg: 32px;
+    padding-inline: 20px;
+  }
+
+  .grid-marketing .grid-gate-logo {
+    height: 36px !important;
+  }
+
+  .grid-marketing .grid-gate-main .section-label {
+    letter-spacing: 0.12em;
+  }
+
+  .grid-marketing .grid-gate-form {
+    width: min(100%, 280px);
+  }
+}
+
+@media (max-height: 700px) {
+  .grid-marketing.grid-gate {
+    --gate-space: 16px;
+    --gate-space-lg: 28px;
+  }
+}
