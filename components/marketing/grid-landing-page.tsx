@@ -37,7 +37,7 @@ const uses = [
   },
   {
     title: "Training validation",
-    text: "Replace the quiz at the end with proof of understanding.",
+    text: "See which topics teams didn't understand, before it shows up in their work.",
     icon: GraduationCap,
   },
   {
@@ -56,6 +56,27 @@ const uses = [
     icon: Crown,
   },
 ];
+
+const modes = [
+  {
+    n: "Check",
+    title: "Is this team working?",
+    text: "New team or one that has worked together for years. One session shows whether it fits, or where it needs help.",
+    flow: ["Session", "Report", "Clear yes, or a to-do"],
+  },
+  {
+    n: "Compare",
+    title: "Which setup works best?",
+    text: "Same game, different team mixes. Swap people between teams and see which combination solves faster and shares more.",
+    flow: ["Mix A", "Mix B", "Mix C", "Best setup"],
+  },
+  {
+    n: "Re-run",
+    title: "Did it stick?",
+    text: "Run a session, work on what it showed, then run it again. You see in numbers whether the team got better.",
+    flow: ["Session 1", "Work on it", "Session 2", "Better?"],
+  },
+] as const;
 
 export function GridLandingPage() {
   return (
@@ -99,10 +120,6 @@ export function GridLandingPage() {
             }}
             aria-hidden
           />
-          <div className="grid-hero-scan" aria-hidden />
-          <div className="grid-orb grid-orb-a" aria-hidden />
-          <div className="grid-orb grid-orb-b" aria-hidden />
-          <div className="grid-orb grid-orb-c" aria-hidden />
           <div style={{ position: "relative", zIndex: 1, maxWidth: 1040, width: "100%" }}>
             <p className="section-label" style={{ letterSpacing: "0.28em", marginBottom: 18 }}>
               Play-based team intelligence
@@ -131,23 +148,35 @@ export function GridLandingPage() {
                 opacity: 0.78,
               }}
             >
-              Surveys hear what people say. Tells sees what teams do. Your team plays for 30 minutes
-              and you see where it gets stuck, how roles really work and whether the topic landed.
+              Surveys hear what people say. Tells sees what teams do. Your team plays for 10, 30 or
+              120 minutes, and you see where it gets stuck, how roles really work and whether the
+              topic landed.
             </p>
 
             <div className="grid-hero-cta-row">
-              <Link href="#access" className="grid-cta">
-                Run a session with your team
+              <Link href="#pricing" className="grid-cta">
+                Run a session now
               </Link>
-              <Link href="#see" className="grid-cta-outline">
-                See a sample report
+              <Link href="#access" className="grid-cta-outline">
+                Book a 15-min demo
               </Link>
             </div>
+            <p className="grid-hero-play-first">
+              <a
+                href="https://exitmania.com/try-tells"
+                className="grid-text-link"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Or play a game first →
+              </a>
+            </p>
             <ul className="grid-hero-trust">
-              <li>Starts in 60 seconds</li>
+              <li>Ready in 60 seconds</li>
               <li>Any device</li>
+              <li>In the browser, Slack or Microsoft Teams</li>
               <li>No app, no login</li>
-              <li>2 to 50,000 people</li>
+              <li>10 to 50,000 people</li>
             </ul>
             <GridHeroLive />
           </div>
@@ -222,18 +251,53 @@ export function GridLandingPage() {
               <div style={{ textAlign: "center", marginBottom: 28, maxWidth: 740, marginInline: "auto" }}>
                 <span className="section-label">How it works</span>
                 <h2 className="grid-h2">
-                  Content in. Insight out.
+                  One code in. Clear answers out.
                   <br />
-                  <span style={{ color: "var(--grid-cyan)" }}>Nothing in between.</span>
+                  <span style={{ color: "var(--grid-cyan)" }}>No host in between.</span>
                 </h2>
               </div>
             </GridReveal>
-            <GridReveal delay={80}>
-              <GridHowItWorks />
-            </GridReveal>
+            <GridHowItWorks />
             <GridReveal delay={160}>
               <p className="grid-body" style={{ marginTop: 32, textAlign: "center", maxWidth: 560, marginInline: "auto" }}>
-                No host. No facilitator. No IT ticket. If you can send an email, you can run Tells.
+                No host. No facilitator. No IT ticket. If you can send a link, you can run Tells.
+              </p>
+            </GridReveal>
+          </div>
+        </section>
+
+        <section id="modes" className="grid-section" style={{ background: "var(--grid-bg-elevated)" }}>
+          <div className="grid-container">
+            <GridReveal>
+              <div style={{ textAlign: "center", marginBottom: 32, maxWidth: 760, marginInline: "auto" }}>
+                <span className="section-label">Why companies use Tells</span>
+                <h2 className="grid-h2">
+                  Understand your teams.
+                  <br />
+                  <span style={{ color: "var(--grid-cyan)" }}>Then see if it worked.</span>
+                </h2>
+              </div>
+            </GridReveal>
+            <div className="ts-modes">
+              {modes.map((mode, index) => (
+                <GridReveal key={mode.title} delay={index * 90}>
+                  <article className="grid-card ts-mode">
+                    <p className="ts-mode-n">{mode.n}</p>
+                    <h3 className="grid-product-header ts-mode-title">{mode.title}</h3>
+                    <p className="grid-product-copy">{mode.text}</p>
+                    <ol className="ts-mode-flow" aria-label="Example">
+                      {mode.flow.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ol>
+                  </article>
+                </GridReveal>
+              ))}
+            </div>
+            <GridReveal delay={200}>
+              <p className="ts-team-statement">
+                <strong>We never measure individuals.</strong> Most of what goes wrong at work goes wrong
+                between people, so that&apos;s where Tells looks: at the team.
               </p>
             </GridReveal>
           </div>
@@ -250,19 +314,15 @@ export function GridLandingPage() {
             </GridReveal>
             <GridBenefits />
             <div className="grid-show-cta">
-              <Link href="#access" className="grid-cta">
-                Run a session with your team
+              <Link href="#pricing" className="grid-cta">
+                Run a session now
               </Link>
             </div>
             <div className="grid-logo-row-wrap">
               <p className="grid-logo-row-kicker">Already on Exitmania</p>
-              <ul className="grid-logo-row">
-                <li>Siemens</li>
-                <li>Bosch</li>
-                <li>Allianz</li>
-                <li>SAP</li>
-                <li>BMW</li>
-              </ul>
+              <p className="grid-logo-row-copy">
+                Teams from 800+ companies have played on Exitmania
+              </p>
             </div>
           </div>
         </section>
@@ -296,7 +356,7 @@ export function GridLandingPage() {
                 <h2 className="grid-h2">
                   10 minutes or 2 hours.
                   <br />
-                  <span style={{ color: "var(--grid-cyan)" }}>Two people or fifty thousand.</span>
+                  <span style={{ color: "var(--grid-cyan)" }}>Ten people or fifty thousand.</span>
                 </h2>
               </div>
             </GridReveal>
@@ -310,13 +370,14 @@ export function GridLandingPage() {
                 <span>Offices, kickoffs, conferences</span>
               </article>
               <article className="grid-try-surface">
-                <strong>Outdoor</strong>
-                <span>City games in 1,900+ cities</span>
+                <strong>Anywhere</strong>
+                <span>Teams in different locations, one game, one score</span>
               </article>
             </div>
             <GridReveal delay={120}>
               <p className="grid-body" style={{ marginTop: 28, textAlign: "center" }}>
-                Any language. Any device. Every team starts at the same second.
+                English, German, French, Spanish, Italian. Any device. Every team starts at the same
+                second.
               </p>
             </GridReveal>
           </div>
@@ -366,8 +427,10 @@ export function GridLandingPage() {
               </h2>
               <ul className="grid-privacy-list">
                 <li>Team-level only: no individual scores, no personal profiles</li>
-                <li>Minimum group size: results appear only for groups of 5 or more</li>
+                <li>Roles are assigned by the system, never linked to a person in the report</li>
+                <li>Minimum team size: 5 people</li>
                 <li>GDPR-compliant</li>
+                <li>Works council ready: template agreement and data protection documents included</li>
               </ul>
               <p className="grid-body" style={{ marginTop: 28 }}>
                 Your people play. Nobody gets graded.
@@ -387,24 +450,20 @@ export function GridLandingPage() {
                   <span style={{ color: "var(--grid-cyan)" }}>on Tells.</span>
                 </h2>
                 <p className="grid-body">
-                  50,000+ players in city games, indoors and online, booked and started in seconds.
-                  Same engine. Same speed. Now pointed at your team.
-                </p>
-                <p className="grid-try-price">
-                  From <strong>€9.90</strong> per person
-                  <span>1,900+ cities · start after booking</span>
+                  50,000+ players in games across Europe, booked and started in seconds. Same
+                  engine. Same speed. Now pointed at your team.
                 </p>
                 <div className="grid-hero-cta-row">
-                  <Link href="#access" className="grid-cta">
-                    Run a session with your team
+                  <Link href="#pricing" className="grid-cta">
+                    Run a session now
                   </Link>
                   <a
-                    href="https://exitmania.com"
+                    href="https://exitmania.com/try-tells"
                     className="grid-text-link"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    Play a session
+                    Play a game first →
                   </a>
                 </div>
               </div>
@@ -423,7 +482,7 @@ export function GridLandingPage() {
                   <span style={{ color: "var(--grid-cyan)" }}>Then decide.</span>
                 </h2>
                 <p className="grid-body" style={{ marginTop: 16 }}>
-                  Pay monthly or save 20% yearly.
+                  Start with one session. If you stay, it&apos;s credited to your yearly plan.
                 </p>
               </div>
             </GridReveal>
@@ -455,13 +514,23 @@ export function GridLandingPage() {
                 <h2 className="grid-h2" style={{ marginBottom: 16 }}>
                   Find out
                   <br />
-                  <span style={{ color: "var(--grid-cyan)" }}>what they say.</span>
+                  <span style={{ color: "var(--grid-cyan)" }}>how they work.</span>
                 </h2>
-                <p className="grid-body" style={{ maxWidth: 560, margin: "0 auto" }}>
-                  We set up your first session within 24 hours.
+                <p className="grid-body" style={{ maxWidth: 560, margin: "0 auto 28px" }}>
+                  Run your first session in 60 seconds, or talk to us first.
                 </p>
+                <div className="grid-hero-cta-row" style={{ marginBottom: 32 }}>
+                  <Link href="#pricing" className="grid-cta">
+                    Run a session now
+                  </Link>
+                  <Link href="#access-form" className="grid-cta-outline">
+                    Book a 15-min demo
+                  </Link>
+                </div>
               </div>
-              <EnterpriseBriefingForm />
+              <div id="access-form">
+                <EnterpriseBriefingForm />
+              </div>
             </GridReveal>
           </div>
         </section>

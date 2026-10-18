@@ -1,208 +1,229 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
+import { EXAMPLE, EXAMPLE_TEAMS } from "@/components/marketing/tells-example-data";
+
+type Bar = { label: string; value: number; display: string; hot?: boolean };
+
+function Bars({ bars, max, note }: { bars: readonly Bar[]; max: number; note?: string }) {
+  return (
+    <div className="ts-chart">
+      <div className="ts-chart-bars">
+        {bars.map((bar) => (
+          <div key={bar.label} className={`ts-chart-col${bar.hot ? " is-hot" : ""}`}>
+            <span className="ts-chart-val">{bar.display}</span>
+            <span className="ts-chart-track">
+              <i style={{ height: `${Math.round((bar.value / max) * 100)}%` }} />
+            </span>
+            <span className="ts-chart-label">{bar.label}</span>
+          </div>
+        ))}
+      </div>
+      {note ? <p className="ts-chart-note">{note}</p> : null}
+    </div>
+  );
+}
+
+function RoleFlow() {
+  return (
+    <div className="ts-chart">
+      <svg viewBox="0 0 320 210" className="ts-flow" role="img" aria-label="Handoffs between roles">
+        <defs>
+          <marker id="ts-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+            <path d="M0 0L10 5L0 10z" fill="currentColor" />
+          </marker>
+        </defs>
+        <g className="ts-flow-edge">
+          <line x1="88" y1="52" x2="226" y2="52" strokeWidth="5" markerEnd="url(#ts-arrow)" />
+          <text x="157" y="40">14</text>
+        </g>
+        <g className="ts-flow-edge is-weak">
+          <line x1="240" y1="78" x2="178" y2="158" strokeWidth="1.5" markerEnd="url(#ts-arrow)" strokeDasharray="4 4" />
+          <text x="226" y="128">3</text>
+        </g>
+        <g className="ts-flow-edge">
+          <line x1="140" y1="160" x2="80" y2="80" strokeWidth="3.5" markerEnd="url(#ts-arrow)" />
+          <text x="88" y="130">9</text>
+        </g>
+        <g className="ts-flow-node">
+          <circle cx="60" cy="52" r="28" />
+          <text x="60" y="57">Alpha</text>
+        </g>
+        <g className="ts-flow-node">
+          <circle cx="260" cy="52" r="28" />
+          <text x="260" y="57">Beta</text>
+        </g>
+        <g className="ts-flow-node">
+          <circle cx="160" cy="178" r="28" />
+          <text x="160" y="183">Gamma</text>
+        </g>
+      </svg>
+      <p className="ts-chart-note">Handoffs per session · average across {EXAMPLE.teamCount} teams</p>
+    </div>
+  );
+}
+
+function OverTime() {
+  const points = [
+    { s: "S1", v: 61 },
+    { s: "S2", v: 64 },
+    { s: "S3", v: 58, note: "Reorg" },
+    { s: "S5", v: 66 },
+    { s: "S8", v: 72 },
+    { s: "S10", v: 78 },
+  ];
+  const x = (i: number) => 24 + i * 54;
+  const y = (v: number) => 170 - ((v - 50) / 30) * 140;
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i)} ${y(p.v)}`).join(" ");
+  return (
+    <div className="ts-chart">
+      <svg viewBox="0 0 320 200" className="ts-line" role="img" aria-label="Team score over sessions">
+        <path d={path} className="ts-line-path" pathLength={1} />
+        {points.map((p, i) => (
+          <g key={p.s} className={p.note ? "is-hot" : undefined}>
+            <circle cx={x(i)} cy={y(p.v)} r="5" />
+            <text x={x(i)} y={y(p.v) - 12} className="ts-line-val">
+              {p.v}
+            </text>
+            <text x={x(i)} y="194" className="ts-line-label">
+              {p.s}
+            </text>
+            {p.note ? (
+              <text x={x(i)} y={y(p.v) + 24} className="ts-line-note">
+                {p.note}
+              </text>
+            ) : null}
+          </g>
+        ))}
+      </svg>
+      <p className="ts-chart-note">Team score per session</p>
+    </div>
+  );
+}
+
+function Board() {
+  return (
+    <div className="ts-chart">
+      <div className="ts-board-filter">
+        <span className="is-on">Department</span>
+        <span>Country</span>
+      </div>
+      <ol className="ts-board">
+        {EXAMPLE_TEAMS.map((team, index) => (
+          <li key={team.name} className={index === 0 ? "is-hot" : undefined}>
+            <span>#{index + 1}</span>
+            <strong>{team.name}</strong>
+            <i style={{ width: `${team.score}%` }} aria-hidden />
+            <b>{team.score}</b>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
 
 const SEES = [
   {
     id: "bottlenecks",
-    n: "01",
     pill: "Bottlenecks",
-    title: "Where does the team get stuck, and who waits on whom?",
-    text: "Waits, stalls and dropped handoffs become a map. You see the bottleneck before Monday does.",
+    title: "Where does the team get stuck?",
+    text: "Gamma waits for input in every team. Fix the handoff, not the people.",
+    visual: (
+      <Bars
+        max={48}
+        note={`Average wait for input · across ${EXAMPLE.teamCount} teams`}
+        bars={[
+          { label: "Alpha", value: 12, display: "12 s" },
+          { label: "Beta", value: 18, display: "18 s" },
+          { label: "Gamma", value: 48, display: "48 s", hot: true },
+          { label: "Team Ø", value: 27, display: "27 s" },
+        ]}
+      />
+    ),
   },
   {
     id: "roles",
-    n: "02",
     pill: "Role dynamics",
-    title: "Does information flow, or does one role carry everything?",
-    text: "Navigator, Solver, Spotter. You see who decides, who waits, and who never gets the next input.",
+    title: "Who passes work to whom?",
+    text: "Beta rarely hands over. Information stays in one place.",
+    visual: <RoleFlow />,
   },
   {
     id: "understanding",
-    n: "03",
     pill: "Understanding",
-    title: "Did the topic land, or did teams guess their way through?",
-    text: "Wrong answers cluster. If three of five miss the same task, the topic did not land.",
+    title: "Which topic didn't land?",
+    text: "Mission 4, your discount policy. Teams bought hints and still guessed. Re-explain it before it costs a deal.",
+    visual: (
+      <Bars
+        max={100}
+        note="Solved without a hint · per mission · all teams"
+        bars={[
+          { label: "M1", value: 92, display: "92%" },
+          { label: "M2", value: 88, display: "88%" },
+          { label: "M3", value: 85, display: "85%" },
+          { label: "M4", value: 40, display: "40%", hot: true },
+          { label: "M5", value: 80, display: "80%" },
+          { label: "M6", value: 90, display: "90%" },
+        ]}
+      />
+    ),
+  },
+  {
+    id: "overtime",
+    pill: "Over time",
+    title: "One session is a snapshot. Ten are a pattern.",
+    text: "See the dip after the reorg, and how fast the team recovered.",
+    visual: <OverTime />,
   },
   {
     id: "benchmarks",
-    n: "04",
     pill: "Benchmarks",
-    title: "How does your team compare to anonymized teams worldwide?",
-    text: "Same task. Same clock. Your pattern next to anonymized teams — not a survey score.",
+    title: "How do you compare?",
+    text: "Your teams solve faster than average, but need more hints on Mission 4.",
+    visual: (
+      <Bars
+        max={80}
+        note="Team score · same game"
+        bars={[
+          { label: "Your teams", value: 72, display: "72", hot: true },
+          { label: "Tells average", value: 64, display: "64" },
+        ]}
+      />
+    ),
   },
   {
     id: "boards",
-    n: "05",
     pill: "Leaderboards",
-    title: "Rankings by team, department, country and language.",
-    text: "The board you already use at work. Then the teams land on it.",
+    title: "Let teams compete.",
+    text: "By department or country. A little pressure shows how they really work.",
+    visual: <Board />,
   },
 ] as const;
-
-const WAIT_BARS = [
-  { role: "Navigator", seconds: 12, tell: false },
-  { role: "Solver", seconds: 18, tell: false },
-  { role: "Spotter", seconds: 48, tell: true },
-  { role: "Team", seconds: 27, tell: false },
-] as const;
-
-function ShowBottlenecks() {
-  return (
-    <div className="grid-show-data">
-      <p>Who waits on whom</p>
-      <p className="grid-show-example">Example data</p>
-      <div className="grid-show-chart" aria-label="Wait time by role">
-        {WAIT_BARS.map((bar) => (
-          <div key={bar.role} className={`grid-show-chart-col${bar.tell ? " is-tell" : ""}`}>
-            <span className="grid-show-chart-val">{bar.seconds}s</span>
-            <i style={{ "--h": `${Math.round((bar.seconds / 48) * 100)}%` } as CSSProperties} />
-            <span className="grid-show-chart-role">{bar.role}</span>
-          </div>
-        ))}
-      </div>
-      <ul>
-        <li>Spotter waited 48s for input</li>
-        <li>Task 4 stalled · 3 of 5 teams</li>
-      </ul>
-    </div>
-  );
-}
-
-function ShowRoles() {
-  return (
-    <div className="grid-show-heal">
-      <div className="grid-show-heal-row">
-        <span className="is-ok">Navigator · decides</span>
-        <span className="is-ok">Solver · types</span>
-        <span className="is-drop">Spotter · waits</span>
-      </div>
-      <p className="grid-show-heal-fix">One role carries. The others wait.</p>
-    </div>
-  );
-}
-
-const LAND_BARS = [
-  { role: "Navigator", value: 88, tell: false },
-  { role: "Solver", value: 80, tell: false },
-  { role: "Spotter", value: 24, tell: true },
-  { role: "Team", value: 76, tell: false },
-] as const;
-
-function ShowUnderstanding() {
-  return (
-    <div className="grid-show-data">
-      <p>Did the topic land</p>
-      <p className="grid-show-example">Example data</p>
-      <div className="grid-show-chart" aria-label="Solved share by role">
-        {LAND_BARS.map((bar) => (
-          <div key={bar.role} className={`grid-show-chart-col${bar.tell ? " is-tell" : ""}`}>
-            <span className="grid-show-chart-val">{bar.value}%</span>
-            <i style={{ "--h": `${bar.value}%` } as CSSProperties} />
-            <span className="grid-show-chart-role">{bar.role}</span>
-          </div>
-        ))}
-      </div>
-      <ul>
-        <li>Task 4 failed in 3 of 5 teams</li>
-        <li>Guessed through. Topic missed.</li>
-      </ul>
-    </div>
-  );
-}
-
-function ShowBenchmarks() {
-  return (
-    <div className="grid-show-time">
-      <div className="grid-show-time-opts">
-        <span>Same dept</span>
-        <span className="is-on">Mixed +31%</span>
-      </div>
-      <div className="grid-show-time-bar" aria-hidden>
-        <i />
-      </div>
-      <p>Anonymized teams. Same task. Your pattern next to theirs.</p>
-    </div>
-  );
-}
-
-function ShowBoards() {
-  return (
-    <div className="grid-show-score">
-      <p>Your board</p>
-      <table>
-        <thead>
-          <tr>
-            <th>Team</th>
-            <th>Dept</th>
-            <th>Country</th>
-            <th>Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>North</td>
-            <td>Mixed</td>
-            <td>DE</td>
-            <td>12:04</td>
-          </tr>
-          <tr>
-            <td>APAC</td>
-            <td>Ops</td>
-            <td>JP</td>
-            <td>12:41</td>
-          </tr>
-          <tr>
-            <td>West</td>
-            <td>HQ</td>
-            <td>US</td>
-            <td>13:08</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function Visual({ id }: { id: (typeof SEES)[number]["id"] }) {
-  const body = {
-    bottlenecks: <ShowBottlenecks />,
-    roles: <ShowRoles />,
-    understanding: <ShowUnderstanding />,
-    benchmarks: <ShowBenchmarks />,
-    boards: <ShowBoards />,
-  } as const;
-  return <div className={`grid-show-visual is-${id} is-run`}>{body[id]}</div>;
-}
 
 export function GridBenefits() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const [inView, setInView] = useState(false);
-  const hold = useRef(false);
+  const [held, setHeld] = useState(false);
 
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setInView(entry.isIntersecting),
-      { threshold: 0.28 },
-    );
+    const observer = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), {
+      threshold: 0.35,
+    });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
-    if (!inView || hold.current) return;
+    if (!inView || held || index === SEES.length - 1) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const id = window.setInterval(() => {
-      if (hold.current) return;
-      setIndex((current) => (current + 1) % SEES.length);
-    }, 4800);
-    return () => window.clearInterval(id);
-  }, [inView]);
+    const id = window.setTimeout(() => setIndex((current) => current + 1), 5200);
+    return () => window.clearTimeout(id);
+  }, [inView, held, index]);
 
-  const current = SEES[index];
+  const current = SEES[index]!;
 
   return (
     <div ref={rootRef} className="grid-show">
@@ -215,7 +236,7 @@ export function GridBenefits() {
             aria-selected={i === index}
             className={i === index ? "is-on" : undefined}
             onClick={() => {
-              hold.current = true;
+              setHeld(true);
               setIndex(i);
             }}
           >
@@ -224,10 +245,12 @@ export function GridBenefits() {
         ))}
       </div>
 
-      <div className="grid-show-stage">
-        <Visual key={current.id} id={current.id} />
+      <div className="grid-show-stage ts-show-stage">
+        <div className={`ts-show-visual is-${current.id}`} key={current.id}>
+          {current.visual}
+          <p className="ts-example">Example data</p>
+        </div>
         <div className="grid-show-copy">
-          <p className="grid-show-n">{current.n}</p>
           <h3 className="grid-product-header">{current.title}</h3>
           <p className="grid-product-copy">{current.text}</p>
         </div>

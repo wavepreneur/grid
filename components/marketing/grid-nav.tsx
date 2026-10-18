@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GridLogo } from "@/components/marketing/grid-logo";
 
-const ACCESS_HREF = "/#access";
+const ACCESS_HREF = "/#pricing";
 
 export function GridNav() {
   const [scrolled, setScrolled] = useState(false);

@@ -1,161 +1,141 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { EXAMPLE, EXAMPLE_SLOTS, EXAMPLE_TEAMS } from "@/components/marketing/tells-example-data";
+import { useStoryTimeline } from "@/components/marketing/use-story-timeline";
+import { CodeLock, PointsDecay, Tile } from "@/components/marketing/tells-play-bits";
 
-const PHASES = [
-  { id: "join", ms: 2200 },
-  { id: "roles", ms: 2000 },
-  { id: "tell-wait", ms: 2600 },
-  { id: "tell-fail", ms: 2600 },
-  { id: "tell-mix", ms: 3200 },
-] as const;
+/** 0 mission · 1 wrong code · 2 hint + vault open · 3 tell · 4 report (end state) */
+const DURATIONS = [2200, 2200, 2800, 3000] as const;
 
-const PLAYERS = [
-  { name: "Maya", role: "Navigator", beat: "decides" },
-  { name: "Jan", role: "Solver", beat: "types" },
-  { name: "Lea", role: "Spotter", beat: "waits" },
-] as const;
+/** Missions done per team (of 6) at each step. */
+const PROGRESS: Record<string, readonly number[]> = {
+  Falcon: [3, 3, 4, 4, 6],
+  Lynx: [4, 4, 4, 5, 6],
+  Orca: [3, 3, 3, 3, 6],
+  Heron: [2, 3, 3, 3, 6],
+  Bison: [3, 3, 3, 3, 6],
+};
 
-const TELLS = [
-  {
-    id: "wait",
-    phase: 2,
-    text: "Spotter role waited 48s on average for input",
-  },
-  {
-    id: "fail",
-    phase: 3,
-    text: "Task 4 failed in 3 of 5 teams: topic not understood",
-  },
-  {
-    id: "mix",
-    phase: 4,
-    text: "Mixed-department teams solved 31% faster",
-  },
-] as const;
+const HINTS: readonly (readonly string[])[] = [
+  [],
+  ["Falcon"],
+  ["Falcon", "Orca", "Heron"],
+  ["Falcon", "Orca", "Heron"],
+  [],
+];
 
-function formatClock(seconds: number) {
-  const safe = Math.max(0, seconds);
-  const mm = String(Math.floor(safe / 60)).padStart(2, "0");
-  const ss = String(safe % 60).padStart(2, "0");
-  return `${mm}:${ss}`;
-}
+const POINTS = [120, 104, 96, 96, 96] as const;
 
 export function GridHeroLive() {
-  const [phase, setPhase] = useState(2);
-  const [seconds, setSeconds] = useState(48);
-  const [reduce, setReduce] = useState(false);
+  const { ref, step } = useStoryTimeline<HTMLDivElement>({
+    durations: DURATIONS,
+    loopPauseMs: 4000,
+  });
 
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (media.matches) {
-      setReduce(true);
-      setPhase(PHASES.length - 1);
-      setSeconds(48);
-      return;
-    }
-
-    let cancelled = false;
-    let phaseIndex = 2;
-    let timer = 0;
-
-    const advance = () => {
-      if (cancelled) return;
-      timer = window.setTimeout(() => {
-        phaseIndex = (phaseIndex + 1) % PHASES.length;
-        setPhase(phaseIndex);
-        if (phaseIndex === 0) setSeconds(12);
-        if (phaseIndex === 2) setSeconds(48);
-        advance();
-      }, PHASES[phaseIndex].ms);
-    };
-
-    advance();
-    const clock = window.setInterval(() => {
-      setSeconds((current) => current + 1);
-    }, 1000);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-      window.clearInterval(clock);
-    };
-  }, []);
-
-  const rolesOn = reduce || phase >= 1;
-  const liveOn = reduce || phase >= 4;
-  const shownTells = reduce ? TELLS.length : Math.max(2, TELLS.filter((item) => phase >= item.phase).length);
-  const clock = reduce ? 48 : Math.min(seconds, 59);
+  const done = step >= 4;
+  const open = step >= 2;
 
   return (
-    <div className={`grid-hero-live${liveOn ? " is-live" : ""}`}>
-      <div className="grid-hero-split">
-        <section className="grid-hero-pane" aria-label="Live play">
-          <div className="grid-hero-pane-top">
-            <p className="grid-hero-live-kicker">
-              <span className="grid-hero-live-dot" />
-              Live play
-            </p>
-            <p className="grid-hero-timer" aria-live="polite">
-              {formatClock(clock)}
-            </p>
+    <div ref={ref} className="grid-hero-live ts-hero">
+      <section className="ts-hero-side" aria-label="What your team sees">
+        <p className="ts-side-label">What your team sees</p>
+        <div className="ts-phone">
+          <div className="ts-phone-notch" aria-hidden />
+          {done ? (
+            <div className="ts-phone-screen ts-end" key="end">
+              <p className="ts-end-kicker">Game over</p>
+              <p className="ts-end-team">Team Falcon</p>
+              <p className="ts-end-score">{EXAMPLE_TEAMS[0].score}</p>
+              <p className="ts-end-rank">#1 of {EXAMPLE.teamCount} teams</p>
+            </div>
+          ) : (
+            <div className="ts-phone-screen">
+              <div className="ts-hud">
+                <span>Falcon · Alpha</span>
+                <span className="ts-pill">⏱ 0{open ? "6:12" : "7:40"}</span>
+              </div>
+              <p className="ts-task-n">{step >= 3 ? "Mission 5 · The archive" : EXAMPLE.mission4}</p>
+              <PointsDecay points={POINTS[step]!} max={120} />
+              <div className="ts-tiles">
+                <Tile
+                  label={EXAMPLE_SLOTS.tile.label}
+                  text={EXAMPLE_SLOTS.tile.text}
+                  hint={step >= 2 ? "unlocked" : step === 1 ? "offer" : undefined}
+                />
+                <Tile label="Deal list" text="3 deals · 8 %, 12 %, 15 %" />
+              </div>
+              {step >= 3 ? (
+                <p className="ts-feedback is-right ts-fade" key="next">
+                  Vault open · next mission
+                </p>
+              ) : (
+                <CodeLock
+                  digits={step === 0 ? "" : step === 1 ? "0812" : "1215"}
+                  state={step === 1 ? "wrong" : open ? "right" : "idle"}
+                />
+              )}
+              {step === 2 ? <p className="ts-toast ts-fade">💡 Hint unlocked · −20 P for the team</p> : null}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="ts-hero-side is-you" aria-label="What you see">
+        <p className="ts-side-label">What you see</p>
+        <div className="ts-dash">
+          <div className="ts-dash-top">
+            <span className="ts-live-dot" aria-hidden />
+            {done ? "Session finished" : `Live · ${EXAMPLE.teamCount} teams playing`}
+            <em>
+              {EXAMPLE.company} · {EXAMPLE.session}
+            </em>
           </div>
-
-          <ul className="grid-hero-play-list">
-            {PLAYERS.map((person, index) => {
-              const inPlay = reduce || phase >= 0;
-              const waiting = person.beat === "waits" && (reduce || phase >= 2);
-              return (
-                <li
-                  key={person.name}
-                  className={`grid-hero-play-row${inPlay ? " is-in" : " is-wait"}${waiting ? " is-hot" : ""}`}
-                  style={{ transitionDelay: `${index * 90}ms` }}
-                >
-                  <span className="grid-hero-live-avatar">{person.name.slice(0, 1)}</span>
-                  <span className="grid-hero-live-who">
-                    <strong>{person.name}</strong>
-                    <em>{waiting ? "waiting" : person.beat}</em>
-                  </span>
-                  <span className={`grid-hero-live-role${rolesOn ? " is-on" : ""}`}>
-                    {rolesOn ? person.role : "…"}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-
-        <section className="grid-hero-pane is-tells" aria-label="Live tells">
-          <div className="grid-hero-pane-top">
-            <p className="grid-hero-live-kicker">
-              <span className="grid-hero-live-dot" />
-              Live tells
+          {done ? (
+            <div className="ts-report-mini ts-fade" key="report">
+              <p className="ts-report-mini-head">Report ready</p>
+              <div className="ts-report-mini-stats">
+                <span>
+                  <strong>{EXAMPLE.avgScore}</strong> Ø team score
+                </span>
+                <span>
+                  <strong>3</strong> tells
+                </span>
+              </div>
+              <p className="ts-next">
+                <b>Next step</b> {EXAMPLE.nextStep}
+              </p>
+            </div>
+          ) : (
+            <ul className="ts-bars">
+              {EXAMPLE_TEAMS.map((team) => {
+                const value = PROGRESS[team.name]![step]!;
+                const hint = HINTS[step]!.includes(team.name);
+                return (
+                  <li key={team.name} className={hint ? "is-stuck" : undefined}>
+                    <span className="ts-bar-name">{team.name}</span>
+                    <span className="ts-bar-track" aria-hidden>
+                      <i style={{ width: `${(value / 6) * 100}%` }} />
+                    </span>
+                    <span className="ts-bar-meta">{hint ? "💡 hint" : `${value}/6`}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {done ? null : step === 3 ? (
+            <p className="ts-tell ts-pop" key="tell">
+              <span aria-hidden>⚡</span> 3 of 5 teams needed a hint on the policy tile. Topic not
+              understood.
             </p>
-            <p className={`grid-hero-live-go${shownTells > 0 ? " is-on" : ""}`}>
-              {liveOn ? "Reading" : shownTells > 0 ? "Live" : "Watching"}
+          ) : (
+            <p className="ts-tell is-idle">
+              <span aria-hidden>⚡</span>
+              {step === 2 ? "Same tile, three teams…" : "Live tells · watching every team"}
             </p>
-          </div>
-
-          <ul className="grid-tell-list" aria-live="polite">
-            {TELLS.map((item, index) => {
-              const visible = reduce || index < shownTells;
-              if (!visible) return null;
-              return (
-                <li
-                  key={item.id}
-                  className="grid-tell-row is-in"
-                  style={{ animationDelay: `${index * 80}ms` }}
-                >
-                  <span className="grid-tell-bolt" aria-hidden>
-                    ⚡
-                  </span>
-                  <span>{item.text}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      </div>
+          )}
+        </div>
+      </section>
+      <p className="ts-example">Example data</p>
     </div>
   );
 }

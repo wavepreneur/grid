@@ -11,11 +11,16 @@ export function GridMarketingFooter() {
             <p className="grid-footer-tag">Play-based team intelligence.</p>
           </div>
           <nav className="grid-footer-nav" aria-label="Footer">
-            <Link href="/#access" className="grid-nav-link">
+            <Link href="/#pricing" className="grid-nav-link">
               Run a session
             </Link>
-            <a href="https://exitmania.com" className="grid-nav-link" target="_blank" rel="noopener noreferrer">
-              Play a session
+            <a
+              href="https://exitmania.com/try-tells"
+              className="grid-nav-link"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Play a game first
             </a>
             <Link href="/login" className="grid-nav-link">
               Customer Login
@@ -31,7 +36,7 @@ export function GridMarketingFooter() {
 
         <div className="grid-footer-legal">
           <p className="grid-footer-copy">
-            © 2026 Kinetic Pillar OÜ
+            © 2026 Kinetic Pillar Infrastructure OÜ
             <span>·</span>
             All rights reserved.
           </p>

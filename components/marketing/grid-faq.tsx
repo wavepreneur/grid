@@ -3,11 +3,11 @@
 const FAQS = [
   {
     q: "Is this just another quiz or team event tool?",
-    a: "No. Events end with a photo, Tells ends with a report. The game is the method, not the product.",
+    a: "No. It's a team event your people enjoy, and a report on how they work together. Ready in 60 seconds, no host, and every session adds to what you know about your teams.",
   },
   {
     q: "Do we have to build a game?",
-    a: "No. You add content, Tells builds the game.",
+    a: "No. You pick a proven game and fill a few prepared slots with your content. Missions, difficulty and roles stay as tested.",
   },
   {
     q: "Do we need a host or facilitator?",
@@ -19,11 +19,19 @@ const FAQS = [
   },
   {
     q: "What do we pay for?",
-    a: "Sessions via monthly plans and credits. Your first live session comes before any contract.",
+    a: "Start with a one-off session. If you take a yearly plan afterwards, the cost is credited in full.",
   },
   {
-    q: "Will this land on IT’s desk?",
-    a: "No. No installation, no app, no login.",
+    q: "Will this land on IT's desk?",
+    a: "No. It runs in any browser. If you prefer, also inside Slack or Microsoft Teams. No app, no login, no installation.",
+  },
+  {
+    q: "Does it need our works council?",
+    a: "If you have one, we provide a template agreement and all data protection documents.",
+  },
+  {
+    q: "Can we try it first?",
+    a: "Yes. Run a one-off session with your own team. If you take a yearly plan afterwards, the cost is credited in full. Or play an Exitmania game first: it runs on the same engine.",
   },
 ] as const;
 

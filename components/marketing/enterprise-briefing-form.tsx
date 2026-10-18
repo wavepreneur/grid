@@ -14,7 +14,7 @@ export function EnterpriseBriefingForm() {
     const name = String(form.get("name") ?? "");
     const email = String(form.get("email") ?? "");
     const company = String(form.get("organization") ?? "");
-    const note = ["Session request", form.get("teamSize")]
+    const note = ["Enterprise / question", form.get("message")]
       .map((value) => String(value ?? "").trim())
       .filter(Boolean)
       .join(" · ");
@@ -37,7 +37,7 @@ export function EnterpriseBriefingForm() {
       >
         <p style={{ fontSize: 20, fontWeight: 800 }}>We have it.</p>
         <p className="grid-body" style={{ marginTop: 12 }}>
-          We set up your first session within 24 hours.
+          We’ll get back to you shortly.
         </p>
       </div>
     );
@@ -49,6 +49,9 @@ export function EnterpriseBriefingForm() {
       className="grid-card"
       style={{ display: "grid", gap: 16, padding: 32 }}
     >
+      <p className="grid-body" style={{ margin: 0, fontSize: 15 }}>
+        Enterprise or a question? Talk to us.
+      </p>
       <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
         <label>
           <span className="grid-input-label">Name *</span>
@@ -62,19 +65,11 @@ export function EnterpriseBriefingForm() {
           <span className="grid-input-label">Company *</span>
           <input className="grid-input" name="organization" autoComplete="organization" required />
         </label>
-        <label>
-          <span className="grid-input-label">Team size *</span>
-          <select className="grid-input" name="teamSize" defaultValue="" required>
-            <option value="" disabled>
-              Select a range
-            </option>
-            <option>2–12</option>
-            <option>13–50</option>
-            <option>51–200</option>
-            <option>200+</option>
-          </select>
-        </label>
       </div>
+      <label>
+        <span className="grid-input-label">What do you need?</span>
+        <textarea className="grid-input" name="message" rows={4} />
+      </label>
       <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "var(--grid-muted)" }}>
         <input type="checkbox" required style={{ marginTop: 3 }} />
         <span>I agree to be contacted by Tells.</span>
@@ -86,11 +81,8 @@ export function EnterpriseBriefingForm() {
         className="grid-cta"
         style={{ justifyContent: "center", width: "fit-content", opacity: pending ? 0.6 : 1 }}
       >
-        {pending ? "Sending…" : "Request your first session"}
+        {pending ? "Sending…" : "Talk to us"}
       </button>
-      <p className="grid-body" style={{ fontSize: 12 }}>
-        We set up your first session within 24 hours.
-      </p>
     </form>
   );
 }
