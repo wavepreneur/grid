@@ -1,5 +1,5 @@
 /**
- * Player-facing role names (Alpha/Beta/Gamma stay technical in Studio).
+ * Player-facing role names (Alpha/Beta/Gamma/Delta stay technical in Studio).
  */
 
 import type { ArchetypeRole } from "@/lib/tells/archetype-roles";
@@ -10,12 +10,14 @@ export type RoleDisplayLabels = {
   alpha: string;
   beta: string;
   gamma: string;
+  delta: string;
 };
 
 export const DEFAULT_ROLE_LABELS: RoleDisplayLabels = {
   alpha: "Team Lead",
   beta: "Profiler",
   gamma: "Organizer",
+  delta: "Delta",
 };
 
 export function parseRoleDisplayLabels(raw: unknown): RoleDisplayLabels {
@@ -25,6 +27,7 @@ export function parseRoleDisplayLabels(raw: unknown): RoleDisplayLabels {
     alpha: typeof o.alpha === "string" && o.alpha.trim() ? o.alpha.trim() : DEFAULT_ROLE_LABELS.alpha,
     beta: typeof o.beta === "string" && o.beta.trim() ? o.beta.trim() : DEFAULT_ROLE_LABELS.beta,
     gamma: typeof o.gamma === "string" && o.gamma.trim() ? o.gamma.trim() : DEFAULT_ROLE_LABELS.gamma,
+    delta: typeof o.delta === "string" && o.delta.trim() ? o.delta.trim() : DEFAULT_ROLE_LABELS.delta,
   };
 }
 
@@ -42,6 +45,7 @@ function normalizeAudienceRole(
 ): ArchetypeRole {
   if (role === "captain" || role === "navigator" || role === "alpha") return "alpha";
   if (role === "beta") return "beta";
+  if (role === "delta") return "delta";
   return "gamma";
 }
 

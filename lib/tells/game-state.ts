@@ -51,7 +51,7 @@ export type LevelRevealState = {
  */
 export type ActiveBonusState = {
   from_level: number;
-  for_role: "alpha" | "beta" | "gamma";
+  for_role: "alpha" | "beta" | "gamma" | "delta";
   for_team: boolean;
   started_at: string;
   /** Compiled bonus id when from bonuses[]. */
@@ -72,7 +72,7 @@ export type BonusHandoffRecord = {
 export type BonusQueueItem = {
   bonus_id: string;
   from_level: number;
-  for_role: "alpha" | "beta" | "gamma";
+  for_role: "alpha" | "beta" | "gamma" | "delta";
   for_team: boolean;
   armed_at: string;
   ready_at: string | null;

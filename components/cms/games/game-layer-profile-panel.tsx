@@ -256,14 +256,15 @@ export function GameLayerProfilePanel({ game }: Props) {
             Rollen-Namen im Spiel
           </p>
           <p className="mb-3 text-sm text-slate-500">
-            Alpha / Beta / Gamma bleiben technische Schlüssel. Im Spiel sehen Teams nur diese Namen.
+            Alpha / Beta / Gamma / Delta bleiben technische Schlüssel. Im Spiel sehen Teams nur diese Namen.
           </p>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {(
               [
                 ["alpha", "Alpha"],
                 ["beta", "Beta"],
                 ["gamma", "Gamma"],
+                ["delta", "Delta"],
               ] as const
             ).map(([key, tech]) => (
               <label key={key} className="block space-y-1.5">
@@ -272,7 +273,7 @@ export function GameLayerProfilePanel({ game }: Props) {
                 </span>
                 <input
                   type="text"
-                  value={runtimeProfiles.role_labels[key]}
+                  value={runtimeProfiles.role_labels[key] ?? ""}
                   disabled={pending}
                   onChange={(e) =>
                     setRuntimeProfiles((prev) => ({

@@ -5,7 +5,7 @@ import type { PlayPhase, PlaySurface } from "@/lib/tells/play-surface";
 
 export type LevelType = "gps" | "digital" | "quiz" | "station";
 
-export type PlayerRole = "captain" | "solver" | "navigator" | "alpha" | "beta" | "gamma";
+export type PlayerRole = "captain" | "solver" | "navigator" | "alpha" | "beta" | "gamma" | "delta";
 
 export type LevelLocation = {
   lat: number;
@@ -55,7 +55,7 @@ export type ArrivalQuiz = {
 
 /** Layer-3 bonus after mission solve — role or whole team. */
 export type BonusTask = {
-  for_role: "alpha" | "beta" | "gamma";
+  for_role: "alpha" | "beta" | "gamma" | "delta";
   /** When true, every player sees/answers the bonus (for_role used as display only). */
   for_team?: boolean;
   title: string;
@@ -329,7 +329,7 @@ export type ResolvedEventContent = {
   growthOffer?: import("@/lib/tells/growth-pack").GrowthOffer | null;
   /** Optional game logo for lobby / onboarding. */
   logoUrl?: string | null;
-  /** Player-facing Alpha/Beta/Gamma names for this game. */
+  /** Player-facing Alpha/Beta/Gamma/Delta names for this game. */
   roleLabels?: import("@/lib/tells/role-labels").RoleDisplayLabels;
   /** Studio „Testen“ session — GPS may be triggered remotely. */
   isStudioTest?: boolean;

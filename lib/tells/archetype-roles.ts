@@ -1,8 +1,11 @@
 import type { BlueprintDefinition } from "@/lib/tells/blueprints";
 import type { PlayerSession } from "@/lib/tells/types";
 
-export const ARCHETYPE_ROLES = ["alpha", "beta", "gamma"] as const;
+export const ARCHETYPE_ROLES = ["alpha", "beta", "gamma", "delta"] as const;
 export type ArchetypeRole = (typeof ARCHETYPE_ROLES)[number];
+
+/** After Alpha, seats rotate Beta → Gamma → Delta. Alpha is never repeated. */
+const ROTATING_ROLES = ["beta", "gamma", "delta"] as const;
 
 export type TeamRoleRefs = {
   captainPlayerId: string | null;
@@ -15,6 +18,7 @@ export type ArchetypeRoleFlags = {
   isAlpha: boolean;
   isBeta: boolean;
   isGamma: boolean;
+  isDelta: boolean;
   /** Alpha absorbs Beta UI when solo (1 player, no dedicated Beta). */
   effectiveBeta: boolean;
   canManageTeam: boolean;
@@ -22,8 +26,25 @@ export type ArchetypeRoleFlags = {
 };
 
 export function normalizeArchetypeRole(role: string | null | undefined): ArchetypeRole {
-  if (role === "alpha" || role === "captain") return "alpha";
+  if (role === "alpha" || role === "captain" || role === "navigator") return "alpha";
   if (role === "beta") return "beta";
+  if (role === "delta") return "delta";
+  return "gamma";
+}
+
+export function archetypeRoleFromPlayerFields(input: {
+  role?: string | null;
+  isCaptain?: boolean;
+  isAlpha?: boolean;
+  isBeta?: boolean;
+  isGamma?: boolean;
+  isDelta?: boolean;
+}): ArchetypeRole {
+  if (input.isCaptain || input.isAlpha) return "alpha";
+  if (input.isBeta) return "beta";
+  if (input.isDelta) return "delta";
+  if (input.role) return normalizeArchetypeRole(input.role);
+  if (input.isGamma) return "gamma";
   return "gamma";
 }
 
@@ -36,9 +57,10 @@ export function resolveArchetypeRoleForPlayer(
   if (isCaptain || playerRole === "alpha" || team.captainPlayerId === playerId) {
     return "alpha";
   }
-  if (playerRole === "beta" || team.betaPlayerId === playerId) {
-    return "beta";
-  }
+  if (playerRole === "beta") return "beta";
+  if (playerRole === "delta") return "delta";
+  if (playerRole === "gamma") return "gamma";
+  if (team.betaPlayerId === playerId) return "beta";
   return "gamma";
 }
 
@@ -59,6 +81,7 @@ export function resolveArchetypeRoleFlags(input: {
   const isAlpha = archetypeRole === "alpha";
   const isBeta = archetypeRole === "beta";
   const isGamma = archetypeRole === "gamma";
+  const isDelta = archetypeRole === "delta";
   // If nobody else is Beta (missing assignment / solo), Alpha still sees notes & tiles.
   const hasDedicatedBeta =
     Boolean(input.team.betaPlayerId) &&
@@ -71,6 +94,7 @@ export function resolveArchetypeRoleFlags(input: {
     isAlpha,
     isBeta,
     isGamma,
+    isDelta,
     effectiveBeta,
     canManageTeam: isAlpha,
     canUnlockGps: isAlpha && input.gpsEnabled,
@@ -90,6 +114,7 @@ export function buildArchetypeSessionFields(input: {
   | "isAlpha"
   | "isBeta"
   | "isGamma"
+  | "isDelta"
   | "effectiveBeta"
   | "canManageTeam"
   | "canUnlockGps"
@@ -100,6 +125,7 @@ export function buildArchetypeSessionFields(input: {
     isAlpha: flags.isAlpha,
     isBeta: flags.isBeta,
     isGamma: flags.isGamma,
+    isDelta: flags.isDelta,
     effectiveBeta: flags.effectiveBeta,
     canManageTeam: flags.canManageTeam,
     canUnlockGps: flags.canUnlockGps,
@@ -109,8 +135,7 @@ export function buildArchetypeSessionFields(input: {
 /** Which role to assign to the Nth active player (1-indexed join order). */
 export function archetypeRoleForJoinOrder(joinOrder: number): ArchetypeRole {
   if (joinOrder <= 1) return "alpha";
-  if (joinOrder === 2) return "beta";
-  return "gamma";
+  return ROTATING_ROLES[(joinOrder - 2) % ROTATING_ROLES.length]!;
 }
 
 export function minPlayersToStart(blueprint: BlueprintDefinition): number {
@@ -145,5 +170,7 @@ export function archetypeRoleLabel(role: ArchetypeRole): string {
       return "Beta";
     case "gamma":
       return "Gamma";
+    case "delta":
+      return "Delta";
   }
 }

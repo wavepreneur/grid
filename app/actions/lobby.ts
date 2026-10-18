@@ -15,7 +15,7 @@ import {
   normalizeCode,
 } from "@/lib/tells/codes";
 import { writeAuditLog } from "@/lib/tells/audit-log";
-import { canStartTeamGame } from "@/lib/tells/archetype-roles";
+import { archetypeRoleForJoinOrder, canStartTeamGame } from "@/lib/tells/archetype-roles";
 import { buildDefaultContentConfig, getBlueprint, isBlueprintSlug, resolveBlueprint, type BlueprintSlug } from "@/lib/tells/blueprints";
 import { parseContentConfig } from "@/lib/tells/content-engine";
 import { initializeTeamGameState } from "@/app/actions/game";
@@ -958,7 +958,7 @@ export async function joinTeamAsPlayer(input: {
     const sessionId = randomUUID();
     const activeBeforeJoin = await countActivePlayers(team.id);
     const isFirst = activeBeforeJoin === 0;
-    const initialRole = isFirst ? "alpha" : activeBeforeJoin === 1 ? "beta" : "gamma";
+    const initialRole = archetypeRoleForJoinOrder(activeBeforeJoin + 1);
 
     const { data: player, error } = await supabase
       .from("players")
@@ -1005,7 +1005,7 @@ export async function joinTeamAsPlayer(input: {
             from: lobbyOpenedAt,
           }).toISOString();
     } else {
-      if (initialRole === "beta") {
+      if (initialRole === "beta" && !team.beta_player_id) {
         teamPatch.beta_player_id = player.id;
       }
       if (team.status === "setup") {

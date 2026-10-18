@@ -12,7 +12,7 @@ export type GridTeamStatus =
   | "finished"
   | "disbanded";
 
-export type PlayerRole = "captain" | "solver" | "navigator" | "alpha" | "beta" | "gamma";
+export type PlayerRole = "captain" | "solver" | "navigator" | "alpha" | "beta" | "gamma" | "delta";
 
 export type GridEvent = {
   id: string;
@@ -66,7 +66,8 @@ export type LobbyPlayer = {
   is_alpha?: boolean;
   is_beta?: boolean;
   is_gamma?: boolean;
-  archetype_role?: "alpha" | "beta" | "gamma";
+  is_delta?: boolean;
+  archetype_role?: "alpha" | "beta" | "gamma" | "delta";
   role?: PlayerRole;
   joined_at: string;
   last_seen_at?: string;
@@ -101,10 +102,11 @@ export type PlayerSession = {
   inviteCode: string;
   isCaptain: boolean;
   isNavigator: boolean;
-  archetypeRole: "alpha" | "beta" | "gamma";
+  archetypeRole: "alpha" | "beta" | "gamma" | "delta";
   isAlpha: boolean;
   isBeta: boolean;
   isGamma: boolean;
+  isDelta: boolean;
   effectiveBeta: boolean;
   canManageTeam: boolean;
   canUnlockGps: boolean;

@@ -159,12 +159,14 @@ export type RoleDisplayLabels = {
   alpha: string;
   beta: string;
   gamma: string;
+  delta: string;
 };
 
 export const DEFAULT_ROLE_LABELS: RoleDisplayLabels = {
   alpha: "Team Lead",
   beta: "Profiler",
   gamma: "Organizer",
+  delta: "Delta",
 };
 
 export type RuntimeProfiles = {
@@ -181,7 +183,7 @@ export type RuntimeProfiles = {
    */
   route_order: "linear" | "free";
   /**
-   * Player-facing names for Alpha/Beta/Gamma (Studio keeps technical keys).
+   * Player-facing names for Alpha/Beta/Gamma/Delta (Studio keeps technical keys).
    */
   role_labels: RoleDisplayLabels;
   profiles: Record<ContentMode, RuntimeModeProfile>;
@@ -221,6 +223,8 @@ function parseRoleLabels(raw: unknown): RoleDisplayLabels {
     beta: typeof o.beta === "string" && o.beta.trim() ? o.beta.trim() : DEFAULT_ROLE_LABELS.beta,
     gamma:
       typeof o.gamma === "string" && o.gamma.trim() ? o.gamma.trim() : DEFAULT_ROLE_LABELS.gamma,
+    delta:
+      typeof o.delta === "string" && o.delta.trim() ? o.delta.trim() : DEFAULT_ROLE_LABELS.delta,
   };
 }
 

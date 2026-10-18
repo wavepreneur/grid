@@ -794,7 +794,13 @@ export function GameRoom({
       name: p.display_name,
       role:
         p.archetype_role ??
-        (p.is_alpha || p.is_captain ? "alpha" : p.is_beta ? "beta" : "gamma"),
+        (p.is_alpha || p.is_captain
+          ? "alpha"
+          : p.is_beta
+            ? "beta"
+            : p.is_delta || p.role === "delta"
+              ? "delta"
+              : "gamma"),
     }));
     return findForeignActiveBonuses(teamState.gameState, session.archetypeRole, {
       claimUnassigned: soloAlpha,
@@ -1035,7 +1041,9 @@ export function GameRoom({
                 ? "alpha"
                 : p.is_beta
                   ? "beta"
-                  : "gamma");
+                  : p.is_delta || p.role === "delta"
+                    ? "delta"
+                    : "gamma");
             return {
               id: p.id,
               name: p.display_name,
@@ -1053,7 +1061,9 @@ export function GameRoom({
               ? "alpha"
               : p.is_beta
                 ? "beta"
-                : "gamma");
+                : p.is_delta || p.role === "delta"
+                  ? "delta"
+                  : "gamma");
           return {
             id: p.id,
             name: p.display_name,

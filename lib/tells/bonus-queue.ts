@@ -123,9 +123,10 @@ export function mergeBonusQueue(
 
 function normalizeQueueRole(
   role: string | null | undefined,
-): "alpha" | "beta" | "gamma" | null {
+): "alpha" | "beta" | "gamma" | "delta" | null {
   if (role === "captain" || role === "navigator" || role === "alpha") return "alpha";
   if (role === "beta") return "beta";
+  if (role === "delta") return "delta";
   if (role === "solver" || role === "gamma") return "gamma";
   return null;
 }

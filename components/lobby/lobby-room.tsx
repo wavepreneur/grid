@@ -713,7 +713,9 @@ export function LobbyRoom({
                         ? "alpha"
                         : player.is_beta
                           ? "beta"
-                          : "gamma"),
+                          : player.is_delta || player.role === "delta"
+                            ? "delta"
+                            : "gamma"),
                     labels,
                   );
                   return (
@@ -845,7 +847,9 @@ export function LobbyRoom({
                               ? "alpha"
                               : player.is_beta
                                 ? "beta"
-                                : "gamma"),
+                                : player.is_delta || player.role === "delta"
+                                  ? "delta"
+                                  : "gamma"),
                           labels,
                         );
                         const isMe = player.id === session.playerId;

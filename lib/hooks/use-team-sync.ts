@@ -107,8 +107,15 @@ function toLobbyPlayers(rows: PlayerRow[], team: TeamRoleRow | null): LobbyPlaye
     const isAlpha = team?.captain_player_id
       ? team.captain_player_id === player.id
       : player.is_captain || role === "alpha";
-    const isBeta = !isAlpha && (role === "beta" || team?.beta_player_id === player.id);
-    const archetype_role = isAlpha ? "alpha" : isBeta ? "beta" : "gamma";
+    const isBeta = !isAlpha && role === "beta";
+    const isDelta = !isAlpha && !isBeta && role === "delta";
+    const archetype_role = isAlpha
+      ? "alpha"
+      : isBeta
+        ? "beta"
+        : isDelta
+          ? "delta"
+          : "gamma";
 
     return {
       id: player.id,
@@ -120,6 +127,7 @@ function toLobbyPlayers(rows: PlayerRow[], team: TeamRoleRow | null): LobbyPlaye
       is_alpha: isAlpha,
       is_beta: isBeta,
       is_gamma: archetype_role === "gamma",
+      is_delta: isDelta,
       archetype_role,
     };
   });

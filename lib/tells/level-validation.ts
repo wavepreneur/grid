@@ -17,23 +17,28 @@ export type LevelValidationContext = {
   isNavigator: boolean;
   canUnlockGps?: boolean;
   effectiveBeta?: boolean;
-  archetypeRole?: "alpha" | "beta" | "gamma";
+  archetypeRole?: "alpha" | "beta" | "gamma" | "delta";
   playerRole: PlayerRole;
   gpsEnabled?: boolean;
   /** Alpha lead override when GPS fails — audited by caller. */
   forceUnlock?: "geofence" | "distance";
 };
 
-function normalizeRequiredRole(role: PlayerRole): "alpha" | "beta" | "gamma" | "captain" | "navigator" | "solver" {
+function normalizeRequiredRole(
+  role: PlayerRole,
+): "alpha" | "beta" | "gamma" | "delta" | "captain" | "navigator" | "solver" {
   if (role === "captain" || role === "navigator") return "alpha";
   if (role === "solver") return "gamma";
   return role;
 }
 
-function playerEffectiveArchetypeRole(context: LevelValidationContext): "alpha" | "beta" | "gamma" {
+function playerEffectiveArchetypeRole(
+  context: LevelValidationContext,
+): "alpha" | "beta" | "gamma" | "delta" {
   if (context.archetypeRole) return context.archetypeRole;
   if (context.isCaptain) return "alpha";
   if (context.playerRole === "beta") return "beta";
+  if (context.playerRole === "delta") return "delta";
   return "gamma";
 }
 
@@ -47,7 +52,13 @@ export function validateLevelSolution(
     const playerRole = playerEffectiveArchetypeRole(context);
     if (required !== playerRole && !(required === "beta" && context.effectiveBeta)) {
       const label =
-        required === "alpha" ? "Alpha" : required === "beta" ? "Beta" : "Gamma";
+        required === "alpha"
+          ? "Alpha"
+          : required === "beta"
+            ? "Beta"
+            : required === "delta"
+              ? "Delta"
+              : "Gamma";
       return {
         ok: false,
         error: `Diese Aufgabe ist für die Rolle „${label}" reserviert.`,

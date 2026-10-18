@@ -1,3 +1,4 @@
+import { archetypeRoleFromPlayerFields } from "@/lib/tells/archetype-roles";
 import type { LobbyPlayer, PlayerSession } from "@/lib/tells/types";
 
 /** Apply a live roster row onto the local player session (lead transfer, roles). */
@@ -7,9 +8,14 @@ export function applyRosterToSession(
 ): PlayerSession {
   const liveIsAlpha = Boolean(me.is_alpha || me.is_captain);
   const liveCanManage = liveIsAlpha;
-  const liveRole =
-    me.archetype_role ??
-    (liveIsAlpha ? "alpha" : me.is_beta ? "beta" : "gamma");
+  const liveRole = archetypeRoleFromPlayerFields({
+    role: me.archetype_role ?? me.role,
+    isCaptain: liveIsAlpha,
+    isAlpha: liveIsAlpha,
+    isBeta: me.is_beta,
+    isGamma: me.is_gamma,
+    isDelta: me.is_delta,
+  });
 
   if (
     current.canManageTeam === liveCanManage &&
@@ -26,7 +32,8 @@ export function applyRosterToSession(
     isCaptain: Boolean(me.is_captain),
     isAlpha: liveIsAlpha,
     isBeta: Boolean(me.is_beta),
-    isGamma: Boolean(me.is_gamma) || liveRole === "gamma",
+    isGamma: liveRole === "gamma",
+    isDelta: liveRole === "delta",
     isNavigator: Boolean(me.is_navigator),
     canManageTeam: liveCanManage,
     canUnlockGps: Boolean(me.is_navigator),
@@ -40,9 +47,14 @@ export function rosterNeedsSessionSync(
   me: LobbyPlayer,
 ): boolean {
   const liveIsAlpha = Boolean(me.is_alpha || me.is_captain);
-  const liveRole =
-    me.archetype_role ??
-    (liveIsAlpha ? "alpha" : me.is_beta ? "beta" : "gamma");
+  const liveRole = archetypeRoleFromPlayerFields({
+    role: me.archetype_role ?? me.role,
+    isCaptain: liveIsAlpha,
+    isAlpha: liveIsAlpha,
+    isBeta: me.is_beta,
+    isGamma: me.is_gamma,
+    isDelta: me.is_delta,
+  });
 
   return (
     current.canManageTeam !== liveIsAlpha ||
@@ -67,6 +79,7 @@ export function applyCaptainTransferToPlayers(
         is_alpha: true,
         is_beta: false,
         is_gamma: false,
+        is_delta: false,
         is_navigator: true,
         archetype_role: "alpha" as const,
         role: "alpha",
@@ -79,6 +92,7 @@ export function applyCaptainTransferToPlayers(
         is_alpha: false,
         is_beta: true,
         is_gamma: false,
+        is_delta: false,
         is_navigator: false,
         archetype_role: "beta" as const,
         role: "beta",
@@ -101,6 +115,7 @@ export function sessionAfterCaptainTransfer(
       is_alpha: true,
       is_beta: false,
       is_gamma: false,
+      is_delta: false,
       is_navigator: true,
       archetype_role: "alpha",
       joined_at: "",
@@ -114,6 +129,7 @@ export function sessionAfterCaptainTransfer(
       is_alpha: false,
       is_beta: true,
       is_gamma: false,
+      is_delta: false,
       is_navigator: false,
       archetype_role: "beta",
       joined_at: "",

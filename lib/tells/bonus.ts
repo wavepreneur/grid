@@ -233,9 +233,10 @@ export function resolveBonusForPlay(
 
 export function normalizeBonusRole(
   role: PlayerRole | string | null | undefined,
-): "alpha" | "beta" | "gamma" | null {
+): "alpha" | "beta" | "gamma" | "delta" | null {
   if (role === "captain" || role === "navigator" || role === "alpha") return "alpha";
   if (role === "beta") return "beta";
+  if (role === "delta") return "delta";
   if (role === "solver" || role === "gamma") return "gamma";
   return null;
 }
@@ -335,6 +336,8 @@ export function roleLabelDe(role: BonusTask["for_role"]): string {
       return "Beta";
     case "gamma":
       return "Gamma";
+    case "delta":
+      return "Delta";
   }
 }
 

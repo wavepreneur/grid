@@ -1383,9 +1383,10 @@ async function persistPhaseState(input: {
 
 function normalizePlayRole(
   role: string | null | undefined,
-): "alpha" | "beta" | "gamma" {
+): "alpha" | "beta" | "gamma" | "delta" {
   if (role === "captain" || role === "navigator" || role === "alpha") return "alpha";
   if (role === "beta") return "beta";
+  if (role === "delta") return "delta";
   return "gamma";
 }
 
@@ -2151,7 +2152,10 @@ async function completeActiveBonus(input: {
       ? "alpha"
       : playerRole === "solver"
         ? "gamma"
-        : playerRole === "alpha" || playerRole === "beta" || playerRole === "gamma"
+        : playerRole === "alpha" ||
+            playerRole === "beta" ||
+            playerRole === "gamma" ||
+            playerRole === "delta"
           ? playerRole
           : "gamma";
   const claimUnassigned = (await countActivePlayers(team.id)) <= 1;

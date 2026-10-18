@@ -16,7 +16,7 @@ Rules: `.cursor/rules/product-direction.mdc`, `.cursor/rules/ecosystem-exitmania
 
 ## This repo owns
 
-- Multiplayer runtime (`/e/{code}/…`), roles Alpha/Beta/Gamma
+- Multiplayer runtime (`/e/{code}/…`), roles Alpha/Beta/Gamma/Delta
 - Content loader: `global_levels`, `local_waypoints`, `route_override`, blueprints
 - **Layer model:** Layer 1 (geo), Layer 2 (mission), Layer 3 (roles/bonus) — composable game profiles
 - GRID Studio: layer profile, task layer assignment, publish snapshots with `layer_profile`
