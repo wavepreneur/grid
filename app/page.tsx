@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { GridLandingPage } from "@/components/marketing/grid-landing-page";
+import { TellsLandingPage } from "@/components/marketing/landing/landing-page";
 
 export const metadata: Metadata = {
   title: "Tells | Don’t ask your team. Let it tell.",
   description:
-    "Play-based team intelligence. Surveys hear what people say. Tells sees what teams do. Your team plays for 10, 30 or 120 minutes — then you see how it works.",
+    "Your team plays a game for 10 to 120 minutes. Tells measures how they work together and gives you a report: where they get stuck, which topic didn’t land, and what to do next.",
   openGraph: {
-    title: "Tells — Don’t ask your team. Let it tell.",
-    description: "Play-based team intelligence. Your team plays. You see how it works.",
+    title: "Tells | Don’t ask your team. Let it tell.",
+    description: "Play-based team intelligence. Your team plays. You get a report on how it works.",
     images: [{ url: "/marketing/tells-icon.png", width: 512, height: 512, alt: "Tells" }],
   },
   icons: {
@@ -17,5 +17,5 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  return <GridLandingPage />;
+  return <TellsLandingPage />;
 }

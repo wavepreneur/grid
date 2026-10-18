@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { GridLogo } from "@/components/marketing/grid-logo";
 import { EXAMPLE_REPORT } from "@/components/report/example-data";
 import { TeamComparison } from "@/components/report/team-comparison";
 import { CollaborationPanel } from "@/components/report/collaboration-panel";
@@ -51,11 +53,29 @@ export default async function ExampleReportPage({ searchParams }: Props) {
 
   return (
     <div className="tells-report min-h-dvh bg-[#F8F5EE] font-sans text-[#13261F] print:bg-white">
-      <nav
-        aria-label={copy.demo.preview}
-        className="sticky top-0 z-10 border-b border-[#E6E1D6] bg-[#F8F5EE]/90 backdrop-blur print:hidden"
-      >
-        <div className="mx-auto flex max-w-[1080px] flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3 text-sm">
+      <header className="sticky top-0 z-10 border-b border-[#E6E1D6] bg-[#F8F5EE]/90 backdrop-blur print:hidden">
+        <div className="mx-auto flex h-14 max-w-[1080px] items-center gap-4 px-6 text-sm">
+          <Link
+            href="/"
+            className="flex items-center gap-3 rounded-md text-[#3E4D47] transition-colors hover:text-[#13261F] focus-visible:outline-2 focus-visible:outline-[#0F5C4A]"
+          >
+            <ArrowLeft size={16} strokeWidth={1.5} aria-hidden />
+            <GridLogo height={20} />
+            <span className="sr-only wide:not-sr-only">{copy.demo.back}</span>
+          </Link>
+          <span className="hidden text-[#56655E] wide:inline" aria-hidden>
+            /
+          </span>
+          <span className="hidden font-medium wide:inline">{copy.demo.example}</span>
+          <Link
+            href="/#contact"
+            className="ml-auto inline-flex h-9 items-center rounded-[10px] bg-[#0F5C4A] px-3.5 font-medium text-white transition-colors hover:bg-[#0c4d3e] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F5C4A]"
+          >
+            {copy.demo.book}
+          </Link>
+        </div>
+      <nav aria-label={copy.demo.preview} className="border-t border-[#E6E1D6]">
+        <div className="mx-auto flex max-w-[1080px] flex-wrap items-center gap-x-6 gap-y-2 px-6 py-2.5 text-sm">
           <span className="text-[#56655E]">{copy.demo.preview}</span>
           <div className="flex rounded-full border border-[#E6E1D6] bg-white p-0.5">
             {REPORT_TIERS.map((item) => (
@@ -88,6 +108,7 @@ export default async function ExampleReportPage({ searchParams }: Props) {
           </span>
         </div>
       </nav>
+      </header>
 
       <ReportPrintStyles footer={copy.print.footer} />
       <main className="mx-auto flex max-w-[1080px] flex-col gap-10 px-6 py-12 md:py-16 print:max-w-none print:gap-8 print:p-0">

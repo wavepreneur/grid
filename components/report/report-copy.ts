@@ -12,6 +12,9 @@ type NextStep = { action: string; when: string; whenTeamevent?: string; needsCon
 const en = {
   locale: "en-GB",
   demo: {
+    back: "Back to Tells",
+    example: "Example report",
+    book: "Book a session",
     preview: "Preview",
     tiers: { light: "Light", session: "Session", year: "Yearly plan" } as Record<ReportTier, string>,
     print: "Save as PDF",
@@ -216,6 +219,9 @@ export type ReportCopy = typeof en;
 const de: ReportCopy = {
   locale: "de-DE",
   demo: {
+    back: "Zurück zu Tells",
+    example: "Beispiel-Report",
+    book: "Session buchen",
     preview: "Vorschau",
     tiers: { light: "Light", session: "Session", year: "Jahresplan" },
     print: "Als PDF speichern",
