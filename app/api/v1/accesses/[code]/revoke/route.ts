@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { authorizeGridApi } from "@/lib/grid/api-auth";
-import { normalizeCode } from "@/lib/grid/codes";
+import { authorizeGridApi } from "@/lib/tells/api-auth";
+import { normalizeCode } from "@/lib/tells/codes";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { authorizeBookingApi } from "@/lib/grid/booking-api";
-import { getOrganizationBySlug } from "@/lib/grid/organizations";
-import { listPublishedStudioGames } from "@/lib/grid/studio-booking";
+import { authorizeBookingApi } from "@/lib/tells/booking-api";
+import { getOrganizationBySlug } from "@/lib/tells/organizations";
+import { listPublishedStudioGames } from "@/lib/tells/studio-booking";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

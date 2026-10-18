@@ -1,10 +1,10 @@
 "use client";
 
 import { Timer } from "lucide-react";
-import { formatCountdown, type LevelScoringSnapshot } from "@/lib/grid/level-scoring";
+import { formatCountdown, type LevelScoringSnapshot } from "@/lib/tells/level-scoring";
 import { useLevelScoringTimer } from "@/lib/hooks/use-level-scoring-timer";
-import type { LevelScoring } from "@/lib/grid/level-types";
-import { playUi } from "@/lib/grid/play-ui";
+import type { LevelScoring } from "@/lib/tells/level-types";
+import { playUi } from "@/lib/tells/play-ui";
 import { LevelScoreHud, ScorePill } from "@/components/game/city/level-screen-blocks";
 
 type Props = {

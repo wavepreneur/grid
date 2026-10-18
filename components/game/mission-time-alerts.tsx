@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { playPlaySfx } from "@/lib/grid/play-sfx";
-import { playUi } from "@/lib/grid/play-ui";
+import { playPlaySfx } from "@/lib/tells/play-sfx";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   remainingSeconds: number;

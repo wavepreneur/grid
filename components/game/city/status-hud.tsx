@@ -2,7 +2,7 @@
 
 import { IconClock, IconFlag, IconStar } from "@/components/game/city/icons";
 import type { ContentMode } from "@/lib/cms/layer-model";
-import { playUi } from "@/lib/grid/play-ui";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   mode: ContentMode;

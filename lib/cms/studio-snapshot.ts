@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { parseLevelDefinitions } from "@/lib/grid/content-engine";
-import type { LevelDefinition } from "@/lib/grid/level-types";
+import { parseLevelDefinitions } from "@/lib/tells/content-engine";
+import type { LevelDefinition } from "@/lib/tells/level-types";
 import type { CompiledGameLogic } from "@/lib/cms/logic-rules";
 import { parseLogicRules, orderLinksForCompile } from "@/lib/cms/logic-rules";
 import type { StudioGame, StudioGameTaskLink } from "@/lib/cms/types";

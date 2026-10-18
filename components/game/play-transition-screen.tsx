@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 import { IconGift, IconKey, IconUser, IconUsers } from "@/components/game/city/icons";
 import { SectionLabel } from "@/components/game/city/ui";
-import { playPlaySfx } from "@/lib/grid/play-sfx";
-import { playUi } from "@/lib/grid/play-ui";
+import { playPlaySfx } from "@/lib/tells/play-sfx";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Kind = "unlock" | "bonus";
 

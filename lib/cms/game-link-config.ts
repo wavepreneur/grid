@@ -1,4 +1,4 @@
-import type { PlayerRole } from "@/lib/grid/level-types";
+import type { PlayerRole } from "@/lib/tells/level-types";
 import type { RoleAssignment, StudioLayer } from "@/lib/cms/layer-model";
 import type { StudioGameTaskLink } from "@/lib/cms/types";
 

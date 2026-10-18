@@ -7,15 +7,16 @@ alwaysApply: true
 
 If a requested feature **contradicts** this, **stop**. Report the conflict and discuss. Do not implement around it.
 
-**Now:** finish Exitmania GRID live launch. Do not build customer Studio, credits, or annual billing until that launch is through.
+**Now:** finish Exitmania → Tells live launch. Do not build customer Studio, credits, or annual billing until that launch is through.
 
 ## Brands
 
-- **Exitmania** = only public storefront + growth wheel. Impulse buy: self-guided escape / city / small teamevents. ~€200 teamevents with light custom route **stay** on Exitmania (manual today → later same `route_override` as GRID).
-- **GRID** = the product orgs keep: large-group join, data, template overwrites. Annual subscription (monthly or discounted yearly) unlocks **customer** Studio.
-- **Tabbrain = discarded.** No third brand, no Tabbrain GTM/billing. Online/pulse surfaces are GRID, not a Tabbrain product.
+- **Tells** (this repo, tells.team) = the product orgs keep: large-group join, data, template overwrites. Spoken name for what the code still calls GRID. Annual subscription later unlocks **customer** Studio.
+- **Exitmania** = only public storefront + growth wheel. Impulse buy: self-guided escape / city / small teamevents. ~€200 teamevents with light custom route **stay** on Exitmania (manual today → later same `route_override`).
+- **Tabbrain = discarded.** No third brand. Online/pulse surfaces are Tells, not a Tabbrain product.
+- Engine code lives in `lib/tells/`. `GRID_*` env still works. See `.cursor/rules/tells-vs-exitmania.mdc`.
 
-## What a GRID customer buys
+## What a Tells customer buys
 
 1. Fast setup: people join, land in teams, compete
 2. GRID data: usable results after play

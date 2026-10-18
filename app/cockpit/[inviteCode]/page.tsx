@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import { getEventByInviteCode } from "@/lib/grid/session-auth";
+import { getEventByInviteCode } from "@/lib/tells/session-auth";
 import { EventCockpit } from "@/components/cockpit/event-cockpit";
 import { StudioPage } from "@/components/cms/studio-page";
 import { BackofficeFrame } from "@/components/platform/backoffice-frame";
-import { normalizeCode } from "@/lib/grid/codes";
+import { normalizeCode } from "@/lib/tells/codes";
 
 type CockpitPageProps = {
   params: Promise<{ inviteCode: string }>;

@@ -22,8 +22,8 @@ import {
   type StudioTask,
   type StudioTaskContent,
 } from "@/lib/cms/types";
-import type { ArrivalQuiz, BonusTask, LevelContentTile, QuizOption } from "@/lib/grid/level-types";
-import { splitSideFact } from "@/lib/grid/side-fact";
+import type { ArrivalQuiz, BonusTask, LevelContentTile, QuizOption } from "@/lib/tells/level-types";
+import { splitSideFact } from "@/lib/tells/side-fact";
 import { normalizeTaskContent, studioScoringToLevelScoring, studioTilesToLevelTiles } from "@/lib/cms/task-content";
 
 export type StudioArrivalQuiz = {

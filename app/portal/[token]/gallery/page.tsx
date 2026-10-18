@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { listEventCapturesByPortalToken } from "@/lib/grid/event-captures";
+import { listEventCapturesByPortalToken } from "@/lib/tells/event-captures";
 
 export const dynamic = "force-dynamic";
 

@@ -7,10 +7,10 @@ import {
   STUDIO_TEST_MAX_PLAYERS,
   studioTestBookingReference,
 } from "@/lib/cms/studio-test-session";
-import { generateInviteCode, generateJoinCode, generatePortalToken } from "@/lib/grid/codes";
-import { eventCaptainPath, eventLobbyPath, eventTeamJoinPath, cockpitPath } from "@/lib/grid/event-routes";
-import { getCityIdBySlug } from "@/lib/grid/organizations";
-import type { ActionResult } from "@/lib/grid/types";
+import { generateInviteCode, generateJoinCode, generatePortalToken } from "@/lib/tells/codes";
+import { eventCaptainPath, eventLobbyPath, eventTeamJoinPath, cockpitPath } from "@/lib/tells/event-routes";
+import { getCityIdBySlug } from "@/lib/tells/organizations";
+import type { ActionResult } from "@/lib/tells/types";
 import { parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
 
 export type StudioTestSession = {

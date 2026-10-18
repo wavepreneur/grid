@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CityPlayShell } from "@/components/game/city/play-shell";
 import { GameOverFlywheel } from "@/components/game/game-over-flywheel";
-import { loadPublicTeamRecap } from "@/lib/grid/public-recap";
-import { playUi } from "@/lib/grid/play-ui";
+import { loadPublicTeamRecap } from "@/lib/tells/public-recap";
+import { playUi } from "@/lib/tells/play-ui";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {

@@ -22,8 +22,8 @@ import {
   StudioSectionTitle,
   StudioSelect,
 } from "@/components/cms/studio-ui";
-import type { AccessStatus } from "@/lib/grid/access";
-import { formatTeamSeatPreview, splitTeamSeats } from "@/lib/grid/team-seats";
+import type { AccessStatus } from "@/lib/tells/access";
+import { formatTeamSeatPreview, splitTeamSeats } from "@/lib/tells/team-seats";
 
 type Props = {
   batches: StudioAccessBatchView[];

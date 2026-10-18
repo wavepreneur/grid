@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { resolvePlayAccessCode } from "@/app/actions/access";
 import { GridButton, GridError, GridInput } from "@/components/grid/grid-shell";
 import { IconArrowRight } from "@/components/cms/studio-icons";
-import { normalizeCode } from "@/lib/grid/codes";
+import { normalizeCode } from "@/lib/tells/codes";
 
 export function PlayCodeEntry({ initialCode = "" }: { initialCode?: string }) {
   const router = useRouter();

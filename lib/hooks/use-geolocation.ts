@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { GeolocationSample } from "@/lib/grid/level-types";
-import { distanceMeters } from "@/lib/grid/geofence";
+import type { GeolocationSample } from "@/lib/tells/level-types";
+import { distanceMeters } from "@/lib/tells/geofence";
 import {
   geoErrorKindFromCode,
   type GeoErrorKind,
-} from "@/lib/grid/play-ui";
+} from "@/lib/tells/play-ui";
 
 type GeolocationState = {
   sample: GeolocationSample | null;

@@ -9,9 +9,9 @@ import {
   GRID_FIELD_BASELINE,
   type AuditAttemptRow,
   type TeamIndexScores,
-} from "@/lib/grid/data-indices";
-import { parseTeamGameState } from "@/lib/grid/game-state";
-import type { ActionResult } from "@/lib/grid/types";
+} from "@/lib/tells/data-indices";
+import { parseTeamGameState } from "@/lib/tells/game-state";
+import type { ActionResult } from "@/lib/tells/types";
 
 const FINISHED_TEAM_LIMIT = 40;
 const ATTEMPT_ACTIONS = ["play_attempt_ok", "play_attempt_failed", "hint_purchased"] as const;

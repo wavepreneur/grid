@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { GridButton, GridHint, GridInput } from "@/components/grid/grid-shell";
 import { IconArrowRight, IconPlay, IconUsers } from "@/components/cms/studio-icons";
-import { eventPath } from "@/lib/grid/event-routes";
-import { loadPlayerSession } from "@/lib/grid/player-session";
-import { resolveTeamSession } from "@/lib/grid/session-recovery";
-import type { GridEvent } from "@/lib/grid/types";
+import { eventPath } from "@/lib/tells/event-routes";
+import { loadPlayerSession } from "@/lib/tells/player-session";
+import { resolveTeamSession } from "@/lib/tells/session-recovery";
+import type { GridEvent } from "@/lib/tells/types";
 
 type EventResumeCardProps = {
   inviteCode: string;

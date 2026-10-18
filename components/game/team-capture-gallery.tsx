@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { listTeamEventCaptures } from "@/app/actions/captures";
-import type { EventCaptureItem } from "@/lib/grid/event-captures";
-import { playUi } from "@/lib/grid/play-ui";
+import type { EventCaptureItem } from "@/lib/tells/event-captures";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   inviteCode: string;

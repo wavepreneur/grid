@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getEventByInviteCode } from "@/lib/grid/session-auth";
+import { getEventByInviteCode } from "@/lib/tells/session-auth";
 import { EventLiveRanking } from "@/components/event/event-live-ranking";
-import { eventPlayPath, eventRecapPath } from "@/lib/grid/event-routes";
-import { normalizeCode } from "@/lib/grid/codes";
+import { eventPlayPath, eventRecapPath } from "@/lib/tells/event-routes";
+import { normalizeCode } from "@/lib/tells/codes";
 
 export const dynamic = "force-dynamic";
 

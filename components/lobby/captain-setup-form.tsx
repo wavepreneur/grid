@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { cacheEventContent } from "@/lib/grid/offline-content";
-import type { ResolvedEventContent } from "@/lib/grid/level-types";
+import { cacheEventContent } from "@/lib/tells/offline-content";
+import type { ResolvedEventContent } from "@/lib/tells/level-types";
 import { ArrowRight, Flag, User } from "lucide-react";
 import {
   createTeamAsCaptain,
@@ -13,10 +13,10 @@ import {
   IdentityField,
   LobbyPrimaryButton,
 } from "@/components/lobby/lobby-identity";
-import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
-import { eventLobbyPath } from "@/lib/grid/event-routes";
-import { playUi } from "@/lib/grid/play-ui";
-import { savePlayerSession } from "@/lib/grid/player-session";
+import { MAX_PLAYERS_PER_TEAM } from "@/lib/tells/team-seats";
+import { eventLobbyPath } from "@/lib/tells/event-routes";
+import { playUi } from "@/lib/tells/play-ui";
+import { savePlayerSession } from "@/lib/tells/player-session";
 
 type CaptainSetupFormProps = {
   inviteCode: string;

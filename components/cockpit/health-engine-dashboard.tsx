@@ -23,7 +23,7 @@ import {
 } from "@/app/actions/cockpit-overview";
 import { StudioPage } from "@/components/cms/studio-page";
 import { Chip, Empty, Modal, Panel, Stat } from "@/components/cms/ui";
-import { cockpitPath } from "@/lib/grid/event-routes";
+import { cockpitPath } from "@/lib/tells/event-routes";
 import { queryKeys } from "@/lib/platform/query-keys";
 
 const HEALING_LOOP = ["Signal erkannt", "Regel geprüft", "Eingriff ausgelöst", "Selbst geheilt"];

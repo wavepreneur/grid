@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { Check } from "lucide-react";
-import { playUi } from "@/lib/grid/play-ui";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Tone = "team" | "player";
 

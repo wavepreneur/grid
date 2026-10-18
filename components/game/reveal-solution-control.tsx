@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Flag } from "lucide-react";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
-import { playUi } from "@/lib/grid/play-ui";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   disabled?: boolean;

@@ -2,14 +2,14 @@
 
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { assertPlayerSession } from "@/lib/grid/session-auth";
-import { parseTeamGameState } from "@/lib/grid/game-state";
-import { parseGrowthPack } from "@/lib/grid/growth-pack";
-import { postGrowthCapture } from "@/lib/grid/growth-dispatch";
-import { getPublicOrigin } from "@/lib/grid/booking-api";
-import { buildEventPortalResultsUrl } from "@/lib/grid/codes";
-import { ensureEventPortalToken } from "@/lib/grid/portal";
-import type { ActionResult } from "@/lib/grid/types";
+import { assertPlayerSession } from "@/lib/tells/session-auth";
+import { parseTeamGameState } from "@/lib/tells/game-state";
+import { parseGrowthPack } from "@/lib/tells/growth-pack";
+import { postGrowthCapture } from "@/lib/tells/growth-dispatch";
+import { getPublicOrigin } from "@/lib/tells/booking-api";
+import { buildEventPortalResultsUrl } from "@/lib/tells/codes";
+import { ensureEventPortalToken } from "@/lib/tells/portal";
+import type { ActionResult } from "@/lib/tells/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

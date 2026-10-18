@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { GridButton } from "@/components/grid/grid-shell";
 import { IconCopy } from "@/components/cms/studio-icons";
-import { playUi } from "@/lib/grid/play-ui";
+import { playUi } from "@/lib/tells/play-ui";
 
 type CopyInviteLinkProps = {
   url: string;

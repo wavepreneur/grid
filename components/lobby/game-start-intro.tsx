@@ -5,8 +5,8 @@ import { BookOpen, MapPin, Navigation, Play } from "lucide-react";
 import { PlayDocSheet } from "@/components/game/play-doc-sheet";
 import { LanguageBadge } from "@/components/grid/language-badge";
 import { LobbyPrimaryButton } from "@/components/lobby/lobby-identity";
-import { playUi, playUiLang } from "@/lib/grid/play-ui";
-import { walkingDirectionsUrl, type StartCoords } from "@/lib/grid/start-location";
+import { playUi, playUiLang } from "@/lib/tells/play-ui";
+import { walkingDirectionsUrl, type StartCoords } from "@/lib/tells/start-location";
 
 type Props = {
   gameTitle: string;

@@ -1,6 +1,6 @@
 "use server";
 
-import type { ActionResult } from "@/lib/grid/types";
+import type { ActionResult } from "@/lib/tells/types";
 
 const GRID_BRIEFING_TO = "dk@kineticpillar.co";
 

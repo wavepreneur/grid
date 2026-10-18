@@ -1,7 +1,7 @@
 "use client";
 
 import { ContentMediaSheet } from "@/components/game/city/content-media-sheet";
-import { playUi } from "@/lib/grid/play-ui";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   open: boolean;

@@ -26,36 +26,36 @@ import {
   GridError,
   GridHint,
 } from "@/components/grid/grid-shell";
-import { eventPlayPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
+import { eventPlayPath, eventTeamJoinPath } from "@/lib/tells/event-routes";
 import { useTeamSync } from "@/lib/hooks/use-team-sync";
-import { buildTeamInviteUrl } from "@/lib/grid/codes";
-import { isLobbyRosterFull } from "@/lib/grid/lobby-auto-start";
+import { buildTeamInviteUrl } from "@/lib/tells/codes";
+import { isLobbyRosterFull } from "@/lib/tells/lobby-auto-start";
 import {
   displayRoleLabel,
   DEFAULT_ROLE_LABELS,
   type RoleDisplayLabels,
-} from "@/lib/grid/role-labels";
+} from "@/lib/tells/role-labels";
 import {
   applyCaptainTransferToPlayers,
   applyRosterToSession,
   rosterNeedsSessionSync,
   rosterWithHeldCaptain,
   sessionAfterCaptainTransfer,
-} from "@/lib/grid/live-session";
-import { nextLeadSeq, noteLeadSeq, parseLeadSeq } from "@/lib/grid/lead-seq";
-import { isSessionSupersededResult } from "@/lib/grid/session-codes";
+} from "@/lib/tells/live-session";
+import { nextLeadSeq, noteLeadSeq, parseLeadSeq } from "@/lib/tells/lead-seq";
+import { isSessionSupersededResult } from "@/lib/tells/session-codes";
 import {
   clearMissionStarting,
   markMissionStarting,
   missionStartProgress,
   persistStartProgress,
   startOverlayCopy,
-} from "@/lib/grid/mission-start-signal";
+} from "@/lib/tells/mission-start-signal";
 import { STUDIO_TEST_MAX_PLAYERS } from "@/lib/cms/studio-test-session";
-import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
-import { abandonTeamSession } from "@/lib/grid/session-recovery";
-import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
-import { playUi } from "@/lib/grid/play-ui";
+import { clearPlayerSession, savePlayerSession } from "@/lib/tells/player-session";
+import { abandonTeamSession } from "@/lib/tells/session-recovery";
+import type { LobbySnapshot, PlayerSession } from "@/lib/tells/types";
+import { playUi } from "@/lib/tells/play-ui";
 import { PlayDocumentLang } from "@/components/game/play-viewport-guard";
 
 type LobbyRoomProps = {

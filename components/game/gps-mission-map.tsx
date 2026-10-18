@@ -2,16 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Circle, CircleMarker, Map as LeafletMap, Polyline } from "leaflet";
-import type { GameLevelStatus } from "@/lib/grid/game-state";
-import type { GeolocationSample, LevelLocation } from "@/lib/grid/level-types";
+import type { GameLevelStatus } from "@/lib/tells/game-state";
+import type { GeolocationSample, LevelLocation } from "@/lib/tells/level-types";
 import {
   bearingDegrees,
   distanceMeters,
   PLAY_LIVE_MAP_MAX_METERS,
-} from "@/lib/grid/geofence";
+} from "@/lib/tells/geofence";
 import { IconNav } from "@/components/game/city/icons";
-import { playUi } from "@/lib/grid/play-ui";
-import { walkingDirectionsUrl } from "@/lib/grid/start-location";
+import { playUi } from "@/lib/tells/play-ui";
+import { walkingDirectionsUrl } from "@/lib/tells/start-location";
 
 export type GpsMapWaypoint = {
   level: number;

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { submitGridDemoRequest } from "@/app/actions/demo-request";
-import type { PlayUiLang } from "@/lib/grid/play-ui";
+import type { PlayUiLang } from "@/lib/tells/play-ui";
 
 type Props = {
   language?: PlayUiLang;

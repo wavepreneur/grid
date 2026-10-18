@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activateReadyBonuses } from "@/app/actions/game";
 import { useWalkedDistance } from "@/lib/hooks/use-walked-distance";
-import type { TeamGameState, TeamRealtimeState } from "@/lib/grid/game-state";
+import type { TeamGameState, TeamRealtimeState } from "@/lib/tells/game-state";
 
 type Options = {
   inviteCode: string;

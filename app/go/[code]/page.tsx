@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { lookupAccessCode } from "@/lib/grid/access";
+import { lookupAccessCode } from "@/lib/tells/access";
 import { GridError, GridShell } from "@/components/grid/grid-shell";
 import { PlayCodeEntry } from "@/components/entry/play-code-entry";
 

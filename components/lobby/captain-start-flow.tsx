@@ -4,11 +4,11 @@ import { useState } from "react";
 import { CaptainSetupForm } from "@/components/lobby/captain-setup-form";
 import { GameStartIntro } from "@/components/lobby/game-start-intro";
 import { GridShell } from "@/components/grid/grid-shell";
-import { playUi } from "@/lib/grid/play-ui";
-import { firstPuzzleLocation } from "@/lib/grid/start-location";
-import type { ResolvedEventContent } from "@/lib/grid/level-types";
+import { playUi } from "@/lib/tells/play-ui";
+import { firstPuzzleLocation } from "@/lib/tells/start-location";
+import type { ResolvedEventContent } from "@/lib/tells/level-types";
 import Link from "next/link";
-import { eventPath } from "@/lib/grid/event-routes";
+import { eventPath } from "@/lib/tells/event-routes";
 
 type Props = {
   inviteCode: string;

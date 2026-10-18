@@ -22,7 +22,7 @@ intelligence_score_delta = stress_index − collaboration_streak
 | `stress_index` | `level_completed`, `game_finished` (sync) | `score / 1000`, clamp 0–1 |
 | `collaboration_streak` | `pulse_progress_logged` (async) | `streak_count / 12`, clamp 0–1 |
 
-Code: `lib/grid/telemetry-bridge.ts`, `lib/grid/telemetry-envelope.ts`
+Code: `lib/tells/telemetry-bridge.ts`, `lib/tells/telemetry-envelope.ts`
 
 ## Datenbank (Migration `20260623100000_pulse_sprint_telemetry.sql`)
 
@@ -101,7 +101,7 @@ Pulse-Progress schreibt direkt `pulse_collaboration_streak` (`async_pulse`).
 Macro-Events können im Spiel-Snapshot `feature_flags.follow_up_trigger` tragen (Absicht). Dispatch ist **nicht** gebaut. Wenn er kommt:
 
 - Arming-Quelle: `teams.finished_at`, nicht ein neuer Game-FSM-Schritt
-- Fälligkeit: `followUpDueAt(finished_at, cadence_days)` in `lib/grid/follow-up-trigger.ts`
+- Fälligkeit: `followUpDueAt(finished_at, cadence_days)` in `lib/tells/follow-up-trigger.ts`
 - Provision: diese REST-API (`program_slug` + `channel` + `booking_reference`)
 - JSON-Key nicht umbenennen (`follow_up_trigger`)
 

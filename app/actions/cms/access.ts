@@ -8,9 +8,9 @@ import {
   provisionStudioAccessBatch,
   type AccessKind,
   type AccessStatus,
-} from "@/lib/grid/access";
-import { splitTeamSeats } from "@/lib/grid/team-seats";
-import type { ActionResult } from "@/lib/grid/types";
+} from "@/lib/tells/access";
+import { splitTeamSeats } from "@/lib/tells/team-seats";
+import type { ActionResult } from "@/lib/tells/types";
 
 export type StudioAccessCodeView = {
   id: string;

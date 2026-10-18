@@ -8,7 +8,7 @@ import {
 import type { GameLinkOverrides } from "@/lib/cms/game-link-config";
 import { normalizeTaskContent } from "@/lib/cms/task-content";
 import type { StudioGame, StudioTaskContent } from "@/lib/cms/types";
-import { withGameHelpLinks } from "@/lib/grid/game-help-links";
+import { withGameHelpLinks } from "@/lib/tells/game-help-links";
 import type {
   ArrivalQuiz,
   BonusDefinition,
@@ -16,8 +16,8 @@ import type {
   LevelDefinition,
   LevelHint,
   QuizOption,
-} from "@/lib/grid/level-types";
-import { splitSideFact } from "@/lib/grid/side-fact";
+} from "@/lib/tells/level-types";
+import { splitSideFact } from "@/lib/tells/side-fact";
 
 export type TranslationCoverage = {
   confirmed: number;

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getPortalEventResults } from "@/app/actions/event-results";
 import { EventResultsBoard } from "@/components/event/event-results-board";
-import type { EventResultsSnapshot } from "@/lib/grid/event-results";
+import type { EventResultsSnapshot } from "@/lib/tells/event-results";
 
 type Props = {
   portalToken: string;

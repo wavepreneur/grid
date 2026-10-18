@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { IdentityBar } from "@/components/player/identity-bar";
-import type { PlayerSession } from "@/lib/grid/types";
+import type { PlayerSession } from "@/lib/tells/types";
 
 type PlayerShellProps = {
   inviteCode: string;

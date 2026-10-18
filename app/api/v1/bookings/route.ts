@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { writeAuditLog } from "@/lib/grid/audit-log";
+import { writeAuditLog } from "@/lib/tells/audit-log";
 import {
   authorizeBookingApi,
   buildBookingResponse,
@@ -9,9 +9,9 @@ import {
   resolveBookingBlueprint,
   validateBookingRequest,
   type GridBookingRequest,
-} from "@/lib/grid/booking-api";
-import { generateInviteCode, generateJoinCode } from "@/lib/grid/codes";
-import { getOrganizationBySlug } from "@/lib/grid/organizations";
+} from "@/lib/tells/booking-api";
+import { generateInviteCode, generateJoinCode } from "@/lib/tells/codes";
+import { getOrganizationBySlug } from "@/lib/tells/organizations";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

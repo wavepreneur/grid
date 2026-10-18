@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PLAY_HELP_FAIL_HINT_AT, PLAY_HELP_IDLE_MS } from "@/lib/grid/play-help";
-import { playUi } from "@/lib/grid/play-ui";
+import { PLAY_HELP_FAIL_HINT_AT, PLAY_HELP_IDLE_MS } from "@/lib/tells/play-help";
+import { playUi } from "@/lib/tells/play-ui";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 
 type Props = {

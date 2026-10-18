@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Don’t break working play
 
-Live play (`/e/{code}`, `app/actions/game.ts`, `components/game/`, `lib/grid/game-state.ts`) is tested on phone + desktop. A path the user already signed off is **done**.
+Live play (`/e/{code}`, `app/actions/game.ts`, `components/game/`, `lib/tells/game-state.ts`) is tested on phone + desktop. A path the user already signed off is **done**.
 
 ## Do
 

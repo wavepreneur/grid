@@ -9,7 +9,7 @@ import {
   type TaskScoring,
   type TaskTileMediaType,
 } from "@/lib/cms/types";
-import { HINT_POINT_COST, type LevelContentTile, type LevelScoring } from "@/lib/grid/level-types";
+import { HINT_POINT_COST, type LevelContentTile, type LevelScoring } from "@/lib/tells/level-types";
 
 export function createTaskTileId(): string {
   return `tile_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;

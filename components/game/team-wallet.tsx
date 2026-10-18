@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { BigButton } from "@/components/game/city/ui";
-import { WALLET_UNLOCK_COST, type WalletNote } from "@/lib/grid/wallet";
-import { playUi } from "@/lib/grid/play-ui";
+import { WALLET_UNLOCK_COST, type WalletNote } from "@/lib/tells/wallet";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   notes: WalletNote[];

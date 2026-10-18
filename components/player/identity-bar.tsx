@@ -3,17 +3,17 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getPlayerResumeToken, handoverSession } from "@/app/actions/lobby";
-import { abandonTeamSession } from "@/lib/grid/session-recovery";
+import { abandonTeamSession } from "@/lib/tells/session-recovery";
 import {
   eventPath,
   eventTeamJoinPath,
-} from "@/lib/grid/event-routes";
-import { buildManageTeamUrl, copyGoReturnSnippet } from "@/lib/grid/play-url";
-import { archetypeRoleLabel } from "@/lib/grid/archetype-roles";
-import { clearPlayerSession } from "@/lib/grid/player-session";
+} from "@/lib/tells/event-routes";
+import { buildManageTeamUrl, copyGoReturnSnippet } from "@/lib/tells/play-url";
+import { archetypeRoleLabel } from "@/lib/tells/archetype-roles";
+import { clearPlayerSession } from "@/lib/tells/player-session";
 import { IconHome, IconUsers } from "@/components/cms/studio-icons";
-import { playUi } from "@/lib/grid/play-ui";
-import type { PlayerSession } from "@/lib/grid/types";
+import { playUi } from "@/lib/tells/play-ui";
+import type { PlayerSession } from "@/lib/tells/types";
 
 type IdentityBarProps = {
   inviteCode: string;

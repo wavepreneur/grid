@@ -12,10 +12,10 @@ import { MediaCapturePanel } from "@/components/game/media-capture-panel";
 import { MediaModal } from "@/components/game/media-modal";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
 import { CODE_BOX_MAX } from "@/lib/cms/types";
-import type { BonusTask, LevelContentTile } from "@/lib/grid/level-types";
-import type { BonusSessionState } from "@/lib/grid/game-state";
-import { bonusMediaKind, formatBonusSolution, resolveBonusPlayerCopy } from "@/lib/grid/bonus";
-import { earliestIsoTimestamp } from "@/lib/grid/level-scoring";
+import type { BonusTask, LevelContentTile } from "@/lib/tells/level-types";
+import type { BonusSessionState } from "@/lib/tells/game-state";
+import { bonusMediaKind, formatBonusSolution, resolveBonusPlayerCopy } from "@/lib/tells/bonus";
+import { earliestIsoTimestamp } from "@/lib/tells/level-scoring";
 import { useLevelScoringTimer } from "@/lib/hooks/use-level-scoring-timer";
 import {
   bonusAudienceHeadline,
@@ -23,14 +23,14 @@ import {
   bonusAudiencePlayerNames,
   type BonusAudiencePlayer,
   type RoleDisplayLabels,
-} from "@/lib/grid/role-labels";
+} from "@/lib/tells/role-labels";
 import type { ContentMode } from "@/lib/cms/layer-model";
-import { hubLabel } from "@/lib/grid/play-slots";
-import { playPlaySfx } from "@/lib/grid/play-sfx";
-import { playUi } from "@/lib/grid/play-ui";
+import { hubLabel } from "@/lib/tells/play-slots";
+import { playPlaySfx } from "@/lib/tells/play-sfx";
+import { playUi } from "@/lib/tells/play-ui";
 import { CityTeamBar } from "@/components/game/city/team-bar";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
-import type { CaptureBrandStamp } from "@/lib/grid/capture-stamp";
+import type { CaptureBrandStamp } from "@/lib/tells/capture-stamp";
 
 function bonusClockStorageKey(bonusId: string, clockScope: string): string {
   return `grid:bonus-clock:${clockScope}:${bonusId}`;

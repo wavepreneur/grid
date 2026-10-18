@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type RealtimeChannel, type SupabaseClient } from "@supabase/supabase-js";
 import { getRealtimeAccessToken } from "@/app/actions/realtime";
-import { cacheTeamState } from "@/lib/grid/offline-state";
+import { cacheTeamState } from "@/lib/tells/offline-state";
 import {
   parseTeamGameState,
   type TeamGameState,
   type TeamSyncEvent,
-} from "@/lib/grid/game-state";
-import type { LobbyPlayer } from "@/lib/grid/types";
+} from "@/lib/tells/game-state";
+import type { LobbyPlayer } from "@/lib/tells/types";
 import { getPlayRealtimeClient } from "@/lib/supabase/realtime-browser";
-import { playUi } from "@/lib/grid/play-ui";
+import { playUi } from "@/lib/tells/play-ui";
 
 type UseTeamSyncOptions = {
   sessionId: string;

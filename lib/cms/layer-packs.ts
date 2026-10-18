@@ -16,7 +16,7 @@ import { parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
 import type { RoleAssignment, StudioLayer } from "@/lib/cms/layer-model";
 import { isStudioLayer } from "@/lib/cms/layer-model";
 import { DEFAULT_TASK_CONTENT, type StudioGame, type StudioGameTaskLink, type StudioTask } from "@/lib/cms/types";
-import { randomStationAccessCode } from "@/lib/grid/stations";
+import { randomStationAccessCode } from "@/lib/tells/stations";
 
 export const PACK_SLOT_MAX = 30;
 export const PACK_SEARCH_LIMIT = 40;

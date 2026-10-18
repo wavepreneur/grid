@@ -121,7 +121,7 @@ Tabbrain bucht das Erlebnis; Exitmania-JSON (oder kundenspezifisches JSON im sel
 |---|---|---|
 | GPS nur auf Alpha-Gerät | ✅ Live | `teams.navigator_player_id` (= Alpha), `canUnlockGps`, `level-validation.ts` |
 | Desktop + Mobile im selben Team | ✅ Live | Browser-UI, `level.type` digital/quiz/gps |
-| Rollen Alpha / Beta / Gamma | ✅ Live | `grid_player_role`, `teams.beta_player_id`, `lib/grid/archetype-roles.ts`, Lobby-Transfer |
+| Rollen Alpha / Beta / Gamma | ✅ Live | `grid_player_role`, `teams.beta_player_id`, `lib/tells/archetype-roles.ts`, Lobby-Transfer |
 | Legacy Captain / Navigator | ✅ Kompatibel | `is_captain` = Alpha, `navigator_player_id` folgt Alpha |
 | Beamer-Ansicht | ✅ Live (Operator) | `/cockpit/{code}/show` — **kein Team-Spieler**, sondern Operator-Display |
 | Blueprint-Step steuert Hardware | ⬜ Vision | Heute: `level.type` + `canUnlockGps`, nicht `blueprint_step` |
@@ -151,7 +151,7 @@ UI-Logik **strikt getrennt vom Inhalt**, archetyp-basiert:
 | JSON-Content-Engine | 🟡 Basis | `global_levels`, `route_override`, `content-loader.ts` |
 | `ui_layout` Module | 🟡 Basis | `exitmania` live; `quiz` / `training` nur Typen |
 | Exitmania (konkretes Spiel) | ✅ Live | Kacheln, Tipps, GPS-Karte, 10 Levels — **= Referenz für ASYMMETRIC_INFORMANT** |
-| `blueprint_slug` / Archetyp-Routing | ✅ Live | `lib/grid/blueprints.ts`, `content_config.blueprint_slug` |
+| `blueprint_slug` / Archetyp-Routing | ✅ Live | `lib/tells/blueprints.ts`, `content_config.blueprint_slug` |
 | ASYMMETRIC_INFORMANT | 🟡 Referenz live | Exitmania + Tabbrain (no GPS) share mission shell |
 | TIME_DECAY_SPRINT | ⬜ Vision | Kein Server-Decay, keine Joker in `game_state` |
 | COOPERATIVE_COLLECTIVE | ⬜ Vision | Kein Voting, keine Fraktionen |
@@ -175,7 +175,7 @@ Zwei Deployment-Säulen unter **einer Engine**:
 
 Micro-Pulses dürfen **keine permanenten WebSockets** nutzen. Fortschritt = stateless `pulse_player_states`.
 
-**Folge-Trigger (Absicht vs. Dispatch):** Studio speichert nur Intent im Publish-Snapshot (`lib/grid/follow-up-trigger.ts`). Ausspielen kommt später und dockt an **bestehende** Daten: `teams.status = finished` / `finished_at`, `cadence_days` → `followUpDueAt()`, dann `POST /api/v1/pulse/sessions` (`program_slug`, `channel`, idempotente `booking_reference`). **Nicht** in den Play-Write-Path (Solve/OK) und **nicht** als neuer FSM-Schritt. Slack/Teams-Bot und Checkout bleiben Partner-Produkte.
+**Folge-Trigger (Absicht vs. Dispatch):** Studio speichert nur Intent im Publish-Snapshot (`lib/tells/follow-up-trigger.ts`). Ausspielen kommt später und dockt an **bestehende** Daten: `teams.status = finished` / `finished_at`, `cadence_days` → `followUpDueAt()`, dann `POST /api/v1/pulse/sessions` (`program_slug`, `channel`, idempotente `booking_reference`). **Nicht** in den Play-Write-Path (Solve/OK) und **nicht** als neuer FSM-Schritt. Slack/Teams-Bot und Checkout bleiben Partner-Produkte.
 
 **Global Team Intelligence Score** = `stress_index` (sync) − `collaboration_streak` (async) — beide in `domain_telemetry_metrics`.
 
@@ -187,11 +187,11 @@ Micro-Pulses dürfen **keine permanenten WebSockets** nutzen. Fortschritt = stat
 | `pulse_sessions` / `pulse_player_states` | ✅ Schema | REST-only async rooms |
 | `pulse_programs` (B2B ARR / Jahres-Landing) | ✅ Schema | Org container + streak interval |
 | `domain_telemetry_metrics` | ✅ Schema | Unified `telemetry_envelope` JSON |
-| Envelope builder | ✅ Code | `lib/grid/telemetry-envelope.ts`, `domain-telemetry.ts` |
+| Envelope builder | ✅ Code | `lib/tells/telemetry-envelope.ts`, `domain-telemetry.ts` |
 | REST API (pulse POST) | ⬜ Vision | Nächster Implementierungsschritt |
 | Slack/Teams Bot | ⬜ Vision | Tabbrain / Integration layer |
 
-**Unified envelope:** `lib/grid/telemetry-envelope.ts` — `schema_version: 1`, `play_mode`, `content_config`, `performance`.
+**Unified envelope:** `lib/tells/telemetry-envelope.ts` — `schema_version: 1`, `play_mode`, `content_config`, `performance`.
 
 ---
 
@@ -207,7 +207,7 @@ Micro-Pulses dürfen **keine permanenten WebSockets** nutzen. Fortschritt = stat
 | Anforderung | Status | Code / Schema |
 |---|---|---|
 | `activity_logs` | ⬜ Vision | **Nicht vorhanden** — heute: `audit_logs` + `domain_telemetry_metrics` |
-| `audit_logs` (Ops-Rohlog) | 🟡 Basis | `lib/grid/audit-log.ts` |
+| `audit_logs` (Ops-Rohlog) | 🟡 Basis | `lib/tells/audit-log.ts` |
 | `domain_telemetry_metrics` (Master-Analytik) | 🟡 Schema | sync_live + async_pulse unified envelope |
 | `teams.department` / `teams.region` | ✅ Live | Captain-Setup, `team_lobby_snapshot` |
 | Metadaten in Logs denormalisiert | ⬜ Vision | Logs haben `team_id`, Abteilung nur via Join |
@@ -260,12 +260,12 @@ Bei jedem Release prüfen:
 
 | Bereich | Pfade |
 |---|---|
-| Rollen & GPS | `lib/grid/level-validation.ts`, `lib/grid/team-session.ts`, `components/game/exitmania-level-view.tsx` |
+| Rollen & GPS | `lib/tells/level-validation.ts`, `lib/tells/team-session.ts`, `components/game/exitmania-level-view.tsx` |
 | Sync | `lib/hooks/use-team-sync.ts`, `supabase/migrations/20260614200000_phase2_realtime_sync.sql` |
-| Content | `lib/grid/content-loader.ts`, `lib/grid/level-types.ts` |
+| Content | `lib/tells/content-loader.ts`, `lib/tells/level-types.ts` |
 | Operator | `app/actions/cockpit.ts`, `components/cockpit/event-cockpit-show.tsx` |
-| Telemetrie | `lib/grid/audit-log.ts`, `supabase/migrations/20260615120000_architecture_foundation.sql` |
-| Follow-up Intent | `lib/grid/follow-up-trigger.ts` — Snapshot-JSON, Dispatch später über Pulse-REST |
+| Telemetrie | `lib/tells/audit-log.ts`, `supabase/migrations/20260615120000_architecture_foundation.sql` |
+| Follow-up Intent | `lib/tells/follow-up-trigger.ts` — Snapshot-JSON, Dispatch später über Pulse-REST |
 | Layer profile UI | `components/cms/games/game-layer-profile-panel.tsx` |
 | Marketing-Kompass | `components/marketing/grid-landing-page.tsx` |
 

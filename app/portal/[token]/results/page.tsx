@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { EventDebriefPanel } from "@/components/event/event-debrief-panel";
 import { EventResultsLive } from "@/components/event/event-results-live";
-import { loadEventResultsByPortalToken } from "@/lib/grid/event-results";
+import { loadEventResultsByPortalToken } from "@/lib/tells/event-results";
 
 export const dynamic = "force-dynamic";
 

@@ -7,7 +7,7 @@ import {
   GridInput,
   GridLabel,
 } from "@/components/grid/grid-shell";
-import { eventTeamJoinPath } from "@/lib/grid/event-routes";
+import { eventTeamJoinPath } from "@/lib/tells/event-routes";
 
 type TeamCodeEntryProps = {
   inviteCode: string;

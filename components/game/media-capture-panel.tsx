@@ -19,20 +19,20 @@ import {
   createCaptureRecorder,
   encodeCanvasJpeg,
   fitCaptureSize,
-} from "@/lib/grid/compress-capture";
+} from "@/lib/tells/compress-capture";
 import {
   EVENT_CAPTURES_BUCKET,
   EVENT_CAPTURE_MAX_BYTES,
   EVENT_CAPTURE_VIDEO_MAX_SECONDS,
   normalizeCaptureMime,
-} from "@/lib/grid/event-captures";
+} from "@/lib/tells/event-captures";
 import { createClient } from "@/lib/supabase/client";
-import type { MediaInputMode, SolveLevelPayload } from "@/lib/grid/level-types";
+import type { MediaInputMode, SolveLevelPayload } from "@/lib/tells/level-types";
 import {
   stampCapturePhoto,
   type CaptureBrandStamp,
-} from "@/lib/grid/capture-stamp";
-import { playUi, playUiLang } from "@/lib/grid/play-ui";
+} from "@/lib/tells/capture-stamp";
+import { playUi, playUiLang } from "@/lib/tells/play-ui";
 
 type CaptureContext = {
   inviteCode: string;

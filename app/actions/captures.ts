@@ -1,13 +1,13 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { assertPlayerSession } from "@/lib/grid/session-auth";
-import { loadResolvedEventContent } from "@/lib/grid/content-loader";
-import { getLevelDefinition, parseContentConfig } from "@/lib/grid/content-engine";
-import { playActionError, playUi } from "@/lib/grid/play-ui";
-import { bonusMediaKind, findBonusInContent } from "@/lib/grid/bonus";
-import { isMediaInputMode } from "@/lib/grid/level-types";
-import type { ActionResult } from "@/lib/grid/types";
+import { assertPlayerSession } from "@/lib/tells/session-auth";
+import { loadResolvedEventContent } from "@/lib/tells/content-loader";
+import { getLevelDefinition, parseContentConfig } from "@/lib/tells/content-engine";
+import { playActionError, playUi } from "@/lib/tells/play-ui";
+import { bonusMediaKind, findBonusInContent } from "@/lib/tells/bonus";
+import { isMediaInputMode } from "@/lib/tells/level-types";
+import type { ActionResult } from "@/lib/tells/types";
 import {
   EVENT_CAPTURES_BUCKET,
   EVENT_CAPTURE_MAX_BYTES,
@@ -16,7 +16,7 @@ import {
   parseCaptureKind,
   type EventCaptureItem,
   type EventCaptureKind,
-} from "@/lib/grid/event-captures";
+} from "@/lib/tells/event-captures";
 
 function absoluteStorageUrl(signedUrl: string): string {
   if (signedUrl.startsWith("http://") || signedUrl.startsWith("https://")) {

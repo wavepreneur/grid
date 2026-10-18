@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { ClipboardCopy, Smartphone, StickyNote } from "lucide-react";
-import { copyGoReturnSnippet } from "@/lib/grid/play-url";
-import { playUi } from "@/lib/grid/play-ui";
+import { copyGoReturnSnippet } from "@/lib/tells/play-url";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   inviteCode: string;

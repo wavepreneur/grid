@@ -6,37 +6,37 @@ import {
   DEFAULT_LOBBY_AUTO_START_SECONDS,
   LOBBY_IDLE_RELEASE_MS,
   NAVIGATOR_OFFLINE_MS,
-} from "@/lib/grid/constants";
-import { computeLobbyAutoStartAt } from "@/lib/grid/lobby-auto-start";
+} from "@/lib/tells/constants";
+import { computeLobbyAutoStartAt } from "@/lib/tells/lobby-auto-start";
 import {
   generateInviteCode,
   generateJoinCode,
   isValidDisplayName,
   normalizeCode,
-} from "@/lib/grid/codes";
-import { writeAuditLog } from "@/lib/grid/audit-log";
-import { canStartTeamGame } from "@/lib/grid/archetype-roles";
-import { buildDefaultContentConfig, getBlueprint, isBlueprintSlug, resolveBlueprint, type BlueprintSlug } from "@/lib/grid/blueprints";
-import { parseContentConfig } from "@/lib/grid/content-engine";
+} from "@/lib/tells/codes";
+import { writeAuditLog } from "@/lib/tells/audit-log";
+import { canStartTeamGame } from "@/lib/tells/archetype-roles";
+import { buildDefaultContentConfig, getBlueprint, isBlueprintSlug, resolveBlueprint, type BlueprintSlug } from "@/lib/tells/blueprints";
+import { parseContentConfig } from "@/lib/tells/content-engine";
 import { initializeTeamGameState } from "@/app/actions/game";
 import { isStudioTestEvent, needsBriefingBeforePlay, STUDIO_TEST_MAX_PLAYERS } from "@/lib/cms/studio-test-session";
-import { parseTeamGameState } from "@/lib/grid/game-state";
-import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
-import { MAX_PLAYERS_PER_TEAM } from "@/lib/grid/team-seats";
+import { parseTeamGameState } from "@/lib/tells/game-state";
+import { DEFAULT_CITY_SLUG } from "@/lib/tells/level-types";
+import { MAX_PLAYERS_PER_TEAM } from "@/lib/tells/team-seats";
 import {
   getCityIdBySlug,
   getDefaultOrganizationId,
   getOrganizationBySlug,
-} from "@/lib/grid/organizations";
+} from "@/lib/tells/organizations";
 import {
   signPlayerResumeToken,
   verifyPlayerResumeToken,
-} from "@/lib/grid/resume-token";
+} from "@/lib/tells/resume-token";
 import {
   PLAYER_NOT_FOUND,
   SESSION_SUPERSEDED,
   TEAM_FULL,
-} from "@/lib/grid/session-codes";
+} from "@/lib/tells/session-codes";
 import {
   buildPlayerSession,
   countActivePlayers,
@@ -47,12 +47,12 @@ import {
   setTeamBeta,
   setTeamNavigator,
   syncTeamLeadershipAfterPlayerLeaves,
-} from "@/lib/grid/team-session";
+} from "@/lib/tells/team-session";
 import {
   assertEventPoolHasSeat,
   touchAccessOnJoin,
-} from "@/lib/grid/access";
-import { teamEntryPath } from "@/lib/grid/team-routes";
+} from "@/lib/tells/access";
+import { teamEntryPath } from "@/lib/tells/team-routes";
 import type {
   ActionResult,
   GridEvent,
@@ -60,7 +60,7 @@ import type {
   LobbySnapshot,
   PlayerRole,
   PlayerSession,
-} from "@/lib/grid/types";
+} from "@/lib/tells/types";
 import { randomUUID } from "crypto";
 
 type TeamRow = {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { playUiLang } from "@/lib/grid/play-ui";
+import { playUiLang } from "@/lib/tells/play-ui";
 
 /** Keep Safari from translating booked English chrome into German. */
 export function PlayDocumentLang({ language }: { language?: string | null }) {

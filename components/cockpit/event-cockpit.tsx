@@ -26,7 +26,7 @@ import {
   GridLabel,
   GridSuccess,
 } from "@/components/grid/grid-shell";
-import { cockpitShowPath, eventLobbyPath, eventPath } from "@/lib/grid/event-routes";
+import { cockpitShowPath, eventLobbyPath, eventPath } from "@/lib/tells/event-routes";
 
 type EventCockpitProps = {
   inviteCode: string;

@@ -5,8 +5,8 @@ import {
   savePortalOverrides,
   type PortalSaveInput,
   type PortalSnapshot,
-} from "@/lib/grid/portal";
-import type { ActionResult } from "@/lib/grid/types";
+} from "@/lib/tells/portal";
+import type { ActionResult } from "@/lib/tells/types";
 
 export async function getPortalSnapshot(
   token: string,

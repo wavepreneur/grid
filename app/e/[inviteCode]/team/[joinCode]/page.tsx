@@ -4,8 +4,8 @@ import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GridLink, GridShell } from "@/components/grid/grid-shell";
 import { TeamEntryGate } from "@/components/lobby/team-entry-gate";
 import { needsBriefingBeforePlay } from "@/lib/cms/studio-test-session";
-import { eventPath } from "@/lib/grid/event-routes";
-import { playUi } from "@/lib/grid/play-ui";
+import { eventPath } from "@/lib/tells/event-routes";
+import { playUi } from "@/lib/tells/play-ui";
 
 type EventTeamPageProps = {
   params: Promise<{ inviteCode: string; joinCode: string }>;

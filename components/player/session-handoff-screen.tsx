@@ -4,9 +4,9 @@ import { useState, useTransition } from "react";
 import { recoverSessionByPlayerId } from "@/app/actions/lobby";
 import { GridButton } from "@/components/grid/grid-shell";
 import { IconPlay } from "@/components/cms/studio-icons";
-import { savePlayerSession } from "@/lib/grid/player-session";
+import { savePlayerSession } from "@/lib/tells/player-session";
 
-import { playUi } from "@/lib/grid/play-ui";
+import { playUi } from "@/lib/tells/play-ui";
 
 type SessionHandoffScreenProps = {
   inviteCode: string;

@@ -15,7 +15,7 @@ import {
   StudioSelect,
   StudioTextarea,
 } from "@/components/cms/studio-ui";
-import { HINT_POINT_COST } from "@/lib/grid/level-types";
+import { HINT_POINT_COST } from "@/lib/tells/level-types";
 
 type Props = {
   tiles: TaskContentTile[];

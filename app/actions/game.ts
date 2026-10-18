@@ -1,13 +1,13 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { writeAuditLog } from "@/lib/grid/audit-log";
+import { writeAuditLog } from "@/lib/tells/audit-log";
 import {
   computeAttemptDurations,
   logPlayAttempt,
   logPlayReveal,
-} from "@/lib/grid/attempt-analytics";
-import { loadResolvedEventContent } from "@/lib/grid/content-loader";
+} from "@/lib/tells/attempt-analytics";
+import { loadResolvedEventContent } from "@/lib/tells/content-loader";
 import {
   buildLevelCompletedModal,
   createInitialGameState,
@@ -23,43 +23,43 @@ import {
   endedReasonForFinish,
   ensureLevelSlots,
   resolveAfterTeamBonus,
-} from "@/lib/grid/game-state";
+} from "@/lib/tells/game-state";
 import {
   createInitialGameStateFromCompiled,
   elapsedMinutesSince,
   resolveProgressionAfterSolve,
-} from "@/lib/grid/logic-engine";
-import { computeLevelReward, earliestIsoTimestamp } from "@/lib/grid/level-scoring";
+} from "@/lib/tells/logic-engine";
+import { computeLevelReward, earliestIsoTimestamp } from "@/lib/tells/level-scoring";
 import {
   getLevelDefinition,
   validateArrivalQuiz,
   validateLevelSolution,
   validateStationCode,
-} from "@/lib/grid/level-validation";
-import { HINT_POINT_COST, EXITMANIA_TOTAL_LEVELS, isMediaInputMode } from "@/lib/grid/level-types";
+} from "@/lib/tells/level-validation";
+import { HINT_POINT_COST, EXITMANIA_TOTAL_LEVELS, isMediaInputMode } from "@/lib/tells/level-types";
 import {
   unlockWalletNote,
   upsertLockedWalletNote,
   upsertWalletNote,
   WALLET_UNLOCK_COST,
-} from "@/lib/grid/wallet";
-import type { PlayerRole, SolveLevelPayload } from "@/lib/grid/level-types";
-import { resolveArchetypeRoleFlags } from "@/lib/grid/archetype-roles";
-import { resolveBlueprint } from "@/lib/grid/blueprints";
-import { parseContentConfig } from "@/lib/grid/content-engine";
-import { countActivePlayers } from "@/lib/grid/team-session";
-import { assertPlayerSession } from "@/lib/grid/session-auth";
-import { SESSION_SUPERSEDED } from "@/lib/grid/session-codes";
-import type { ActionResult } from "@/lib/grid/types";
-import { findLevelByStationCode } from "@/lib/grid/content-loader";
+} from "@/lib/tells/wallet";
+import type { PlayerRole, SolveLevelPayload } from "@/lib/tells/level-types";
+import { resolveArchetypeRoleFlags } from "@/lib/tells/archetype-roles";
+import { resolveBlueprint } from "@/lib/tells/blueprints";
+import { parseContentConfig } from "@/lib/tells/content-engine";
+import { countActivePlayers } from "@/lib/tells/team-session";
+import { assertPlayerSession } from "@/lib/tells/session-auth";
+import { SESSION_SUPERSEDED } from "@/lib/tells/session-codes";
+import type { ActionResult } from "@/lib/tells/types";
+import { findLevelByStationCode } from "@/lib/tells/content-loader";
 import {
   buildPlaySlot,
   initialPhaseForSurface,
   missionFromLevel,
   usesPhasedPlay,
-} from "@/lib/grid/play-slots";
-import type { PlayPhase } from "@/lib/grid/play-surface";
-import { isWithinGeofenceForPlay, withHealthRadiusBonus } from "@/lib/grid/geofence";
+} from "@/lib/tells/play-slots";
+import type { PlayPhase } from "@/lib/tells/play-surface";
+import { isWithinGeofenceForPlay, withHealthRadiusBonus } from "@/lib/tells/geofence";
 import {
   effectiveDistanceUnlockMeters,
   hasReachedDistanceMeters,
@@ -67,15 +67,15 @@ import {
   upsertOutdoorBonusMeters,
   upsertOutdoorLevelProgress,
   type OutdoorForceUnlock,
-} from "@/lib/grid/outdoor-unlock";
+} from "@/lib/tells/outdoor-unlock";
 import {
   canPresentBonus,
   formatBonusAttemptLabel,
   isBonusAnswerCorrect,
   resolveBonusDefinitions,
   resolveBonusForPlay,
-} from "@/lib/grid/bonus";
-import { playActionError, playUi, type PlayUiCopy } from "@/lib/grid/play-ui";
+} from "@/lib/tells/bonus";
+import { playActionError, playUi, type PlayUiCopy } from "@/lib/tells/play-ui";
 import {
   bonusQueueItemMatchesPlayer,
   markBonusActive,
@@ -83,8 +83,8 @@ import {
   mergeBonusQueue,
   pickBonusToActivate,
   promoteArmedBonuses,
-} from "@/lib/grid/bonus-queue";
-import { queueGrowthTeamFinished } from "@/lib/grid/growth-dispatch";
+} from "@/lib/tells/bonus-queue";
+import { queueGrowthTeamFinished } from "@/lib/tells/growth-dispatch";
 import { parseBonusWhen } from "@/lib/cms/bonus-bindings";
 
 function actionErr(

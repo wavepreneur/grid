@@ -44,9 +44,9 @@ import { parseLinkLayer, parseLinkOverrides } from "@/lib/cms/game-link-config";
 import { surfaceToPreset, taskToOpenerArrivalQuiz } from "@/lib/cms/game-slots";
 import { seedCityShellTranslations } from "@/lib/cms/city-shell-i18n";
 import { parseGpsOverride, type GpsPin } from "@/lib/cms/gps-defaults";
-import { generateGameSlug, mintStableGameCode } from "@/lib/grid/codes";
-import { parseCustomerStationCode, randomStationAccessCode } from "@/lib/grid/stations";
-import type { ActionResult } from "@/lib/grid/types";
+import { generateGameSlug, mintStableGameCode } from "@/lib/tells/codes";
+import { parseCustomerStationCode, randomStationAccessCode } from "@/lib/tells/stations";
+import type { ActionResult } from "@/lib/tells/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type AdminClient = ReturnType<typeof createAdminClient>;

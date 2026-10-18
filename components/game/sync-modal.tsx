@@ -3,9 +3,9 @@
 import { useEffect } from "react";
 import { Flag, PartyPopper } from "lucide-react";
 import { BigButton } from "@/components/game/city/ui";
-import { playPlaySfx } from "@/lib/grid/play-sfx";
-import { playUi } from "@/lib/grid/play-ui";
-import type { GameModalState } from "@/lib/grid/game-state";
+import { playPlaySfx } from "@/lib/tells/play-sfx";
+import { playUi } from "@/lib/tells/play-ui";
+import type { GameModalState } from "@/lib/tells/game-state";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
 
 type SyncModalProps = {

@@ -7,10 +7,10 @@ import {
   GridInput,
   GridLabel,
 } from "@/components/grid/grid-shell";
-import { distanceMeters, formatDistance, isWithinGeofenceForPlay } from "@/lib/grid/geofence";
+import { distanceMeters, formatDistance, isWithinGeofenceForPlay } from "@/lib/tells/geofence";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
-import type { LevelDefinition } from "@/lib/grid/level-types";
-import { playGeoError, playUi } from "@/lib/grid/play-ui";
+import type { LevelDefinition } from "@/lib/tells/level-types";
+import { playGeoError, playUi } from "@/lib/tells/play-ui";
 
 type LevelPanelProps = {
   level: LevelDefinition;

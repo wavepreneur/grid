@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { BigButton, SectionLabel } from "@/components/game/city/ui";
 import { IconCheck, IconKey, IconX } from "@/components/game/city/icons";
-import type { ArrivalQuiz } from "@/lib/grid/level-types";
-import type { QuizRevealState } from "@/lib/grid/game-state";
-import { playPlaySfx } from "@/lib/grid/play-sfx";
-import { playUi } from "@/lib/grid/play-ui";
-import { resolveQuizSideFact } from "@/lib/grid/side-fact";
+import type { ArrivalQuiz } from "@/lib/tells/level-types";
+import type { QuizRevealState } from "@/lib/tells/game-state";
+import { playPlaySfx } from "@/lib/tells/play-sfx";
+import { playUi } from "@/lib/tells/play-ui";
+import { resolveQuizSideFact } from "@/lib/tells/side-fact";
 import { FormattedTaskText } from "@/components/game/formatted-task-text";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
 

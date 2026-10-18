@@ -85,7 +85,7 @@ Surfaces sind **Darstellung + Einstieg**, nicht drei getrennte Spiele.
 | **indoor** | Exitmania | Stationsliste | Stationscode (oder Antippen) | Phone |
 | **online** | Tabbrain | Missions-Deck | gemeinsamer Start (Ready später) | Stage |
 
-Code: `lib/grid/play-surface.ts`, `lib/cms/layer-model.ts` → `CONTENT_MODES`.
+Code: `lib/tells/play-surface.ts`, `lib/cms/layer-model.ts` → `CONTENT_MODES`.
 
 ### Player-Phasen (verbindlich)
 
@@ -301,7 +301,7 @@ Bestehende Spiele ohne Pack-IDs bleiben auf `studio_game_tasks`.
 
 | Feature | Status | Hinweis |
 |---------|--------|---------|
-| Alpha/Beta/Gamma Runtime | ✅ Live | `lib/grid/archetype-roles.ts` |
+| Alpha/Beta/Gamma Runtime | ✅ Live | `lib/tells/archetype-roles.ts` |
 | global_levels + local_waypoints | ✅ Live | Layer 1/2 Outdoor |
 | Surfaces-Typen (outdoor/indoor/online) | ✅ Typen | `play-surface.ts`, `layer-model` |
 | Player-Phasen Hub→Quiz→Level→Bonus | ✅ Basis | inkl. Bonus-Phase + City-UI (`frontend_idee`) |
@@ -339,14 +339,14 @@ Bestehende Spiele ohne Pack-IDs bleiben auf `studio_game_tasks`.
 
 | Bereich | Pfad |
 |---------|------|
-| Surfaces & Phasen | `lib/grid/play-surface.ts` |
+| Surfaces & Phasen | `lib/tells/play-surface.ts` |
 | Layer-Typen & Presets | `lib/cms/layer-model.ts` |
-| Level / Config / Stations | `lib/grid/level-types.ts` |
+| Level / Config / Stations | `lib/tells/level-types.ts` |
 | UI-Prototyp | `frontend_idee/` |
 | Layer-Packs | `lib/cms/layer-packs.ts`, `app/actions/cms/packs.ts` |
 | Studio Layer-Profil | `components/cms/games/game-layer-profile-panel.tsx` |
-| Content Loader | `lib/grid/content-loader.ts` |
-| Rollen | `lib/grid/archetype-roles.ts` |
+| Content Loader | `lib/tells/content-loader.ts` |
+| Rollen | `lib/tells/archetype-roles.ts` |
 
 ---
 

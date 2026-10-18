@@ -1,20 +1,20 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { loadResolvedEventContent } from "@/lib/grid/content-loader";
-import { completedLevelNumbers, revealedLevelNumbers } from "@/lib/grid/event-results";
-import { parseTeamGameState } from "@/lib/grid/game-state";
-import { setTeamNavigator } from "@/lib/grid/team-session";
-import { writeAuditLog } from "@/lib/grid/audit-log";
-import { bumpEventContentRevision } from "@/lib/grid/content-revision";
-import { getEventByInviteCode } from "@/lib/grid/session-auth";
-import { normalizeCode } from "@/lib/grid/codes";
-import type { LevelDefinition } from "@/lib/grid/level-types";
-import type { ActionResult } from "@/lib/grid/types";
+import { loadResolvedEventContent } from "@/lib/tells/content-loader";
+import { completedLevelNumbers, revealedLevelNumbers } from "@/lib/tells/event-results";
+import { parseTeamGameState } from "@/lib/tells/game-state";
+import { setTeamNavigator } from "@/lib/tells/team-session";
+import { writeAuditLog } from "@/lib/tells/audit-log";
+import { bumpEventContentRevision } from "@/lib/tells/content-revision";
+import { getEventByInviteCode } from "@/lib/tells/session-auth";
+import { normalizeCode } from "@/lib/tells/codes";
+import type { LevelDefinition } from "@/lib/tells/level-types";
+import type { ActionResult } from "@/lib/tells/types";
 import {
   listEventCapturesByEventId,
   type EventCaptureItem,
-} from "@/lib/grid/event-captures";
+} from "@/lib/tells/event-captures";
 import {
   applyGpsTestOverride,
   getEventAdminDetails,

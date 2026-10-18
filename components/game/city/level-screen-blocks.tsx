@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { FormattedTaskText } from "@/components/game/formatted-task-text";
 import { SectionLabel } from "@/components/game/city/ui";
-import { playUi } from "@/lib/grid/play-ui";
+import { playUi } from "@/lib/tells/play-ui";
 
 export function LevelHero({
   title,

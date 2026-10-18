@@ -15,7 +15,7 @@ import {
   type TaskListPage,
   type TaskListSort,
 } from "@/lib/cms/types";
-import type { ActionResult } from "@/lib/grid/types";
+import type { ActionResult } from "@/lib/tells/types";
 import { normalizeTaskContent } from "@/lib/cms/task-content";
 import { taskToOpenerArrivalQuiz } from "@/lib/cms/game-slots";
 import { parseLinkOverrides } from "@/lib/cms/game-link-config";

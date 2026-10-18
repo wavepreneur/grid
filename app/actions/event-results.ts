@@ -4,9 +4,9 @@ import {
   loadEventResultsByPortalToken,
   loadEventResultsForEvent,
   type EventResultsSnapshot,
-} from "@/lib/grid/event-results";
-import { assertPlayerSession, getEventByInviteCode } from "@/lib/grid/session-auth";
-import type { ActionResult } from "@/lib/grid/types";
+} from "@/lib/tells/event-results";
+import { assertPlayerSession, getEventByInviteCode } from "@/lib/tells/session-auth";
+import type { ActionResult } from "@/lib/tells/types";
 
 export async function getPortalEventResults(
   token: string,

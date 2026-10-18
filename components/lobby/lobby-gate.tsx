@@ -10,17 +10,17 @@ import { GridError, GridLink } from "@/components/grid/grid-shell";
 import {
   eventPlayPath,
   eventTeamJoinPath,
-} from "@/lib/grid/event-routes";
-import type { ResolvedEventContent } from "@/lib/grid/level-types";
-import { cacheEventContent } from "@/lib/grid/offline-content";
-import type { RoleDisplayLabels } from "@/lib/grid/role-labels";
+} from "@/lib/tells/event-routes";
+import type { ResolvedEventContent } from "@/lib/tells/level-types";
+import { cacheEventContent } from "@/lib/tells/offline-content";
+import type { RoleDisplayLabels } from "@/lib/tells/role-labels";
 import {
   abandonTeamSession,
   resolveTeamSession,
-} from "@/lib/grid/session-recovery";
-import { isMissionStarting } from "@/lib/grid/mission-start-signal";
-import type { LobbySnapshot, PlayerSession } from "@/lib/grid/types";
-import { playUi } from "@/lib/grid/play-ui";
+} from "@/lib/tells/session-recovery";
+import { isMissionStarting } from "@/lib/tells/mission-start-signal";
+import type { LobbySnapshot, PlayerSession } from "@/lib/tells/types";
+import { playUi } from "@/lib/tells/play-ui";
 
 type LobbyGateProps = {
   inviteCode: string;

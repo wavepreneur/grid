@@ -1,6 +1,6 @@
 "use client";
 
-import { playUi } from "@/lib/grid/play-ui";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   requiredMeters: number;

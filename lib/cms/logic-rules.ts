@@ -1,4 +1,4 @@
-import type { LevelDefinition, PlayerRole, StationKind } from "@/lib/grid/level-types";
+import type { LevelDefinition, PlayerRole, StationKind } from "@/lib/tells/level-types";
 import type { StudioGame, StudioGameTaskLink, StudioTaskContent } from "@/lib/cms/types";
 import {
   groupLinksByLayerOnLink,
@@ -15,8 +15,8 @@ import {
 } from "@/lib/cms/game-slots";
 import { parseRuntimeProfiles } from "@/lib/cms/layer-model";
 import { parseBonusWhen } from "@/lib/cms/bonus-bindings";
-import { effectiveDistanceUnlockMeters } from "@/lib/grid/outdoor-unlock";
-import { resolveStationAccessCode } from "@/lib/grid/stations";
+import { effectiveDistanceUnlockMeters } from "@/lib/tells/outdoor-unlock";
+import { resolveStationAccessCode } from "@/lib/tells/stations";
 /** When → Then rule (stored on studio_games.logic_rules). */
 export type LogicWhenType =
   | "game_start"

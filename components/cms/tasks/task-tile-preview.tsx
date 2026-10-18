@@ -1,5 +1,5 @@
 import type { StudioTaskContent } from "@/lib/cms/types";
-import { tileTypeIcon } from "@/lib/grid/level-content";
+import { tileTypeIcon } from "@/lib/tells/level-content";
 
 type Props = {
   title: string;

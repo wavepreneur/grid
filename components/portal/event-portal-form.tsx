@@ -11,14 +11,14 @@ import {
 } from "@/components/grid/grid-shell";
 import { EventIntelligencePanel } from "@/components/event/event-intelligence-panel";
 import { EventProgressPanel } from "@/components/event/event-progress-panel";
-import { eventPortalGalleryPath, eventPortalResultsPath } from "@/lib/grid/event-routes";
+import { eventPortalGalleryPath, eventPortalResultsPath } from "@/lib/tells/event-routes";
 import {
   PORTAL_DURATION_OPTIONS,
   type PortalAccess,
   type PortalSaveInput,
   type PortalSnapshot,
   type PortalStation,
-} from "@/lib/grid/portal";
+} from "@/lib/tells/portal";
 
 function absoluteUrl(pathOrUrl: string): string {
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;

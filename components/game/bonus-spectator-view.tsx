@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BonusResultBanner } from "@/components/game/bonus-result-banner";
-import type { BonusRevealState } from "@/lib/grid/game-state";
-import { playPlaySfx } from "@/lib/grid/play-sfx";
-import { playUi } from "@/lib/grid/play-ui";
+import type { BonusRevealState } from "@/lib/tells/game-state";
+import { playPlaySfx } from "@/lib/tells/play-sfx";
+import { playUi } from "@/lib/tells/play-ui";
 
 export type BonusSpectatorItem = {
   bonusId: string;

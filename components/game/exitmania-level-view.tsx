@@ -8,10 +8,10 @@ import { LevelScoringBar } from "@/components/game/level-scoring-bar";
 import { MediaModal } from "@/components/game/media-modal";
 import { HintUnlockToast } from "@/components/game/hint-unlock-toast";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
-import type { GameLevelStatus, LevelRevealState, PurchasedTileHint } from "@/lib/grid/game-state";
-import type { LevelContentTile, LevelDefinition, SolveLevelPayload } from "@/lib/grid/level-types";
+import type { GameLevelStatus, LevelRevealState, PurchasedTileHint } from "@/lib/tells/game-state";
+import type { LevelContentTile, LevelDefinition, SolveLevelPayload } from "@/lib/tells/level-types";
 import type { GpsFixPayload } from "@/lib/hooks/use-team-sync";
-import type { CaptureBrandStamp } from "@/lib/grid/capture-stamp";
+import type { CaptureBrandStamp } from "@/lib/tells/capture-stamp";
 
 type ExitmaniaLevelViewProps = {
   level: LevelDefinition;

@@ -3,7 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
 import type { StudioTicketPool } from "@/lib/cms/types";
-import type { ActionResult } from "@/lib/grid/types";
+import type { ActionResult } from "@/lib/tells/types";
 
 export async function listTicketPools(): Promise<ActionResult<StudioTicketPool[]>> {
   try {

@@ -12,22 +12,22 @@ import { IconCheck, IconLock, IconX } from "@/components/game/city/icons";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
 import { useWalkedDistance } from "@/lib/hooks/use-walked-distance";
 import type { ContentMode } from "@/lib/cms/layer-model";
-import { isWithinGeofenceForPlay, playGeofenceRadiusMeters, withHealthRadiusBonus } from "@/lib/grid/geofence";
+import { isWithinGeofenceForPlay, playGeofenceRadiusMeters, withHealthRadiusBonus } from "@/lib/tells/geofence";
 import {
   computeHealthRadiusBonus,
   isNearButOutsideGeofence,
-} from "@/lib/grid/cockpit-health";
+} from "@/lib/tells/cockpit-health";
 import {
   effectiveDistanceUnlockMeters,
   type OutdoorForceUnlock,
-} from "@/lib/grid/outdoor-unlock";
-import { playPlaySfx } from "@/lib/grid/play-sfx";
+} from "@/lib/tells/outdoor-unlock";
+import { playPlaySfx } from "@/lib/tells/play-sfx";
 import { FormattedTaskText } from "@/components/game/formatted-task-text";
-import type { GameLevelStatus } from "@/lib/grid/game-state";
-import type { LevelDefinition, GeolocationSample } from "@/lib/grid/level-types";
+import type { GameLevelStatus } from "@/lib/tells/game-state";
+import type { LevelDefinition, GeolocationSample } from "@/lib/tells/level-types";
 import type { GpsFixPayload } from "@/lib/hooks/use-team-sync";
-import { hubLabel } from "@/lib/grid/play-slots";
-import { playUi } from "@/lib/grid/play-ui";
+import { hubLabel } from "@/lib/tells/play-slots";
+import { playUi } from "@/lib/tells/play-ui";
 import { useGeoAccess } from "@/lib/hooks/use-geo-access";
 
 export type OutdoorArriveInput = {

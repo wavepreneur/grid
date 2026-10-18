@@ -2,10 +2,10 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStudioOrganizationId } from "@/app/actions/cms/organizations";
-import { HEALTH_NEAR_STUCK_MS } from "@/lib/grid/cockpit-health";
-import { normalizeCode } from "@/lib/grid/codes";
-import { parseTeamGameState } from "@/lib/grid/game-state";
-import type { ActionResult } from "@/lib/grid/types";
+import { HEALTH_NEAR_STUCK_MS } from "@/lib/tells/cockpit-health";
+import { normalizeCode } from "@/lib/tells/codes";
+import { parseTeamGameState } from "@/lib/tells/game-state";
+import type { ActionResult } from "@/lib/tells/types";
 
 const HEALING_ACTIONS = [
   "outdoor_force_unlock",

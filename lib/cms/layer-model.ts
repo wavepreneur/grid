@@ -1,7 +1,7 @@
 /**
  * GRID Layer Model — content architecture for scalable games.
  * @see docs/GRID_LAYER_MODEL.md
- * @see lib/grid/play-surface.ts
+ * @see lib/tells/play-surface.ts
  */
 
 export const STUDIO_LAYERS = [1, 2, 3] as const;

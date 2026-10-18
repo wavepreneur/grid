@@ -3,7 +3,7 @@ import { getEventContent } from "@/app/actions/content";
 import { getEventInvite } from "@/app/actions/lobby";
 import { EventLanding } from "@/components/event/event-landing";
 import { GridShell } from "@/components/grid/grid-shell";
-import { cockpitPath } from "@/lib/grid/event-routes";
+import { cockpitPath } from "@/lib/tells/event-routes";
 import Link from "next/link";
 
 type EventPageProps = {

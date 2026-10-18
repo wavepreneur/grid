@@ -1,4 +1,6 @@
-# GRID — Agent Guide
+# Tells
+
+Public brand and engine: **Tells** (tells.team). Conversation “Tells” = this repo. “Exitmania” = `../Developer/exitmania`. Engine code lives in `lib/tells/`. The git folder may still be named `grid`. See `.cursor/rules/tells-vs-exitmania.mdc`.
 
 Next.js engine repo. Read `node_modules/next/dist/docs/` for Next.js 16 conventions.
 
@@ -31,13 +33,13 @@ Rules: `.cursor/rules/product-direction.mdc`, `.cursor/rules/ecosystem-exitmania
 | Area | Path |
 |------|------|
 | **Layer model (read first for Studio)** | `docs/GRID_LAYER_MODEL.md`, `lib/cms/layer-model.ts` |
-| Play surfaces & phases | `lib/grid/play-surface.ts`, `frontend_idee/` |
-| Indoor stations | `lib/grid/stations.ts`, `local_stations` |
+| Play surfaces & phases | `lib/tells/play-surface.ts`, `frontend_idee/` |
+| Indoor stations | `lib/tells/stations.ts`, `local_stations` |
 | Layer profile UI | `components/cms/games/game-layer-profile-panel.tsx` |
-| Blueprints | `lib/grid/blueprints.ts` |
-| Roles | `lib/grid/archetype-roles.ts` |
-| Pulse / Telemetry envelope | `lib/grid/telemetry-envelope.ts`, `lib/grid/domain-telemetry.ts`, `lib/grid/telemetry-bridge.ts` |
-| Pulse REST API | `lib/grid/pulse-api.ts`, `app/api/v1/pulse/` |
-| Content load | `lib/grid/content-loader.ts` |
-| Booking API | `app/api/v1/bookings/route.ts`, `lib/grid/booking-api.ts` |
+| Blueprints | `lib/tells/blueprints.ts` |
+| Roles | `lib/tells/archetype-roles.ts` |
+| Pulse / Telemetry envelope | `lib/tells/telemetry-envelope.ts`, `lib/tells/domain-telemetry.ts`, `lib/tells/telemetry-bridge.ts` |
+| Pulse REST API | `lib/tells/pulse-api.ts`, `app/api/v1/pulse/` |
+| Content load | `lib/tells/content-loader.ts` |
+| Booking API | `app/api/v1/bookings/route.ts`, `lib/tells/booking-api.ts` |
 | Architecture | `GRID_ARCHITECTURE.md` |

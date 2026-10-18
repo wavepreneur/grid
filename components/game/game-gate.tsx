@@ -12,13 +12,13 @@ import { GridError } from "@/components/grid/grid-shell";
 import {
   cacheEventContent,
   loadCachedEventContent,
-} from "@/lib/grid/offline-content";
-import { eventLobbyPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
+} from "@/lib/tells/offline-content";
+import { eventLobbyPath, eventTeamJoinPath } from "@/lib/tells/event-routes";
 import { useQuietContentRefresh } from "@/lib/hooks/use-quiet-content-refresh";
 import {
   abandonTeamSession,
   resolveTeamSession,
-} from "@/lib/grid/session-recovery";
+} from "@/lib/tells/session-recovery";
 import {
   clearMissionStarting,
   isMissionStarting,
@@ -26,11 +26,11 @@ import {
   missionStartProgress,
   persistStartProgress,
   startOverlayCopy,
-} from "@/lib/grid/mission-start-signal";
-import { savePlayerSession } from "@/lib/grid/player-session";
-import { playUi } from "@/lib/grid/play-ui";
-import type { ResolvedEventContent } from "@/lib/grid/level-types";
-import type { PlayerSession } from "@/lib/grid/types";
+} from "@/lib/tells/mission-start-signal";
+import { savePlayerSession } from "@/lib/tells/player-session";
+import { playUi } from "@/lib/tells/play-ui";
+import type { ResolvedEventContent } from "@/lib/tells/level-types";
+import type { PlayerSession } from "@/lib/tells/types";
 
 type GameGateProps = {
   inviteCode: string;

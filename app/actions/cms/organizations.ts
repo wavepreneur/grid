@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { StudioOrganization } from "@/lib/cms/types";
-import type { ActionResult } from "@/lib/grid/types";
+import type { ActionResult } from "@/lib/tells/types";
 import { ADMIN_CAPABILITIES } from "@/lib/cms/org-roles";
 import { PORTAL_COOKIE, verifyPortalSession } from "@/lib/marketing/portal-session";
 

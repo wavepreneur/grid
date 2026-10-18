@@ -2,7 +2,7 @@
 
 import { MapPin, RefreshCw, Settings, Users } from "lucide-react";
 import { LobbyPrimaryButton } from "@/components/lobby/lobby-identity";
-import { playUi } from "@/lib/grid/play-ui";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   open: boolean;

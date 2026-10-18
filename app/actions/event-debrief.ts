@@ -3,8 +3,8 @@
 import {
   loadEventDebriefByPortalToken,
   type EventDebriefSnapshot,
-} from "@/lib/grid/event-debrief";
-import type { ActionResult } from "@/lib/grid/types";
+} from "@/lib/tells/event-debrief";
+import type { ActionResult } from "@/lib/tells/types";
 
 export async function getPortalEventDebrief(
   token: string,

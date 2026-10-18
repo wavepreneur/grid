@@ -1,13 +1,13 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { loadResolvedEventContent } from "@/lib/grid/content-loader";
-import { getEventByInviteCode } from "@/lib/grid/session-auth";
-import { DEFAULT_CITY_SLUG } from "@/lib/grid/level-types";
-import type { ResolvedEventContent } from "@/lib/grid/level-types";
-import type { ActionResult, GridEvent } from "@/lib/grid/types";
-import { bumpEventContentRevision, getEventContentRevisionByInviteCode } from "@/lib/grid/content-revision";
-import { normalizeCode } from "@/lib/grid/codes";
+import { loadResolvedEventContent } from "@/lib/tells/content-loader";
+import { getEventByInviteCode } from "@/lib/tells/session-auth";
+import { DEFAULT_CITY_SLUG } from "@/lib/tells/level-types";
+import type { ResolvedEventContent } from "@/lib/tells/level-types";
+import type { ActionResult, GridEvent } from "@/lib/tells/types";
+import { bumpEventContentRevision, getEventContentRevisionByInviteCode } from "@/lib/tells/content-revision";
+import { normalizeCode } from "@/lib/tells/codes";
 import { isStudioTestEvent, needsBriefingBeforePlay } from "@/lib/cms/studio-test-session";
 
 export type EventAdminDetails = {

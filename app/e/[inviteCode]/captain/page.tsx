@@ -3,7 +3,7 @@ import { getEventContent } from "@/app/actions/content";
 import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
 import { CaptainStartFlow } from "@/components/lobby/captain-start-flow";
 import { isStudioTestEvent, needsBriefingBeforePlay } from "@/lib/cms/studio-test-session";
-import { eventLobbyPath, eventTeamJoinPath } from "@/lib/grid/event-routes";
+import { eventLobbyPath, eventTeamJoinPath } from "@/lib/tells/event-routes";
 
 type EventCaptainPageProps = {
   params: Promise<{ inviteCode: string }>;

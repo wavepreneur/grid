@@ -20,15 +20,15 @@ import {
 import { BigButton } from "@/components/game/city/ui";
 import { PlayDocSheet } from "@/components/game/play-doc-sheet";
 import { TeamWalletList } from "@/components/game/team-wallet";
-import { walletMenuHint, type WalletNote } from "@/lib/grid/wallet";
+import { walletMenuHint, type WalletNote } from "@/lib/tells/wallet";
 import { PersonalResumeLinkCard } from "@/components/player/personal-resume-link-card";
 import type { ContentMode } from "@/lib/cms/layer-model";
 import {
   playHelpMenuHint,
   playHowToPlayHint,
   playRulesSteps,
-} from "@/lib/grid/play-help";
-import { playUi } from "@/lib/grid/play-ui";
+} from "@/lib/tells/play-help";
+import { playUi } from "@/lib/tells/play-ui";
 import { PlayGpsHelp } from "@/components/game/play-gps-help";
 import { recoverPlayViewport } from "@/components/game/play-viewport-guard";
 

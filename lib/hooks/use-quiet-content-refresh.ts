@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, type MutableRefObject } from "react";
 import { getEventContent, getEventContentRevision } from "@/app/actions/content";
-import { cacheEventContent } from "@/lib/grid/offline-content";
-import type { ResolvedEventContent } from "@/lib/grid/level-types";
+import { cacheEventContent } from "@/lib/tells/offline-content";
+import type { ResolvedEventContent } from "@/lib/tells/level-types";
 
 /**
  * Quiet content refresh — battery first.

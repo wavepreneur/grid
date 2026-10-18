@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getPortalEventIntelligence } from "@/app/actions/event-intelligence";
-import type { EventIntelligenceSnapshot } from "@/lib/grid/event-intelligence";
+import type { EventIntelligenceSnapshot } from "@/lib/tells/event-intelligence";
 
 type Props = {
   portalToken: string;

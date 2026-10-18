@@ -34,7 +34,7 @@ import {
   withLinkLocale,
 } from "@/lib/cms/game-i18n";
 import { translateUnitsNative } from "@/lib/cms/gemini-translate";
-import { generateGameSlug, isCityDerivedGameCode, mintStableGameCode } from "@/lib/grid/codes";
+import { generateGameSlug, isCityDerivedGameCode, mintStableGameCode } from "@/lib/tells/codes";
 import {
   DEFAULT_RUNTIME_PROFILES,
   buildLayerSnapshotMeta,
@@ -59,15 +59,15 @@ import {
   parseLogicRules,
   type StudioLogicRule,
 } from "@/lib/cms/logic-rules";
-import type { ActionResult } from "@/lib/grid/types";
+import type { ActionResult } from "@/lib/tells/types";
 import type { ContentMode } from "@/lib/cms/layer-model";
 import {
   normalizeStationCode,
   randomStationAccessCode,
   resolveStationAccessCode,
-} from "@/lib/grid/stations";
+} from "@/lib/tells/stations";
 import { PUSHABLE_EVENT_STATUSES, withLastLivePushAt } from "@/lib/cms/live-push";
-import { pingTeamsContentUpdated } from "@/lib/grid/content-ping";
+import { pingTeamsContentUpdated } from "@/lib/tells/content-ping";
 import { loadMergedGameTaskLinksForGame, addTaskToLayerPack, fetchPackItem, fillComposeShellIfEmpty, loadRecipeOriginContext, loadRecipeOriginGame, removeTaskFromLayerPack, reorderPackBackedGameTasks, savePackBackedGameLink } from "@/app/actions/cms/packs";
 import { gameUsesLayerPacks, isRecipeCityShell, packItemToGameLink, parsePackLinkId } from "@/lib/cms/layer-packs";
 import { localeCopyFromPatch, localeWritePackIds } from "@/lib/cms/studio-mutate";

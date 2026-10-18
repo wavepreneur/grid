@@ -1,7 +1,7 @@
 "use server";
 
-import { lookupAccessCode, type ResolvedAccess } from "@/lib/grid/access";
-import type { ActionResult } from "@/lib/grid/types";
+import { lookupAccessCode, type ResolvedAccess } from "@/lib/tells/access";
+import type { ActionResult } from "@/lib/tells/types";
 
 export async function resolvePlayAccessCode(
   code: string,

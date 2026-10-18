@@ -52,14 +52,14 @@ import {
   type GpsPin,
 } from "@/lib/cms/gps-defaults";
 import type { StudioGameTaskLink } from "@/lib/cms/types";
-import { MIN_DISTANCE_UNLOCK_METERS } from "@/lib/grid/outdoor-unlock";
+import { MIN_DISTANCE_UNLOCK_METERS } from "@/lib/tells/outdoor-unlock";
 import {
   parseStationAccessCode,
   randomStationAccessCode,
   resolveStationAccessCode,
   STATION_ACCESS_CODE_MAX,
   STATION_ACCESS_CODE_MIN,
-} from "@/lib/grid/stations";
+} from "@/lib/tells/stations";
 
 function tagsMatchingSets(sets: string[][], selected: string[]) {
   if (selected.length === 0) return sets;

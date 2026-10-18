@@ -12,7 +12,7 @@ import {
   type DirectoryCountry,
   type ExitmaniaCityPayload,
 } from "@/lib/cms/city-directory";
-import type { ActionResult } from "@/lib/grid/types";
+import type { ActionResult } from "@/lib/tells/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type AdminClient = ReturnType<typeof createAdminClient>;

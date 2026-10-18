@@ -6,12 +6,12 @@ import { ContentMediaSheet } from "@/components/game/city/content-media-sheet";
 import { BigButton } from "@/components/game/city/ui";
 import { LevelScoringBar } from "@/components/game/level-scoring-bar";
 import { TileHintModal } from "@/components/game/tile-hint-modal";
-import type { PurchasedTileHint } from "@/lib/grid/game-state";
-import type { LevelContentTile, LevelScoring } from "@/lib/grid/level-types";
-import { HINT_POINT_COST } from "@/lib/grid/level-types";
-import type { LevelScoringSnapshot } from "@/lib/grid/level-scoring";
-import { hasLiveLevelScoring } from "@/lib/grid/level-scoring";
-import { playTileTypeLabel, playUi } from "@/lib/grid/play-ui";
+import type { PurchasedTileHint } from "@/lib/tells/game-state";
+import type { LevelContentTile, LevelScoring } from "@/lib/tells/level-types";
+import { HINT_POINT_COST } from "@/lib/tells/level-types";
+import type { LevelScoringSnapshot } from "@/lib/tells/level-scoring";
+import { hasLiveLevelScoring } from "@/lib/tells/level-scoring";
+import { playTileTypeLabel, playUi } from "@/lib/tells/play-ui";
 
 type MediaModalProps = {
   tile: LevelContentTile | null;

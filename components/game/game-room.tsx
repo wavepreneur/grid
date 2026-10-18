@@ -20,7 +20,7 @@ import {
   handOffBonus,
   syncOutdoorWalkProgress,
 } from "@/app/actions/game";
-import { usesMissionShell } from "@/lib/grid/blueprints";
+import { usesMissionShell } from "@/lib/tells/blueprints";
 import { CityPlayShell } from "@/components/game/city/play-shell";
 import { BonusCompleteToast } from "@/components/game/bonus-complete-toast";
 import { BonusSpectatorView } from "@/components/game/bonus-spectator-view";
@@ -33,25 +33,25 @@ import type { PlayMorePanel } from "@/components/game/play-more-sheet";
 import { GameOverFlywheel } from "@/components/game/game-over-flywheel";
 import { TeamCaptureGallery } from "@/components/game/team-capture-gallery";
 import { TeamWalletList } from "@/components/game/team-wallet";
-import { visibleWalletNotes } from "@/lib/grid/wallet";
+import { visibleWalletNotes } from "@/lib/tells/wallet";
 import { MissionTimeAlerts } from "@/components/game/mission-time-alerts";
 import { SyncModal } from "@/components/game/sync-modal";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
 import { IdentityBar } from "@/components/player/identity-bar";
 import { SessionHandoffScreen } from "@/components/player/session-handoff-screen";
 import { GridError } from "@/components/grid/grid-shell";
-import { eventTeamJoinPath } from "@/lib/grid/event-routes";
+import { eventTeamJoinPath } from "@/lib/tells/event-routes";
 import { transferCaptain, handoverSession, removePlayerFromLobby } from "@/app/actions/lobby";
 import { useTeamSync, type GpsFixPayload } from "@/lib/hooks/use-team-sync";
 import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
-import { cacheTeamState, readLocalPaused, writeLocalPaused, pauseStorageKey } from "@/lib/grid/offline-state";
+import { cacheTeamState, readLocalPaused, writeLocalPaused, pauseStorageKey } from "@/lib/tells/offline-state";
 import {
   displayRoleLabel,
   bonusAudiencePlayerNames,
   formatBonusAudienceNames,
   DEFAULT_ROLE_LABELS,
-} from "@/lib/grid/role-labels";
-import { findForeignActiveBonuses } from "@/lib/grid/bonus-queue";
+} from "@/lib/tells/role-labels";
+import { findForeignActiveBonuses } from "@/lib/tells/bonus-queue";
 import { StudioDeskTestBar } from "@/components/game/studio-desk-test-bar";
 import { useBonusQueueTick } from "@/lib/hooks/use-bonus-queue-tick";
 import { clearWalkedDistanceStorage } from "@/lib/hooks/use-walked-distance";
@@ -59,21 +59,21 @@ import {
   pickNewerTeamState,
   type TeamGameState,
   type TeamRealtimeState,
-} from "@/lib/grid/game-state";
-import { isSessionSupersededResult } from "@/lib/grid/session-codes";
+} from "@/lib/tells/game-state";
+import { isSessionSupersededResult } from "@/lib/tells/session-codes";
 import type {
   ResolvedEventContent,
   SolveLevelPayload,
-} from "@/lib/grid/level-types";
-import { applyCaptainTransferToPlayers, applyRosterToSession, rosterWithHeldCaptain, sessionAfterCaptainTransfer } from "@/lib/grid/live-session";
-import { nextLeadSeq, noteLeadSeq, parseLeadSeq } from "@/lib/grid/lead-seq";
-import { abandonTeamSession } from "@/lib/grid/session-recovery";
-import { clearPlayerSession, savePlayerSession } from "@/lib/grid/player-session";
-import type { LobbyPlayer, PlayerSession } from "@/lib/grid/types";
-import { usesPhasedPlay } from "@/lib/grid/play-slots";
-import { playUi } from "@/lib/grid/play-ui";
+} from "@/lib/tells/level-types";
+import { applyCaptainTransferToPlayers, applyRosterToSession, rosterWithHeldCaptain, sessionAfterCaptainTransfer } from "@/lib/tells/live-session";
+import { nextLeadSeq, noteLeadSeq, parseLeadSeq } from "@/lib/tells/lead-seq";
+import { abandonTeamSession } from "@/lib/tells/session-recovery";
+import { clearPlayerSession, savePlayerSession } from "@/lib/tells/player-session";
+import type { LobbyPlayer, PlayerSession } from "@/lib/tells/types";
+import { usesPhasedPlay } from "@/lib/tells/play-slots";
+import { playUi } from "@/lib/tells/play-ui";
 import { PlayDocumentLang } from "@/components/game/play-viewport-guard";
-import { playPlaySfx, unlockPlayAudio } from "@/lib/grid/play-sfx";
+import { playPlaySfx, unlockPlayAudio } from "@/lib/tells/play-sfx";
 import { useRouter } from "next/navigation";
 
 type GameRoomProps = {

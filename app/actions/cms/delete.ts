@@ -15,7 +15,7 @@ import {
   type TaskGameUsage,
   type TaskLiveGameLink,
 } from "@/lib/cms/delete-status";
-import type { ActionResult } from "@/lib/grid/types";
+import type { ActionResult } from "@/lib/tells/types";
 import type { StudioGameStatus } from "@/lib/cms/types";
 
 type JoinedGame = {

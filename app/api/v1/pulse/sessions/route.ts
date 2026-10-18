@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { authorizeGridApi } from "@/lib/grid/api-auth";
-import { getPublicOrigin } from "@/lib/grid/booking-api";
+import { authorizeGridApi } from "@/lib/tells/api-auth";
+import { getPublicOrigin } from "@/lib/tells/booking-api";
 import {
   buildPulseSessionUrls,
   createPulseSession,
   validatePulseSessionRequest,
   type PulseSessionCreateRequest,
-} from "@/lib/grid/pulse-api";
-import { getOrganizationBySlug } from "@/lib/grid/organizations";
+} from "@/lib/tells/pulse-api";
+import { getOrganizationBySlug } from "@/lib/tells/organizations";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function unauthorized() {

@@ -72,7 +72,7 @@ import {
   parseFollowUpTrigger,
   withFollowUpTrigger,
   type FollowUpKind,
-} from "@/lib/grid/follow-up-trigger";
+} from "@/lib/tells/follow-up-trigger";
 
 type Props = {
   game: StudioGame;

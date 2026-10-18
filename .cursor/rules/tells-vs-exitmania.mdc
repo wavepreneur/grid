@@ -1,0 +1,36 @@
+---
+description: Tells vs Exitmania — Gespräch, Code wandert zu tells, Exitmania-Tabellen bleiben
+alwaysApply: true
+---
+
+# Tells vs Exitmania
+
+When Dervis says **Tells**, he means **this repo** (`/Users/dervis/grid`, tells.team).
+When he says **Exitmania**, he means `/Users/dervis/Developer/exitmania`.
+
+Tells is **pre-launch** (password gate, no real customers). Engine identifiers migrate to `tells` now so the name does not calcify as GRID.
+
+## Spoken / customer-facing
+
+- Tells = org product (join, data, overwrites, later year-abo)
+- Exitmania = public storefront + impulse commerce (this one **is** live)
+- Tabbrain = discarded
+
+New UI copy: **Tells**, not GRID.
+
+## Code in this repo
+
+- New and moved engine code lives under `lib/tells/`
+- Do not add new `lib/tells/` files
+- `GRID_*` env still works until Vercel aliases exist (`TELLS_*` may read the same value)
+- Do not rename Tailwind `grid` layout classes
+- Do not rename the git repo or `/e/` play URLs unless asked
+
+## Code in Exitmania
+
+Leave `grid_*` tables and routes (`grid_pilot_*`, `grid_checkout_*`, `GRID_PUBLIC_URL`). Exitmania has real bookings. That rename is a later, explicit job.
+
+## Examples
+
+- “Passwort-Gate auf Tells” → this repo, `/gate`
+- “KIRA-Finale auf Exitmania” → Exitmania, `/m/kira/…`

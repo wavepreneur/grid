@@ -8,7 +8,7 @@ import {
   type StudioCollection,
   type StudioCollectionOverview,
 } from "@/lib/cms/collections";
-import type { ActionResult } from "@/lib/grid/types";
+import type { ActionResult } from "@/lib/tells/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const GAME_PAGE = 1000;

@@ -2,8 +2,8 @@
 
 import { Maximize2, Play } from "lucide-react";
 import { LobbyPrimaryButton } from "@/components/lobby/lobby-identity";
-import { youtubeEmbedUrl } from "@/lib/grid/game-help-links";
-import { playUi } from "@/lib/grid/play-ui";
+import { youtubeEmbedUrl } from "@/lib/tells/game-help-links";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   youtubeUrl: string;

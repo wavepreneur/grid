@@ -13,8 +13,8 @@ import {
 } from "lucide-react";
 import { BigButton } from "@/components/game/city/ui";
 import type { ContentMode } from "@/lib/cms/layer-model";
-import { playHelpMenuHint } from "@/lib/grid/play-help";
-import { playUi } from "@/lib/grid/play-ui";
+import { playHelpMenuHint } from "@/lib/tells/play-help";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   mode?: ContentMode;

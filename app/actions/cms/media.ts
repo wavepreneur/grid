@@ -1,7 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { ActionResult } from "@/lib/grid/types";
+import type { ActionResult } from "@/lib/tells/types";
 
 const BUCKET = "studio-media";
 const MAX_BYTES = 4.5 * 1024 * 1024;

@@ -5,8 +5,8 @@ import {
   computeLevelScoringSnapshot,
   earliestIsoTimestamp,
   type LevelScoringSnapshot,
-} from "@/lib/grid/level-scoring";
-import type { LevelScoring } from "@/lib/grid/level-types";
+} from "@/lib/tells/level-scoring";
+import type { LevelScoring } from "@/lib/tells/level-types";
 
 export function useLevelScoringTimer(
   scoring: LevelScoring | undefined,

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getPortalEventDebrief } from "@/app/actions/event-debrief";
-import type { DebriefLevel, EventDebriefSnapshot, EventDebriefTeam } from "@/lib/grid/event-debrief";
+import type { DebriefLevel, EventDebriefSnapshot, EventDebriefTeam } from "@/lib/tells/event-debrief";
 
 type Props = {
   portalToken: string;

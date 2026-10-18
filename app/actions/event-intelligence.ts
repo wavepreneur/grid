@@ -3,8 +3,8 @@
 import {
   loadEventIntelligenceByPortalToken,
   type EventIntelligenceSnapshot,
-} from "@/lib/grid/event-intelligence";
-import type { ActionResult } from "@/lib/grid/types";
+} from "@/lib/tells/event-intelligence";
+import type { ActionResult } from "@/lib/tells/types";
 
 export async function getPortalEventIntelligence(
   token: string,

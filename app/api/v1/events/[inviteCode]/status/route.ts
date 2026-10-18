@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { authorizeBookingApi, getEventStatusByInviteCode } from "@/lib/grid/booking-api";
-import { normalizeCode } from "@/lib/grid/codes";
+import { authorizeBookingApi, getEventStatusByInviteCode } from "@/lib/tells/booking-api";
+import { normalizeCode } from "@/lib/tells/codes";
 
 type RouteParams = {
   params: Promise<{ inviteCode: string }>;

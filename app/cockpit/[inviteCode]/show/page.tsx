@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { getEventByInviteCode } from "@/lib/grid/session-auth";
+import { getEventByInviteCode } from "@/lib/tells/session-auth";
 import { EventCockpitShow } from "@/components/cockpit/event-cockpit-show";
-import { normalizeCode } from "@/lib/grid/codes";
+import { normalizeCode } from "@/lib/tells/codes";
 
 type CockpitShowPageProps = {
   params: Promise<{ inviteCode: string }>;

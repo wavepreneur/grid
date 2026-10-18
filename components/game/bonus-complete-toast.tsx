@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { BonusResultBanner } from "@/components/game/bonus-result-banner";
 import { hasSeenBonusResult } from "@/components/game/bonus-spectator-view";
-import type { BonusNoticeState } from "@/lib/grid/game-state";
-import { playPlaySfx } from "@/lib/grid/play-sfx";
-import { playUi } from "@/lib/grid/play-ui";
+import type { BonusNoticeState } from "@/lib/tells/game-state";
+import { playPlaySfx } from "@/lib/tells/play-sfx";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   notice: BonusNoticeState | null | undefined;

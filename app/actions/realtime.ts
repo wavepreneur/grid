@@ -1,11 +1,11 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getEventByInviteCode } from "@/lib/grid/session-auth";
-import { normalizeCode } from "@/lib/grid/codes";
-import { signCockpitAccessToken, signPlayerAccessToken } from "@/lib/grid/realtime-token";
-import type { ActionResult } from "@/lib/grid/types";
-import type { CockpitRealtimeAccessToken, RealtimeAccessToken } from "@/lib/grid/realtime-token";
+import { getEventByInviteCode } from "@/lib/tells/session-auth";
+import { normalizeCode } from "@/lib/tells/codes";
+import { signCockpitAccessToken, signPlayerAccessToken } from "@/lib/tells/realtime-token";
+import type { ActionResult } from "@/lib/tells/types";
+import type { CockpitRealtimeAccessToken, RealtimeAccessToken } from "@/lib/tells/realtime-token";
 
 export async function getRealtimeAccessToken(
   sessionId: string,

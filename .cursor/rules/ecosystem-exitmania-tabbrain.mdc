@@ -9,8 +9,8 @@ Read `docs/EXITMANIA_GRID_INTEGRATION.md`, `docs/GRID_LAYER_MODEL.md`, and `.cur
 
 ## Ownership
 
-- **GRID (this repo):** Live engine — FSM, Alpha/Beta/Gamma, Realtime, Cockpit, layer-based content. Later: customer Studio (overwrites only), credits to activate, org data
-- **Exitmania (../Developer/exitmania):** Public storefront + impulse commerce — replaces Loquiz with GRID, does NOT reimplement gameplay. Small teamevents (~€200, light custom route) stay here
+- **Tells / this repo:** Live engine under `lib/tells/` — FSM, Alpha/Beta/Gamma, Realtime, Cockpit, layer-based content. Later: customer Studio (overwrites only), credits to activate, org data.
+- **Exitmania (../Developer/exitmania):** Public storefront + impulse commerce — replaces Loquiz with Tells, does NOT reimplement gameplay. Small teamevents (~€200, light custom route) stay here
 - **Tabbrain:** discarded — do not build. Large groups and self-serve are GRID subscriptions, not a third brand
 
 ## Content (Layer model)

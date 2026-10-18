@@ -11,8 +11,8 @@ import {
   GridLabel,
 } from "@/components/grid/grid-shell";
 import { StudioListbox } from "@/components/cms/shared/studio-listbox";
-import { buildEventInviteUrl } from "@/lib/grid/codes";
-import { cockpitPath, eventPath } from "@/lib/grid/event-routes";
+import { buildEventInviteUrl } from "@/lib/tells/codes";
+import { cockpitPath, eventPath } from "@/lib/tells/event-routes";
 
 export function CreateEventForm() {
   const router = useRouter();

@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { BigButton } from "@/components/game/city/ui";
-import { hapticWalkProgress } from "@/lib/grid/haptics";
-import { playPlaySfx } from "@/lib/grid/play-sfx";
-import { playUi } from "@/lib/grid/play-ui";
+import { hapticWalkProgress } from "@/lib/tells/haptics";
+import { playPlaySfx } from "@/lib/tells/play-sfx";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   title: string;

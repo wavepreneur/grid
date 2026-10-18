@@ -12,18 +12,18 @@ import {
   IdentityField,
   LobbyPrimaryButton,
 } from "@/components/lobby/lobby-identity";
-import { normalizeDisplayNameKey } from "@/lib/grid/codes";
+import { normalizeDisplayNameKey } from "@/lib/tells/codes";
 import {
   abandonTeamSession,
   resolveTeamSession,
-} from "@/lib/grid/session-recovery";
-import { eventLobbyPath } from "@/lib/grid/event-routes";
-import { teamEntryPath } from "@/lib/grid/team-routes";
-import { cacheEventContent } from "@/lib/grid/offline-content";
-import { savePlayerSession } from "@/lib/grid/player-session";
-import { playUi } from "@/lib/grid/play-ui";
-import type { ResolvedEventContent } from "@/lib/grid/level-types";
-import type { GridTeamStatus } from "@/lib/grid/types";
+} from "@/lib/tells/session-recovery";
+import { eventLobbyPath } from "@/lib/tells/event-routes";
+import { teamEntryPath } from "@/lib/tells/team-routes";
+import { cacheEventContent } from "@/lib/tells/offline-content";
+import { savePlayerSession } from "@/lib/tells/player-session";
+import { playUi } from "@/lib/tells/play-ui";
+import type { ResolvedEventContent } from "@/lib/tells/level-types";
+import type { GridTeamStatus } from "@/lib/tells/types";
 
 type TeamEntryGateProps = {
   inviteCode: string;

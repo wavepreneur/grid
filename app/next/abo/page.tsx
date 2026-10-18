@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { GridAboNextPage } from "@/components/marketing/grid-abo-next-page";
-import { playUiLang } from "@/lib/grid/play-ui";
+import { playUiLang } from "@/lib/tells/play-ui";
 
 export const dynamic = "force-dynamic";
 

@@ -8,8 +8,8 @@ import {
   liveFamilyVoucherUntil,
   LIVE_FAMILY_VOUCHER,
   type GrowthOffer,
-} from "@/lib/grid/growth-pack";
-import { playUi } from "@/lib/grid/play-ui";
+} from "@/lib/tells/growth-pack";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   offer: GrowthOffer;

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { Check, Lightbulb } from "lucide-react";
 import { BigButton } from "@/components/game/city/ui";
-import { playUi } from "@/lib/grid/play-ui";
+import { playUi } from "@/lib/tells/play-ui";
 
 type TileHintModalProps = {
   open: boolean;

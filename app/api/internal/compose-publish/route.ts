@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authorizeGridApi } from "@/lib/grid/api-auth";
+import { authorizeGridApi } from "@/lib/tells/api-auth";
 import { publishDraftComposeGames } from "@/app/actions/cms/games";
 
 export const maxDuration = 300;

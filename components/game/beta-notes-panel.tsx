@@ -2,9 +2,9 @@
 
 import { ContentTileGrid } from "@/components/game/content-tile-grid";
 import { SectionLabel } from "@/components/game/city/ui";
-import type { PurchasedTileHint } from "@/lib/grid/game-state";
-import type { LevelContentTile } from "@/lib/grid/level-types";
-import { playUi } from "@/lib/grid/play-ui";
+import type { PurchasedTileHint } from "@/lib/tells/game-state";
+import type { LevelContentTile } from "@/lib/tells/level-types";
+import { playUi } from "@/lib/tells/play-ui";
 
 type BetaNotesPanelProps = {
   tiles: LevelContentTile[];

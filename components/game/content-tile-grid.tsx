@@ -1,9 +1,9 @@
 "use client";
 
 import { mediaTypeLucideIcon } from "@/components/game/city/level-screen-blocks";
-import type { PurchasedTileHint } from "@/lib/grid/game-state";
-import type { LevelContentTile } from "@/lib/grid/level-types";
-import { playTileTypeLabel, playUi } from "@/lib/grid/play-ui";
+import type { PurchasedTileHint } from "@/lib/tells/game-state";
+import type { LevelContentTile } from "@/lib/tells/level-types";
+import { playTileTypeLabel, playUi } from "@/lib/tells/play-ui";
 
 type ContentTileGridProps = {
   tiles: LevelContentTile[];

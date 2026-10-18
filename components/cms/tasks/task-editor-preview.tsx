@@ -5,7 +5,7 @@ import { Lightbulb } from "lucide-react";
 import type { StudioTaskContent, TaskContentTile, TaskTileMediaType } from "@/lib/cms/types";
 import { defaultTaskScoring, isMediaAnswerType } from "@/lib/cms/task-content";
 import { ContentMediaSheet } from "@/components/game/city/content-media-sheet";
-import { HINT_POINT_COST } from "@/lib/grid/level-types";
+import { HINT_POINT_COST } from "@/lib/tells/level-types";
 import {
   LevelHero,
   LevelTaskCard,

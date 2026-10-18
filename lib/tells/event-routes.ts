@@ -1,0 +1,79 @@
+import type { GridTeamStatus } from "@/lib/tells/types";
+
+function code(value: string): string {
+  return value.toUpperCase();
+}
+
+/** Canonical player entry for an event (Kahoot-style landing). */
+export function eventPath(inviteCode: string): string {
+  return `/e/${code(inviteCode)}`;
+}
+
+export function eventCaptainPath(inviteCode: string, prebookedJoinCode?: string): string {
+  const base = `/e/${code(inviteCode)}/captain`;
+  if (!prebookedJoinCode) return base;
+  return `${base}?team=${code(prebookedJoinCode)}`;
+}
+
+export function eventTeamJoinPath(inviteCode: string, joinCode: string): string {
+  return `/e/${code(inviteCode)}/team/${code(joinCode)}`;
+}
+
+export function eventLobbyPath(
+  inviteCode: string,
+  joinCode: string,
+  options?: { manage?: boolean },
+): string {
+  const base = `/e/${code(inviteCode)}/lobby/${code(joinCode)}`;
+  if (options?.manage) return `${base}?manage=1`;
+  return base;
+}
+
+export function eventPlayPath(inviteCode: string, joinCode: string): string {
+  return `/e/${code(inviteCode)}/play/${code(joinCode)}`;
+}
+
+/** Player-facing live highscore — not the operator cockpit. */
+export function eventRankingPath(inviteCode: string, joinCode?: string): string {
+  const base = `/e/${code(inviteCode)}/ranking`;
+  if (!joinCode) return base;
+  return `${base}?team=${code(joinCode)}`;
+}
+
+/** Public game-over recap — works without a player session, a week later too. */
+export function eventRecapPath(inviteCode: string, joinCode: string): string {
+  return `/e/${code(inviteCode)}/recap/${code(joinCode)}`;
+}
+
+export function cockpitPath(inviteCode: string): string {
+  return `/cockpit/${code(inviteCode)}`;
+}
+
+export function cockpitShowPath(inviteCode: string): string {
+  return `/cockpit/${code(inviteCode)}/show`;
+}
+
+/** Booker-only all-teams results — gated by portal token, never by invite. */
+export function eventPortalResultsPath(portalToken: string): string {
+  return `/portal/${portalToken}/results`;
+}
+
+export function eventPortalGalleryPath(portalToken: string): string {
+  return `/portal/${portalToken}/gallery`;
+}
+
+export function teamEntryPath(
+  inviteCode: string,
+  joinCode: string,
+  teamStatus: GridTeamStatus,
+): string {
+  if (teamStatus === "playing" || teamStatus === "finished") {
+    return eventPlayPath(inviteCode, joinCode);
+  }
+  return eventLobbyPath(inviteCode, joinCode);
+}
+
+/** Legacy redirects — keep old bookmarks working. */
+export function legacyJoinPath(inviteCode: string): string {
+  return `/join/${code(inviteCode)}`;
+}

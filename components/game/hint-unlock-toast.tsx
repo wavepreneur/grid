@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Lightbulb } from "lucide-react";
-import type { PurchasedTileHint } from "@/lib/grid/game-state";
-import { playPlaySfx } from "@/lib/grid/play-sfx";
-import { playUi } from "@/lib/grid/play-ui";
+import type { PurchasedTileHint } from "@/lib/tells/game-state";
+import { playPlaySfx } from "@/lib/tells/play-sfx";
+import { playUi } from "@/lib/tells/play-ui";
 
 type Props = {
   purchasedHints: Record<string, PurchasedTileHint>;

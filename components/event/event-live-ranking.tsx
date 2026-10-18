@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getEventLiveRanking } from "@/app/actions/event-results";
-import type { EventResultsSnapshot, EventResultsTeam } from "@/lib/grid/event-results";
+import type { EventResultsSnapshot, EventResultsTeam } from "@/lib/tells/event-results";
 
 type Props = {
   inviteCode: string;

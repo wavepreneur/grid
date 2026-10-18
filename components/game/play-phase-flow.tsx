@@ -16,38 +16,38 @@ import { PlayHelpNudge } from "@/components/game/play-help-nudge";
 import { PlayMenuTour } from "@/components/game/play-menu-tour";
 import { PlayQuizView } from "@/components/game/play-quiz-view";
 import { PlayTransitionScreen } from "@/components/game/play-transition-screen";
-import { levelAllowsSkip, levelHasUnusedTileHint } from "@/lib/grid/play-help";
-import { canPresentBonus, resolveBonusForPlay } from "@/lib/grid/bonus";
+import { levelAllowsSkip, levelHasUnusedTileHint } from "@/lib/tells/play-help";
+import { canPresentBonus, resolveBonusForPlay } from "@/lib/tells/bonus";
 import {
   bonusSessionIsLive,
   findPresentableBonusForRole,
-} from "@/lib/grid/bonus-queue";
-import type { PurchasedTileHint, TeamGameState } from "@/lib/grid/game-state";
+} from "@/lib/tells/bonus-queue";
+import type { PurchasedTileHint, TeamGameState } from "@/lib/tells/game-state";
 import type {
   LevelDefinition,
   ResolvedEventContent,
   SolveLevelPayload,
-} from "@/lib/grid/level-types";
-import { buildPlaySlot, missionFromLevel, usesPhasedPlay } from "@/lib/grid/play-slots";
+} from "@/lib/tells/level-types";
+import { buildPlaySlot, missionFromLevel, usesPhasedPlay } from "@/lib/tells/play-slots";
 import type { GpsFixPayload } from "@/lib/hooks/use-team-sync";
 import {
   bonusAudiencePlayerNames,
   formatBonusAudienceNames,
   DEFAULT_ROLE_LABELS,
   type RoleDisplayLabels,
-} from "@/lib/grid/role-labels";
+} from "@/lib/tells/role-labels";
 import type { SolveFeedbackState } from "@/components/game/solve-feedback-banner";
-import { visibleWalletNotes } from "@/lib/grid/wallet";
-import { playUi } from "@/lib/grid/play-ui";
+import { visibleWalletNotes } from "@/lib/tells/wallet";
+import { playUi } from "@/lib/tells/play-ui";
 import {
   menuTourStorageKey,
   readMenuTourSeen,
   writeMenuTourSeen,
-} from "@/lib/grid/offline-state";
+} from "@/lib/tells/offline-state";
 import {
   resolveCaptureBrandStamp,
   type CaptureBrandStamp,
-} from "@/lib/grid/capture-stamp";
+} from "@/lib/tells/capture-stamp";
 
 type Teammate = {
   id: string;

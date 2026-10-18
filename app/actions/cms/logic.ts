@@ -2,7 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseLogicRules, type StudioLogicRule } from "@/lib/cms/logic-rules";
-import type { ActionResult } from "@/lib/grid/types";
+import type { ActionResult } from "@/lib/tells/types";
 
 export async function updateGameLogicRules(
   gameId: string,

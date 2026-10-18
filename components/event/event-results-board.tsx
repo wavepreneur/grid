@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { EventResultsSnapshot } from "@/lib/grid/event-results";
+import type { EventResultsSnapshot } from "@/lib/tells/event-results";
 
 function statusLabel(status: string): string {
   if (status === "playing") return "Im Spiel";

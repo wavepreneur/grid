@@ -4,7 +4,7 @@ import { getEventInvite, resolveTeamJoinCode } from "@/app/actions/lobby";
 import { GridShell } from "@/components/grid/grid-shell";
 import { LobbyGate } from "@/components/lobby/lobby-gate";
 import { isStudioTestEvent, needsBriefingBeforePlay } from "@/lib/cms/studio-test-session";
-import { playUi } from "@/lib/grid/play-ui";
+import { playUi } from "@/lib/tells/play-ui";
 
 type EventLobbyPageProps = {
   params: Promise<{ inviteCode: string; joinCode: string }>;

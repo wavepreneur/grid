@@ -16,19 +16,19 @@ import {
   type SolveFeedbackState,
 } from "@/components/game/solve-feedback-banner";
 import { IconCheck, IconMapPin } from "@/components/cms/studio-icons";
-import { distanceMeters, formatDistance, isWithinGeofenceForPlay } from "@/lib/grid/geofence";
+import { distanceMeters, formatDistance, isWithinGeofenceForPlay } from "@/lib/tells/geofence";
 import { useGeolocation } from "@/lib/hooks/use-geolocation";
 import { useLevelScoringTimer } from "@/lib/hooks/use-level-scoring-timer";
 import { LevelScoringBar } from "@/components/game/level-scoring-bar";
 import { CodeBoxesInput } from "@/components/game/code-boxes-input";
-import { hasLiveLevelScoring } from "@/lib/grid/level-scoring";
-import { formatLevelSolution } from "@/lib/grid/level-solution";
-import { isMediaInputMode, type LevelDefinition, type SolveLevelPayload } from "@/lib/grid/level-types";
-import type { LevelRevealState } from "@/lib/grid/game-state";
+import { hasLiveLevelScoring } from "@/lib/tells/level-scoring";
+import { formatLevelSolution } from "@/lib/tells/level-solution";
+import { isMediaInputMode, type LevelDefinition, type SolveLevelPayload } from "@/lib/tells/level-types";
+import type { LevelRevealState } from "@/lib/tells/game-state";
 import { TeamPaceHint } from "@/components/game/team-pace-hint";
 import { MediaCapturePanel } from "@/components/game/media-capture-panel";
-import type { CaptureBrandStamp } from "@/lib/grid/capture-stamp";
-import { playGeoError, playUi } from "@/lib/grid/play-ui";
+import type { CaptureBrandStamp } from "@/lib/tells/capture-stamp";
+import { playGeoError, playUi } from "@/lib/tells/play-ui";
 
 type LevelSolvePanelProps = {
   level: LevelDefinition;

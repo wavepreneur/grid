@@ -29,7 +29,7 @@ If the feature does not serve Layer 1 city scaling, Layer 2 global mission, Laye
 
 ## Play surfaces
 
-outdoor (GPS) · indoor (stations+codes) · online (GRID pulse / later 15-min). Phases: Hub → Quiz → Level → Bonus. Dual fallback via `allowed_fallbacks`. See `lib/grid/play-surface.ts`, `frontend_idee/`.
+outdoor (GPS) · indoor (stations+codes) · online (GRID pulse / later 15-min). Phases: Hub → Quiz → Level → Bonus. Dual fallback via `allowed_fallbacks`. See `lib/tells/play-surface.ts`, `frontend_idee/`.
 
 ## Game profiles
 
@@ -47,8 +47,8 @@ Presets: full, city_explorer, indoor_escape, mission/online, micro_pulse.
 ## Key paths
 
 - Layer model: `lib/cms/layer-model.ts`
-- Surfaces & phases: `lib/grid/play-surface.ts`
-- Stations: `lib/grid/stations.ts`, `local_stations`
+- Surfaces & phases: `lib/tells/play-surface.ts`
+- Stations: `lib/tells/stations.ts`, `local_stations`
 - Docs: `docs/GRID_LAYER_MODEL.md`
 - UI prototype: `frontend_idee/`
 - Layer profile UI: `components/cms/games/game-layer-profile-panel.tsx`

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useMissionCountdown } from "@/lib/hooks/use-mission-countdown";
-import { eventRankingPath } from "@/lib/grid/event-routes";
-import { playUi } from "@/lib/grid/play-ui";
+import { eventRankingPath } from "@/lib/tells/event-routes";
+import { playUi } from "@/lib/tells/play-ui";
 import { IconCheck, IconMapPin, IconPlay } from "@/components/cms/studio-icons";
 
 type GameHudProps = {

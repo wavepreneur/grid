@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { authorizeGridApi } from "@/lib/grid/api-auth";
-import { getOrganizationBySlug } from "@/lib/grid/organizations";
-import { getPublicOrigin } from "@/lib/grid/booking-api";
-import { provisionStudioAccessBatch, splitTeamSeats, MAX_PLAYERS_PER_TEAM, type AccessKind } from "@/lib/grid/access";
+import { authorizeGridApi } from "@/lib/tells/api-auth";
+import { getOrganizationBySlug } from "@/lib/tells/organizations";
+import { getPublicOrigin } from "@/lib/tells/booking-api";
+import { provisionStudioAccessBatch, splitTeamSeats, MAX_PLAYERS_PER_TEAM, type AccessKind } from "@/lib/tells/access";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -9,7 +9,7 @@ import {
   PERFORMANCE_INDEXES,
   deriveReportSignals,
   deriveStrengthBlindspot,
-} from "@/lib/grid/data-indices";
+} from "@/lib/tells/data-indices";
 import { queryKeys } from "@/lib/platform/query-keys";
 
 const RAW_SIGNALS = [
@@ -222,7 +222,7 @@ function TeamBenchmarkPanel({
   baseline,
 }: {
   team: WorkforceTeamCard;
-  baseline: typeof import("@/lib/grid/data-indices").GRID_FIELD_BASELINE;
+  baseline: typeof import("@/lib/tells/data-indices").GRID_FIELD_BASELINE;
 }) {
   const signals = deriveReportSignals(team.scores);
   const copy = deriveStrengthBlindspot(team.scores);

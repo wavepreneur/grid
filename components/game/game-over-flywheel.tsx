@@ -6,12 +6,12 @@ import Link from "next/link";
 import { X } from "lucide-react";
 import { GrowthRecapCard } from "@/components/game/growth-recap-card";
 import { BigButton } from "@/components/game/city/ui";
-import type { GrowthOffer } from "@/lib/grid/growth-pack";
-import { exitmaniaTeamRankingUrl } from "@/lib/grid/growth-pack";
-import { eventRankingPath, eventRecapPath } from "@/lib/grid/event-routes";
-import { levelPlayOutcome, type TeamGameState } from "@/lib/grid/game-state";
-import type { LevelDefinition } from "@/lib/grid/level-types";
-import { playUi, playUiLang, type PlayUiLang } from "@/lib/grid/play-ui";
+import type { GrowthOffer } from "@/lib/tells/growth-pack";
+import { exitmaniaTeamRankingUrl } from "@/lib/tells/growth-pack";
+import { eventRankingPath, eventRecapPath } from "@/lib/tells/event-routes";
+import { levelPlayOutcome, type TeamGameState } from "@/lib/tells/game-state";
+import type { LevelDefinition } from "@/lib/tells/level-types";
+import { playUi, playUiLang, type PlayUiLang } from "@/lib/tells/play-ui";
 
 type Props = {
   inviteCode: string;

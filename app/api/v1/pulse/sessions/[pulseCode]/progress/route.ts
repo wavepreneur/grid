@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { authorizeGridApi } from "@/lib/grid/api-auth";
+import { authorizeGridApi } from "@/lib/tells/api-auth";
 import {
   upsertPulsePlayerProgress,
   validatePulseProgressRequest,
   type PulseProgressRequest,
-} from "@/lib/grid/pulse-api";
+} from "@/lib/tells/pulse-api";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
