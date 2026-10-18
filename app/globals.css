@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Desktop layout on screens ≥ md and always in print (an A4 page is narrower than md). */
+@custom-variant wide {
+  @media (min-width: 48rem) {
+    @slot;
+  }
+  @media print {
+    @slot;
+  }
+}
+
 /*
  * City Games / GRID Studio design system —
  * hoch kontrastreich, große Flächen, oklch-Tokens.
