@@ -2359,7 +2359,7 @@ async function pushGameCodesToExitmania(
   const base = (process.env.EXITMANIA_APP_URL ?? "").trim().replace(/\/$/, "");
   const apiKey = process.env.GRID_BOOKING_API_KEY?.trim();
   if (!base || !apiKey) return 0;
-  const response = await fetch(`${base}/api/internal/grid/game-codes`, {
+  const response = await fetch(`${base}/api/internal/tells/game-codes`, {
     method: "POST",
     headers: {
       "content-type": "application/json",

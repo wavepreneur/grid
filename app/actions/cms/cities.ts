@@ -126,7 +126,7 @@ async function exitmaniaGet(path: string, search: Record<string, string>): Promi
 }
 
 async function pullExitmaniaCountries(): Promise<DirectoryCountry[]> {
-  const response = await exitmaniaGet("/api/internal/grid/cities", { countries: "1" });
+  const response = await exitmaniaGet("/api/internal/tells/cities", { countries: "1" });
   if (!response?.ok) return [];
   const json = (await response.json()) as { countries?: DirectoryCountry[] };
   return Array.isArray(json.countries)
@@ -147,7 +147,7 @@ async function pullExitmaniaCities(input: {
   offset?: number;
   limit?: number;
 }): Promise<{ cities: ExitmaniaCityPayload[]; nextOffset: number | null }> {
-  const response = await exitmaniaGet("/api/internal/grid/cities", {
+  const response = await exitmaniaGet("/api/internal/tells/cities", {
     q: input.query ?? "",
     country: input.country ?? "",
     all: input.catalog ? "1" : "",
