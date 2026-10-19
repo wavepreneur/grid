@@ -2,7 +2,17 @@
 
 export type StatusLevel = "live" | "pilot" | "legacy" | "roadmap" | "parked";
 
-export type StatusSectionId = "migration" | "revenue" | "tells" | "cockpit" | "parked";
+export type StatusSectionId =
+  | "golive"
+  | "copy"
+  | "flywheel"
+  | "tellsEvent"
+  | "plans"
+  | "migration"
+  | "revenue"
+  | "tells"
+  | "cockpit"
+  | "parked";
 
 export type StatusEntry = {
   section: StatusSectionId;
@@ -20,6 +30,11 @@ export const STATUS_LEVELS: { status: StatusLevel; label: string; meaning: strin
 ];
 
 export const STATUS_SECTIONS: { id: StatusSectionId; letter: string; title: string; note: string }[] = [
+  { id: "golive", letter: "P0", title: "Go-live: Exitmania bookings play on Tells", note: "Go-live plan" },
+  { id: "copy", letter: "P0", title: "Exitmania copy, staged", note: "Deploy with the switch to Tells" },
+  { id: "flywheel", letter: "P1", title: "Flywheel inside Exitmania", note: "After go-live" },
+  { id: "tellsEvent", letter: "P2", title: "From team event to a Tells event", note: "Once Exitmania runs on Tells without issues" },
+  { id: "plans", letter: "P3", title: "Yearly plans", note: "After P2" },
   { id: "migration", letter: "A", title: "Exitmania migration", note: "Priority 1" },
   { id: "revenue", letter: "B", title: "Exitmania revenue levers", note: "Priority 2" },
   { id: "tells", letter: "C", title: "Tells v1", note: "Priority 3 · goes live with the migration" },
@@ -28,6 +43,40 @@ export const STATUS_SECTIONS: { id: StatusSectionId; letter: string; title: stri
 ];
 
 export const STATUS_ENTRIES: StatusEntry[] = [
+  // P0 · Go-live
+  { section: "golive", label: "Remaining Loquiz games rebuilt in Tells and published", status: "pilot", note: "In progress" },
+  { section: "golive", label: "Content pack slug on every Exitmania game (games.grid_content_pack_slug)", status: "pilot", note: "1,910 games set" },
+  { section: "golive", label: "Route points per city set and played once on site per game type", status: "roadmap" },
+  { section: "golive", label: "Decide: cities on global_levels at launch, or migrated to Studio snapshots first", status: "roadmap" },
+  { section: "golive", label: "Rename grid → tells in the Exitmania integration (tables, routes, env, mails)", status: "roadmap", note: "Before any city switches" },
+  { section: "golive", label: "One paid test booking per product: B2C, Click & Play, Teambuilding Pro", status: "roadmap" },
+  { section: "golive", label: "Alert email when provisioning to Tells fails", status: "roadmap", note: "Today only a log line" },
+  { section: "golive", label: "City switch via city runtime table + force_loquiz kill switch tested", status: "pilot" },
+  { section: "golive", label: "Players-per-team cap (10) checked against the largest team events", status: "roadmap" },
+
+  // P0 · Exitmania copy
+  { section: "copy", label: "Ticket email + ticket page: plays in the browser, no app download", status: "roadmap" },
+  { section: "copy", label: "City, game and FAQ pages: no app wording", status: "roadmap" },
+  { section: "copy", label: "Per-person prices: B2C €9.90, Click & Play €12.90, Teambuilding Pro €14.90 (min. 5), upgrades €99 net", status: "roadmap" },
+  { section: "copy", label: "Tells visible in ticket email, at game end and on /try-tells", status: "roadmap" },
+
+  // P1 · Flywheel
+  { section: "flywheel", label: "Family & friends bookers get a 20% team event code by email", status: "roadmap" },
+  { section: "flywheel", label: "Team event code redeemable in the team event checkout", status: "roadmap" },
+  { section: "flywheel", label: "Team event bookers get statistics + Tells offer with setup credit", status: "roadmap" },
+  { section: "flywheel", label: "Recap email content per booking type", status: "pilot" },
+
+  // P2 · Tells event
+  { section: "tellsEvent", label: "tells.team landing page + contact form live", status: "pilot", note: "Built, behind password gate" },
+  { section: "tellsEvent", label: "Real report per event from session data", status: "roadmap" },
+  { section: "tellsEvent", label: "Setup credit code per team event booking: booking amount, max. €245, 90 days, once per company", status: "roadmap" },
+  { section: "tellsEvent", label: "Paddle checkout on Tells; packages bookable only once the product runs cleanly", status: "roadmap" },
+  { section: "tellsEvent", label: "Tells v1 items in section C complete", status: "roadmap" },
+
+  // P3 · Yearly plans
+  { section: "plans", label: "Yearly plans and credits billed on Tells", status: "roadmap" },
+  { section: "plans", label: "Direct entry from Exitmania to a yearly plan", status: "pilot", note: "Contact form today" },
+
   // A · Exitmania migration
   { section: "migration", label: "Zero-auth join: link + name, ephemeral team token", status: "live" },
   { section: "migration", label: "Real-time FSM sync: state, roles, sessions", status: "live" },
@@ -55,7 +104,7 @@ export const STATUS_ENTRIES: StatusEntry[] = [
   { section: "migration", label: "Loquiz decommissioned (after 2 weeks stable)", status: "roadmap" },
 
   // B · Exitmania revenue levers
-  { section: "revenue", label: "Per-person pricing + multiplayer checkout (B2C €9.90, B2B €14.90)", status: "roadmap" },
+  { section: "revenue", label: "Per-person pricing at the switch: B2C €9.90, Click & Play €12.90, Teambuilding Pro €14.90 (min. 5), upgrades €99 net", status: "roadmap" },
   { section: "revenue", label: "Booking API: Exitmania / Tells provision sessions (Paddle)", status: "pilot" },
   { section: "revenue", label: "Content language: Spanish, all cities", status: "roadmap" },
   { section: "revenue", label: "Content language: Italian, all cities", status: "roadmap" },

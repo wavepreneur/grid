@@ -101,7 +101,7 @@ export function familyVoucherBadge(): string {
 }
 
 function isHrProbeUrl(url: string | null): boolean {
-  return Boolean(url?.includes("/grid-hr-probe"));
+  return Boolean(url?.includes("/tells-hr-probe") || url?.includes("/grid-hr-probe"));
 }
 
 export function familyVoucherOffer(input: {

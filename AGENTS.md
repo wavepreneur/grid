@@ -25,7 +25,7 @@ Rules: `.cursor/rules/product-direction.mdc`, `.cursor/rules/ecosystem-exitmania
 
 ## This repo does NOT own
 
-- Checkout, Paddle, city SEO pages, impulse teamevents (Exitmania)
+- Exitmania checkout, city SEO pages, impulse teamevents (Exitmania). Tells' own Paddle checkout for Tells packages comes after Exitmania runs on Tells
 - Loquiz-style multi-partner game builder (customer Studio = template overwrites only)
 
 ## Key paths

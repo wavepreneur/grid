@@ -48,7 +48,7 @@ export const copy = {
 
   /** Shown above the hero when the visitor arrives with ?from=exitmania. */
   fromExitmania:
-    "You just played Exitmania. Now play your own topic: your onboarding, your kickoff, your rules. Your Exitmania booking is credited to the setup.",
+    "You just played Exitmania. Now play your own topic: your onboarding, your kickoff, your rules. We credit your Exitmania booking to the setup, up to €245.",
 
   /** The report as it appears inside the hero window. Same story as /report/example. */
   preview: {
@@ -255,7 +255,7 @@ export const copy = {
       price: "€14.90",
       unit: "per person",
       setup: "+ €490 setup",
-      exitmania: "Played Exitmania? Your booking is credited to the setup.",
+      exitmania: "Played Exitmania? We credit your booking to the setup, up to €245, within 90 days.",
       scope: "10 to 1,000 people · at least 2 teams of 5",
       includes: ["All features of the format", "Team report", "Custom leaderboard", "Live view during play"],
       cta: "Book a session",
