@@ -28,7 +28,7 @@ export function ReportPreview() {
             <p className="tl-rp-score-value">{EXAMPLE.score}</p>
             <div>
               <p className="tl-rp-score-label">{t.scoreLabel}</p>
-              <p className="tl-rp-score-bench">{t.benchmark}</p>
+              <p className="tl-rp-score-bench">{t.scoreScale}</p>
             </div>
           </div>
           <p className="tl-rp-verdict">{t.verdict}</p>

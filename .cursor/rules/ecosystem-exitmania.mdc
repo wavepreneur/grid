@@ -1,0 +1,35 @@
+---
+description: Exitmania + GRID — Produktgrenzen und Integrationsmandat (keine dritte Marke)
+alwaysApply: true
+---
+
+# GRID Ecosystem
+
+Read `docs/EXITMANIA_GRID_INTEGRATION.md`, `docs/GRID_LAYER_MODEL.md`, and `.cursor/rules/product-direction.mdc` before integration or content work.
+
+## Ownership
+
+- **Tells / this repo:** Live engine under `lib/tells/` — FSM, Alpha/Beta/Gamma, Realtime, Cockpit, layer-based content. Later: customer Studio (overwrites only), credits to activate, org data.
+- **Exitmania (../Developer/exitmania):** Public storefront + impulse commerce — replaces Loquiz with Tells, does NOT reimplement gameplay. Small teamevents (~€200, light custom route) stay here
+- **No third brand.** Large groups and self-serve are Tells subscriptions
+
+## Content (Layer model)
+
+- **Layer 1:** `local_waypoints` (outdoor GPS) + `local_stations` (indoor codes) + city-scoped tasks
+- **Layer 2:** `global_levels` (global mission — one content, all surfaces)
+- **Layer 3:** logic rules + role assignments (bonus, Micro-Pulse)
+- Surfaces: outdoor | indoor | online (GRID pulse / later 15-min); dual fallback; phases Hub → Quiz → Level → Bonus
+- Per booking: `events.content_config` + `events.route_override` (GPS + station code deltas)
+- Never duplicate full route JSON per event
+- See `docs/GRID_LAYER_MODEL.md` for Studio priorities
+
+## Booking API
+
+Exitmania (and later GRID customer Studio) provision via `POST /api/v1/bookings` with `booking_reference` (idempotent), `content_pack_slug`, optional `route_override`.
+
+## Do not
+
+- Add checkout/Paddle to GRID
+- Add CMS for master content to GRID (use migrations or future Exitmania pack pipeline)
+- Build separate game runtime in Exitmania
+- Use permanent WebSockets for `pulse_sessions` (REST + `pulse_player_states` only)

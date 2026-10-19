@@ -93,8 +93,8 @@ function SetupPanel() {
       <PanelBar title={t.title} aside={`${EXAMPLE.company}`} />
       <div className="tl-panel-grid">
         <div className="tl-field">
-          <p className="tl-field-label">{t.game}</p>
-          <p className="tl-field-value">{t.gameValue}</p>
+          <p className="tl-field-label">{t.format}</p>
+          <p className="tl-field-value">{t.formatValue}</p>
           <p className="tl-field-label tl-gap">{t.fixedTitle}</p>
           <p className="tl-fixed">
             <Lock size={14} strokeWidth={1.5} aria-hidden /> {t.fixed}

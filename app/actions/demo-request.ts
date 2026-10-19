@@ -6,11 +6,20 @@ const GRID_BRIEFING_TO = "dk@kineticpillar.co";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function escapeHtml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 export async function submitGridDemoRequest(input: {
   name: string;
   email: string;
   company: string;
   note?: string;
+  interest?: string;
+  teamSize?: number;
+  playedExitmania?: boolean;
+  /** Where the visitor came from, e.g. "exitmania" for ?from=exitmania. */
+  source?: string;
   language?: "de" | "en";
 }): Promise<ActionResult<{ sent: true }>> {
   const english = input.language === "en";
@@ -18,6 +27,12 @@ export async function submitGridDemoRequest(input: {
   const email = input.email.trim().toLowerCase();
   const company = input.company.trim().slice(0, 120);
   const note = (input.note ?? "").trim().slice(0, 800);
+  const interest = (input.interest ?? "").trim().slice(0, 60);
+  const teamSize =
+    typeof input.teamSize === "number" && Number.isFinite(input.teamSize) && input.teamSize > 0
+      ? Math.min(Math.round(input.teamSize), 100000)
+      : null;
+  const source = (input.source ?? "").trim().slice(0, 40) || "unknown";
   if (!name || !company || !EMAIL_RE.test(email)) {
     return {
       success: false,
@@ -38,10 +53,20 @@ export async function submitGridDemoRequest(input: {
   }
 
   const from = process.env.RESEND_FROM?.trim() || "GRID <hello@exitmania.com>";
+  const details = [
+    interest ? `Interested in: ${interest}` : null,
+    teamSize ? `Team size: ${teamSize}` : null,
+    input.playedExitmania === undefined ? null : `Played Exitmania: ${input.playedExitmania ? "yes" : "no"}`,
+    `Source: ${source}`,
+  ]
+    .filter(Boolean)
+    .map((line) => escapeHtml(line!))
+    .join("<br/>");
   const html = `
-    <p><strong>GRID Demo-Anfrage</strong></p>
-    <p>${name} · ${company}<br/>${email}</p>
-    ${note ? `<p>${note.replace(/</g, "&lt;")}</p>` : ""}
+    <p><strong>Tells request</strong></p>
+    <p>${escapeHtml(name)} · ${escapeHtml(company)}<br/>${escapeHtml(email)}</p>
+    <p>${details}</p>
+    ${note ? `<p>${escapeHtml(note)}</p>` : ""}
   `;
 
   try {
@@ -55,7 +80,7 @@ export async function submitGridDemoRequest(input: {
         from,
         to: [GRID_BRIEFING_TO],
         reply_to: email,
-        subject: `GRID Demo: ${company}`,
+        subject: `Tells request: ${company}${source === "exitmania" ? " (from Exitmania)" : ""}`,
         html,
       }),
     });

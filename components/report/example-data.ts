@@ -18,8 +18,9 @@ export type ReportTeam = {
 };
 export type ReportTask = { id: string; title: string; solvedBy: readonly string[] };
 /** `people`: everyone who held the role across all teams. Below MIN_GROUP_SIZE the row is hidden. */
-export type RoleWait = { role: "Alpha" | "Beta" | "Gamma"; seconds: number; people: number };
-export type Handoff = { from: "Alpha" | "Beta" | "Gamma"; to: "Alpha" | "Beta" | "Gamma"; avg: number };
+type Role = "Alpha" | "Beta" | "Gamma" | "Delta";
+export type RoleWait = { role: Role; seconds: number; people: number };
+export type Handoff = { from: Role; to: Role; avg: number };
 export type TrendPoint = { session: number; score: number; note?: "reorg" };
 
 export const EXAMPLE_REPORT = {
@@ -86,12 +87,14 @@ export const EXAMPLE_REPORT = {
     { role: "Alpha", seconds: 12, people: 5 },
     { role: "Beta", seconds: 18, people: 10 },
     { role: "Gamma", seconds: 48, people: 10 },
+    { role: "Delta", seconds: 30, people: 5 },
   ] satisfies RoleWait[],
   teamAvgWait: 27,
   handoffs: [
     { from: "Alpha", to: "Beta", avg: 14 },
     { from: "Beta", to: "Gamma", avg: 3 },
-    { from: "Gamma", to: "Alpha", avg: 9 },
+    { from: "Gamma", to: "Delta", avg: 11 },
+    { from: "Delta", to: "Alpha", avg: 9 },
   ] satisfies Handoff[],
   trend: {
     team: "Orca",

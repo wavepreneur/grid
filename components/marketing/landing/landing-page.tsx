@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { ContactForm } from "@/components/marketing/landing/contact-form";
+import { ExitmaniaBanner } from "@/components/marketing/landing/exitmania-banner";
+import { LogoStrip } from "@/components/marketing/landing/logo-strip";
 import { copy, LINKS } from "@/components/marketing/landing/copy";
 import { tellsMono, tellsSans } from "@/components/marketing/landing/fonts";
 import { LandingFooter } from "@/components/marketing/landing/footer";
@@ -17,6 +19,7 @@ export function TellsLandingPage() {
   return (
     <div className={`tl ${tellsSans.variable} ${tellsMono.variable}`}>
       <LandingNav />
+      <ExitmaniaBanner />
 
       <main>
         <section className="tl-hero" aria-labelledby="tl-hero-title">
@@ -65,6 +68,8 @@ export function TellsLandingPage() {
             </ul>
           </div>
         </section>
+
+        <LogoStrip />
 
         <section className="tl-section" aria-labelledby="tl-problem-title">
           <div className="tl-container tl-split">

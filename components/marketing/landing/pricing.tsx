@@ -30,6 +30,7 @@ export function Pricing() {
           </p>
           <p className="tl-small">{s.setup}</p>
           <p className="tl-small">{s.scope}</p>
+          <p className="tl-session-credit">{s.exitmania}</p>
           <Link href={LINKS.contact} className="tl-btn tl-btn-primary">
             {s.cta}
           </Link>

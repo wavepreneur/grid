@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { Lock } from "lucide-react";
 import { copy, EXAMPLE } from "@/components/marketing/landing/copy";
 import { Signal } from "@/components/marketing/landing/signal";
 
@@ -34,22 +35,25 @@ function HBars({ rows, max, marker }: { rows: readonly Row[]; max: number; marke
 
 function RoleFlow() {
   return (
-    <svg viewBox="0 0 360 240" className="tl-flow">
+    <svg viewBox="0 0 360 260" className="tl-flow">
       <defs>
-        <marker id="tl-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+        <marker id="tl-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
           <path d="M0 0L10 5L0 10z" fill="context-stroke" />
         </marker>
       </defs>
-      <line x1="106" y1="56" x2="248" y2="56" className="tl-flow-edge" strokeWidth="5" markerEnd="url(#tl-arrow)" />
-      <text x="177" y="42" className="tl-flow-n">14</text>
-      <line x1="262" y1="84" x2="200" y2="176" className="tl-flow-edge is-signal" strokeWidth="1.5" strokeDasharray="4 4" markerEnd="url(#tl-arrow)" />
-      <text x="248" y="140" className="tl-flow-n is-signal">3</text>
-      <line x1="158" y1="178" x2="98" y2="86" className="tl-flow-edge" strokeWidth="3.5" markerEnd="url(#tl-arrow)" />
-      <text x="106" y="140" className="tl-flow-n">9</text>
+      <line x1="114" y1="50" x2="240" y2="50" className="tl-flow-edge" strokeWidth="5" markerEnd="url(#tl-arrow)" />
+      <text x="177" y="36" className="tl-flow-n">14</text>
+      <line x1="280" y1="84" x2="280" y2="170" className="tl-flow-edge is-signal" strokeWidth="1.5" strokeDasharray="4 4" markerEnd="url(#tl-arrow)" />
+      <text x="300" y="134" className="tl-flow-n is-signal">3</text>
+      <line x1="246" y1="210" x2="120" y2="210" className="tl-flow-edge" strokeWidth="4" markerEnd="url(#tl-arrow)" />
+      <text x="183" y="236" className="tl-flow-n">11</text>
+      <line x1="80" y1="176" x2="80" y2="90" className="tl-flow-edge" strokeWidth="3.5" markerEnd="url(#tl-arrow)" />
+      <text x="60" y="134" className="tl-flow-n">9</text>
       {[
-        { x: 76, y: 56, label: "Alpha" },
-        { x: 284, y: 56, label: "Beta" },
-        { x: 180, y: 200, label: "Gamma" },
+        { x: 80, y: 50, label: "Alpha" },
+        { x: 280, y: 50, label: "Beta" },
+        { x: 280, y: 210, label: "Gamma" },
+        { x: 80, y: 210, label: "Delta" },
       ].map((node) => (
         <g key={node.label} className="tl-flow-node">
           <circle cx={node.x} cy={node.y} r="30" />
@@ -141,12 +145,13 @@ const VISUALS: Record<TabId, { caption: string; node: ReactNode }> = {
           { label: "Alpha", value: 12, display: "12 s" },
           { label: "Beta", value: 18, display: "18 s" },
           { label: "Gamma", value: 48, display: "48 s", signal: true },
+          { label: "Delta", value: 30, display: "30 s" },
         ]}
       />
     ),
   },
   roles: {
-    caption: `Handoffs per session · average across ${EXAMPLE.teams} teams`,
+    caption: `Handoffs per session · four roles per team · average across ${EXAMPLE.teams} teams`,
     node: <RoleFlow />,
   },
   overtime: {
@@ -154,15 +159,12 @@ const VISUALS: Record<TabId, { caption: string; node: ReactNode }> = {
     node: <Trend />,
   },
   benchmarks: {
-    caption: `Average team score · same game`,
+    caption: copy.insights.tabs.find((tab) => tab.id === "benchmarks")!.answer,
     node: (
-      <HBars
-        max={100}
-        rows={[
-          { label: "Your teams", value: EXAMPLE.score, display: String(EXAMPLE.score), signal: true },
-          { label: "Tells average", value: EXAMPLE.benchmark, display: String(EXAMPLE.benchmark) },
-        ]}
-      />
+      <div className="tl-locked">
+        <Lock size={18} strokeWidth={1.5} aria-hidden />
+        <p>{copy.insights.tabs.find((tab) => tab.id === "benchmarks")!.answer}</p>
+      </div>
     ),
   },
   leaderboards: {
@@ -208,19 +210,33 @@ export function Insights() {
       </div>
 
       <div id="tl-insight-panel" role="tabpanel" aria-labelledby={`tl-tab-${current.id}`} className="tl-insight">
-        <div className="tl-insight-head">
-          <h3 className="tl-h3">{current.question}</h3>
-          <p className="tl-body">{current.answer}</p>
-        </div>
-        <figure className="tl-insight-chart" key={current.id}>
-          <div role="img" aria-label={`${visual.caption}. ${current.answer}`}>
-            {visual.node}
-          </div>
-          <figcaption>
-            <span>{visual.caption}</span>
-            <span>{copy.insights.note}</span>
-          </figcaption>
-        </figure>
+        {"locked" in current ? (
+          <>
+            <div className="tl-insight-head">
+              <h3 className="tl-h3">{current.label}</h3>
+              <p className="tl-body">{current.question}</p>
+            </div>
+            <div className="tl-insight-chart" key={current.id}>
+              {visual.node}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="tl-insight-head">
+              <h3 className="tl-h3">{current.question}</h3>
+              <p className="tl-body">{current.answer}</p>
+            </div>
+            <figure className="tl-insight-chart" key={current.id}>
+              <div role="img" aria-label={`${visual.caption}. ${current.answer}`}>
+                {visual.node}
+              </div>
+              <figcaption>
+                <span>{visual.caption}</span>
+                <span>{copy.insights.note}</span>
+              </figcaption>
+            </figure>
+          </>
+        )}
       </div>
     </div>
   );

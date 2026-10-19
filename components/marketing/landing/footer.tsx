@@ -19,7 +19,6 @@ export function LandingFooter() {
           </a>
           <Link href={LINKS.login}>{t.links.login}</Link>
           <Link href={LINKS.imprint}>{t.links.imprint}</Link>
-          <Link href={LINKS.status}>{t.links.status}</Link>
         </nav>
       </div>
       <div className="tl-container">

@@ -12,18 +12,16 @@ export const LINKS = {
   playFirst: "https://exitmania.com/try-tells",
   login: "/login",
   imprint: "/imprint",
-  status: "/status",
 } as const;
 
 export const EXAMPLE = {
   company: "Northwind",
   session: "Onboarding Q4",
-  game: "Vault Run",
+  format: "Escape",
   minutes: 30,
   teams: 5,
   players: 30,
   score: 72,
-  benchmark: 64,
   code: "NW-4821",
   date: "14 Oct 2026",
 } as const;
@@ -45,8 +43,12 @@ export const copy = {
     primary: "Book a session",
     secondary: "See an example report",
     playFirst: "Or play an Exitmania game first",
-    facts: ["Ready in 60 seconds", "Browser, Slack or Microsoft Teams", "10 to 50,000 people"],
+    facts: ["Ready in 60 seconds", "Share one link in Slack, Teams or email", "10 to 5,000 people"],
   },
+
+  /** Shown above the hero when the visitor arrives with ?from=exitmania. */
+  fromExitmania:
+    "You just played Exitmania. Now play your own topic: your onboarding, your kickoff, your rules. Your Exitmania booking is credited to the setup.",
 
   /** The report as it appears inside the hero window. Same story as /report/example. */
   preview: {
@@ -54,7 +56,7 @@ export const copy = {
     actions: ["Share", "Export PDF"],
     meta: "Northwind · 14 Oct 2026 · 30 min · 5 teams · 30 players",
     scoreLabel: "Average team score",
-    benchmark: "Tells average for this game: 64",
+    scoreScale: "out of 100",
     verdict: "Solid start. One topic didn’t land.",
     findingsTitle: "Top findings",
     findings: [
@@ -96,8 +98,8 @@ export const copy = {
   panels: {
     setup: {
       title: "New session",
-      game: "Game",
-      gameValue: "Vault Run · 30 min",
+      format: "Format",
+      formatValue: "Escape · 30 min",
       slotsTitle: "Your content",
       slots: [
         { kind: "Clue", value: "Sales may approve up to 10% alone." },
@@ -105,8 +107,8 @@ export const copy = {
         { kind: "Image", value: "Northwind HQ" },
       ],
       checked: "Checked",
-      fixedTitle: "Stays as tested",
-      fixed: "Missions, difficulty, roles, timing",
+      fixedTitle: "Set by the format",
+      fixed: "Levels, roles, hints, timing",
       linkTitle: "Join link",
       link: "tells.team/go/NW-4821",
       share: ["Copy", "Slack", "Teams"],
@@ -135,10 +137,15 @@ export const copy = {
   proof: {
     label: "Built on the engine behind Exitmania",
     items: [
-      { value: "50,000+", label: "players" },
+      { value: "50,000+", label: "players of our games" },
       { value: "800+", label: "companies" },
       { value: "14", label: "years of team games" },
     ],
+  },
+
+  /** Logos only with written approval. Remove an entry to hide it. */
+  logos: {
+    title: "Teams at 800+ companies have played our games.",
   },
 
   problem: {
@@ -159,7 +166,7 @@ export const copy = {
       {
         n: "01",
         title: "Set up in a minute",
-        text: "Pick a tested game and drop your own content into the prepared slots. Send one link.",
+        text: "Pick a format and fill the slots with your own content. Send one link.",
       },
       {
         n: "02",
@@ -176,7 +183,7 @@ export const copy = {
 
   insights: {
     title: "What the report shows",
-    lead: "Six views, all at team level. Example data from one 30-minute onboarding session.",
+    lead: "Everything at team level. Example data from one 30-minute onboarding session.",
     note: "Example data",
     tabs: [
       {
@@ -207,8 +214,9 @@ export const copy = {
       {
         id: "benchmarks",
         label: "Benchmarks",
-        question: "How do you compare?",
-        answer: "Your teams scored 72. Teams playing the same game average 64.",
+        question: "Available after your first sessions",
+        answer: "Benchmarks unlock after your first sessions.",
+        locked: true,
       },
       {
         id: "leaderboards",
@@ -247,8 +255,9 @@ export const copy = {
       price: "€14.90",
       unit: "per person",
       setup: "+ €490 setup",
+      exitmania: "Played Exitmania? Your booking is credited to the setup.",
       scope: "10 to 1,000 people · at least 2 teams of 5",
-      includes: ["All game features", "Team report", "Custom leaderboard", "Live view during play"],
+      includes: ["All features of the format", "Team report", "Custom leaderboard", "Live view during play"],
       cta: "Book a session",
     },
     yearly: {
@@ -260,13 +269,13 @@ export const copy = {
       recommended: "Most teams",
       rows: [
         { label: "Price", values: ["€119", "€319", "€792", "€2,320"], kind: "price" },
-        { label: "Teams at once", values: ["3", "12", "50", "Up to 50,000 people"] },
+        { label: "Teams at once", values: ["3", "12", "50", "Up to 5,000 people · More? Talk to us"] },
         { label: "Per team", values: ["€49", "€39", "€29", "from €19"] },
         { label: "People per team", values: ["min. 5", "up to 8", "up to 10", "up to 12"] },
         { label: "Company page", values: [true, true, true, true] },
         { label: "Live view and results", values: [true, true, true, true] },
         { label: "Scores by country and department", values: [false, true, true, true] },
-        { label: "Live support if a session stalls", values: [false, true, true, true] },
+        { label: "Priority email support", values: [false, true, true, true] },
         { label: "Volume credits", values: [false, false, true, true] },
         { label: "One page per country", values: [false, false, true, true] },
         { label: "Onboarding, security review and NDA", values: [false, false, false, true] },
@@ -294,7 +303,7 @@ export const copy = {
       },
       {
         q: "Do we have to build a game?",
-        a: "No. You pick a tested game and fill a few prepared slots with your content. Missions, difficulty and roles stay as tested, and we check every slot before it goes live.",
+        a: "No. You pick a format, fill in your content, and Tells builds the game. Roles, difficulty and timing are set by the format.",
       },
       {
         q: "Do we need a host?",
@@ -302,7 +311,7 @@ export const copy = {
       },
       {
         q: "Online or on site?",
-        a: "Both. Remote, in the office, or teams in different cities playing the same game. English, German, French, Spanish and Italian.",
+        a: "Both. Remote, in the office, or teams in different cities in the same session. English, German, French, Spanish and Italian.",
       },
       {
         q: "Does it rate individual employees?",
@@ -310,7 +319,7 @@ export const copy = {
       },
       {
         q: "Will this land on IT’s desk?",
-        a: "No. It runs in any browser, or inside Slack or Microsoft Teams. No app, no login, nothing to install.",
+        a: "No. It runs in any browser. Share one link in Slack, Teams or email. No app, no install.",
       },
       {
         q: "Do we need our works council?",
@@ -330,7 +339,9 @@ export const copy = {
     email: "Work email",
     company: "Company",
     interest: "Interested in",
-    interests: ["One-off session", "Yearly plan", "Enterprise", "Works council package", "Just a question"],
+    teamSize: "Team size",
+    interests: ["One-off session", "Yearly plan", "Enterprise"],
+    playedExitmania: "I played Exitmania",
     message: "Anything we should know?",
     consent: "I agree to be contacted by Tells about this request.",
     submit: "Send",
@@ -347,7 +358,6 @@ export const copy = {
       playFirst: "Play a game first",
       login: "Customer login",
       imprint: "Imprint",
-      status: "Status",
     },
     legal: "© 2026 Kinetic Pillar Infrastructure OÜ · Tallinn, Estonia",
   },
