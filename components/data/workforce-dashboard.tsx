@@ -310,7 +310,7 @@ function TeamBenchmarkPanel({
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             Folge-Trigger (Micro-Pulse / Slack) liegen im Spiel-Snapshot in Studio. Billing und
-            Ausspielung bleiben bei Exitmania bzw. Tabbrain — Tells speichert nur die Kopplung.
+            Ausspielung bleiben bei Exitmania bzw. Tells — Tells speichert nur die Kopplung.
           </p>
         </div>
       </div>

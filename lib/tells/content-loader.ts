@@ -409,7 +409,7 @@ export async function loadResolvedEventContent(input: {
       const { game, levels, compiledLogic } = live;
       const mergedConfig = mergeContentConfigWithBlueprint({
         ...contentConfig,
-        blueprint_slug: game.gps_enabled ? "exitmania" : "tabbrain",
+        blueprint_slug: game.gps_enabled ? "exitmania" : "tells",
         city_slug: game.city_slug ?? contentConfig.city_slug,
         runtime_profiles: game.runtime_profiles ?? contentConfig.runtime_profiles,
         content_mode: parseRuntimeProfiles(game.runtime_profiles).default_mode,
@@ -449,7 +449,7 @@ export async function loadResolvedEventContent(input: {
       const { game, levels, compiledLogic } = snapshot;
       const mergedConfig = mergeContentConfigWithBlueprint({
         ...contentConfig,
-        blueprint_slug: game.gps_enabled ? "exitmania" : "tabbrain",
+        blueprint_slug: game.gps_enabled ? "exitmania" : "tells",
         city_slug: game.city_slug ?? contentConfig.city_slug,
         runtime_profiles: game.runtime_profiles ?? contentConfig.runtime_profiles,
         content_mode: parseRuntimeProfiles(game.runtime_profiles).default_mode,
@@ -491,7 +491,7 @@ export async function loadResolvedEventContent(input: {
       const { game, levels, compiledLogic } = live;
       const mergedConfig = mergeContentConfigWithBlueprint({
         ...contentConfig,
-        blueprint_slug: game.gps_enabled ? "exitmania" : "tabbrain",
+        blueprint_slug: game.gps_enabled ? "exitmania" : "tells",
         city_slug: game.city_slug ?? contentConfig.city_slug,
         runtime_profiles: game.runtime_profiles ?? contentConfig.runtime_profiles,
         content_mode: parseRuntimeProfiles(game.runtime_profiles).default_mode,

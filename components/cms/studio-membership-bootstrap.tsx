@@ -31,7 +31,7 @@ export function StudioMembershipBootstrap() {
   return (
     <div className="space-y-3">
       <p className="text-sm leading-6 text-slate-600">
-        Weist Exitmania + Tabbrain als <strong>admin</strong> zu (volle Tells-Kontrolle). Voraussetzung:
+        Weist Exitmania + Tells als <strong>admin</strong> zu (volle Tells-Kontrolle). Voraussetzung:
         Migration <code className="text-xs">organization_members</code> ist angewandt.
       </p>
       <StudioButton type="button" disabled={pending} onClick={run}>

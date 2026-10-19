@@ -1,5 +1,5 @@
 ---
-description: Zielbild nach Exitmania-GRID-Launch — Tabbrain tot, Overwrites, Credits, Widersprüche stoppen
+description: Zielbild nach Exitmania-GRID-Launch — keine dritte Marke, Overwrites, Credits, Widersprüche stoppen
 alwaysApply: true
 ---
 
@@ -13,7 +13,7 @@ If a requested feature **contradicts** this, **stop**. Report the conflict and d
 
 - **Tells** (this repo, tells.team) = the product orgs keep: large-group join, data, template overwrites. Spoken name for what the code still calls GRID. Annual subscription later unlocks **customer** Studio.
 - **Exitmania** = only public storefront + growth wheel. Impulse buy: self-guided escape / city / small teamevents. ~€200 teamevents with light custom route **stay** on Exitmania (manual today → later same `route_override`).
-- **Tabbrain = discarded.** No third brand. Online/pulse surfaces are Tells, not a Tabbrain product.
+- **No third brand.** Online/pulse surfaces are Tells.
 - Engine code lives in `lib/tells/`. `GRID_*` env still works. See `.cursor/rules/tells-vs-exitmania.mdc`.
 
 ## What a Tells customer buys
@@ -34,7 +34,7 @@ If a requested feature **contradicts** this, **stop**. Report the conflict and d
 
 ## Do not build
 
-- Tabbrain app/brand/org billing
+- A third brand, app or org billing beside Tells
 - Partner/customer Loquiz-style creator
 - Consulting-heavy SKUs as the Exitmania default
 - A second route/content system beside `route_override`

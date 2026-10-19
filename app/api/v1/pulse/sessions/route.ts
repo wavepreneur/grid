@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const pulseCode = url.searchParams.get("pulse_code")?.trim();
   const bookingReference = url.searchParams.get("booking_reference")?.trim();
-  const orgSlug = url.searchParams.get("organization_slug")?.trim() ?? "tabbrain";
+  const orgSlug = url.searchParams.get("organization_slug")?.trim() ?? "tells";
 
   if (!pulseCode && !bookingReference) {
     return NextResponse.json(

@@ -1,5 +1,5 @@
 /**
- * Booking-time growth handoff. Commerce (Exitmania/Tabbrain) owns mail and CTAs.
+ * Booking-time growth handoff. Commerce (Exitmania/Tells) owns mail and CTAs.
  * GRID only renders the public card and POSTs to URLs from the pack.
  *
  * Secrets (capture_url, webhook_url, capture_secret) stay on events.content_config
@@ -11,7 +11,7 @@ import { playUi, playUiLang } from "@/lib/tells/play-ui";
 export const GROWTH_SURFACES = [
   "exitmania_b2c",
   "exitmania_teamevent",
-  "tabbrain",
+  "tells",
   "studio",
   "partner",
 ] as const;

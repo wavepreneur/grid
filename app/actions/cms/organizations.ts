@@ -223,7 +223,7 @@ export async function clearStudioOrganizationCookies(): Promise<void> {
 }
 
 /**
- * Assign Exitmania + Tabbrain as admin to an email (service-role).
+ * Assign Exitmania + Tells as admin to an email (service-role).
  * Used for bootstrap / ops — creates memberships for existing auth users.
  */
 export async function assignStudioAdminByEmail(
@@ -257,7 +257,7 @@ export async function assignStudioAdminByEmail(
     const { data: orgs, error: orgError } = await supabase
       .from("organizations")
       .select("id")
-      .in("slug", ["exitmania", "tabbrain"]);
+      .in("slug", ["exitmania", "tells"]);
     if (orgError) throw new Error(orgError.message);
 
     for (const org of orgs ?? []) {

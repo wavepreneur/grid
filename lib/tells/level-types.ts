@@ -245,8 +245,8 @@ export type EventContentConfig = {
   city_slug?: string;
   /** Reference to a content pack in global_levels (e.g. berlin-classic). */
   content_pack_slug?: string;
-  /** Engine blueprint — exitmania (GPS/indoor) | tabbrain (online). */
-  blueprint_slug?: "exitmania" | "tabbrain";
+  /** Engine blueprint — exitmania (GPS/indoor) | tells (online). */
+  blueprint_slug?: "exitmania" | "tells";
   /** Player UI module — exitmania | quiz | training (legacy fallback). */
   ui_layout?: "exitmania" | "quiz" | "training";
   show_live_score?: boolean;
@@ -274,7 +274,7 @@ export type EventContentConfig = {
   /** Partner upgrades for this booking. Absent = routes + quiz on, Data off. */
   modules?: EventModules;
   /**
-   * Commerce growth pack (Exitmania/Tabbrain). Secrets stay on this JSON;
+   * Commerce growth pack (Exitmania/Tells). Secrets stay on this JSON;
    * play only receives `ResolvedEventContent.growthOffer`.
    */
   growth?: import("@/lib/tells/growth-pack").GrowthPack;
@@ -301,7 +301,7 @@ export type ResolvedEventContent = {
   templateName: string;
   city: string | null;
   levels: LevelDefinition[];
-  blueprintSlug: "exitmania" | "tabbrain";
+  blueprintSlug: "exitmania" | "tells";
   archetype: "ASYMMETRIC_INFORMANT" | "TIME_DECAY_SPRINT" | "COOPERATIVE_COLLECTIVE";
   capabilities: BlueprintCapabilities;
   uiLayout: "exitmania" | "quiz" | "training";

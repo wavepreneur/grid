@@ -83,10 +83,10 @@ Default: Captain = GPS. Übertragbar in Lobby oder Operator-Cockpit.
 ### Phase 4: Analytics & Remote Control — 🟡 Basis
 * `audit_logs`, Cockpit-Eingriffe — Deep Dashboard offen
 
-**Architektur-Mandat (Omnichannel & Blaupausen):** Siehe [`GRID_ARCHITECTURE.md`](./GRID_ARCHITECTURE.md) — Mandat vs. Ist-Stand, Tabbrain/Exitmania-Integration, Ziel-Tracker-Pflege.
+**Architektur-Mandat (Omnichannel & Blaupausen):** Siehe [`GRID_ARCHITECTURE.md`](./GRID_ARCHITECTURE.md) — Mandat vs. Ist-Stand, Tells/Exitmania-Integration, Ziel-Tracker-Pflege.
 
 ### Vertriebsmodell (Kurz)
-- **Tabbrain:** Enterprise-Plattform (Landing Page, Buchung 3.000+ MA, **GRID-Token-Generierung**)
+- **Tells:** Enterprise-Plattform (Landing Page, Buchung 3.000+ MA, **GRID-Token-Generierung**)
 - **GRID:** Live-Engine, Sessions, Telemetrie — **kein** Enterprise-Shop
 - **Exitmania:** Mechanik-Referenz = Archetyp 01 (`ASYMMETRIC_INFORMANT`), Content als JSON
 

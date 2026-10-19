@@ -69,13 +69,13 @@ export function missionFromLevel(level: LevelDefinition): LevelDefinition {
 
 export function resolveContentMode(input: {
   contentMode?: ContentMode | null;
-  blueprintSlug?: "exitmania" | "tabbrain";
+  blueprintSlug?: "exitmania" | "tells";
   gpsCapable?: boolean;
 }): ContentMode {
   if (input.contentMode === "outdoor" || input.contentMode === "indoor" || input.contentMode === "online") {
     return input.contentMode;
   }
-  if (input.blueprintSlug === "tabbrain" || input.gpsCapable === false) {
+  if (input.blueprintSlug === "tells" || input.gpsCapable === false) {
     return "online";
   }
   return "outdoor";

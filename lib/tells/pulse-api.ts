@@ -212,7 +212,7 @@ export async function createPulseSession(
   body: PulseSessionCreateRequest,
   origin: string,
 ): Promise<PulseSessionResponse> {
-  const orgSlug = body.organization_slug ?? "tabbrain";
+  const orgSlug = body.organization_slug ?? "tells";
   const organization = await getOrganizationBySlug(orgSlug);
   if (!organization) {
     throw new Error(`Organization "${orgSlug}" not found`);

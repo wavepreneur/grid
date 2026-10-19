@@ -10,7 +10,7 @@
  * 2. Due time = `followUpDueAt(finished_at, cadence_days)` — derived, not stored on the game.
  * 3. Provision = existing Pulse REST (`POST /api/v1/pulse/sessions`) with `program_slug`,
  *    `channel`, idempotent `booking_reference`. Slack/Teams bots live outside GRID.
- * 4. Billing / shop stay Exitmania or Tabbrain. GRID never checkouts.
+ * 4. Billing / shop stay Exitmania or Tells. GRID never checkouts.
  *
  * Stable key: `follow_up_trigger`. Do not rename; later workers will read snapshots.
  */

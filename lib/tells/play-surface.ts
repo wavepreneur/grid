@@ -31,7 +31,7 @@ export type SurfacePresentation = {
   /** Shell: phone for co-located play, stage for remote multi-device. */
   shell: "phone" | "stage";
   /** Product default for this surface. */
-  product: "exitmania" | "tabbrain";
+  product: "exitmania" | "tells";
   usesGps: boolean;
   usesStationCodes: boolean;
 };
@@ -69,7 +69,7 @@ export const SURFACE_PRESENTATION: Record<PlaySurface, SurfacePresentation> = {
     unitLabelDe: "Mission",
     unitLabelEn: "Mission",
     shell: "stage",
-    product: "tabbrain",
+    product: "tells",
     usesGps: false,
     usesStationCodes: false,
   },

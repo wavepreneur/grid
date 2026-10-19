@@ -1,4 +1,4 @@
-# Exitmania ↔ GRID ↔ Tabbrain — Integrations-Kompass
+# Exitmania ↔ Tells — Integrations-Kompass
 
 > **Für Agenten:** Diese Datei ist die Single Source of Truth für Produktgrenzen, Content-Flow und Migrationspfad. Bei Integrationstasks zuerst lesen.
 
@@ -7,10 +7,10 @@
 | Produkt | Verkauft | Behält | Nutzt GRID für |
 |---------|----------|--------|----------------|
 | **Exitmania** | Kurzfristige Stadt-Escape-Games (B2C + B2B Teamevents) | Shop, SEO, Checkout (Paddle), Portale, Admin, E-Mails, Minigames `/m/*` | Live-Spiel statt Loquiz |
-| **Tabbrain** | Org-/Team-Lead-Multiplayer (Standard + Enterprise-Jahres-Landing) — *noch nicht gebaut* | GTM, Org-Accounts, Billing, Branding | Dieselbe Engine, anderer Blueprint |
+| **Tells** | Org-/Team-Lead-Multiplayer (Standard + Enterprise-Jahres-Landing) — *noch nicht gebaut* | GTM, Org-Accounts, Billing, Branding | Dieselbe Engine, anderer Blueprint |
 | **GRID** | nichts (Engine) | FSM, Rollen, Realtime, Cockpit, `audit_logs`, `domain_telemetry_metrics` | — |
 
-**Exitmania verkauft genauso wie Tabbrain — unterschiedliche Produkte, gleiche Runtime.**
+**Exitmania verkauft genauso wie Tells — unterschiedliche Produkte, gleiche Runtime.**
 
 Loquiz wird **nur** durch GRID ersetzt — nicht Exitmanias Commerce-Schicht.
 
@@ -24,7 +24,7 @@ Loquiz wird **nur** durch GRID ersetzt — nicht Exitmanias Commerce-Schicht.
 | **2** | Mission/Rätselblatt nach Freischaltung | Global (`global_levels`) |
 | **3** | Bonus, Alpha/Beta/Gamma-Aufgaben | Trigger + Rollen |
 
-Spiele kombinieren Layer frei. Surfaces: `content_config.content_mode` = outdoor | indoor | online (Tabbrain). Dual-Fallback Indoor (Stationen/Codes) oder Online. Kunden-Override Layer 1 = `route_override` (GPS + `stations` Codes).
+Spiele kombinieren Layer frei. Surfaces: `content_config.content_mode` = outdoor | indoor | online (Tells). Dual-Fallback Indoor (Stationen/Codes) oder Online. Kunden-Override Layer 1 = `route_override` (GPS + `stations` Codes).
 
 ## Content — keine Duplikate
 
@@ -129,9 +129,9 @@ Live-Checkout bleibt auf Loquiz, **solange** `grid_city_runtime` leer ist. Admin
 
 Pilot: Admin erzeugt Tickets. Loquiz parallel für alle echten Käufe.
 
-## Tabbrain (greenfield)
+## Tells (greenfield)
 
-- Gleiche GRID-API, `organization_slug: "tabbrain"`, `blueprint_slug: "tabbrain"`
+- Gleiche GRID-API, `organization_slug: "tells"`, `blueprint_slug: "tells"`
 - Kein Loquiz-Migration-Pfad nötig
 - Enterprise: `route_override` / `content_payload` bei Buchung
 - **Micro-Pulses:** REST-only via `POST /api/v1/pulse/sessions` — siehe [`docs/PULSE_SPRINT_PROTOCOL.md`](./PULSE_SPRINT_PROTOCOL.md)
@@ -141,6 +141,6 @@ Pilot: Admin erzeugt Tickets. Loquiz parallel für alle echten Käufe.
 1. **GRID:** Kein Checkout, kein SEO, kein Paddle — nur Engine + Operator-Cockpit
 2. **Exitmania:** Kein GPS/Level-Runtime nachbauen — GRID aufrufen
 3. **Content-Änderungen:** Master in `global_levels`; Event-Patches in `route_override`
-4. **Neue Features:** Prüfen ob Commerce (Exitmania/Tabbrain) oder Runtime (GRID)
+4. **Neue Features:** Prüfen ob Commerce (Exitmania/Tells) oder Runtime (GRID)
 
 Verwandt: [`GRID_ARCHITECTURE.md`](../GRID_ARCHITECTURE.md), Exitmania `docs/ARCHITECTURE.md` + `docs/GRID_INTEGRATION.md`

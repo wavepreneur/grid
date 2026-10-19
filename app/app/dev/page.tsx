@@ -15,7 +15,7 @@ export default function AdminDevPage() {
           <h2 className="mb-2 text-xl font-semibold text-slate-900">Projekt-Rollen</h2>
           <p className="mb-6 text-sm leading-7 text-slate-500">
             Foundation für spätere RBAC: Studio / Cockpit / Data sowie Tasks / Spiele / Tickets.
-            Aktuell: du als Admin auf Exitmania + Tabbrain.
+            Aktuell: du als Admin auf Exitmania + Tells.
           </p>
           <StudioMembershipBootstrap />
         </StudioPanel>

@@ -1,5 +1,5 @@
 -- Paste into Supabase SQL Editor (GridOS) if `db push` is unavailable.
--- Creates organization_members + admin memberships for Dervis on Exitmania + Tabbrain.
+-- Creates organization_members + admin memberships for Dervis on Exitmania + Tells.
 
 create table if not exists public.organization_members (
   id uuid primary key default gen_random_uuid(),
@@ -33,7 +33,7 @@ insert into public.organization_members (
 select o.id, '27b0d6e2-2341-4895-a8e6-5a3bf1cfd05f'::uuid, 'admin',
   true, true, true, true, true, true
 from public.organizations o
-where o.slug in ('exitmania', 'tabbrain')
+where o.slug in ('exitmania', 'tells')
 on conflict (organization_id, user_id) do update set
   role = 'admin',
   can_access_studio = true,
@@ -53,7 +53,7 @@ insert into public.organization_members (
 select o.id, 'c2a7efad-0c11-43c4-9ac1-c9e629144bd5'::uuid, 'admin',
   true, true, true, true, true, true
 from public.organizations o
-where o.slug in ('exitmania', 'tabbrain')
+where o.slug in ('exitmania', 'tells')
 on conflict (organization_id, user_id) do update set
   role = 'admin',
   can_access_studio = true,

@@ -144,7 +144,7 @@ async function createTestEventAndTeam(input: {
   const bookingRef = studioTestBookingReference(input.gameId);
 
   const contentConfig = {
-    blueprint_slug: input.gpsEnabled ? "exitmania" : "tabbrain",
+    blueprint_slug: input.gpsEnabled ? "exitmania" : "tells",
     city_slug: input.citySlug ?? undefined,
     ui_layout: input.gpsEnabled ? "exitmania" : "quiz",
     cms_game_id: input.gameId,
@@ -446,7 +446,7 @@ export async function createLiveEventFromGame(
 
     const inviteCode = generateInviteCode();
     const contentConfig = {
-      blueprint_slug: game.gps_enabled ? "exitmania" : "tabbrain",
+      blueprint_slug: game.gps_enabled ? "exitmania" : "tells",
       city_slug: game.city_slug ?? undefined,
       ui_layout: game.gps_enabled ? "exitmania" : "quiz",
       cms_game_id: game.id,

@@ -87,7 +87,7 @@ export function TicketPoolsPanel({ pools, games }: Props) {
               </div>
               <div>
                 <StudioLabel>Name</StudioLabel>
-                <StudioInput value={name} onChange={(e) => setName(e.target.value)} required placeholder="z. B. Tabbrain Sommer 2026" />
+                <StudioInput value={name} onChange={(e) => setName(e.target.value)} required placeholder="z. B. Tells Sommer 2026" />
               </div>
               <div>
                 <StudioLabel>Modus</StudioLabel>

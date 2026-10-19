@@ -125,7 +125,7 @@ export function GameLayerProfilePanel({ game }: Props) {
     <StudioPanel>
       <StudioSectionTitle
         title="Layer-Profil"
-        description="Content-Layer und Play-Surfaces — Outdoor, Indoor-Stationen oder Online (Tabbrain). Spieler-Flow: Hub → Quiz → Level → Bonus."
+        description="Content-Layer und Play-Surfaces — Outdoor, Indoor-Stationen oder Online (Tells). Spieler-Flow: Hub → Quiz → Level → Bonus."
       />
 
       <div className="space-y-6">
@@ -218,7 +218,7 @@ export function GameLayerProfilePanel({ game }: Props) {
             <p className="text-sm font-semibold text-slate-800">Fallback-Optionen</p>
             <p className="mt-1 text-xs leading-5 text-slate-500">
               Kunde/Operator kann zur Laufzeit umschalten: Indoor (Codes im Gebäude) und/oder
-              Online (am Tisch / remote, Tabbrain-Shell).
+              Online (am Tisch / remote, Tells-Shell).
             </p>
             <div className="mt-3 space-y-2">
               {FALLBACK_OPTIONS.filter((m) => m !== runtimeProfiles.default_mode).map(

@@ -83,7 +83,7 @@ Surfaces sind **Darstellung + Einstieg**, nicht drei getrennte Spiele.
 |---------|---------|-----|---------|-------|
 | **outdoor** | Exitmania | GPS-Karte / Wegpunkte | Geofence | Phone |
 | **indoor** | Exitmania | Stationsliste | Stationscode (oder Antippen) | Phone |
-| **online** | Tabbrain | Missions-Deck | gemeinsamer Start (Ready später) | Stage |
+| **online** | Tells | Missions-Deck | gemeinsamer Start (Ready später) | Stage |
 
 Code: `lib/tells/play-surface.ts`, `lib/cms/layer-model.ts` → `CONTENT_MODES`.
 
@@ -116,7 +116,7 @@ Slot N  (global_level_id)
 
 - **Exitmania Outdoor:** Hub = Waypoints, Fallback wählbar
 - **Exitmania Indoor (primär oder Fallback):** Hub = Stationen
-- **Tabbrain Online:** Hub = Missionen (= Layer-2-Liste), kein GPS/Code
+- **Tells Online:** Hub = Missionen (= Layer-2-Liste), kein GPS/Code
 
 ---
 
@@ -127,7 +127,7 @@ Gebucht oft als Outdoor. Bei Regen / Planänderung entscheidet der Kunde (oder O
 | Fallback | Spieler-Erlebnis |
 |----------|------------------|
 | **indoor** | Im Gebäude laufen, Stationscodes finden |
-| **online** | Am Tisch / remote, jeder am eigenen Gerät (Tabbrain-Shell) |
+| **online** | Am Tisch / remote, jeder am eigenen Gerät (Tells-Shell) |
 
 Studio-Definition:
 
@@ -171,7 +171,7 @@ DB: `local_stations` (parallel zu `local_waypoints`), Unique `(city_id, global_l
 | **Vollständig** | 1 + 2 + 3 | outdoor (+ Fallback indoor/online) | Exitmania Standard |
 | **Stadt-Entdecker** | 1 (+ 3) | outdoor | Orte entdecken |
 | **Indoor-Escape** | 1 + 2 + 3 | indoor | Museum/Venue mit Codes |
-| **Mission / Online** | 2 + 3 | online | Tabbrain remote |
+| **Mission / Online** | 2 + 3 | online | Tells remote |
 | **Micro-Pulse** | 3 | — | Slack/Teams, REST |
 
 Im Studio: `studio_games.active_layers` + `runtime_profiles`.

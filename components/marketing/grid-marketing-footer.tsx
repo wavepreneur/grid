@@ -28,9 +28,6 @@ export function GridMarketingFooter() {
             <Link href="/imprint" className="grid-nav-link">
               Imprint
             </Link>
-            <Link href="/status" className="grid-footer-dev">
-              Status
-            </Link>
           </nav>
         </div>
 

@@ -616,7 +616,7 @@ export function GameEditorPanel({
                 <p className="mt-1 text-sm text-muted-foreground">
                   Absicht für später — Tells spielt noch nichts aus. Speichern + Publish legt die
                   Kopplung im Snapshot ab. Dispatch (Pulse-REST, Slack/Teams) kommt in einem eigenen
-                  Schritt. Billing bleibt Exitmania oder Tabbrain.
+                  Schritt. Billing bleibt Exitmania oder Tells.
                 </p>
                 <label className="mt-4 flex items-center gap-2 text-sm font-medium">
                   <input
@@ -745,7 +745,7 @@ export function GameEditorPanel({
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <StudioLabel>CTA-Link (Exitmania / Tabbrain)</StudioLabel>
+                      <StudioLabel>CTA-Link (Exitmania / Tells)</StudioLabel>
                       <StudioInput
                         type="url"
                         placeholder="https://…"

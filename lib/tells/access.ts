@@ -533,7 +533,7 @@ export async function provisionStudioAccessBatch(
       : Math.max(1, teamSeats.length);
 
   const contentConfig = {
-    blueprint_slug: game.gps_enabled ? "exitmania" : "tabbrain",
+    blueprint_slug: game.gps_enabled ? "exitmania" : "tells",
     city_slug: game.city_slug ?? undefined,
     cms_game_id: game.id,
     cms_version_number: game.published_version_number,

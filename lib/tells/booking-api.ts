@@ -108,8 +108,8 @@ export function resolveBookingBlueprint(
   orgSlug: string,
   requested?: string,
 ): BlueprintSlug {
-  if (requested === "exitmania" || requested === "tabbrain") return requested;
-  if (orgSlug === "tabbrain") return "tabbrain";
+  if (requested === "exitmania" || requested === "tells") return requested;
+  if (orgSlug === "tells") return "tells";
   return "exitmania";
 }
 

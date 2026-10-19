@@ -11,6 +11,7 @@ import {
   Code2,
   Layers,
   LayoutGrid,
+  ListChecks,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -111,6 +112,13 @@ const NAV: NavItem[] = [
     icon: Code2,
     group: "Intern",
     match: (p) => p.startsWith(appPaths.dev),
+  },
+  {
+    href: appPaths.status,
+    label: "Status",
+    note: "Plan & Reifegrad",
+    icon: ListChecks,
+    match: (p) => p.startsWith(appPaths.status),
   },
 ];
 

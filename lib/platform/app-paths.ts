@@ -14,6 +14,7 @@ export const appPaths = {
   tickets: `${APP_HOME}/tickets`,
   templates: `${APP_HOME}/games#vorlagen`,
   dev: `${APP_HOME}/dev`,
+  status: "/status",
   cockpit: "/cockpit",
   data: "/data",
 } as const;

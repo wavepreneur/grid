@@ -2,7 +2,7 @@
 
 > **Status:** Design-Notiz (keine Implementierung).  
 > **Quellen:** Exitmania-Loquiz-Integration (nur gelesen), GRID Booking-/Ticket-Stand.  
-> **Ziel:** Exitmania + Tabbrain können GRID so ansteuern wie heute Loquiz — browserbasiert, multiplayer-fähig.
+> **Ziel:** Exitmania + Tells können GRID so ansteuern wie heute Loquiz — browserbasiert, multiplayer-fähig.
 
 Verwandt: [`EXITMANIA_GRID_INTEGRATION.md`](./EXITMANIA_GRID_INTEGRATION.md), [`GRID_LAYER_MODEL.md`](./GRID_LAYER_MODEL.md)
 
@@ -149,7 +149,7 @@ Empfehlung: Für Partner-CSV **Access Codes** (kurz, teilbar) speichern; beim er
 
 ---
 
-## 4. Partner-API (Exitmania / Tabbrain) — Soll-Vertrag
+## 4. Partner-API (Exitmania / Tells) — Soll-Vertrag
 
 Auth wie heute: `x-grid-api-key` (Org-scoped). Idempotenz über `booking_reference` bzw. `idempotency_key`.
 
@@ -239,7 +239,7 @@ Team sieht nur den eigenen Stand im Spiel. `/results/{invite}` ist geschlossen.
 | `results.loquiz.com/…` | GRID Results / Exitmania Proxy auf GRID Status |
 | `team_credentials` user/pass | `grid_invite_code`, `grid_join_code`, `grid_play_url`, optional `access_code` |
 
-Tabbrain: gleiche Endpunkte, `organization_slug: "tabbrain"`, oft `shared` Scope für Org-Events + Bulk für Partner.
+Tells: gleiche Endpunkte, `organization_slug: "tells"`, oft `shared` Scope für Org-Events + Bulk für Partner.
 
 ---
 
@@ -288,7 +288,7 @@ Neue API-Calls failen; bestehende Accesses/Events laufen weiter bis Expiry/Revok
 1. **Kein User/Pass als Primärlogin** — Browser: Link/Code.
 2. **Event = Multiplayer-Container** — Teams + Players + Rollen, nicht nur Score-Bucket.
 3. **Frozen published version** am Event — Content-Stabilität trotz späterem Entwurf.
-4. **Commerce bleibt außerhalb** — Exitmania/Tabbrain Checkout; GRID nur Engine + Access-API.
+4. **Commerce bleibt außerhalb** — Exitmania/Tells Checkout; GRID nur Engine + Access-API.
 5. **Realtime/Cockpit** sind First-Class; Loquiz Results sind nachgelagert.
 
 Lernenswert von Loquiz:
@@ -315,7 +315,7 @@ Lernenswert von Loquiz:
 
 ## 9. Agent-Regeln
 
-- Exitmania/Tabbrain **ändern** Access nur über GRID-API — keine parallele Ticket-Engine.
+- Exitmania/Tells **ändern** Access nur über GRID-API — keine parallele Ticket-Engine.
 - Keine Loquiz-User/Pass-Semantik in GRID-Player-UI einführen.
 - Unpublish ≠ revoke.
 - Shared Scope = ein Event; nie Scores über Events „heimlich“ mergen außer Modus `public`.

@@ -1,6 +1,6 @@
 import type { EventContentConfig, LevelDefinition, ResolvedEventContent } from "@/lib/tells/level-types";
 
-export const BLUEPRINT_SLUGS = ["exitmania", "tabbrain"] as const;
+export const BLUEPRINT_SLUGS = ["exitmania", "tells"] as const;
 export type BlueprintSlug = (typeof BLUEPRINT_SLUGS)[number];
 
 export type BlueprintArchetype =
@@ -43,15 +43,15 @@ export const BLUEPRINTS: Record<BlueprintSlug, BlueprintDefinition> = {
       ui_layout: "exitmania",
     },
   },
-  tabbrain: {
-    slug: "tabbrain",
+  tells: {
+    slug: "tells",
     archetype: "ASYMMETRIC_INFORMANT",
     uiLayout: "exitmania",
     capabilities: { gps: false, navigatorRole: false },
     minPlayersToStart: 1,
     allowSoloPlay: true,
     defaultContent: {
-      template_slug: "tabbrain-enterprise-demo",
+      template_slug: "tells-enterprise-demo",
       show_live_score: true,
       mission_duration_minutes: 90,
       ui_layout: "exitmania",
@@ -141,7 +141,7 @@ export function buildResolvedBlueprintFields(
 }
 
 export function usesMissionShell(content: Pick<ResolvedEventContent, "uiLayout" | "blueprintSlug">): boolean {
-  if (content.blueprintSlug === "exitmania" || content.blueprintSlug === "tabbrain") {
+  if (content.blueprintSlug === "exitmania" || content.blueprintSlug === "tells") {
     return true;
   }
   return content.uiLayout === "exitmania";

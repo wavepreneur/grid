@@ -129,7 +129,7 @@ export const LAYER_GAME_PRESETS: LayerGamePreset[] = [
   {
     id: "mission",
     labelDe: "Mission / Online (2 + 3)",
-    descriptionDe: "Tabbrain: remote am eigenen Gerät, Missions-Deck ohne GPS.",
+    descriptionDe: "Tells: remote am eigenen Gerät, Missions-Deck ohne GPS.",
     activeLayers: [2, 3],
     gpsEnabled: false,
     playMode: "sync_live",

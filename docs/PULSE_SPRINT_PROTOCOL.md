@@ -1,6 +1,6 @@
 # Pulse-Sprint-Protokoll — REST + Unified Telemetry
 
-> **Für Agenten:** Micro-Pulses nutzen **keine permanenten WebSockets**. Macro-Events (Exitmania/Tabbrain 90 Min) bleiben auf `sync_live` + Realtime FSM.
+> **Für Agenten:** Micro-Pulses nutzen **keine permanenten WebSockets**. Macro-Events (Exitmania/Tells 90 Min) bleiben auf `sync_live` + Realtime FSM.
 
 ## Zwei Säulen, eine Engine
 
@@ -43,7 +43,7 @@ POST /api/v1/pulse/sessions
 Content-Type: application/json
 
 {
-  "organization_slug": "tabbrain",
+  "organization_slug": "tells",
   "title": "Weekly Pulse — Engineering",
   "channel": "slack",
   "duration_minutes": 10,
@@ -77,7 +77,7 @@ Schreibt: `pulse_player_states` (upsert), `audit_logs`, `domain_telemetry_metric
 
 ```http
 GET /api/v1/pulse/sessions/{PULSE_CODE}/status
-GET /api/v1/pulse/sessions?pulse_code=ABCD1234&organization_slug=tabbrain
+GET /api/v1/pulse/sessions?pulse_code=ABCD1234&organization_slug=tells
 ```
 
 ## Telemetry-Bridge
@@ -93,7 +93,7 @@ Pulse-Progress schreibt direkt `pulse_collaboration_streak` (`async_pulse`).
 
 1. **Kein WebSocket** für `pulse_sessions` — nur REST.
 2. **Gleiches Envelope** für Content + Performance in beiden Modi.
-3. **Exitmania unberührt** — Pulse ist Tabbrain/Slack-Pfad; Macro bleibt Booking-API.
+3. **Exitmania unberührt** — Pulse ist Tells/Slack-Pfad; Macro bleibt Booking-API.
 4. Slack/Teams-Bots sind **Integration Layer** — rufen nur REST, nicht GRID-FSM.
 
 ## Studio-Kopplung (noch kein Cron)

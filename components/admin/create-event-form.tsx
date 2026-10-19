@@ -19,7 +19,7 @@ export function CreateEventForm() {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [createdInviteCode, setCreatedInviteCode] = useState<string | null>(null);
-  const [blueprintSlug, setBlueprintSlug] = useState<"exitmania" | "tabbrain">("exitmania");
+  const [blueprintSlug, setBlueprintSlug] = useState<"exitmania" | "tells">("exitmania");
 
   function handleSubmit(formData: FormData) {
     setError(null);
@@ -58,10 +58,10 @@ export function CreateEventForm() {
           <GridLabel>Blueprint</GridLabel>
           <StudioListbox
             value={blueprintSlug}
-            onChange={(value) => setBlueprintSlug(value as "exitmania" | "tabbrain")}
+            onChange={(value) => setBlueprintSlug(value as "exitmania" | "tells")}
             options={[
               { value: "exitmania", label: "Exitmania (GPS + Mission Shell)" },
-              { value: "tabbrain", label: "Tabbrain (Mission Shell, kein GPS)" },
+              { value: "tells", label: "Tells (Mission Shell, kein GPS)" },
             ]}
             aria-label="Blueprint"
           />

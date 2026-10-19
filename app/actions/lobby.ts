@@ -429,7 +429,7 @@ export async function createEvent(input: {
         ? input.blueprintSlug
         : "exitmania";
     const blueprint = getBlueprint(blueprintSlug);
-    const orgSlug = blueprintSlug === "tabbrain" ? "tabbrain" : "exitmania";
+    const orgSlug = blueprintSlug === "tells" ? "tells" : "exitmania";
 
     const supabase = createAdminClient();
     const inviteCode = generateInviteCode();

@@ -203,7 +203,7 @@ export function TicketAccessPanel({ batches }: Props) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  placeholder="z. B. Tabbrain Sommer 2026"
+                  placeholder="z. B. Tells Sommer 2026"
                 />
               </div>
               <div>

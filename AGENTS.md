@@ -6,13 +6,13 @@ Next.js engine repo. Read `node_modules/next/dist/docs/` for Next.js 16 conventi
 
 ## Ecosystem (read first for integration)
 
-**[`docs/EXITMANIA_GRID_INTEGRATION.md`](docs/EXITMANIA_GRID_INTEGRATION.md)** — Exitmania + GRID boundaries, Loquiz replacement, API contract. Tabbrain is discarded.
+**[`docs/EXITMANIA_GRID_INTEGRATION.md`](docs/EXITMANIA_GRID_INTEGRATION.md)** — Exitmania + GRID boundaries, Loquiz replacement, API contract. No third brand.
 
-**[`docs/ACCESS_SCOPE_AND_PARTNER_API.md`](docs/ACCESS_SCOPE_AND_PARTNER_API.md)** — Loquiz scope/tickets analysis → GRID access batches, publish rules, partner API (Exitmania/Tabbrain).
+**[`docs/ACCESS_SCOPE_AND_PARTNER_API.md`](docs/ACCESS_SCOPE_AND_PARTNER_API.md)** — Loquiz scope/tickets analysis → GRID access batches, publish rules, partner API (Exitmania/Tells).
 
 **[`docs/GRID_LAYER_MODEL.md`](docs/GRID_LAYER_MODEL.md)** — Layer-first content architecture (mandatory before Studio CMS work).
 
-Rules: `.cursor/rules/product-direction.mdc`, `.cursor/rules/ecosystem-exitmania-tabbrain.mdc`, `.cursor/rules/grid-layer-model.mdc`
+Rules: `.cursor/rules/product-direction.mdc`, `.cursor/rules/ecosystem-exitmania.mdc`, `.cursor/rules/grid-layer-model.mdc`
 
 ## This repo owns
 
