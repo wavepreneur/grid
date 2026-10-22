@@ -20,10 +20,12 @@ import {
   collectCityShellTranslationUnits,
   collectTranslationUnits,
   existingValueForTranslationKey,
+  isHonestlyConfirmed,
   localeCopyWithCoverage,
   localesFromOverrides,
   parseConfirmed,
   parseTranslations,
+  pruneConfirmedKeys,
   resolveSharedGameCopy,
   seedLocaleCopy,
   seedSlotCopyFromStudio,
@@ -2049,16 +2051,34 @@ export async function translateGameLocale(input: {
       linkIds,
       values: translated,
     });
-    const gameCopy: GameLocaleCopy = {
-      ...(recipeBound ? existingCopy : applied.gameCopy),
-      name: existingCopy.name,
-      confirmed: parseConfirmed([
+    const unitByKey = new Map(units.map((unit) => [unit.key, unit]));
+    const newlyConfirmed = Object.entries(translated)
+      .filter(([key, value]) => {
+        const unit = unitByKey.get(key);
+        return unit ? isHonestlyConfirmed(unit, value) : false;
+      })
+      .map(([key]) => key);
+    const confirmed = pruneConfirmedKeys({
+      keys: [
         ...parseConfirmed(existingCopy.confirmed).filter((key) =>
-          recipeBound ? !key.includes(":quiz:") : true,
+          recipeBound ? key === "game:name" || key.includes(":quiz:") : true,
         ),
-        ...Object.keys(translated),
-      ]),
-    };
+        ...newlyConfirmed,
+      ],
+      units,
+      gameCopy: recipeBound ? { ...existingCopy, ...applied.gameCopy, name: existingCopy.name } : applied.gameCopy,
+      slotCopies: applied.slotCopies,
+      linkIds,
+    });
+    const gameCopy = localeCopyWithCoverage(
+      existingCopy,
+      {
+        ...(recipeBound ? existingCopy : applied.gameCopy),
+        name: existingCopy.name,
+        confirmed,
+      },
+      units,
+    );
 
     const openerByGeo = new Map(openerSlots.map((slot) => [slot.linkId, slot]));
     const saved = await saveGameLocale({
@@ -2113,6 +2133,7 @@ export async function translateGameLocale(input: {
           ? {
               ...resolveSharedGameCopy(saved.data!, input.language, origin),
               confirmed: gameCopy.confirmed,
+              coverage: gameCopy.coverage,
             }
           : gameCopy,
         slots: applied.slotCopies,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   addGameLocale,
@@ -13,7 +13,12 @@ import { setComposeRecipeOrigin } from "@/app/actions/cms/packs";
 import { GameLanguageCell } from "@/components/cms/games/game-language-cell";
 import { GameTranslationPanel } from "@/components/cms/games/game-translation-panel";
 import { GameTestPlayModal } from "@/components/cms/games/game-test-play-modal";
-import { collectCityShellTranslationUnits, gameLocales, localeCoverageMap } from "@/lib/cms/game-i18n";
+import {
+  collectCityShellTranslationUnits,
+  gameLocales,
+  localeCoverageMap,
+  type TranslationCoverage,
+} from "@/lib/cms/game-i18n";
 import { localeLabel, parseStudioLanguage, type StudioLanguage } from "@/lib/cms/languages";
 import { StudioBadge, StudioPanel } from "@/components/cms/admin-shell";
 import { GameLayerProfilePanel } from "@/components/cms/games/game-layer-profile-panel";
@@ -153,9 +158,13 @@ export function GameEditorPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [testOpen, setTestOpen] = useState(false);
+  const [liveCoverage, setLiveCoverage] = useState<TranslationCoverage | null>(null);
 
   const locale = parseStudioLanguage(localeParam ?? initialGame.language);
   const isSourceLocale = locale === parseStudioLanguage(initialGame.language);
+  useEffect(() => {
+    setLiveCoverage(null);
+  }, [locale, game.id]);
   const recipeBound = isRecipeCityShell(initialGame, origin, isRecipeSource);
   const shell = recipeBound && origin ? origin : game;
   const shellFlags = (shell.feature_flags ?? {}) as Record<string, unknown>;
@@ -375,7 +384,10 @@ export function GameEditorPanel({
           locales={gameLocales(game, origin)}
           sourceLocale={game.language}
           activeLocale={locale}
-          coverageByLocale={localeCoverageMap(game, origin, cityShellUnits, cityShellAliases)}
+          coverageByLocale={{
+            ...localeCoverageMap(game, origin, cityShellUnits, cityShellAliases),
+            ...(liveCoverage && !isSourceLocale ? { [locale]: liveCoverage } : {}),
+          }}
           adding={pending}
           onAdd={handleAddLocale}
           variant="comfortable"
@@ -394,6 +406,7 @@ export function GameEditorPanel({
           isRecipeSource={isRecipeSource}
           locale={locale}
           taskLinks={taskLinks}
+          onCoverageChange={setLiveCoverage}
           onGameChange={(next) => {
             cache.setGame(next);
             setGame(toEditorState(next));

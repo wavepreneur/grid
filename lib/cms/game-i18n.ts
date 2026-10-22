@@ -292,7 +292,10 @@ export function localeCoverage(
   if (locale === source) return { confirmed: 1, total: 1 };
   const copy = parseTranslations(game.translations)[locale];
   if (!copy) return { confirmed: 0, total: 1 };
-  if (copy.coverage) return copy.coverage;
+  if (copy.coverage && copy.coverage.total > 0) return copy.coverage;
+  // Avoid a fake 0% when confirmed keys exist but coverage was never written.
+  const confirmed = parseConfirmed(copy.confirmed).length;
+  if (confirmed > 0) return { confirmed, total: confirmed };
   return { confirmed: 0, total: 1 };
 }
 
@@ -1291,6 +1294,43 @@ export function unitNeedsMachineTranslation(unit: TranslationUnit, existing: str
   const current = (existing ?? "").trim();
   if (!current) return true;
   return current === unit.source.trim();
+}
+
+/** True when a checkmark honestly means “done”, not leftover German with a stale Haken. */
+export function isHonestlyConfirmed(unit: TranslationUnit, existing: string | undefined): boolean {
+  const current = (existing ?? "").trim();
+  if (!current) return false;
+  if (current !== unit.source.trim()) return true;
+  // Same as source is OK for titles the author keeps, and for shared URLs.
+  if (unit.key === "game:name") return true;
+  if (unit.key.includes("iframe_url") || unit.key.includes("youtube_url") || /:url$/.test(unit.key)) {
+    return true;
+  }
+  return false;
+}
+
+/** Drop stale checkmarks that still show the German source. */
+export function pruneConfirmedKeys(input: {
+  keys: Iterable<string>;
+  units: TranslationUnit[];
+  gameCopy: GameLocaleCopy;
+  slotCopies: Record<string, SlotLocaleCopy>;
+  linkIds: string[];
+}): string[] {
+  const byKey = new Map(input.units.map((unit) => [unit.key, unit]));
+  const kept: string[] = [];
+  for (const key of input.keys) {
+    const unit = byKey.get(key);
+    if (!unit) continue;
+    const existing = existingValueForTranslationKey({
+      key,
+      gameCopy: input.gameCopy,
+      slotCopies: input.slotCopies,
+      linkIds: input.linkIds,
+    });
+    if (isHonestlyConfirmed(unit, existing)) kept.push(key);
+  }
+  return parseConfirmed(kept);
 }
 
 function cloneSlotCopy(slot: SlotLocaleCopy): SlotLocaleCopy {

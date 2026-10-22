@@ -25,6 +25,7 @@ import {
   localesFromOverrides,
   mergeSlotCopy,
   parseConfirmed,
+  pruneConfirmedKeys,
   remainingPercent,
   resolveGameCopy,
   resolveSharedGameCopy,
@@ -34,6 +35,7 @@ import {
   type QuizLocaleCopy,
   type SlotLocaleCopy,
   type TileLocaleCopy,
+  type TranslationCoverage,
 } from "@/lib/cms/game-i18n";
 import { localeLabel, type StudioLanguage } from "@/lib/cms/languages";
 import type { StudioGame, StudioGameTaskLink } from "@/lib/cms/types";
@@ -47,6 +49,7 @@ type Props = {
   locale: StudioLanguage;
   taskLinks: StudioGameTaskLink[];
   onGameChange?: (game: StudioGame) => void;
+  onCoverageChange?: (coverage: TranslationCoverage) => void;
 };
 
 function sameText(value: string | undefined, source: string | undefined) {
@@ -267,6 +270,7 @@ export function GameTranslationPanel({
   locale,
   taskLinks,
   onGameChange,
+  onCoverageChange,
 }: Props) {
   const cache = useStudioCache();
   const [pending, startTransition] = useTransition();
@@ -388,19 +392,45 @@ export function GameTranslationPanel({
     }
     return keys;
   }, [copy, recipeBound, slotCopies, slots, sourceCopy, sourceSlots, units]);
+  const linkIdsForKeys = useMemo(
+    () => slots.map((slot) => slot.levelLink.id),
+    [slots],
+  );
   const confirmed = useMemo(
     () =>
-      parseConfirmed(
-        aliasSlotConfirmedKeys([...checked, ...inferred], slotIdAliases).filter((key) =>
-          units.some((unit) => unit.key === key),
-        ),
-      ),
-    [checked, inferred, slotIdAliases, units],
+      pruneConfirmedKeys({
+        keys: aliasSlotConfirmedKeys([...checked, ...inferred], slotIdAliases),
+        units,
+        gameCopy: copy,
+        slotCopies,
+        linkIds: linkIdsForKeys,
+      }),
+    [checked, copy, inferred, linkIdsForKeys, slotCopies, slotIdAliases, units],
   );
   const confirmedSet = useMemo(() => new Set(confirmed), [confirmed]);
   const coverage = coverageForConfirmed(units, confirmed);
   const donePercent = coveragePercent(coverage);
   const openPercent = remainingPercent(coverage);
+
+  useEffect(() => {
+    onCoverageChange?.(coverage);
+  }, [coverage, onCoverageChange]);
+
+  useEffect(() => {
+    setChecked((prev) => {
+      const honest = pruneConfirmedKeys({
+        keys: prev,
+        units,
+        gameCopy: copy,
+        slotCopies,
+        linkIds: linkIdsForKeys,
+      });
+      if (honest.length === prev.length && honest.every((key, index) => key === prev[index])) {
+        return prev;
+      }
+      return honest;
+    });
+  }, [copy, linkIdsForKeys, slotCopies, units]);
 
   function patchSlot(linkId: string, patch: Partial<SlotLocaleCopy>) {
     setDirtySlotIds((prev) => {
@@ -527,18 +557,30 @@ export function GameTranslationPanel({
         cache.invalidateGame(data.game.id);
         onGameChange?.(data.game);
         setCopy(resolveSharedGameCopy(data.game, locale, origin));
-        setSlotCopies((prev) => {
-          const next = { ...prev };
+        setSlotCopies(() => {
+          const next: Record<string, SlotLocaleCopy> = {};
           for (const slot of slots) {
+            const linkId = slot.levelLink.id;
+            const applied = data.slots[linkId] ?? {};
             const geo = layer1LinkForSlot(slot);
-            const quiz =
-              (geo ? data.slots[geo.id]?.quiz : undefined) ?? data.slots[slot.levelLink.id]?.quiz;
-            if (!quiz) continue;
-            next[slot.levelLink.id] = { ...next[slot.levelLink.id], quiz };
+            const geoQuiz = geo ? data.slots[geo.id]?.quiz : undefined;
+            next[linkId] = mergeSlotCopy(sourceSlots[linkId] ?? {}, {
+              ...applied,
+              quiz: geoQuiz ?? applied.quiz,
+            });
           }
           return next;
         });
-        setChecked(parseConfirmed(data.copy.confirmed));
+        setDirtySlotIds(new Set());
+        setChecked(
+          pruneConfirmedKeys({
+            keys: parseConfirmed(data.copy.confirmed),
+            units,
+            gameCopy: data.copy,
+            slotCopies: data.slots,
+            linkIds: linkIdsForKeys,
+          }),
+        );
         setMessage(
           data.translated > 0
             ? recipeBound

@@ -1,11 +1,11 @@
-import https from "node:https";
 import { localeLabel, type StudioLanguage } from "@/lib/cms/languages";
 import type { TranslationUnit } from "@/lib/cms/game-i18n";
 
-/** Live Flash aliases only — gemini-2.0/2.5-flash now 404 for new keys. */
-const GEMINI_MODELS = ["gemini-flash-latest", "gemini-3.8-flash", "gemini-3.5-flash"] as const;
-const CHUNK_SIZE = 24;
-const REQUEST_TIMEOUT_MS = 40_000;
+/** Prefer fast Flash without multi-model retries (dead 2.x IDs 404). */
+const GEMINI_MODELS = ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"] as const;
+const CHUNK_SIZE = 12;
+const REQUEST_TIMEOUT_MS = 35_000;
+const JOB_TIMEOUT_MS = 90_000;
 const DEFAULT_REFERER = "https://www.exitmania.com/";
 
 const NATIVE_VOICE: Record<StudioLanguage, string> = {
@@ -59,87 +59,76 @@ function geminiHttpError(status: number, detail: string): Error {
   return new Error(`Gemini ${status}${detail ? `: ${detail.slice(0, 180)}` : ""}`);
 }
 
-function postGemini(model: string, key: string, body: string): Promise<{ status: number; text: string }> {
+async function postGemini(
+  model: string,
+  key: string,
+  body: string,
+  signal: AbortSignal,
+): Promise<{ status: number; text: string }> {
   const referer = allowedReferer();
-  const path = `/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const fail = (error: Error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      reject(error);
-    };
-    const ok = (value: { status: number; text: string }) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(value);
-    };
-
-    const req = https.request(
-      {
-        hostname: "generativelanguage.googleapis.com",
-        path,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(body),
-          "x-goog-api-key": key,
-          Referer: referer,
-        },
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": key,
+        Referer: referer,
       },
-      (res) => {
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk) => chunks.push(chunk as Buffer));
-        res.on("end", () =>
-          ok({
-            status: res.statusCode ?? 0,
-            text: Buffer.concat(chunks).toString("utf8"),
-          }),
-        );
-      },
-    );
-
-    const timer = setTimeout(() => {
-      req.destroy();
-      fail(
-        new Error(
-          `Gemini-Timeout (${Math.round(REQUEST_TIMEOUT_MS / 1000)}s) bei ${model}. Bitte erneut versuchen.`,
-        ),
-      );
-    }, REQUEST_TIMEOUT_MS);
-    timer.unref?.();
-
-    req.on("error", (error) => {
-      fail(error instanceof Error ? error : new Error(String(error)));
-    });
-    req.write(body);
-    req.end();
-  });
+      body,
+      signal,
+    },
+  );
+  const text = await response.text();
+  return { status: response.status, text };
 }
 
-async function generateJson(model: string, key: string, prompt: string): Promise<Record<string, string>> {
+async function generateJson(
+  model: string,
+  key: string,
+  prompt: string,
+  parentSignal: AbortSignal,
+): Promise<Record<string, string>> {
   const body = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
       temperature: 0.45,
       responseMimeType: "application/json",
+      // Flash aliases may think by default; budget 0 keeps Studio snappy.
+      thinkingConfig: { thinkingBudget: 0 },
     },
   });
-  const response = await postGemini(model, key, body);
-  if (response.status < 200 || response.status >= 300) {
-    throw geminiHttpError(response.status, response.text);
+
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  parentSignal.addEventListener("abort", onAbort, { once: true });
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await postGemini(model, key, body, controller.signal);
+    if (response.status < 200 || response.status >= 300) {
+      throw geminiHttpError(response.status, response.text);
+    }
+    const payload = JSON.parse(response.text) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      error?: { message?: string };
+    };
+    const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) {
+      throw new Error(payload.error?.message || "Gemini hat keinen Text geliefert.");
+    }
+    return parseJsonObject(text);
+  } catch (error) {
+    if (controller.signal.aborted && !parentSignal.aborted) {
+      throw new Error(
+        `Gemini-Timeout (${Math.round(REQUEST_TIMEOUT_MS / 1000)}s) bei ${model}. Bitte erneut versuchen.`,
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    parentSignal.removeEventListener("abort", onAbort);
   }
-  const payload = JSON.parse(response.text) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    error?: { message?: string };
-  };
-  const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new Error(payload.error?.message || "Gemini hat keinen Text geliefert.");
-  }
-  return parseJsonObject(text);
 }
 
 function buildPrompt(input: {
@@ -185,26 +174,42 @@ export async function translateUnitsNative(input: {
 
   const merged: Record<string, string> = {};
   let lastError: Error | null = null;
+  const job = new AbortController();
+  const jobTimer = setTimeout(() => job.abort(), JOB_TIMEOUT_MS);
 
-  for (let offset = 0; offset < input.units.length; offset += CHUNK_SIZE) {
-    const chunk = input.units.slice(offset, offset + CHUNK_SIZE);
-    const prompt = buildPrompt({ source: input.source, target: input.target, units: chunk });
-    let done = false;
-    for (const model of GEMINI_MODELS) {
-      try {
-        const part = await generateJson(model, key, prompt);
-        for (const unit of chunk) {
-          const value = part[unit.key];
-          if (typeof value === "string" && value.trim()) merged[unit.key] = value;
+  try {
+    for (let offset = 0; offset < input.units.length; offset += CHUNK_SIZE) {
+      if (job.signal.aborted) {
+        if (Object.keys(merged).length > 0) return merged;
+        throw new Error(
+          `Übersetzung abgebrochen nach ${Math.round(JOB_TIMEOUT_MS / 1000)}s. Bitte erneut klicken — fertige Felder bleiben.`,
+        );
+      }
+      const chunk = input.units.slice(offset, offset + CHUNK_SIZE);
+      const prompt = buildPrompt({ source: input.source, target: input.target, units: chunk });
+      let done = false;
+      for (const model of GEMINI_MODELS) {
+        try {
+          const part = await generateJson(model, key, prompt, job.signal);
+          for (const unit of chunk) {
+            const value = part[unit.key];
+            if (typeof value === "string" && value.trim()) merged[unit.key] = value;
+          }
+          done = true;
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error("Übersetzung fehlgeschlagen.");
+          if (job.signal.aborted) break;
         }
-        done = true;
-        lastError = null;
-        break;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error("Übersetzung fehlgeschlagen.");
+      }
+      if (!done && lastError) {
+        if (Object.keys(merged).length > 0) return merged;
+        throw lastError;
       }
     }
-    if (!done && lastError) throw lastError;
+  } finally {
+    clearTimeout(jobTimer);
   }
 
   return merged;
