@@ -508,8 +508,16 @@ export function GameTranslationPanel({
     setMessage(null);
     setBusy("translate");
     startTransition(async () => {
+      const CLIENT_TIMEOUT_MS = 100_000;
+      let timedOut = false;
+      const watchdog = window.setTimeout(() => {
+        timedOut = true;
+        setBusy(null);
+        setError("Übersetzung dauert zu lange — Bitte erneut versuchen. Schon übersetzte Felder bleiben erhalten.");
+      }, CLIENT_TIMEOUT_MS);
       try {
         const result = await translateGameLocale({ gameId: game.id, language: locale });
+        if (timedOut) return;
         if (!result.success) {
           setError(result.error);
           return;
@@ -539,9 +547,11 @@ export function GameTranslationPanel({
             : `Nichts Neues zum Übersetzen.`,
         );
       } catch (err) {
+        if (timedOut) return;
         setError(err instanceof Error ? err.message : "Übersetzung ist fehlgeschlagen.");
       } finally {
-        setBusy(null);
+        window.clearTimeout(watchdog);
+        if (!timedOut) setBusy(null);
       }
     });
   }

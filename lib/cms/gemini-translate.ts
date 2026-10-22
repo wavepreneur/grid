@@ -2,10 +2,10 @@ import https from "node:https";
 import { localeLabel, type StudioLanguage } from "@/lib/cms/languages";
 import type { TranslationUnit } from "@/lib/cms/game-i18n";
 
-/** Prefer known Flash models; skip invented IDs that hang or 404 forever. */
-const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"] as const;
+/** Live Flash aliases only — gemini-2.0/2.5-flash now 404 for new keys. */
+const GEMINI_MODELS = ["gemini-flash-latest", "gemini-3.8-flash", "gemini-3.5-flash"] as const;
 const CHUNK_SIZE = 24;
-const REQUEST_TIMEOUT_MS = 45_000;
+const REQUEST_TIMEOUT_MS = 40_000;
 const DEFAULT_REFERER = "https://www.exitmania.com/";
 
 const NATIVE_VOICE: Record<StudioLanguage, string> = {
@@ -63,6 +63,20 @@ function postGemini(model: string, key: string, body: string): Promise<{ status:
   const referer = allowedReferer();
   const path = `/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    };
+    const ok = (value: { status: number; text: string }) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+
     const req = https.request(
       {
         hostname: "generativelanguage.googleapis.com",
@@ -79,21 +93,27 @@ function postGemini(model: string, key: string, body: string): Promise<{ status:
         const chunks: Buffer[] = [];
         res.on("data", (chunk) => chunks.push(chunk as Buffer));
         res.on("end", () =>
-          resolve({
+          ok({
             status: res.statusCode ?? 0,
             text: Buffer.concat(chunks).toString("utf8"),
           }),
         );
       },
     );
-    req.setTimeout(REQUEST_TIMEOUT_MS, () => {
-      req.destroy(
+
+    const timer = setTimeout(() => {
+      req.destroy();
+      fail(
         new Error(
           `Gemini-Timeout (${Math.round(REQUEST_TIMEOUT_MS / 1000)}s) bei ${model}. Bitte erneut versuchen.`,
         ),
       );
+    }, REQUEST_TIMEOUT_MS);
+    timer.unref?.();
+
+    req.on("error", (error) => {
+      fail(error instanceof Error ? error : new Error(String(error)));
     });
-    req.on("error", reject);
     req.write(body);
     req.end();
   });

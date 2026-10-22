@@ -19,7 +19,7 @@ import {
   buildSnapshotLocales,
   collectCityShellTranslationUnits,
   collectTranslationUnits,
-  isMachineTranslatableUnit,
+  existingValueForTranslationKey,
   localeCopyWithCoverage,
   localesFromOverrides,
   parseConfirmed,
@@ -30,6 +30,7 @@ import {
   isLocaleComplete,
   type GameLocaleCopy,
   type SlotLocaleCopy,
+  unitNeedsMachineTranslation,
   withGeoQuizLocales,
   withLinkLocale,
 } from "@/lib/cms/game-i18n";
@@ -2022,9 +2023,17 @@ export async function translateGameLocale(input: {
       }
     }
 
-    const toTranslate = units.filter(
-      (unit) => unit.key !== "game:name" && isMachineTranslatableUnit(unit),
-    );
+    const linkIds = (recipeBound ? shellSlots : sourceSlots).map((slot) => slot.linkId);
+    const toTranslate = units.filter((unit) => {
+      if (unit.key === "game:name") return false;
+      const existing = existingValueForTranslationKey({
+        key: unit.key,
+        gameCopy: existingCopy,
+        slotCopies,
+        linkIds,
+      });
+      return unitNeedsMachineTranslation(unit, existing);
+    });
     const translated =
       toTranslate.length > 0
         ? await translateUnitsNative({
@@ -2037,7 +2046,7 @@ export async function translateGameLocale(input: {
     const applied = applyTranslationUnits({
       gameCopy: existingCopy,
       slotCopies,
-      linkIds: (recipeBound ? shellSlots : sourceSlots).map((slot) => slot.linkId),
+      linkIds,
       values: translated,
     });
     const gameCopy: GameLocaleCopy = {

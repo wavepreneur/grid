@@ -1175,6 +1175,124 @@ export function isMachineTranslatableUnit(unit: TranslationUnit): boolean {
   return true;
 }
 
+function getBonusPath(bonus: BonusLocaleCopy | undefined, path: string): string | undefined {
+  if (!bonus) return undefined;
+  if (path === "title") return bonus.title;
+  if (path === "description") return bonus.description;
+  if (path === "question") return bonus.question;
+  if (path === "success_info") return bonus.success_info;
+  if (path.startsWith("option:")) {
+    const id = path.slice("option:".length);
+    return bonus.options?.find((option) => option.id === id)?.label;
+  }
+  if (path.startsWith("tile:")) {
+    const rest = path.slice("tile:".length);
+    const sep = rest.lastIndexOf(":");
+    if (sep <= 0) return undefined;
+    const id = rest.slice(0, sep);
+    const field = rest.slice(sep + 1);
+    const tile = bonus.tiles?.find((item) => item.id === id);
+    if (!tile) return undefined;
+    if (field === "label") return tile.label;
+    if (field === "url") return tile.url;
+    if (field === "hint") return tile.hint_text;
+  }
+  return undefined;
+}
+
+function getSlotPath(slot: SlotLocaleCopy | undefined, path: string): string | undefined {
+  if (!slot) return undefined;
+  if (path === "title") return slot.title;
+  if (path === "description") return slot.description;
+  if (path === "question") return slot.question;
+  if (path === "success_title") return slot.success_title;
+  if (path === "success_info") return slot.success_info;
+  if (path.startsWith("option:")) {
+    const id = path.slice("option:".length);
+    return slot.options?.find((option) => option.id === id)?.label;
+  }
+  if (path.startsWith("tile:")) {
+    const rest = path.slice("tile:".length);
+    const sep = rest.lastIndexOf(":");
+    if (sep <= 0) return undefined;
+    const id = rest.slice(0, sep);
+    const field = rest.slice(sep + 1);
+    const tile = slot.tiles?.find((item) => item.id === id);
+    if (!tile) return undefined;
+    if (field === "label") return tile.label;
+    if (field === "url") return tile.url;
+    if (field === "hint") return tile.hint_text;
+  }
+  if (path.startsWith("hint:")) {
+    const id = path.slice("hint:".length);
+    return slot.hints?.find((hint) => hint.id === id)?.text;
+  }
+  if (path.startsWith("quiz:")) {
+    const quizPath = path.slice("quiz:".length);
+    const quiz = slot.quiz;
+    if (!quiz) return undefined;
+    if (quizPath === "title") return quiz.title;
+    if (quizPath === "description") return quiz.description;
+    if (quizPath === "question") return quiz.question;
+    if (quizPath === "side_fact_title") return quiz.side_fact_title;
+    if (quizPath === "side_fact") return quiz.side_fact;
+    if (quizPath.startsWith("option:")) {
+      const id = quizPath.slice("option:".length);
+      return quiz.options?.find((option) => option.id === id)?.label;
+    }
+  }
+  if (path.startsWith("station:")) {
+    const field = path.slice("station:".length);
+    if (field === "name") return slot.station?.name;
+    if (field === "place") return slot.station?.place;
+  }
+  if (path.startsWith("bonus:")) {
+    const rest = path.slice("bonus:".length);
+    const taskMatch = /^([0-9a-f-]{36}):/i.exec(rest);
+    if (!taskMatch) return undefined;
+    const taskId = taskMatch[1]!;
+    return getBonusPath(slot.bonuses?.[taskId], rest.slice(taskId.length + 1));
+  }
+  return undefined;
+}
+
+/** Current locale string for a translation unit key, if any. */
+export function existingValueForTranslationKey(input: {
+  key: string;
+  gameCopy: GameLocaleCopy;
+  slotCopies: Record<string, SlotLocaleCopy>;
+  linkIds: string[];
+}): string | undefined {
+  const { key, gameCopy, slotCopies, linkIds } = input;
+  if (key.startsWith("game:")) {
+    const field = key.slice("game:".length);
+    if (field === "name") return gameCopy.name;
+    if (field === "description") return gameCopy.description;
+    if (field === "farewell_text") return gameCopy.farewell_text;
+    if (field === "briefing_iframe_url") return gameCopy.briefing_iframe_url;
+    if (field === "faq_iframe_url") return gameCopy.faq_iframe_url;
+    if (field === "intro_youtube_url") return gameCopy.intro_youtube_url;
+    return undefined;
+  }
+  if (!key.startsWith("slot:")) return undefined;
+  const rest = key.slice("slot:".length);
+  const sorted = [...linkIds].sort((a, b) => b.length - a.length);
+  const linkId = sorted.find((id) => rest.startsWith(`${id}:`));
+  if (!linkId) return undefined;
+  return getSlotPath(slotCopies[linkId], rest.slice(linkId.length + 1));
+}
+
+/**
+ * Translate only empty or still-source-identical fields.
+ * Keeps existing native copy so a second click does not re-burn the whole game.
+ */
+export function unitNeedsMachineTranslation(unit: TranslationUnit, existing: string | undefined): boolean {
+  if (!isMachineTranslatableUnit(unit)) return false;
+  const current = (existing ?? "").trim();
+  if (!current) return true;
+  return current === unit.source.trim();
+}
+
 function cloneSlotCopy(slot: SlotLocaleCopy): SlotLocaleCopy {
   return {
     ...slot,
