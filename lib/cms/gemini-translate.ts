@@ -2,8 +2,10 @@ import https from "node:https";
 import { localeLabel, type StudioLanguage } from "@/lib/cms/languages";
 import type { TranslationUnit } from "@/lib/cms/game-i18n";
 
-const GEMINI_MODELS = ["gemini-3.8-flash", "gemini-flash-latest"] as const;
-const CHUNK_SIZE = 32;
+/** Prefer known Flash models; skip invented IDs that hang or 404 forever. */
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"] as const;
+const CHUNK_SIZE = 24;
+const REQUEST_TIMEOUT_MS = 45_000;
 const DEFAULT_REFERER = "https://www.exitmania.com/";
 
 const NATIVE_VOICE: Record<StudioLanguage, string> = {
@@ -84,6 +86,13 @@ function postGemini(model: string, key: string, body: string): Promise<{ status:
         );
       },
     );
+    req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+      req.destroy(
+        new Error(
+          `Gemini-Timeout (${Math.round(REQUEST_TIMEOUT_MS / 1000)}s) bei ${model}. Bitte erneut versuchen.`,
+        ),
+      );
+    });
     req.on("error", reject);
     req.write(body);
     req.end();

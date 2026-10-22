@@ -24,6 +24,7 @@ import { OrgSwitcher } from "@/components/cms/org-switcher";
 import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
 import { useStudioShell } from "@/components/cms/studio-shell-provider";
 import { useStudioUnsaved } from "@/components/cms/studio-unsaved";
+import { GridLogo } from "@/components/marketing/grid-logo";
 import { getOrgCockpitOverview } from "@/app/actions/cockpit-overview";
 import { listGames, listTemplates } from "@/app/actions/cms/games";
 import { listTasks } from "@/app/actions/cms/tasks";
@@ -378,9 +379,9 @@ export function StudioLayout({ children }: { children: ReactNode }) {
       <div className="lg:hidden">
         <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
           <div className="min-w-0">
-            <p className="text-xl font-bold">Tells</p>
+            <GridLogo height={28} className="max-w-[7.5rem]" priority />
             {currentProject ? (
-              <p className="truncate text-xs font-semibold text-primary">{currentProject.name}</p>
+              <p className="mt-0.5 truncate text-xs font-semibold text-primary">{currentProject.name}</p>
             ) : null}
           </div>
           <form action={logoutPortal}>
@@ -432,15 +433,15 @@ export function StudioLayout({ children }: { children: ReactNode }) {
                 title="Tells Backoffice"
               >
                 {hydrated && collapsed ? (
-                  <p className="text-lg font-bold leading-none">T</p>
+                  <GridLogo height={22} className="mx-auto max-w-[2.75rem] object-left" />
                 ) : (
                   <>
                     <p className="text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground">
                       Backoffice
                     </p>
-                    <p className="text-2xl font-bold">Tells</p>
+                    <GridLogo height={32} className="mt-1 max-w-[9rem]" priority />
                     {currentProject ? (
-                      <p className="truncate text-sm font-semibold text-primary">{currentProject.name}</p>
+                      <p className="mt-1 truncate text-sm font-semibold text-primary">{currentProject.name}</p>
                     ) : null}
                   </>
                 )}

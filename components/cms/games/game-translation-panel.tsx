@@ -508,35 +508,41 @@ export function GameTranslationPanel({
     setMessage(null);
     setBusy("translate");
     startTransition(async () => {
-      const result = await translateGameLocale({ gameId: game.id, language: locale });
-      setBusy(null);
-      if (!result.success) {
-        setError(result.error);
-        return;
-      }
-      const data = result.data!;
-      cache.setGame(data.game);
-      cache.invalidateGame(data.game.id);
-      onGameChange?.(data.game);
-      setCopy(resolveSharedGameCopy(data.game, locale, origin));
-      setSlotCopies((prev) => {
-        const next = { ...prev };
-        for (const slot of slots) {
-          const geo = layer1LinkForSlot(slot);
-          const quiz = (geo ? data.slots[geo.id]?.quiz : undefined) ?? data.slots[slot.levelLink.id]?.quiz;
-          if (!quiz) continue;
-          next[slot.levelLink.id] = { ...next[slot.levelLink.id], quiz };
+      try {
+        const result = await translateGameLocale({ gameId: game.id, language: locale });
+        if (!result.success) {
+          setError(result.error);
+          return;
         }
-        return next;
-      });
-      setChecked(parseConfirmed(data.copy.confirmed));
-      setMessage(
-        data.translated > 0
-          ? recipeBound
-            ? `${data.translated} Einstiegsaufgaben nach ${localeLabel(locale)} übersetzt. Spielinfo und Mission bleiben am Ursprungsspiel.`
-            : `${data.translated} Felder nach ${localeLabel(locale)} übersetzt. Titel bleibt zum manuellen Anpassen.`
-          : `Nichts Neues zum Übersetzen.`,
-      );
+        const data = result.data!;
+        cache.setGame(data.game);
+        cache.invalidateGame(data.game.id);
+        onGameChange?.(data.game);
+        setCopy(resolveSharedGameCopy(data.game, locale, origin));
+        setSlotCopies((prev) => {
+          const next = { ...prev };
+          for (const slot of slots) {
+            const geo = layer1LinkForSlot(slot);
+            const quiz =
+              (geo ? data.slots[geo.id]?.quiz : undefined) ?? data.slots[slot.levelLink.id]?.quiz;
+            if (!quiz) continue;
+            next[slot.levelLink.id] = { ...next[slot.levelLink.id], quiz };
+          }
+          return next;
+        });
+        setChecked(parseConfirmed(data.copy.confirmed));
+        setMessage(
+          data.translated > 0
+            ? recipeBound
+              ? `${data.translated} Einstiegsaufgaben nach ${localeLabel(locale)} übersetzt. Spielinfo und Mission bleiben am Ursprungsspiel.`
+              : `${data.translated} Felder nach ${localeLabel(locale)} übersetzt. Titel bleibt zum manuellen Anpassen.`
+            : `Nichts Neues zum Übersetzen.`,
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Übersetzung ist fehlgeschlagen.");
+      } finally {
+        setBusy(null);
+      }
     });
   }
 
@@ -559,12 +565,17 @@ export function GameTranslationPanel({
           <StudioButton
             type="button"
             variant="secondary"
-            disabled={pending}
+            disabled={busy === "translate"}
             icon={<IconLanguages size={16} />}
             onClick={handleTranslate}
           >
-            {pending && busy === "translate" ? "Übersetzen…" : "Jetzt übersetzen"}
+            {busy === "translate" ? "Übersetzen…" : "Jetzt übersetzen"}
           </StudioButton>
+          {busy === "translate" ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Läuft… bei vielen Texten kann das 1–2 Minuten dauern. Bei Fehler kannst du erneut klicken.
+            </p>
+          ) : null}
         </div>
         <div className="mt-4 rounded-2xl border border-border bg-secondary/50 px-4 py-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
