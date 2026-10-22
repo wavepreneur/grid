@@ -348,7 +348,6 @@ function NavPendingDot({ active }: { active: boolean }) {
 export function StudioLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { organizations, orgSlug } = useStudioShell();
-  const currentProject = organizations.find((org) => org.slug === orgSlug);
   const [collapsed, setCollapsed] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
@@ -380,9 +379,6 @@ export function StudioLayout({ children }: { children: ReactNode }) {
         <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
           <div className="min-w-0">
             <GridLogo height={28} className="max-w-[7.5rem]" priority />
-            {currentProject ? (
-              <p className="mt-0.5 truncate text-xs font-semibold text-primary">{currentProject.name}</p>
-            ) : null}
           </div>
           <form action={logoutPortal}>
             <button type="submit" className="text-sm font-semibold text-primary">
@@ -440,9 +436,6 @@ export function StudioLayout({ children }: { children: ReactNode }) {
                       Backoffice
                     </p>
                     <GridLogo height={32} className="mt-1 max-w-[9rem]" priority />
-                    {currentProject ? (
-                      <p className="mt-1 truncate text-sm font-semibold text-primary">{currentProject.name}</p>
-                    ) : null}
                   </>
                 )}
               </Link>
