@@ -31,7 +31,7 @@ export const STATUS_LEVELS: { status: StatusLevel; label: string; meaning: strin
 
 export const STATUS_SECTIONS: { id: StatusSectionId; letter: string; title: string; note: string }[] = [
   { id: "golive", letter: "P0", title: "Go-live: Exitmania bookings play on Tells", note: "Go-live plan" },
-  { id: "copy", letter: "P0", title: "Exitmania copy, staged", note: "Deploy with the switch to Tells" },
+  { id: "copy", letter: "P0", title: "Exitmania copy", note: "~1h right before live connect — no app wording, new prices, Tells visible" },
   { id: "flywheel", letter: "P1", title: "Flywheel inside Exitmania", note: "After go-live" },
   { id: "tellsEvent", letter: "P2", title: "From team event to a Tells event", note: "Once Exitmania runs on Tells without issues" },
   { id: "plans", letter: "P3", title: "Yearly plans", note: "After P2" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   addGameLocale,
@@ -159,6 +159,11 @@ export function GameEditorPanel({
   const [pending, startTransition] = useTransition();
   const [testOpen, setTestOpen] = useState(false);
   const [liveCoverage, setLiveCoverage] = useState<TranslationCoverage | null>(null);
+  const handleCoverageChange = useCallback((next: TranslationCoverage) => {
+    setLiveCoverage((prev) =>
+      prev && prev.confirmed === next.confirmed && prev.total === next.total ? prev : next,
+    );
+  }, []);
 
   const locale = parseStudioLanguage(localeParam ?? initialGame.language);
   const isSourceLocale = locale === parseStudioLanguage(initialGame.language);
@@ -406,7 +411,7 @@ export function GameEditorPanel({
           isRecipeSource={isRecipeSource}
           locale={locale}
           taskLinks={taskLinks}
-          onCoverageChange={setLiveCoverage}
+          onCoverageChange={handleCoverageChange}
           onGameChange={(next) => {
             cache.setGame(next);
             setGame(toEditorState(next));

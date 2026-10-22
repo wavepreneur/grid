@@ -7,11 +7,11 @@ alwaysApply: true
 
 If a requested feature **contradicts** this, **stop**. Report the conflict and discuss. Do not implement around it.
 
-**Now:** finish Exitmania → Tells live launch. Do not build customer Studio, credits, or annual billing until that launch is through.
+**Now:** finish Loquiz replacement for **content and games** in this engine (Tells live-ready). Exitmania website redesign, p.p. prices, and flywheel mails are **paused** until that migration is done — then website/UI, then prices/logic at the switch, step by step (see Exitmania `docs/gap-analysis.md` and `product-architecture.mdc`). Do not build customer Studio, credits, or annual billing until that launch is through.
 
 **After the launch:** Tells gets its own Paddle checkout (one-off packages, then plans). Exitmania is a different product for a different audience; Tells customers buy on Tells. Until the checkout exists, tells.team takes requests via the contact form only.
 
-**Exitmania prices at the switch** (not before; the live site still runs Loquiz with team prices): family & friends (B2C) €9.90 p.p., Click & Play €12.90 p.p., Teambuilding Pro €14.90 p.p. (team events from 5 people); upgrades stay €99 net.
+**Exitmania prices at the switch** (not before; the live site still runs Loquiz with team prices): family & friends (B2C) €9.90 p.p., Click & Play / Teambuilding Basic €12.90 p.p., Teambuilding Pro €14.90 p.p., Online-Teamevent €12.90 p.p. net; upgrades stay €99 net. Max **10 people per team** (private and firms). Gift cards stay; **All-Inclusive retired**. End screen (consent, team question, codes) lives in **this** Tells engine; Exitmania sends the automated flywheel emails.
 
 **Exitmania → Tells setup credit:** the Exitmania booking amount, capped at €245 (half the €490 setup), valid 90 days, once per company. Never more than the customer paid.
 

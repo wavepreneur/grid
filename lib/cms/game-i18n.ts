@@ -231,6 +231,53 @@ export function withLinkLocale(
   return { ...overrides, locales };
 }
 
+/**
+ * Drop locale quiz overlays so other languages fall back to the (new) German source.
+ * Used when an Einstiegsfrage task is saved — stale München-EN must not block „Übersetzen“.
+ */
+export function stripLocaleQuizzesFromOverrides(
+  overrides: Record<string, unknown>,
+): Record<string, unknown> {
+  const locales = localesFromOverrides(overrides);
+  const keys = Object.keys(locales);
+  if (keys.length === 0) return overrides;
+  const next: Record<string, SlotLocaleCopy> = {};
+  let changed = false;
+  for (const [lang, copy] of Object.entries(locales)) {
+    if (!copy.quiz) {
+      next[lang] = copy;
+      continue;
+    }
+    changed = true;
+    const { quiz: _quiz, ...rest } = copy;
+    next[lang] = rest;
+  }
+  if (!changed) return overrides;
+  return { ...overrides, locales: next };
+}
+
+/** Remove Einstiegsfrage checkmarks after German source changed. */
+export function clearQuizConfirmedFromTranslations(
+  translations: GameTranslations,
+  sourceLocale: StudioLanguage,
+): GameTranslations | null {
+  let changed = false;
+  const next: GameTranslations = { ...translations };
+  for (const [locale, copy] of Object.entries(translations)) {
+    if (locale === sourceLocale) continue;
+    const confirmed = parseConfirmed(copy.confirmed);
+    const kept = confirmed.filter((key) => !key.includes(":quiz:"));
+    if (kept.length === confirmed.length) continue;
+    changed = true;
+    next[locale] = {
+      ...copy,
+      confirmed: kept,
+      coverage: undefined,
+    };
+  }
+  return changed ? next : null;
+}
+
 export function gameLocales(
   game: Pick<StudioGame, "language" | "translations">,
   origin?: Pick<StudioGame, "language" | "translations"> | null,

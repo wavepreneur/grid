@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { saveGameLocale, translateGameLocale } from "@/app/actions/cms/games";
+import {
+  resetGameCityOpenerLocales,
+  saveGameLocale,
+  translateGameLocale,
+} from "@/app/actions/cms/games";
 import { StudioPanel } from "@/components/cms/admin-shell";
 import { IconCheck, IconLanguages, IconSave } from "@/components/cms/studio-icons";
 import {
@@ -273,8 +277,8 @@ export function GameTranslationPanel({
   onCoverageChange,
 }: Props) {
   const cache = useStudioCache();
-  const [pending, startTransition] = useTransition();
-  const [busy, setBusy] = useState<"save" | "translate" | null>(null);
+  const [, startTransition] = useTransition();
+  const [busy, setBusy] = useState<"save" | "translate" | "reset" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const recipeBound = isRecipeCityShell(game, origin, isRecipeSource);
@@ -408,29 +412,16 @@ export function GameTranslationPanel({
     [checked, copy, inferred, linkIdsForKeys, slotCopies, slotIdAliases, units],
   );
   const confirmedSet = useMemo(() => new Set(confirmed), [confirmed]);
-  const coverage = coverageForConfirmed(units, confirmed);
+  const coverage = useMemo(
+    () => coverageForConfirmed(units, confirmed),
+    [confirmed, units],
+  );
   const donePercent = coveragePercent(coverage);
   const openPercent = remainingPercent(coverage);
 
   useEffect(() => {
     onCoverageChange?.(coverage);
-  }, [coverage, onCoverageChange]);
-
-  useEffect(() => {
-    setChecked((prev) => {
-      const honest = pruneConfirmedKeys({
-        keys: prev,
-        units,
-        gameCopy: copy,
-        slotCopies,
-        linkIds: linkIdsForKeys,
-      });
-      if (honest.length === prev.length && honest.every((key, index) => key === prev[index])) {
-        return prev;
-      }
-      return honest;
-    });
-  }, [copy, linkIdsForKeys, slotCopies, units]);
+  }, [coverage.confirmed, coverage.total, onCoverageChange]);
 
   function patchSlot(linkId: string, patch: Partial<SlotLocaleCopy>) {
     setDirtySlotIds((prev) => {
@@ -470,70 +461,127 @@ export function GameTranslationPanel({
     }
   }
 
-  function handleSave(event: React.FormEvent) {
-    event.preventDefault();
+  function handleSave(event?: React.FormEvent) {
+    event?.preventDefault();
+    if (busy) return;
     setError(null);
     setMessage(null);
     setBusy("save");
     startTransition(async () => {
-      const result = await saveGameLocale({
-        gameId: game.id,
-        language: locale,
-        copy: recipeBound
-          ? { name: copy.name, confirmed, coverage }
-          : { ...copy, confirmed, coverage },
-        slots: slots.flatMap((slot) => {
-          if (!dirtySlotIds.has(slot.levelLink.id)) return [];
-          const copy = slotCopies[slot.levelLink.id] ?? {};
-          const geo = layer1LinkForSlot(slot);
-          if (recipeBound) {
-            if (!geo) return [];
-            return [
+      try {
+        const honestChecked = pruneConfirmedKeys({
+          keys: checked,
+          units,
+          gameCopy: copy,
+          slotCopies,
+          linkIds: linkIdsForKeys,
+        });
+        if (
+          honestChecked.length !== checked.length ||
+          honestChecked.some((key, index) => key !== checked[index])
+        ) {
+          setChecked(honestChecked);
+        }
+        const result = await saveGameLocale({
+          gameId: game.id,
+          language: locale,
+          copy: recipeBound
+            ? { name: copy.name, confirmed, coverage }
+            : { ...copy, confirmed, coverage },
+          slots: slots.flatMap((slot) => {
+            if (!dirtySlotIds.has(slot.levelLink.id)) return [];
+            const slotCopy = slotCopies[slot.levelLink.id] ?? {};
+            const geo = layer1LinkForSlot(slot);
+            if (recipeBound) {
+              if (!geo) return [];
+              return [
+                {
+                  linkId: geo.id,
+                  copy: {
+                    ...localesFromOverrides(geo.overrides)[locale],
+                    quiz: slotCopy.quiz,
+                  },
+                },
+              ];
+            }
+            const rows: Array<{ linkId: string; copy: SlotLocaleCopy }> = [
               {
-                linkId: geo.id,
+                linkId: slot.levelLink.id,
                 copy: {
-                  ...localesFromOverrides(geo.overrides)[locale],
-                  quiz: copy.quiz,
+                  ...slotCopy,
+                  quiz: localesFromOverrides(slot.levelLink.overrides)[locale]?.quiz,
                 },
               },
             ];
-          }
-          const rows: Array<{ linkId: string; copy: SlotLocaleCopy }> = [
-            {
-              linkId: slot.levelLink.id,
-              copy: {
-                ...copy,
-                quiz: localesFromOverrides(slot.levelLink.overrides)[locale]?.quiz,
-              },
-            },
-          ];
-          if (geo) {
-            rows.push({
-              linkId: geo.id,
-              copy: {
-                ...localesFromOverrides(geo.overrides)[locale],
-                quiz: copy.quiz,
-              },
-            });
-          }
-          return rows;
-        }),
-      });
-      setBusy(null);
-      if (!result.success) {
-        setError(result.error);
-        return;
+            if (geo) {
+              rows.push({
+                linkId: geo.id,
+                copy: {
+                  ...localesFromOverrides(geo.overrides)[locale],
+                  quiz: slotCopy.quiz,
+                },
+              });
+            }
+            return rows;
+          }),
+        });
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
+        setDirtySlotIds(new Set());
+        cache.setGame(result.data!);
+        onGameChange?.(result.data!);
+        const saved = result.data!.translations[locale]?.confirmed;
+        if (saved) setChecked(parseConfirmed(saved));
+        setMessage(`${localeLabel(locale)} gespeichert.`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Speichern ist fehlgeschlagen.");
+      } finally {
+        setBusy(null);
       }
-      setDirtySlotIds(new Set());
-      cache.setGame(result.data!);
-      onGameChange?.(result.data!);
-      const saved = result.data!.translations[locale]?.confirmed;
-      if (saved) setChecked(parseConfirmed(saved));
-      setMessage(`${localeLabel(locale)} gespeichert.`);
+    });
+  }
+
+  const saveLabel =
+    busy === "save" ? "Speichern…" : `${localeLabel(locale)} speichern`;
+  const actionsLocked = busy !== null;
+
+  function handleResetOpenerLocales() {
+    if (busy || !recipeBound) return;
+    setError(null);
+    setMessage(null);
+    setBusy("reset");
+    startTransition(async () => {
+      try {
+        const result = await resetGameCityOpenerLocales({ gameId: game.id });
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
+        cache.invalidateGame(game.id);
+        setSlotCopies((prev) => {
+          const next: Record<string, SlotLocaleCopy> = {};
+          for (const [linkId, row] of Object.entries(prev)) {
+            const { quiz: _quiz, ...rest } = row;
+            next[linkId] = mergeSlotCopy(sourceSlots[linkId] ?? {}, rest);
+          }
+          return next;
+        });
+        setChecked((prev) => prev.filter((key) => !key.includes(":quiz:")));
+        setMessage(
+          "Einstiegs-Locales auf Deutsch zurückgesetzt. Jetzt „Übersetzen“ — nicht mehr München-EN.",
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Zurücksetzen fehlgeschlagen.");
+      } finally {
+        setBusy(null);
+      }
     });
   }
 
   function handleTranslate() {
+    if (busy) return;
     setError(null);
     setMessage(null);
     setBusy("translate");
@@ -613,22 +661,40 @@ export function GameTranslationPanel({
             ? `Nur der Stadtname ist hier eigen. Briefing, Links, Mission und Bonus kommen live aus ${origin?.name ?? "dem Ursprungsspiel"} — ${localeLabel(locale)} von ${localeLabel(locale)}. „Jetzt übersetzen“ übersetzt nur die Einstiegsaufgaben dieser Stadt.`
             : `Titel bleibt manuell (z. B. München → Munich). Briefing, Links und Mission kannst du hier pflegen; sie gelten danach für alle Städte des Rezepts. „Jetzt übersetzen“ füllt die Texte, URLs bleiben.`}
         </StudioHint>
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <StudioButton
+            type="button"
+            disabled={actionsLocked}
+            icon={<IconSave size={16} />}
+            onClick={() => handleSave()}
+          >
+            {saveLabel}
+          </StudioButton>
+          {recipeBound ? (
+            <StudioButton
+              type="button"
+              variant="secondary"
+              disabled={actionsLocked}
+              onClick={handleResetOpenerLocales}
+            >
+              {busy === "reset" ? "Setzt zurück…" : "Locales → Deutsch"}
+            </StudioButton>
+          ) : null}
           <StudioButton
             type="button"
             variant="secondary"
-            disabled={busy === "translate"}
+            disabled={actionsLocked}
             icon={<IconLanguages size={16} />}
             onClick={handleTranslate}
           >
             {busy === "translate" ? "Übersetzen…" : "Jetzt übersetzen"}
           </StudioButton>
-          {busy === "translate" ? (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Läuft… bei vielen Texten kann das 1–2 Minuten dauern. Bei Fehler kannst du erneut klicken.
-            </p>
-          ) : null}
         </div>
+        {busy === "translate" ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Läuft… bei vielen Texten kann das 1–2 Minuten dauern. Bei Fehler kannst du erneut klicken.
+          </p>
+        ) : null}
         <div className="mt-4 rounded-2xl border border-border bg-secondary/50 px-4 py-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <p className="text-sm font-semibold text-foreground">
@@ -1092,8 +1158,8 @@ export function GameTranslationPanel({
         </div>
       </StudioPanel>
 
-      <StudioButton type="submit" disabled={pending} icon={<IconSave size={16} />}>
-        {pending && busy === "save" ? "Speichern…" : `${localeLabel(locale)} speichern`}
+      <StudioButton type="submit" disabled={actionsLocked} icon={<IconSave size={16} />}>
+        {saveLabel}
       </StudioButton>
     </form>
   );

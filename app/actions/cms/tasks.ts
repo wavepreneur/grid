@@ -19,6 +19,12 @@ import type { ActionResult } from "@/lib/tells/types";
 import { normalizeTaskContent } from "@/lib/cms/task-content";
 import { taskToOpenerArrivalQuiz } from "@/lib/cms/game-slots";
 import { parseLinkOverrides } from "@/lib/cms/game-link-config";
+import {
+  clearQuizConfirmedFromTranslations,
+  parseTranslations,
+  stripLocaleQuizzesFromOverrides,
+} from "@/lib/cms/game-i18n";
+import { parseStudioLanguage } from "@/lib/cms/languages";
 
 function normalizeTaskRow(row: StudioTask): StudioTask {
   return {
@@ -32,8 +38,9 @@ function normalizeTaskRow(row: StudioTask): StudioTask {
 }
 
 /**
- * Keep mission-link arrival_quiz snapshots in sync when a pool opener task changes
- * (e.g. hero image removed in the task editor).
+ * Keep mission-link arrival_quiz snapshots in sync when a pool opener task changes.
+ * Also drop other-locale quiz overlays so „Übersetzen“ uses the new German source
+ * (city shells still had München-EN after pasting the real city DE).
  */
 async function refreshOpenerQuizSnapshots(
   supabase: ReturnType<typeof createAdminClient>,
@@ -45,15 +52,36 @@ async function refreshOpenerQuizSnapshots(
     .contains("overrides", { opener_task_id: opener.id });
   const { data: items, error: itemsError } = await supabase
     .from("studio_layer_pack_items")
-    .select("id, overrides")
+    .select("id, pack_id, overrides")
     .contains("overrides", { opener_task_id: opener.id });
 
+  const gameIds = new Set<string>();
+  const packIds = new Set<string>();
+
   if (!linksError && links?.length) {
+    for (const link of links) {
+      if (typeof link.game_id === "string") gameIds.add(link.game_id);
+    }
     await writeRefreshedOpenerSnapshots(supabase, "studio_game_tasks", links, opener);
   }
   if (!itemsError && items?.length) {
+    for (const item of items) {
+      if (typeof item.pack_id === "string") packIds.add(item.pack_id);
+    }
     await writeRefreshedOpenerSnapshots(supabase, "studio_layer_pack_items", items, opener);
   }
+
+  if (packIds.size > 0) {
+    const { data: packGames } = await supabase
+      .from("studio_games")
+      .select("id")
+      .in("layer1_pack_id", [...packIds]);
+    for (const row of packGames ?? []) {
+      if (typeof row.id === "string") gameIds.add(row.id);
+    }
+  }
+
+  await clearOpenerQuizConfirmedOnGames(supabase, [...gameIds]);
 }
 
 async function writeRefreshedOpenerSnapshots(
@@ -75,10 +103,39 @@ async function writeRefreshedOpenerSnapshots(
         typeof overrides.opener_points === "number" ? overrides.opener_points : null,
       );
       if (!quiz) return;
+      const nextOverrides = stripLocaleQuizzesFromOverrides({
+        ...overrides,
+        arrival_quiz: quiz,
+      });
+      await supabase.from(table).update({ overrides: nextOverrides }).eq("id", row.id);
+    }),
+  );
+}
+
+async function clearOpenerQuizConfirmedOnGames(
+  supabase: ReturnType<typeof createAdminClient>,
+  gameIds: string[],
+): Promise<void> {
+  const unique = [...new Set(gameIds.filter(Boolean))];
+  if (unique.length === 0) return;
+  const { data: games, error } = await supabase
+    .from("studio_games")
+    .select("id, language, translations")
+    .in("id", unique);
+  if (error || !games?.length) return;
+
+  await Promise.all(
+    games.map(async (game) => {
+      const source = parseStudioLanguage(game.language);
+      const updated = clearQuizConfirmedFromTranslations(
+        parseTranslations(game.translations),
+        source,
+      );
+      if (!updated) return;
       await supabase
-        .from(table)
-        .update({ overrides: { ...overrides, arrival_quiz: quiz } })
-        .eq("id", row.id);
+        .from("studio_games")
+        .update({ translations: updated, updated_at: new Date().toISOString() })
+        .eq("id", game.id);
     }),
   );
 }

@@ -37,6 +37,7 @@ import {
   withLinkLocale,
 } from "@/lib/cms/game-i18n";
 import { translateUnitsNative } from "@/lib/cms/gemini-translate";
+import { resetCityShellOpenerLocales } from "@/lib/cms/reset-city-shell-opener-locales";
 import { generateGameSlug, isCityDerivedGameCode, mintStableGameCode } from "@/lib/tells/codes";
 import {
   DEFAULT_RUNTIME_PROFILES,
@@ -2252,6 +2253,74 @@ export async function translateRecipeCityLocales(input: {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Städte konnten nicht übersetzt werden.",
+    };
+  }
+}
+
+export async function resetRecipeCityOpenerLocales(input: {
+  recipeId: string;
+}): Promise<ActionResult<{ games: number; packItems: number; gameLinks: number }>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const { data: recipe, error: recipeError } = await supabase
+      .from("studio_compose_recipes")
+      .select("id")
+      .eq("id", input.recipeId)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    if (recipeError) throw new Error(recipeError.message);
+    if (!recipe) return { success: false, error: "Rezept nicht gefunden." };
+
+    const result = await resetCityShellOpenerLocales(supabase, {
+      organizationId: orgId,
+      recipeId: input.recipeId,
+    });
+    return { success: true, data: result };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Locale-Quizzes konnten nicht zurückgesetzt werden.",
+    };
+  }
+}
+
+export async function resetGameCityOpenerLocales(input: {
+  gameId: string;
+}): Promise<ActionResult<{ games: number; packItems: number; gameLinks: number }>> {
+  try {
+    const orgId = await getStudioOrganizationId();
+    const supabase = createAdminClient();
+    const { data: game, error } = await supabase
+      .from("studio_games")
+      .select("id, name, city_slug, compose_recipe_id")
+      .eq("id", input.gameId)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!game) return { success: false, error: "Spiel nicht gefunden." };
+    if (!game.compose_recipe_id) {
+      return { success: false, error: "Nur City-Shells eines Rezepts." };
+    }
+    if (/münchen|muenchen|munich/i.test(game.name ?? "") || /^(muenchen|munich)$/i.test(game.city_slug ?? "")) {
+      return { success: false, error: "München ist das Original — Locales bleiben." };
+    }
+
+    const result = await resetCityShellOpenerLocales(supabase, {
+      organizationId: orgId,
+      gameId: input.gameId,
+    });
+    return { success: true, data: result };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Locale-Quizzes konnten nicht zurückgesetzt werden.",
     };
   }
 }
