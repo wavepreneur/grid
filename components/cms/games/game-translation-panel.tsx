@@ -409,6 +409,8 @@ export function GameTranslationPanel({
         gameCopy: copy,
         slotCopies,
         linkIds: linkIdsForKeys,
+        // Manual Haken may keep DE==EN (brand / “Mini Game”); inferred may not.
+        allowIdentical: checked,
       }),
     [checked, copy, inferred, linkIdsForKeys, slotCopies, slotIdAliases, units],
   );
@@ -476,6 +478,7 @@ export function GameTranslationPanel({
           gameCopy: copy,
           slotCopies,
           linkIds: linkIdsForKeys,
+          allowIdentical: checked,
         });
         if (
           honestChecked.length !== checked.length ||

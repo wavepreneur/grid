@@ -1343,11 +1343,20 @@ export function unitNeedsMachineTranslation(unit: TranslationUnit, existing: str
   return current === unit.source.trim();
 }
 
-/** True when a checkmark honestly means “done”, not leftover German with a stale Haken. */
-export function isHonestlyConfirmed(unit: TranslationUnit, existing: string | undefined): boolean {
+/**
+ * True when a checkmark honestly means “done”.
+ * Same-as-source is normally rejected (stale DE after a bad translate) unless
+ * the author explicitly confirmed (`allowIdentical`) — brand names, “Mini Game”, …
+ */
+export function isHonestlyConfirmed(
+  unit: TranslationUnit,
+  existing: string | undefined,
+  options?: { allowIdentical?: boolean },
+): boolean {
   const current = (existing ?? "").trim();
   if (!current) return false;
   if (current !== unit.source.trim()) return true;
+  if (options?.allowIdentical) return true;
   // Same as source is OK for titles the author keeps, and for shared URLs.
   if (unit.key === "game:name") return true;
   if (unit.key.includes("iframe_url") || unit.key.includes("youtube_url") || /:url$/.test(unit.key)) {
@@ -1356,14 +1365,17 @@ export function isHonestlyConfirmed(unit: TranslationUnit, existing: string | un
   return false;
 }
 
-/** Drop stale checkmarks that still show the German source. */
+/** Drop stale checkmarks that still show the German source (unless explicitly allowed). */
 export function pruneConfirmedKeys(input: {
   keys: Iterable<string>;
   units: TranslationUnit[];
   gameCopy: GameLocaleCopy;
   slotCopies: Record<string, SlotLocaleCopy>;
   linkIds: string[];
+  /** Author-toggled keys may keep the source wording on purpose. */
+  allowIdentical?: Iterable<string>;
 }): string[] {
+  const allowIdentical = new Set(input.allowIdentical ?? []);
   const byKey = new Map(input.units.map((unit) => [unit.key, unit]));
   const kept: string[] = [];
   for (const key of input.keys) {
@@ -1375,7 +1387,9 @@ export function pruneConfirmedKeys(input: {
       slotCopies: input.slotCopies,
       linkIds: input.linkIds,
     });
-    if (isHonestlyConfirmed(unit, existing)) kept.push(key);
+    if (isHonestlyConfirmed(unit, existing, { allowIdentical: allowIdentical.has(key) })) {
+      kept.push(key);
+    }
   }
   return parseConfirmed(kept);
 }

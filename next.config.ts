@@ -9,6 +9,13 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "4.5mb",
     },
+    /**
+     * Next 16 defaults this to true. Turbopack then writes an unbounded
+     * `.next/dev/cache/turbopack` (seen at 38+ GB here). Exitmania on Next 15
+     * never had this. No size/age prune yet — keep it off until Next adds one.
+     * @see https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopackFileSystemCache
+     */
+    turbopackFileSystemCacheForDev: false,
   },
   async redirects() {
     return [
