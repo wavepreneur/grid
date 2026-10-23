@@ -47,7 +47,7 @@ import type { PlayerRole, SolveLevelPayload } from "@/lib/tells/level-types";
 import { resolveArchetypeRoleFlags } from "@/lib/tells/archetype-roles";
 import { resolveBlueprint } from "@/lib/tells/blueprints";
 import { parseContentConfig } from "@/lib/tells/content-engine";
-import { countActivePlayers } from "@/lib/tells/team-session";
+import { countActivePlayers, listActivePlayersOrdered } from "@/lib/tells/team-session";
 import { assertPlayerSession } from "@/lib/tells/session-auth";
 import { SESSION_SUPERSEDED } from "@/lib/tells/session-codes";
 import type { ActionResult } from "@/lib/tells/types";
@@ -411,6 +411,21 @@ export async function solveCurrentLevel(input: {
     const wantBonus = Boolean(bonusDefs.length > 0);
 
     const armedAt = new Date();
+    const needsAssignee = bonusDefs.some((def) => def.assign_one && !def.for_team);
+    const activePlayers = needsAssignee
+      ? await listActivePlayersOrdered(team.id)
+      : [];
+    const pickAssignee = (
+      forRole: "alpha" | "beta" | "gamma" | "delta",
+    ): { id: string; role: "alpha" | "beta" | "gamma" | "delta" } | null => {
+      if (activePlayers.length === 0) return null;
+      const chosen =
+        activePlayers.find((p) => normalizePlayRole(p.role) === forRole) ??
+        activePlayers[0];
+      if (!chosen) return null;
+      return { id: chosen.id, role: normalizePlayRole(chosen.role) };
+    };
+
     const bonusQueue: NonNullable<TeamGameState["bonus_queue"]> = wantBonus
       ? bonusDefs.map((def) => {
           const when = parseBonusWhen(def.when);
@@ -445,11 +460,17 @@ export async function solveCurrentLevel(input: {
             readyAt = null;
           }
 
+          const forTeam = Boolean(def.for_team);
+          const assignee =
+            def.assign_one && !forTeam ? pickAssignee(def.for_role) : null;
+          const forRole = assignee?.role ?? def.for_role;
+
           return {
             bonus_id: def.id,
             from_level: currentLevel,
-            for_role: def.for_role,
-            for_team: Boolean(def.for_team),
+            for_role: forRole,
+            for_team: forTeam,
+            for_player_id: assignee?.id,
             armed_at: armedAt.toISOString(),
             ready_at: readyAt,
             status,
@@ -460,8 +481,8 @@ export async function solveCurrentLevel(input: {
                 ? when.minutes
                 : undefined,
             task_snapshot: {
-              for_role: def.for_role,
-              for_team: Boolean(def.for_team),
+              for_role: forRole,
+              for_team: forTeam,
               title: def.title,
               intro: def.intro,
               description: def.description,

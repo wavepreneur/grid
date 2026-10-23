@@ -821,7 +821,8 @@ type GameLinkConfigPatch = {
   bonus_task_id?: string | null;
   bonus_bindings?: Array<{
     task_id: string;
-    role: "alpha" | "beta" | "gamma" | "team";
+    role: "alpha" | "beta" | "gamma" | "delta" | "team";
+    scope?: "one" | "all";
     when: {
       type:
         | "immediate"

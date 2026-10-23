@@ -213,7 +213,7 @@ events.studio_game_version_id  → eingefrorener Snapshot
 ```text
 studio_tasks.layer              → 1 | 2 | 3
 studio_tasks.content_context    → outdoor | indoor | online | any
-studio_tasks.role_assignment    → alpha | beta | gamma | team | none
+studio_tasks.role_assignment    → alpha | beta | gamma | delta | team | none
 studio_layer_packs              → benannte Packs je Layer (Stadt / Mission / Team)
 studio_layer_packs.city_id      → GRID cities.id (Exitmania cities.id via source_city_id)
 studio_layer_pack_items         → Tasks + GPS/Station/Bonus-Overrides (kein Task-Klon pro Stadt)

@@ -20,13 +20,35 @@ export type BonusWhen = {
   meters?: number;
 };
 
-export type BonusAudience = "alpha" | "beta" | "gamma" | "team";
+export type BonusAudience = "alpha" | "beta" | "gamma" | "delta" | "team";
+
+/** How many people in the audience get the bonus. Default: one. */
+export type BonusScope = "one" | "all";
 
 export type BonusBinding = {
   task_id: string;
   role: BonusAudience;
+  /** Default `one` — author must pick `all` for everyone in the audience. */
+  scope: BonusScope;
   when: BonusWhen;
 };
+
+export const BONUS_SCOPE_OPTIONS: Array<{
+  value: BonusScope;
+  label: string;
+  hint: string;
+}> = [
+  {
+    value: "one",
+    label: "Genau eine Person",
+    hint: "Eine Person bekommt die Aufgabe (Join-Reihenfolge). Ideal für Foto/Video.",
+  },
+  {
+    value: "all",
+    label: "Alle",
+    hint: "Jeder in der Zielgruppe sieht dieselbe Bonusaufgabe.",
+  },
+];
 
 export const BONUS_WHEN_OPTIONS: Array<{
   value: BonusWhenType;
@@ -90,21 +112,41 @@ export function hasAuthoredBonusBindings(overrides: GameLinkOverrides): boolean 
   return Array.isArray(overrides.bonus_bindings);
 }
 
+export function parseBonusAudience(raw: unknown): BonusAudience {
+  if (
+    raw === "alpha" ||
+    raw === "beta" ||
+    raw === "gamma" ||
+    raw === "delta" ||
+    raw === "team"
+  ) {
+    return raw;
+  }
+  return "gamma";
+}
+
+/**
+ * Missing scope: role `team` → `all` (legacy Ganzes Team), otherwise `one`.
+ * New Studio bindings always write an explicit scope (default `one`).
+ */
+export function parseBonusScope(raw: unknown, role: BonusAudience): BonusScope {
+  if (raw === "all" || raw === "one") return raw;
+  return role === "team" ? "all" : "one";
+}
+
 export function parseBonusBindings(overrides: GameLinkOverrides): BonusBinding[] {
   const raw = (overrides as GameLinkOverrides & { bonus_bindings?: unknown }).bonus_bindings;
   if (Array.isArray(raw)) {
     const out: BonusBinding[] = [];
     for (const entry of raw) {
       if (!entry || typeof entry !== "object") continue;
-      const e = entry as Partial<BonusBinding>;
+      const e = entry as Partial<BonusBinding> & { scope?: unknown };
       if (typeof e.task_id !== "string" || !e.task_id.trim()) continue;
-      const role: BonusAudience =
-        e.role === "alpha" || e.role === "beta" || e.role === "gamma" || e.role === "team"
-          ? e.role
-          : "gamma";
+      const role = parseBonusAudience(e.role);
       out.push({
         task_id: e.task_id.trim(),
         role,
+        scope: parseBonusScope(e.scope, role),
         when: parseBonusWhen(e.when),
       });
     }
@@ -118,14 +160,7 @@ export function parseBonusBindings(overrides: GameLinkOverrides): BonusBinding[]
       : null;
   if (!legacyId) return [];
 
-  const legacyRole = overrides.role;
-  const role: BonusAudience =
-    legacyRole === "alpha" ||
-    legacyRole === "beta" ||
-    legacyRole === "gamma" ||
-    legacyRole === "team"
-      ? legacyRole
-      : "gamma";
+  const role = parseBonusAudience(overrides.role);
 
   // Legacy Layer-3 trigger delay_seconds → delay_minutes
   const trigger = overrides.trigger;
@@ -137,7 +172,7 @@ export function parseBonusBindings(overrides: GameLinkOverrides): BonusBinding[]
     };
   }
 
-  return [{ task_id: legacyId, role, when }];
+  return [{ task_id: legacyId, role, scope: parseBonusScope(undefined, role), when }];
 }
 
 export function bonusWhenLabel(when: BonusWhen): string {

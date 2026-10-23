@@ -23,7 +23,9 @@ export function parseBonusTask(raw: unknown): BonusTask | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const b = raw as Partial<BonusTask>;
   const role = b.for_role;
-  if (role !== "alpha" && role !== "beta" && role !== "gamma") return undefined;
+  if (role !== "alpha" && role !== "beta" && role !== "gamma" && role !== "delta") {
+    return undefined;
+  }
   if (typeof b.title !== "string" || typeof b.question !== "string") return undefined;
 
   const mode =

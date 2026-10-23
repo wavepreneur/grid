@@ -324,7 +324,15 @@ function virtualLink(args: {
 }
 
 function bonusAudience(role: RoleAssignment | undefined): BonusAudience {
-  if (role === "alpha" || role === "beta" || role === "gamma" || role === "team") return role;
+  if (
+    role === "alpha" ||
+    role === "beta" ||
+    role === "gamma" ||
+    role === "delta" ||
+    role === "team"
+  ) {
+    return role;
+  }
   return "gamma";
 }
 
@@ -425,9 +433,11 @@ export function mergePackLinksOntoGame(input: {
       if (pack3 && bound.length > 0) {
         overrides.bonus_bindings = bound.map((bonus) => {
           const parsed = parsePackItemOverrides(bonus.overrides);
+          const role = bonusAudience(parsed.role);
           return {
             task_id: bonus.task_id,
-            role: bonusAudience(parsed.role),
+            role,
+            scope: "one" as const,
             when: parsed.when ?? { type: "immediate" as const },
           };
         });

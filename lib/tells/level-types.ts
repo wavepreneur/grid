@@ -104,6 +104,11 @@ export type BonusDefinition = BonusTask & {
   id: string;
   when: BonusWhenCompiled;
   fanfare?: boolean;
+  /**
+   * When true, arming picks one player (`for_player_id`) instead of the whole audience.
+   * Studio default; author must opt into `scope: "all"`.
+   */
+  assign_one?: boolean;
 };
 
 export type LevelTileType =

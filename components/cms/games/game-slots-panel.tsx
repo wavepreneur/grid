@@ -41,6 +41,7 @@ import { useStudioCache } from "@/lib/platform/studio-cache";
 import type { ContentMode, RoleAssignment } from "@/lib/cms/layer-model";
 import { contentModeLabel } from "@/lib/cms/layer-model";
 import {
+  BONUS_SCOPE_OPTIONS,
   BONUS_WHEN_OPTIONS,
   type BonusAudience,
   type BonusBinding,
@@ -253,6 +254,7 @@ const VISIBLE_ROLE_OPTIONS: Array<{ value: RoleAssignment; label: string }> = [
   { value: "alpha", label: "Nur Alpha" },
   { value: "beta", label: "Nur Beta" },
   { value: "gamma", label: "Nur Gamma" },
+  { value: "delta", label: "Nur Delta" },
 ];
 
 const BONUS_ROLE_OPTIONS: Array<{ value: BonusAudience; label: string; hint: string }> = [
@@ -272,9 +274,14 @@ const BONUS_ROLE_OPTIONS: Array<{ value: BonusAudience; label: string; hint: str
     hint: "Technisch Beta — im Spiel erscheint der Anzeigename (z. B. Profiler).",
   },
   {
+    value: "delta",
+    label: "Nur Delta",
+    hint: "Technisch Delta — vierte Rolle im Team.",
+  },
+  {
     value: "team",
     label: "Ganzes Team",
-    hint: "Alle Spieler sehen dieselbe Bonusaufgabe mit Team-Intro.",
+    hint: "Zielgruppe = ganzes Team (mit „Alle“ oder „Genau eine“ darunter).",
   },
 ];
 
@@ -416,10 +423,15 @@ export function GameSlotsPanel({
                 task_id: slot.bonusLink.task_id,
                 role: (() => {
                   const r = parseLinkOverrides(slot.bonusLink!.overrides).role;
-                  return r === "alpha" || r === "beta" || r === "gamma" || r === "team"
+                  return r === "alpha" ||
+                    r === "beta" ||
+                    r === "gamma" ||
+                    r === "delta" ||
+                    r === "team"
                     ? r
                     : "gamma";
                 })(),
+                scope: "one" as const,
                 when: { type: "immediate" as const },
               },
             ]
@@ -437,6 +449,7 @@ export function GameSlotsPanel({
       overrides.visible_to === "alpha" ||
         overrides.visible_to === "beta" ||
         overrides.visible_to === "gamma" ||
+        overrides.visible_to === "delta" ||
         overrides.visible_to === "team"
         ? overrides.visible_to
         : "team",
@@ -1294,7 +1307,8 @@ export function GameSlotsPanel({
                       ...prev,
                       {
                         task_id: "",
-                        role: "team",
+                        role: "gamma",
+                        scope: "one",
                         when: { type: "immediate" },
                       },
                     ])
@@ -1304,11 +1318,10 @@ export function GameSlotsPanel({
                 </StudioButton>
               </div>
 
-              {bonusBindings.some((b) => b.role !== "team") ? (
+              {bonusBindings.some((b) => b.role !== "team" && b.scope === "all") ? (
                 <StudioHint tone="warn">
-                  Rollen-Bonus (nur Alpha/Beta/Gamma): Bei Solo-Teams oder wenn die Rolle im
-                  Team fehlt, erscheint dieser Bonus für niemanden. Für Tests oft „Ganzes Team“
-                  oder die Rolle wählen, die wirklich mitspielt.
+                  Rollen-Bonus für alle mit dieser Rolle: Bei Solo-Teams oder wenn die Rolle
+                  fehlt, erscheint er für niemanden. Für Foto/Video besser „Genau eine Person“.
                 </StudioHint>
               ) : null}
 
@@ -1396,6 +1409,33 @@ export function GameSlotsPanel({
                               }
                               className={`rounded-2xl border px-3 py-2 text-left text-sm ${
                                 binding.role === opt.value
+                                  ? "border-primary bg-primary/10 font-semibold"
+                                  : "border-border"
+                              }`}
+                            >
+                              <span className="block font-medium">{opt.label}</span>
+                              <span className="text-xs text-muted-foreground">{opt.hint}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <StudioLabel>Wie viele?</StudioLabel>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {BONUS_SCOPE_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() =>
+                                setBonusBindings((prev) =>
+                                  prev.map((b, i) =>
+                                    i === index ? { ...b, scope: opt.value } : b,
+                                  ),
+                                )
+                              }
+                              className={`rounded-2xl border px-3 py-2 text-left text-sm ${
+                                (binding.scope ?? "one") === opt.value
                                   ? "border-primary bg-primary/10 font-semibold"
                                   : "border-border"
                               }`}

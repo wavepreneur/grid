@@ -618,7 +618,9 @@ export function compileStudioGameToLevels(input: {
                     | "alpha"
                     | "beta"
                     | "gamma"
+                    | "delta"
                     | "team",
+                  scope: "one" as const,
                   when: { type: "immediate" as const },
                 },
                 link,
@@ -627,21 +629,25 @@ export function compileStudioGameToLevels(input: {
         for (const { binding, link } of pairs) {
           if (!link) continue;
           const role = binding.role ?? "gamma";
-          const bonus = taskContentToBonus(
-            link.task,
+          const assignOne = (binding.scope ?? "one") === "one";
+          const audienceRole =
             role === "team"
               ? "team"
-              : role === "alpha" || role === "beta" || role === "gamma"
+              : role === "alpha" ||
+                  role === "beta" ||
+                  role === "gamma" ||
+                  role === "delta"
                 ? role
-                : "gamma",
-          );
+                : "gamma";
+          const bonus = taskContentToBonus(link.task, audienceRole, { assignOne });
           if (!bonus) continue;
-          if (role === "team") bonus.for_team = true;
+          if (audienceRole === "team" && !assignOne) bonus.for_team = true;
           compiled.push({
             ...bonus,
             id: `${slot.index}-${link.task_id}`,
             when: parseBonusWhen(binding.when),
             fanfare: true,
+            assign_one: assignOne,
           });
         }
 

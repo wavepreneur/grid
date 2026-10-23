@@ -233,7 +233,9 @@ export function groupLinksByLayerOnLink<T extends Pick<StudioGameTaskLink, "laye
 export function roleAssignmentToPlayerRole(
   role: RoleAssignment | undefined,
 ): PlayerRole | null {
-  if (role === "alpha" || role === "beta" || role === "gamma") return role;
+  if (role === "alpha" || role === "beta" || role === "gamma" || role === "delta") {
+    return role;
+  }
   return null;
 }
 
@@ -245,6 +247,8 @@ export function roleLabelShort(role: RoleAssignment | undefined): string {
       return "Beta";
     case "gamma":
       return "Gamma";
+    case "delta":
+      return "Delta";
     case "team":
       return "Alle";
     default:

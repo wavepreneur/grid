@@ -15,7 +15,7 @@ export type ContentContext = (typeof CONTENT_CONTEXTS)[number];
 export const CONTENT_MODES = ["outdoor", "indoor", "online"] as const;
 export type ContentMode = (typeof CONTENT_MODES)[number];
 
-export const ROLE_ASSIGNMENTS = ["alpha", "beta", "gamma", "team", "none"] as const;
+export const ROLE_ASSIGNMENTS = ["alpha", "beta", "gamma", "delta", "team", "none"] as const;
 export type RoleAssignment = (typeof ROLE_ASSIGNMENTS)[number];
 
 export type LayerDefinition = {
@@ -275,6 +275,7 @@ export function parseRoleAssignment(raw: unknown): RoleAssignment {
     raw === "alpha" ||
     raw === "beta" ||
     raw === "gamma" ||
+    raw === "delta" ||
     raw === "team" ||
     raw === "none"
   ) {
@@ -387,6 +388,8 @@ export function roleAssignmentLabel(role: RoleAssignment): string {
       return "Beta (Rätselblatt)";
     case "gamma":
       return "Gamma (Aufgabe)";
+    case "delta":
+      return "Delta";
     case "team":
       return "Ganzes Team";
     case "none":

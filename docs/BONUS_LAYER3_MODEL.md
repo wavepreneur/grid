@@ -18,7 +18,8 @@ A mission may bind **0…N** bonuses. Each binding has:
 | Field | Meaning |
 |-------|---------|
 | **Content** | Layer-3 pool task (MC) |
-| **Who** | Alpha / Beta / Gamma / whole team |
+| **Who** | Alpha / Beta / Gamma / Delta / whole team |
+| **How many** | `one` (default) = one player via `for_player_id`; `all` = entire audience |
 | **When** | Fire condition relative to this mission (or game) |
 
 ### When (shared vocabulary — not a second rule engine)
@@ -45,7 +46,8 @@ bonuses: BonusDefinition[]  // full list
 bonus?: BonusTask           // deprecated alias = bonuses[0] content (compat)
 ```
 
-Each `BonusDefinition` = content (`BonusTask`) + `id` + `when` + `fanfare: true`.
+Each `BonusDefinition` = content (`BonusTask`) + `id` + `when` + `fanfare: true` + optional `assign_one`.
+When `assign_one` is set, solve arms the queue item with `for_player_id` (first matching role by join order, else first active player).
 
 ### Game state: queue (not a single phase lock)
 

@@ -234,18 +234,30 @@ export function arrivalQuizToRuntime(quiz: StudioArrivalQuiz): ArrivalQuiz | nul
   };
 }
 
+const ROLE_LABEL: Record<"alpha" | "beta" | "gamma" | "delta", string> = {
+  alpha: "Alpha",
+  beta: "Beta",
+  gamma: "Gamma",
+  delta: "Delta",
+};
+
 export function taskContentToBonus(
   task: StudioGameTaskLink["task"],
-  forRole: "alpha" | "beta" | "gamma" | "team" = "gamma",
+  forRole: "alpha" | "beta" | "gamma" | "delta" | "team" = "gamma",
+  options?: { assignOne?: boolean },
 ): BonusTask | null {
   const content = normalizeTaskContent(task.content);
   const question = (content.question ?? task.description ?? task.title ?? "").trim();
   if (!question) return null;
 
+  const assignOne = Boolean(options?.assignOne);
   const role =
     forRole === "team"
       ? "gamma"
-      : forRole === "alpha" || forRole === "beta" || forRole === "gamma"
+      : forRole === "alpha" ||
+          forRole === "beta" ||
+          forRole === "gamma" ||
+          forRole === "delta"
         ? forRole
         : "gamma";
   const reward =
@@ -257,11 +269,16 @@ export function taskContentToBonus(
   const hero_image_url = content.hero_image_url?.trim() || undefined;
   const tiles: LevelContentTile[] | undefined = studioTilesToLevelTiles(content.tiles);
   const scoring = studioScoringToLevelScoring(content.scoring);
-  const intro =
-    forRole === "team"
+  const roleLabel = ROLE_LABEL[role];
+  const intro = assignOne
+    ? forRole === "team"
+      ? "Eine Person im Team bekommt diese Bonusaufgabe."
+      : `Eine Person (${roleLabel}) bekommt diese Bonusaufgabe.`
+    : forRole === "team"
       ? "Diese Bonusaufgabe sehen alle im Team."
-      : `Nur ${role === "alpha" ? "Alpha" : role === "beta" ? "Beta" : "Gamma"} sieht diese Aufgabe.`;
-  const for_team = forRole === "team";
+      : `Alle mit Rolle ${roleLabel} sehen diese Aufgabe.`;
+  // Team + one person is still a personal assignment, not a shared team card.
+  const for_team = forRole === "team" && !assignOne;
 
   if (content.answer_type === "choice" || content.answer_type === "multi_choice") {
     if (!content.options?.length) return null;
@@ -506,12 +523,18 @@ export function buildGameSlots(
         : bonusLinks.map((link) => {
             const bo = parseLinkOverrides(link.overrides);
             const role = bo.role ?? "gamma";
+            const audience =
+              role === "alpha" ||
+              role === "beta" ||
+              role === "gamma" ||
+              role === "delta" ||
+              role === "team"
+                ? role
+                : ("gamma" as const);
             return {
               task_id: link.task_id,
-              role:
-                role === "alpha" || role === "beta" || role === "gamma" || role === "team"
-                  ? role
-                  : ("gamma" as const),
+              role: audience,
+              scope: "one" as const,
               when: { type: "immediate" as const },
             };
           });
