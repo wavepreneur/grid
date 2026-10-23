@@ -1405,6 +1405,17 @@ function cloneSlotCopy(slot: SlotLocaleCopy): SlotLocaleCopy {
   };
 }
 
+function upsertById<T extends { id: string }>(
+  rows: T[] | undefined,
+  id: string,
+  patch: Partial<T>,
+): T[] {
+  const list = rows ?? [];
+  const index = list.findIndex((row) => row.id === id);
+  if (index < 0) return [...list, { id, ...patch } as T];
+  return list.map((row, i) => (i === index ? { ...row, ...patch } : row));
+}
+
 function setBonusPath(bonus: BonusLocaleCopy, path: string, value: string): BonusLocaleCopy {
   if (path === "title") return { ...bonus, title: value };
   if (path === "description") return { ...bonus, description: value };
@@ -1414,7 +1425,7 @@ function setBonusPath(bonus: BonusLocaleCopy, path: string, value: string): Bonu
     const id = path.slice("option:".length);
     return {
       ...bonus,
-      options: (bonus.options ?? []).map((option) => (option.id === id ? { ...option, label: value } : option)),
+      options: upsertById(bonus.options, id, { label: value }),
     };
   }
   if (path.startsWith("tile:")) {
@@ -1423,16 +1434,16 @@ function setBonusPath(bonus: BonusLocaleCopy, path: string, value: string): Bonu
     if (sep <= 0) return bonus;
     const id = rest.slice(0, sep);
     const field = rest.slice(sep + 1);
-    return {
-      ...bonus,
-      tiles: (bonus.tiles ?? []).map((tile) => {
-        if (tile.id !== id) return tile;
-        if (field === "label") return { ...tile, label: value };
-        if (field === "url") return { ...tile, url: value };
-        if (field === "hint") return { ...tile, hint_text: value };
-        return tile;
-      }),
-    };
+    const patch =
+      field === "label"
+        ? { label: value }
+        : field === "url"
+          ? { url: value }
+          : field === "hint"
+            ? { hint_text: value }
+            : null;
+    if (!patch) return bonus;
+    return { ...bonus, tiles: upsertById(bonus.tiles, id, patch) };
   }
   return bonus;
 }
@@ -1447,7 +1458,7 @@ function setSlotPath(slot: SlotLocaleCopy, path: string, value: string): SlotLoc
     const id = path.slice("option:".length);
     return {
       ...slot,
-      options: (slot.options ?? []).map((option) => (option.id === id ? { ...option, label: value } : option)),
+      options: upsertById(slot.options, id, { label: value }),
     };
   }
   if (path.startsWith("tile:")) {
@@ -1456,22 +1467,22 @@ function setSlotPath(slot: SlotLocaleCopy, path: string, value: string): SlotLoc
     if (sep <= 0) return slot;
     const id = rest.slice(0, sep);
     const field = rest.slice(sep + 1);
-    return {
-      ...slot,
-      tiles: (slot.tiles ?? []).map((tile) => {
-        if (tile.id !== id) return tile;
-        if (field === "label") return { ...tile, label: value };
-        if (field === "url") return { ...tile, url: value };
-        if (field === "hint") return { ...tile, hint_text: value };
-        return tile;
-      }),
-    };
+    const patch =
+      field === "label"
+        ? { label: value }
+        : field === "url"
+          ? { url: value }
+          : field === "hint"
+            ? { hint_text: value }
+            : null;
+    if (!patch) return slot;
+    return { ...slot, tiles: upsertById(slot.tiles, id, patch) };
   }
   if (path.startsWith("hint:")) {
     const id = path.slice("hint:".length);
     return {
       ...slot,
-      hints: (slot.hints ?? []).map((hint) => (hint.id === id ? { ...hint, text: value } : hint)),
+      hints: upsertById(slot.hints, id, { text: value }),
     };
   }
   if (path.startsWith("quiz:")) {
@@ -1484,9 +1495,7 @@ function setSlotPath(slot: SlotLocaleCopy, path: string, value: string): SlotLoc
     else if (quizPath === "side_fact") quiz.side_fact = value;
     else if (quizPath.startsWith("option:")) {
       const id = quizPath.slice("option:".length);
-      quiz.options = (quiz.options ?? []).map((option) =>
-        option.id === id ? { ...option, label: value } : option,
-      );
+      quiz.options = upsertById(quiz.options, id, { label: value });
     }
     return { ...slot, quiz };
   }

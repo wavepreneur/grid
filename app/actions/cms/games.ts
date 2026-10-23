@@ -23,6 +23,7 @@ import {
   isHonestlyConfirmed,
   localeCopyWithCoverage,
   localesFromOverrides,
+  mergeSlotCopy,
   parseConfirmed,
   parseTranslations,
   pruneConfirmedKeys,
@@ -2037,6 +2038,14 @@ export async function translateGameLocale(input: {
       });
       return unitNeedsMachineTranslation(unit, existing);
     });
+    // Seed empty locale slots from German structure so tile/option upserts have rows to fill.
+    const seededSlotCopies: Record<string, SlotLocaleCopy> = { ...slotCopies };
+    if (!recipeBound) {
+      for (const slot of sourceSlots) {
+        seededSlotCopies[slot.linkId] = mergeSlotCopy(slot.source, slotCopies[slot.linkId] ?? {});
+      }
+    }
+
     const translated =
       toTranslate.length > 0
         ? await translateUnitsNative({
@@ -2048,7 +2057,7 @@ export async function translateGameLocale(input: {
 
     const applied = applyTranslationUnits({
       gameCopy: existingCopy,
-      slotCopies,
+      slotCopies: seededSlotCopies,
       linkIds,
       values: translated,
     });

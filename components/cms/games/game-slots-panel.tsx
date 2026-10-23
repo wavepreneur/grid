@@ -1003,7 +1003,7 @@ export function GameSlotsPanel({
                       label="Quiz-Aufgabe aus dem Pool"
                       search={openerSearch}
                       onSearch={setOpenerSearch}
-                      placeholder="Suchen (nur Multiple Choice)…"
+                      placeholder="Suchen oder Task-ID einfügen…"
                       tagIndex={openerTagIndex}
                       selectedTags={openerTags}
                       onTagsChange={setOpenerTags}

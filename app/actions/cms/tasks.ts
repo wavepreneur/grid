@@ -265,6 +265,26 @@ export async function listTaskLibraryTags(): Promise<ActionResult<TaskLibraryTag
   }
 }
 
+const TASK_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function toLibraryItem(row: {
+  id: unknown;
+  title: unknown;
+  slug: unknown;
+  tags: unknown;
+  content: unknown;
+}): TaskLibraryItem {
+  const content = row.content as { answer_type?: string } | null;
+  return {
+    id: row.id as string,
+    title: row.title as string,
+    slug: row.slug as string,
+    tags: (row.tags as string[]) ?? [],
+    answer_type: content?.answer_type,
+  };
+}
+
 /** Lightweight task search for the game logic sidebar — no full content payload. */
 export async function searchTaskLibrary(input: {
   query?: string;
@@ -287,6 +307,29 @@ export async function searchTaskLibrary(input: {
           .filter(Boolean),
       ),
     ];
+    const q = input.query?.trim() ?? "";
+
+    // Exact Task-ID: pin the canonical opener even when title duplicates exist.
+    if (TASK_ID_RE.test(q)) {
+      const { data, error } = await supabase
+        .from("studio_tasks")
+        .select("id, title, slug, tags, content")
+        .eq("id", q)
+        .eq("is_active", true)
+        .or(`organization_id.eq.${orgId},organization_id.is.null`)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data) return { success: true, data: [] };
+      const item = toLibraryItem(data);
+      if (
+        input.quizOnly &&
+        item.answer_type !== "choice" &&
+        item.answer_type !== "multi_choice"
+      ) {
+        return { success: true, data: [] };
+      }
+      return { success: true, data: [item] };
+    }
 
     let query = supabase
       .from("studio_tasks")
@@ -300,7 +343,6 @@ export async function searchTaskLibrary(input: {
       query = query.contains("tags", [tag]);
     }
 
-    const q = input.query?.trim();
     if (q) {
       query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,slug.ilike.%${q}%`);
     }
@@ -308,16 +350,7 @@ export async function searchTaskLibrary(input: {
     const { data, error } = await query;
     if (error) throw new Error(error.message);
 
-    let items = (data ?? []).map((row) => {
-      const content = row.content as { answer_type?: string } | null;
-      return {
-        id: row.id as string,
-        title: row.title as string,
-        slug: row.slug as string,
-        tags: (row.tags as string[]) ?? [],
-        answer_type: content?.answer_type,
-      };
-    });
+    let items = (data ?? []).map((row) => toLibraryItem(row));
 
     if (input.quizOnly) {
       items = items
@@ -336,7 +369,6 @@ export async function searchTaskLibrary(input: {
     };
   }
 }
-
 export async function getTask(taskId: string): Promise<ActionResult<StudioTask>> {
   try {
     const supabase = createAdminClient();
