@@ -276,7 +276,7 @@ const BONUS_ROLE_OPTIONS: Array<{ value: BonusAudience; label: string; hint: str
   {
     value: "delta",
     label: "Nur Delta",
-    hint: "Technisch Delta — vierte Rolle im Team.",
+    hint: "Vierte Person. Fehlt Delta heute → bei „Genau eine“ geht’s an Alpha.",
   },
   {
     value: "team",

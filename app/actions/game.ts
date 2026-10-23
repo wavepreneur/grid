@@ -415,13 +415,16 @@ export async function solveCurrentLevel(input: {
     const activePlayers = needsAssignee
       ? await listActivePlayersOrdered(team.id)
       : [];
+    // One-person bonus: preferred role → Alpha if that seat is empty → first joiner.
+    // e.g. Delta authored but only 3 players today → Alpha gets the task.
     const pickAssignee = (
       forRole: "alpha" | "beta" | "gamma" | "delta",
     ): { id: string; role: "alpha" | "beta" | "gamma" | "delta" } | null => {
       if (activePlayers.length === 0) return null;
+      const byRole = (role: "alpha" | "beta" | "gamma" | "delta") =>
+        activePlayers.find((p) => normalizePlayRole(p.role) === role);
       const chosen =
-        activePlayers.find((p) => normalizePlayRole(p.role) === forRole) ??
-        activePlayers[0];
+        byRole(forRole) ?? (forRole !== "alpha" ? byRole("alpha") : null) ?? activePlayers[0];
       if (!chosen) return null;
       return { id: chosen.id, role: normalizePlayRole(chosen.role) };
     };

@@ -41,7 +41,7 @@ export const BONUS_SCOPE_OPTIONS: Array<{
   {
     value: "one",
     label: "Genau eine Person",
-    hint: "Eine Person bekommt die Aufgabe (Join-Reihenfolge). Ideal für Foto/Video.",
+    hint: "Eine Person bekommt die Aufgabe. Fehlt die Rolle (z. B. kein Delta), fällt es auf Alpha.",
   },
   {
     value: "all",
