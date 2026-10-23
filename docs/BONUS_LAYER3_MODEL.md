@@ -49,6 +49,7 @@ bonus?: BonusTask           // deprecated alias = bonuses[0] content (compat)
 Each `BonusDefinition` = content (`BonusTask`) + `id` + `when` + `fanfare: true` + optional `assign_one`.
 When `assign_one` is set, solve arms the queue item with `for_player_id`: matching role by join order → if that seat is empty (e.g. Delta with only 3 players) → **Alpha** → else first active player.
 
+
 ### Game state: queue (not a single phase lock)
 
 ```ts

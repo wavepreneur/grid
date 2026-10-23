@@ -340,7 +340,8 @@ export function GameTranslationPanel({
       const geoQuiz = geo ? localesFromOverrides(geo.overrides)[locale]?.quiz : undefined;
       next[linkId] = mergeSlotCopy(sourceSlots[linkId] ?? {}, {
         ...levelLocale,
-        quiz: geoQuiz,
+        // Mission opener_task_id stores locales on the level link; city packs on geo.
+        quiz: geoQuiz ?? levelLocale.quiz,
       });
     }
     return next;
@@ -509,7 +510,7 @@ export function GameTranslationPanel({
                 linkId: slot.levelLink.id,
                 copy: {
                   ...slotCopy,
-                  quiz: localesFromOverrides(slot.levelLink.overrides)[locale]?.quiz,
+                  quiz: slotCopy.quiz,
                 },
               },
             ];

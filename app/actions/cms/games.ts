@@ -77,6 +77,12 @@ import { loadMergedGameTaskLinksForGame, addTaskToLayerPack, fetchPackItem, fill
 import { gameUsesLayerPacks, isRecipeCityShell, packItemToGameLink, parsePackLinkId } from "@/lib/cms/layer-packs";
 import { localeCopyFromPatch, localeWritePackIds } from "@/lib/cms/studio-mutate";
 import { getOwnedCollection } from "@/app/actions/cms/collections";
+import {
+  loadOpenerLocalesByTaskIds,
+  quizLocaleHasCopy,
+  sharedQuizForLanguage,
+  withSharedOpenerLocales,
+} from "@/lib/cms/opener-locale-reuse";
 
 function normalizeGameRow(row: StudioGame): StudioGame {
   return {
@@ -846,6 +852,7 @@ async function applyGameLinkConfigPatch(
   orgId: string,
   overrides: GameLinkOverrides,
   patch: GameLinkConfigPatch,
+  sourceLanguage: StudioLanguage = "de",
 ): Promise<ActionResult<GameLinkOverrides>> {
   if (patch.location !== undefined) {
     if (patch.location) {
@@ -908,6 +915,14 @@ async function applyGameLinkConfigPatch(
       } else {
         delete overrides.opener_points;
       }
+      // Inherit EN/FR/… quizzes already authored for this pool task (e.g. München).
+      const shared = await loadOpenerLocalesByTaskIds(supabase, orgId, [patch.opener_task_id]);
+      const merged = withSharedOpenerLocales(
+        overrides as Record<string, unknown>,
+        shared.get(patch.opener_task_id),
+        sourceLanguage,
+      ) as GameLinkOverrides;
+      if (merged.locales) overrides.locales = merged.locales;
     } else {
       overrides.opener_enabled = false;
       delete overrides.opener_task_id;
@@ -985,6 +1000,13 @@ export async function updateGameTaskLinkConfig(
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
+    const { data: gameLangRow } = await supabase
+      .from("studio_games")
+      .select("language")
+      .eq("id", gameId)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    const sourceLanguage = parseStudioLanguage(gameLangRow?.language);
 
     if (parsePackLinkId(linkId)) {
       const parsed = parsePackLinkId(linkId);
@@ -995,7 +1017,13 @@ export async function updateGameTaskLinkConfig(
       const overrides: GameLinkOverrides = {
         ...(((item.overrides as GameLinkOverrides) ?? {}) as GameLinkOverrides),
       };
-      const applied = await applyGameLinkConfigPatch(supabase, orgId, overrides, patch);
+      const applied = await applyGameLinkConfigPatch(
+        supabase,
+        orgId,
+        overrides,
+        patch,
+        sourceLanguage,
+      );
       if (!applied.success) return applied;
 
       return savePackBackedGameLink({
@@ -1021,7 +1049,13 @@ export async function updateGameTaskLinkConfig(
     const overrides: GameLinkOverrides = {
       ...(((existing as { overrides: GameLinkOverrides }).overrides ?? {}) as GameLinkOverrides),
     };
-    const applied = await applyGameLinkConfigPatch(supabase, orgId, overrides, patch);
+    const applied = await applyGameLinkConfigPatch(
+      supabase,
+      orgId,
+      overrides,
+      patch,
+      sourceLanguage,
+    );
     if (!applied.success) return applied;
 
     const { error: updateError } = await supabase
@@ -2008,6 +2042,7 @@ export async function translateGameLocale(input: {
     const openerSlots = openerSlotsFromLinks(links);
     const shellSlots = cityShellQuizSlots(links);
     const sourceSlots = sourceSlotsFromLinks(links);
+    const gameSlots = buildGameSlots(links);
     const units = recipeBound
       ? collectCityShellTranslationUnits({ game, slots: shellSlots })
       : collectTranslationUnits({
@@ -2017,14 +2052,45 @@ export async function translateGameLocale(input: {
     const existingCopy: GameLocaleCopy = recipeBound
       ? { name: game.translations[input.language]?.name ?? game.name, ...game.translations[input.language] }
       : { ...seedLocaleCopy(game), ...game.translations[input.language] };
+
+    // Opener quizzes already translated on city packs (München EN, …) — reuse by task id.
+    const openerTaskIds = gameSlots.flatMap((slot) => {
+      const ids: string[] = [];
+      if (slot.openerTaskId) ids.push(slot.openerTaskId);
+      const geo = layer1LinkForSlot(slot);
+      if (geo?.task_id) ids.push(geo.task_id);
+      return ids;
+    });
+    const sharedOpeners = recipeBound
+      ? new Map()
+      : await loadOpenerLocalesByTaskIds(supabase, orgId, openerTaskIds);
+
     const slotCopies: Record<string, SlotLocaleCopy> = {};
     if (recipeBound) {
       for (const slot of shellSlots) {
         slotCopies[slot.linkId] = { quiz: slot.source.quiz };
       }
     } else {
-      for (const slot of sourceSlots) {
-        slotCopies[slot.linkId] = localesFromOverrides(slot.overrides)[input.language] ?? {};
+      for (const slot of gameSlots) {
+        const sourceRow = sourceSlots.find((row) => row.linkId === slot.levelLink.id);
+        const levelLocale = localesFromOverrides(slot.levelLink.overrides)[input.language] ?? {};
+        const geo = layer1LinkForSlot(slot);
+        const geoQuiz = geo
+          ? localesFromOverrides(geo.overrides)[input.language]?.quiz
+          : undefined;
+        const sharedQuiz =
+          sharedQuizForLanguage(sharedOpeners, slot.openerTaskId, input.language) ??
+          sharedQuizForLanguage(sharedOpeners, geo?.task_id, input.language);
+        const quiz = quizLocaleHasCopy(levelLocale.quiz)
+          ? levelLocale.quiz
+          : quizLocaleHasCopy(geoQuiz)
+            ? geoQuiz
+            : sharedQuiz;
+        slotCopies[slot.levelLink.id] = {
+          ...(sourceRow ? localesFromOverrides(sourceRow.overrides)[input.language] : {}),
+          ...levelLocale,
+          ...(quizLocaleHasCopy(quiz) ? { quiz } : {}),
+        };
       }
     }
 
@@ -2069,12 +2135,27 @@ export async function translateGameLocale(input: {
         return unit ? isHonestlyConfirmed(unit, value) : false;
       })
       .map(([key]) => key);
+    // Opener fields inherited from city packs count as done — no second Gemini pass.
+    const inheritedQuizConfirmed = units
+      .filter((unit) => unit.key.includes(":quiz:"))
+      .filter((unit) => !newlyConfirmed.includes(unit.key))
+      .filter((unit) => {
+        const value = existingValueForTranslationKey({
+          key: unit.key,
+          gameCopy: applied.gameCopy,
+          slotCopies: applied.slotCopies,
+          linkIds,
+        });
+        return isHonestlyConfirmed(unit, value);
+      })
+      .map((unit) => unit.key);
     const confirmed = pruneConfirmedKeys({
       keys: [
         ...parseConfirmed(existingCopy.confirmed).filter((key) =>
           recipeBound ? key === "game:name" || key.includes(":quiz:") : true,
         ),
         ...newlyConfirmed,
+        ...inheritedQuizConfirmed,
       ],
       units,
       gameCopy: recipeBound ? { ...existingCopy, ...applied.gameCopy, name: existingCopy.name } : applied.gameCopy,
@@ -2110,15 +2191,16 @@ export async function translateGameLocale(input: {
               },
             ];
           })
-        : buildGameSlots(links).flatMap((slot) => {
+        : gameSlots.flatMap((slot) => {
             const copy = applied.slotCopies[slot.levelLink.id] ?? {};
             const geo = layer1LinkForSlot(slot);
+            // Persist opener quiz on the mission link (opener_task_id) and on geo when present.
             const rows: Array<{ linkId: string; copy: SlotLocaleCopy }> = [
               {
                 linkId: slot.levelLink.id,
                 copy: {
                   ...copy,
-                  quiz: localesFromOverrides(slot.levelLink.overrides)[input.language]?.quiz,
+                  quiz: copy.quiz,
                 },
               },
             ];
