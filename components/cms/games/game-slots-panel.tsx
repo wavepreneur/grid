@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   addTaskToGame,
+  listGameTasks,
   removeTaskFromGame,
   reorderGameTasksInLayer,
   updateGameTaskLinkConfig,
 } from "@/app/actions/cms/games";
+import { getTask } from "@/app/actions/cms/tasks";
 import { StudioPanel } from "@/components/cms/admin-shell";
 import { StudioModal } from "@/components/cms/shared/studio-modal";
 import { useStudioConfirm } from "@/components/cms/shared/studio-confirm";
@@ -402,6 +404,34 @@ export function GameSlotsPanel({
     cache.setGameTaskLinks(gameId, next);
   }
 
+  /** Titles for bound pool tasks — links may lag after save, so fall back to getTask. */
+  async function resolveBonusTitles(bindings: BonusBinding[], slot: GameSlot) {
+    const titles: Record<string, string> = {};
+    for (const binding of bindings) {
+      if (!binding.task_id) continue;
+      const linked =
+        slot.bonusLinks.find((link) => link.task_id === binding.task_id) ??
+        (slot.bonusLink?.task_id === binding.task_id ? slot.bonusLink : null) ??
+        links.find((link) => link.task_id === binding.task_id) ??
+        null;
+      const fromLink = linked?.task?.title?.trim();
+      if (fromLink) titles[binding.task_id] = fromLink;
+    }
+    setBonusTitles(titles);
+    const missing = bindings
+      .map((b) => b.task_id)
+      .filter((id): id is string => Boolean(id) && !titles[id]);
+    if (missing.length === 0) return;
+    await Promise.all(
+      missing.map(async (taskId) => {
+        const result = await getTask(taskId);
+        const title = result.success ? result.data?.title?.trim() : "";
+        if (title) titles[taskId] = title;
+      }),
+    );
+    setBonusTitles({ ...titles });
+  }
+
   function openQuizEditor(slot: GameSlot) {
     setEditSlot(slot);
     const overrides = parseLinkOverrides(slot.levelLink.overrides);
@@ -436,15 +466,8 @@ export function GameSlotsPanel({
               },
             ]
           : [];
-    const titles: Record<string, string> = {};
-    for (const binding of nextBindings) {
-      const linked =
-        slot.bonusLinks.find((link) => link.task_id === binding.task_id) ??
-        (slot.bonusLink?.task_id === binding.task_id ? slot.bonusLink : null);
-      if (linked?.task.title) titles[binding.task_id] = linked.task.title;
-    }
-    setBonusTitles(titles);
     setBonusBindings(nextBindings);
+    void resolveBonusTitles(nextBindings, slot);
     setVisibleTo(
       overrides.visible_to === "alpha" ||
         overrides.visible_to === "beta" ||
@@ -699,7 +722,9 @@ export function GameSlotsPanel({
         }
       }
 
-      commit(nextLinks);
+      // Server may have auto-attached Layer-3 rows the client never saw — refresh cache.
+      const refreshed = await listGameTasks(gameId);
+      commit(refreshed.success && refreshed.data ? refreshed.data : nextLinks);
       setMessage("Aufgabe gespeichert.");
       setEditSlot(null);
     });
