@@ -83,18 +83,21 @@ function extendTagIndex(
   index: { tags: string[]; sets: string[][] } | undefined,
   tasks: Array<{ tags: string[] }>,
 ) {
-  const unique = new Set(index?.tags ?? []);
+  // Keep server recent-first order; append any tags only seen on the current result page.
+  const ordered: string[] = [...(index?.tags ?? [])];
+  const seen = new Set(ordered);
   const sets = [...(index?.sets ?? [])];
   for (const task of tasks) {
     const taskTags = [...new Set((task.tags ?? []).map((tag) => tag.trim()).filter(Boolean))];
     if (taskTags.length === 0) continue;
     sets.push(taskTags);
-    for (const tag of taskTags) unique.add(tag);
+    for (const tag of taskTags) {
+      if (seen.has(tag)) continue;
+      seen.add(tag);
+      ordered.push(tag);
+    }
   }
-  return {
-    tags: [...unique].sort((a, b) => a.localeCompare(b, "de", { sensitivity: "base" })),
-    sets,
-  };
+  return { tags: ordered, sets };
 }
 
 function PickedPoolTask({
@@ -202,6 +205,8 @@ function PoolTaskPicker({
   );
 }
 
+const POOL_TAG_CHIP_LIMIT = 20;
+
 function PoolTagFilters({
   tags,
   sets,
@@ -213,7 +218,22 @@ function PoolTagFilters({
   selected: string[];
   onChange: (tags: string[]) => void;
 }) {
-  const visible = selected.length === 0 ? tags : [...selected, ...remainingPoolTags(sets, selected)];
+  // Recent-first list from the server; keep selected chips visible, cap the rest.
+  const candidates =
+    selected.length === 0 ? tags : [...selected, ...remainingPoolTags(sets, selected)];
+  const visible: string[] = [];
+  const seen = new Set<string>();
+  for (const tag of selected) {
+    if (seen.has(tag)) continue;
+    seen.add(tag);
+    visible.push(tag);
+  }
+  for (const tag of candidates) {
+    if (seen.has(tag)) continue;
+    if (visible.length >= POOL_TAG_CHIP_LIMIT) break;
+    seen.add(tag);
+    visible.push(tag);
+  }
   if (visible.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -915,7 +935,7 @@ export function GameSlotsPanel({
               onChange={(e) => {
                 setSearch(e.target.value);
               }}
-              placeholder="Suchen…"
+              placeholder="Titel, Beschreibung oder Tag…"
             />
           </div>
           <div className="flex items-end">
@@ -1041,7 +1061,7 @@ export function GameSlotsPanel({
                       label="Quiz-Aufgabe aus dem Pool"
                       search={openerSearch}
                       onSearch={setOpenerSearch}
-                      placeholder="Suchen oder Task-ID einfügen…"
+                      placeholder="Titel, Tag oder Task-ID…"
                       tagIndex={openerTagIndex}
                       selectedTags={openerTags}
                       onTagsChange={setOpenerTags}
@@ -1398,7 +1418,7 @@ export function GameSlotsPanel({
                             label="Inhalt — Aufgabe aus dem Pool"
                             search={bonusSearch}
                             onSearch={setBonusSearch}
-                            placeholder="Suchen…"
+                            placeholder="Titel, Beschreibung oder Tag…"
                             tagIndex={bonusTagIndex}
                             selectedTags={bonusTags}
                             onTagsChange={setBonusTags}

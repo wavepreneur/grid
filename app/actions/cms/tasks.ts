@@ -178,7 +178,8 @@ export async function listTasks(
     if (tag) query = query.contains("tags", [tag]);
     const search = sanitizeTaskSearch(filters.search ?? "");
     if (search) {
-      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,slug.ilike.%${search}%`);
+      const tagMatches = await findTagsMatchingNeedle(supabase, orgId, search);
+      query = query.or(buildTaskTextSearchOr(search, tagMatches));
     }
 
     const { data, error, count } = await query
@@ -218,26 +219,30 @@ export type TaskLibraryTagIndex = {
 const TASK_TAG_PAGE = 1000;
 const TASK_TAG_SCAN_MAX = 50_000;
 
-/** Distinct tags plus per-task sets (for AND-filters in Studio pickers). */
+/** Distinct tags (recent-first) plus per-task sets (for AND-filters in Studio pickers). */
 export async function listTaskLibraryTags(): Promise<ActionResult<TaskLibraryTagIndex>> {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
-    const rows: Array<{ tags: string[] | null }> = [];
+    const rows: Array<{ tags: string[] | null; updated_at?: string | null }> = [];
     for (let from = 0; from < TASK_TAG_SCAN_MAX; from += TASK_TAG_PAGE) {
       const { data, error } = await supabase
         .from("studio_tasks")
-        .select("tags")
+        .select("tags, updated_at")
         .eq("is_active", true)
         .or(`organization_id.eq.${orgId},organization_id.is.null`)
-        .order("id", { ascending: true })
+        .order("updated_at", { ascending: false })
+        .order("id", { ascending: false })
         .range(from, from + TASK_TAG_PAGE - 1);
       if (error) throw new Error(error.message);
-      rows.push(...((data ?? []) as Array<{ tags: string[] | null }>));
+      rows.push(
+        ...((data ?? []) as Array<{ tags: string[] | null; updated_at?: string | null }>),
+      );
       if ((data ?? []).length < TASK_TAG_PAGE) break;
     }
 
-    const unique = new Set<string>();
+    const recentOrder: string[] = [];
+    const seen = new Set<string>();
     const sets: string[][] = [];
     for (const row of rows) {
       const taskTags = [
@@ -247,13 +252,17 @@ export async function listTaskLibraryTags(): Promise<ActionResult<TaskLibraryTag
       ];
       if (taskTags.length === 0) continue;
       sets.push(taskTags);
-      for (const tag of taskTags) unique.add(tag);
+      for (const tag of taskTags) {
+        if (seen.has(tag)) continue;
+        seen.add(tag);
+        recentOrder.push(tag);
+      }
     }
 
     return {
       success: true,
       data: {
-        tags: [...unique].sort((a, b) => a.localeCompare(b, "de", { sensitivity: "base" })),
+        tags: recentOrder,
         sets,
       },
     };
@@ -263,6 +272,53 @@ export async function listTaskLibraryTags(): Promise<ActionResult<TaskLibraryTag
       error: error instanceof Error ? error.message : "Schlagworte konnten nicht geladen werden.",
     };
   }
+}
+
+/** Tags whose name contains `needle` (from recently updated tasks). */
+async function findTagsMatchingNeedle(
+  supabase: ReturnType<typeof createAdminClient>,
+  orgId: string,
+  needle: string,
+): Promise<string[]> {
+  const q = needle.trim().toLowerCase();
+  if (!q) return [];
+  const { data, error } = await supabase
+    .from("studio_tasks")
+    .select("tags")
+    .eq("is_active", true)
+    .or(`organization_id.eq.${orgId},organization_id.is.null`)
+    .order("updated_at", { ascending: false })
+    .limit(2000);
+  if (error) throw new Error(error.message);
+  const hits: string[] = [];
+  const seen = new Set<string>();
+  for (const row of data ?? []) {
+    for (const raw of (row.tags as string[] | null) ?? []) {
+      const tag = raw.trim();
+      if (!tag || seen.has(tag)) continue;
+      if (!tag.toLowerCase().includes(q)) continue;
+      seen.add(tag);
+      hits.push(tag);
+      if (hits.length >= 20) return hits;
+    }
+  }
+  return hits;
+}
+
+function escapePostgrestOrValue(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function buildTaskTextSearchOr(search: string, tagMatches: string[]): string {
+  const parts = [
+    `title.ilike.%${search}%`,
+    `description.ilike.%${search}%`,
+    `slug.ilike.%${search}%`,
+  ];
+  for (const tag of tagMatches) {
+    parts.push(`tags.cs.{"${escapePostgrestOrValue(tag)}"}`);
+  }
+  return parts.join(",");
 }
 
 const TASK_ID_RE =
@@ -344,7 +400,13 @@ export async function searchTaskLibrary(input: {
     }
 
     if (q) {
-      query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,slug.ilike.%${q}%`);
+      const search = sanitizeTaskSearch(q);
+      const tagMatches = search
+        ? await findTagsMatchingNeedle(supabase, orgId, search)
+        : [];
+      if (search) {
+        query = query.or(buildTaskTextSearchOr(search, tagMatches));
+      }
     }
 
     const { data, error } = await query;
