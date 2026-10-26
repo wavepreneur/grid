@@ -15,7 +15,7 @@ import {
 } from "@/lib/tells/level-types";
 import { parseLevelTiles } from "@/lib/tells/level-content";
 import { parseLevelScoring } from "@/lib/tells/level-scoring";
-import { normalizeAnswer } from "@/lib/tells/content-engine";
+import { isFreeTextAnswerCorrect } from "@/lib/tells/content-engine";
 import { playUi } from "@/lib/tells/play-ui";
 import { parseBonusWhen } from "@/lib/cms/bonus-bindings";
 
@@ -279,7 +279,16 @@ export function isBonusAnswerCorrect(bonus: BonusTask, submission: string): bool
     if (!given) return false;
     // No Studio solution configured → never award free points.
     if (!expected) return false;
-    return normalizeAnswer(given) === normalizeAnswer(expected);
+    if (mode === "boxes") {
+      const strip = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+      const needle = strip(given);
+      return expected
+        .split(";")
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .some((alt) => strip(alt) === needle);
+    }
+    return isFreeTextAnswerCorrect(given, expected);
   }
   const correctIds =
     bonus.correct_option_ids && bonus.correct_option_ids.length > 0

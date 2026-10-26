@@ -1,6 +1,7 @@
 import {
   getLevelDefinition,
-  normalizeAnswer,
+  isFreeTextAnswerCorrect,
+  parseAnswerAlternatives,
   requiresGps,
 } from "@/lib/tells/content-engine";
 import { isWithinGeofenceForPlay, withHealthRadiusBonus } from "@/lib/tells/geofence";
@@ -132,13 +133,16 @@ export function validateLevelSolution(
       return { ok: false, error: "Level ohne Lösung konfiguriert." };
     }
     const isBoxes = level.input_mode === "boxes" || level.input_mode === "number";
-    const expected = isBoxes
-      ? level.answer.trim().toLowerCase().replace(/[^a-z0-9]/g, "")
-      : normalizeAnswer(level.answer);
-    const given = isBoxes
-      ? payload.answer.trim().toLowerCase().replace(/[^a-z0-9]/g, "")
-      : normalizeAnswer(payload.answer);
-    if (given !== expected) {
+    if (isBoxes) {
+      const strip = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+      const given = strip(payload.answer);
+      const ok = parseAnswerAlternatives(level.answer).some((alt) => strip(alt) === given);
+      if (!ok) {
+        return { ok: false, error: "Falsche Antwort. Versucht es erneut." };
+      }
+      return { ok: true };
+    }
+    if (!isFreeTextAnswerCorrect(payload.answer, level.answer)) {
       return { ok: false, error: "Falsche Antwort. Versucht es erneut." };
     }
     return { ok: true };

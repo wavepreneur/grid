@@ -326,7 +326,11 @@ export function TaskEditor({ task, returnTo }: Props) {
                       }
                       patchContent({ answer: e.target.value });
                     }}
-                    placeholder={content.code_boxes ? "z. B. A3B47 oder 03641" : "Lösung"}
+                    placeholder={
+                      content.code_boxes
+                        ? "z. B. A3B47 oder 03641"
+                        : "z. B. deep learning; deeplearning"
+                    }
                   />
                   {content.code_boxes ? (
                     <p className="mt-2 text-xs text-muted-foreground">
@@ -334,7 +338,13 @@ export function TaskEditor({ task, returnTo }: Props) {
                         ? "Vorschau: 1 Kästchen"
                         : `Vorschau: ${content.number_fields} Kästchen`}
                     </p>
-                  ) : null}
+                  ) : (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Groß/Klein und doppelte Leerzeichen egal. Mehrere Varianten mit{" "}
+                      <span className="font-semibold">;</span> trennen (wie bei Loquiz) —
+                      eine davon reicht.
+                    </p>
+                  )}
                 </div>
 
                 <section className="rounded-3xl bg-secondary/60 p-4 sm:p-5">

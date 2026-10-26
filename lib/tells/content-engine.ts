@@ -138,3 +138,23 @@ export function requiresGps(level: LevelDefinition): boolean {
 export function normalizeAnswer(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
+
+/**
+ * Studio may list several accepted free-text solutions, separated by `;`
+ * (Loquiz-style), e.g. `deep learning; deeplearning`.
+ */
+export function parseAnswerAlternatives(expected: string): string[] {
+  return expected
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+/** Case-insensitive; collapses spaces. Any `;`-alternative may match. */
+export function isFreeTextAnswerCorrect(given: string, expected: string): boolean {
+  const normalizedGiven = normalizeAnswer(given);
+  if (!normalizedGiven) return false;
+  const alternatives = parseAnswerAlternatives(expected);
+  if (alternatives.length === 0) return false;
+  return alternatives.some((alt) => normalizeAnswer(alt) === normalizedGiven);
+}
