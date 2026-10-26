@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ChevronRight, X } from "lucide-react";
 import { playUi } from "@/lib/tells/play-ui";
 
 export type MediaSheetTab = {
@@ -157,47 +157,83 @@ function MediaSheetTabs({
   language?: string | null;
 }) {
   const t = playUi(language);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [canScrollMore, setCanScrollMore] = useState(false);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+
+    const update = () => {
+      setCanScrollMore(el.scrollWidth - el.scrollLeft - el.clientWidth > 6);
+    };
+
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      ro?.disconnect();
+    };
+  }, [tabs.length, activeId]);
+
   return (
-    <div
-      role="tablist"
-      aria-label={t.tiles.switchAria}
-      className="flex min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      {tabs.map((tab, index) => {
-        const active = tab.id === activeId;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onSelect(tab.id)}
-            className={`cg-tap-lift flex h-11 min-w-0 shrink-0 items-center gap-2 rounded-full px-2.5 text-left ${
-              active
-                ? "bg-[var(--cg-primary)] text-[var(--cg-primary-fg)] shadow-[var(--cg-shadow-soft)]"
-                : "bg-[var(--cg-secondary)] text-[var(--cg-fg)]"
-            }`}
-          >
-            {tab.coverUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={tab.coverUrl}
-                alt=""
-                className="h-7 w-7 shrink-0 rounded-full object-cover"
-              />
-            ) : (
-              <span
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${
-                  active ? "bg-[var(--cg-primary-fg)]/20" : "bg-[var(--cg-card)]"
-                }`}
-              >
-                {index + 1}
-              </span>
-            )}
-            <span className="max-w-[7.5rem] truncate text-xs font-extrabold">{tab.label}</span>
-          </button>
-        );
-      })}
+    <div className="relative min-w-0">
+      <div
+        ref={scrollerRef}
+        role="tablist"
+        aria-label={t.tiles.switchAria}
+        className="flex min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {tabs.map((tab, index) => {
+          const active = tab.id === activeId;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onSelect(tab.id)}
+              className={`cg-tap-lift flex h-11 min-w-0 shrink-0 items-center gap-2 rounded-full px-2.5 text-left ${
+                active
+                  ? "bg-[var(--cg-primary)] text-[var(--cg-primary-fg)] shadow-[var(--cg-shadow-soft)]"
+                  : "bg-[var(--cg-secondary)] text-[var(--cg-fg)]"
+              }`}
+            >
+              {tab.coverUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={tab.coverUrl}
+                  alt=""
+                  className="h-7 w-7 shrink-0 rounded-full object-cover"
+                />
+              ) : (
+                <span
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${
+                    active ? "bg-[var(--cg-primary-fg)]/20" : "bg-[var(--cg-card)]"
+                  }`}
+                >
+                  {index + 1}
+                </span>
+              )}
+              <span className="max-w-[7.5rem] truncate text-xs font-extrabold">{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {canScrollMore ? (
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 flex w-11 items-center justify-end bg-gradient-to-l from-[var(--cg-bg)] via-[var(--cg-bg)]/85 to-transparent pl-4"
+          aria-hidden
+        >
+          <ChevronRight
+            size={16}
+            strokeWidth={2.6}
+            className="mr-0.5 text-[var(--cg-fg)]/45"
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

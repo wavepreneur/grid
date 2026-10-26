@@ -29,9 +29,12 @@ export default async function EventLobbyPage({ params, searchParams }: EventLobb
 
   const holdForBriefing = needsBriefingBeforePlay(eventResult.data);
   const studioPlaytest = isStudioTestEvent(eventResult.data);
-  const title = eventResult.data.title.replace(/^\[Test\]\s*/, "");
   const contentResult = await getEventContent(normalizedInvite);
   const content = contentResult.success ? contentResult.data : null;
+  // Prefer localized studio name (EN/FR/…) over the frozen booking title (often DE).
+  const title =
+    content?.templateName?.trim() ||
+    eventResult.data.title.replace(/^\[Test\]\s*/, "");
   const t = playUi(content?.language);
 
   return (
