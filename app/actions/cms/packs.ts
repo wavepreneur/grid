@@ -493,22 +493,91 @@ export async function updateLayerPack(input: {
   }
 }
 
-export async function deleteLayerPack(packId: string): Promise<ActionResult<{ id: string }>> {
+export async function deleteLayerPack(
+  packId: string,
+): Promise<ActionResult<{ id: string; unlinkedGames: number }>> {
   try {
     const orgId = await getStudioOrganizationId();
     const supabase = createAdminClient();
     const pack = await getOwnedPack(supabase, orgId, packId);
     if (!pack) return { success: false, error: "Pack nicht gefunden." };
 
-    const { error } = await supabase
+    const now = new Date().toISOString();
+    let unlinkedGames = 0;
+
+    for (const column of ["layer1_pack_id", "layer2_pack_id", "layer3_pack_id"] as const) {
+      const { data: linked, error: linkedError } = await supabase
+        .from("studio_games")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq(column, packId);
+      if (linkedError) throw new Error(linkedError.message);
+      const ids = (linked ?? []).map((row) => row.id as string);
+      if (ids.length === 0) continue;
+      const { error: unlinkError } = await supabase
+        .from("studio_games")
+        .update({ [column]: null, updated_at: now })
+        .in("id", ids)
+        .eq("organization_id", orgId);
+      if (unlinkError) {
+        if (/studio_games_layer_combo_key|duplicate key/i.test(unlinkError.message)) {
+          return {
+            success: false,
+            error:
+              "Pack hängt an Spielen, die nach dem Abkoppeln doppelt wären. Spiele zuerst umhängen oder löschen.",
+          };
+        }
+        throw new Error(unlinkError.message);
+      }
+      unlinkedGames += ids.length;
+    }
+
+    await supabase
+      .from("studio_compose_recipes")
+      .update({ layer2_pack_id: null, updated_at: now })
+      .eq("organization_id", orgId)
+      .eq("layer2_pack_id", packId);
+    await supabase
+      .from("studio_compose_recipes")
+      .update({ layer3_pack_id: null, updated_at: now })
+      .eq("organization_id", orgId)
+      .eq("layer3_pack_id", packId);
+
+    await supabase
+      .from("studio_layer_packs")
+      .update({ created_from_pack_id: null, updated_at: now })
+      .eq("organization_id", orgId)
+      .eq("created_from_pack_id", packId);
+
+    const { error: itemsError } = await supabase
+      .from("studio_layer_pack_items")
+      .delete()
+      .eq("pack_id", packId);
+    if (itemsError) throw new Error(itemsError.message);
+
+    const { data: deleted, error } = await supabase
       .from("studio_layer_packs")
       .delete()
       .eq("id", packId)
-      .eq("organization_id", orgId);
+      .eq("organization_id", orgId)
+      .select("id");
     if (error) throw new Error(error.message);
+    if (!deleted?.length) {
+      return { success: false, error: "Pack konnte nicht aus der Datenbank entfernt werden." };
+    }
+
+    const { data: stillThere, error: verifyError } = await supabase
+      .from("studio_layer_packs")
+      .select("id")
+      .eq("id", packId)
+      .maybeSingle();
+    if (verifyError) throw new Error(verifyError.message);
+    if (stillThere) {
+      return { success: false, error: "Pack ist nach dem Löschen noch in der Datenbank." };
+    }
 
     revalidatePacks();
-    return { success: true, data: { id: packId } };
+    return { success: true, data: { id: packId, unlinkedGames } };
   } catch (error) {
     return {
       success: false,

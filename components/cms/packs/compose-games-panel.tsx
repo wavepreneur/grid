@@ -24,7 +24,12 @@ import {
   IconStar,
   IconUsers,
 } from "@/components/cms/studio-icons";
-import { COMPOSE_GAMES_MAX, type StudioComposeRecipe, type StudioLayerPack } from "@/lib/cms/layer-packs";
+import {
+  COMPOSE_GAMES_MAX,
+  dedupeLayer1PacksForCompose,
+  type StudioComposeRecipe,
+  type StudioLayerPack,
+} from "@/lib/cms/layer-packs";
 import { CollectionPicker } from "@/components/cms/games/collection-picker";
 import {
   useInvalidateStudioCollections,
@@ -621,7 +626,14 @@ function CityComposeModal({
     });
   }, [open, query, layer2Id, layer3Id]);
 
-  const available = useMemo(() => cities.filter((city) => !existing.has(city.id)), [cities, existing]);
+  const cityRows = useMemo(
+    () => dedupeLayer1PacksForCompose(cities, existing),
+    [cities, existing],
+  );
+  const available = useMemo(
+    () => cityRows.filter((city) => !existing.has(city.id)),
+    [cityRows, existing],
+  );
   const createCount = selected.filter((id) => !existing.has(id)).length;
 
   return (
@@ -703,7 +715,7 @@ function CityComposeModal({
             {surface === "indoor" ? "Packs laden…" : "Städte laden…"}
           </p>
         ) : null}
-        {cities.map((city) => {
+        {cityRows.map((city) => {
           const taken = existing.has(city.id);
           const checked = selected.includes(city.id);
           return (
@@ -745,7 +757,7 @@ function CityComposeModal({
             </label>
           );
         })}
-        {!loading && cities.length === 0 ? (
+        {!loading && cityRows.length === 0 ? (
           <p className="px-1 py-6 text-sm text-muted-foreground">
             {surface === "indoor"
               ? "Noch keine Stationen. Teile zuerst ein Indoor-Spiel oder lege unten einen Ort ohne Spiel an."

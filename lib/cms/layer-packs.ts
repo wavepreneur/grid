@@ -75,6 +75,30 @@ export function gameUsesLayerPacks(game: Pick<StudioGame, "layer1_pack_id" | "la
   return Boolean(game.layer1_pack_id || game.layer2_pack_id || game.layer3_pack_id);
 }
 
+/** One Ort-Pack pro Stadt im Compose-Picker — Duplikate (z. B. nach Split) ausblenden. */
+export function dedupeLayer1PacksForCompose(
+  packs: StudioLayerPack[],
+  preferredIds: ReadonlySet<string> = new Set(),
+): StudioLayerPack[] {
+  const sorted = [...packs].sort((a, b) => {
+    const aPreferred = preferredIds.has(a.id) ? 0 : 1;
+    const bPreferred = preferredIds.has(b.id) ? 0 : 1;
+    if (aPreferred !== bPreferred) return aPreferred - bPreferred;
+    const byCreated = a.created_at.localeCompare(b.created_at);
+    if (byCreated !== 0) return byCreated;
+    return a.id.localeCompare(b.id);
+  });
+  const seen = new Set<string>();
+  const unique: StudioLayerPack[] = [];
+  for (const pack of sorted) {
+    const key = pack.city_id?.trim() || pack.city_slug?.trim() || pack.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(pack);
+  }
+  return unique;
+}
+
 export function packLinkId(packId: string, itemId: string): string {
   return `pack:${packId}:item:${itemId}`;
 }

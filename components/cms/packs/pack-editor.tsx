@@ -519,8 +519,9 @@ export function PackEditor({ pack: initialPack, items: initialItems }: Props) {
         itemLabel="Pack"
         pending={pending}
         warnings={
-          <StudioHint tone="info">
-            Aufgaben bleiben. Spiele behalten ihre anderen Packs — dieses Pack wird nur abgekoppelt.
+          <StudioHint tone="warn">
+            Das Pack wird aus der Datenbank gelöscht (inkl. Stops). Aufgaben in der Bibliothek bleiben.
+            Spiele, die es nutzen, verlieren nur diesen Teil.
           </StudioHint>
         }
         onConfirm={() => {

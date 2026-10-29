@@ -407,22 +407,28 @@ export function PackCatalog() {
         itemLabel="Bestandteil"
         pending={pending}
         warnings={
-          <StudioHint tone="info">
-            Zutaten bleiben. Spiele behalten ihre anderen Teile — dieser wird nur abgekoppelt.
+          <StudioHint tone="warn">
+            Der Bestandteil wird aus der Datenbank gelöscht (inkl. Stops). Aufgaben in der Bibliothek
+            bleiben. Spiele, die ihn nutzen, verlieren nur diesen Teil.
           </StudioHint>
         }
         onConfirm={() => {
           if (!deleteTarget) return;
           const id = deleteTarget.id;
-          setDeleteOpen(false);
-          setDeleteTarget(null);
           startTransition(async () => {
             const result = await deleteLayerPack(id);
             if (!result.success) {
               setError(result.error);
               return;
             }
-            setMessage("Bestandteil gelöscht.");
+            setDeleteOpen(false);
+            setDeleteTarget(null);
+            const unlinked = result.data?.unlinkedGames ?? 0;
+            setMessage(
+              unlinked > 0
+                ? `Bestandteil aus der Datenbank gelöscht. Von ${unlinked} Spiel${unlinked === 1 ? "" : "en"} abgekoppelt.`
+                : "Bestandteil aus der Datenbank gelöscht.",
+            );
             invalidate();
           });
         }}
