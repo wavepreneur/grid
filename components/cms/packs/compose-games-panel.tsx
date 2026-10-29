@@ -131,8 +131,9 @@ export function ComposeGamesPanel() {
                 {recipe.surface === "indoor" ? "Indoor" : "Outdoor"}
                 {recipe.collection_id
                   ? ` · ${collections.find((row) => row.id === recipe.collection_id)?.name ?? "Collection"}`
-                  : ""}
-                {recipe.origin_game_name ? ` · ${recipe.origin_game_name}` : ""}
+                  : recipe.origin_game_name
+                    ? ` · ${recipe.origin_game_name}`
+                    : ""}
               </p>
             </button>
           );

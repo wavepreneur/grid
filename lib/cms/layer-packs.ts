@@ -481,7 +481,10 @@ export function composeGameName(cityLabel: string | null | undefined, missionNam
   return city || mission || "Neues Spiel";
 }
 
-/** "First Profiler München" + Bochum → "First Profiler Bochum". */
+/**
+ * "First Profiler München" / "Mad Infection in München" + Bochum
+ * → "First Profiler Bochum" / "Mad Infection Bochum" (nie „in“).
+ */
 export function composeCityGameName(
   originName: string | null | undefined,
   cityLabel: string | null | undefined,
@@ -489,11 +492,30 @@ export function composeCityGameName(
   const city = (cityLabel ?? "").trim();
   const origin = (originName ?? "").trim();
   if (!city && !origin) return "Neues Spiel";
-  if (!city) return origin;
+  if (!city) return stripInBeforeCity(origin);
   if (!origin) return city;
-  const fromMunich = origin.replace(/\s+München\s*$/iu, ` ${city}`).trim();
-  if (fromMunich !== origin) return fromMunich;
-  const prefix = origin.replace(/\s+Game\s*$/iu, "").trim() || origin;
+
+  // "Mission in Stadt" → base + neue Stadt
+  const withoutInCity = origin.replace(/\s+in\s+.+$/iu, "").trim();
+  if (withoutInCity !== origin && withoutInCity) {
+    return `${withoutInCity} ${city}`;
+  }
+
+  // "Mission München" / "Mission Munich" → Mission + neue Stadt
+  const fromMunich = origin
+    .replace(/\s+(?:in\s+)?München\s*$/iu, "")
+    .replace(/\s+(?:in\s+)?Munich\s*$/iu, "")
+    .trim();
+  if (fromMunich !== origin && fromMunich) {
+    return `${fromMunich} ${city}`;
+  }
+
+  const prefix = stripInBeforeCity(origin.replace(/\s+Game\s*$/iu, "").trim() || origin);
   if (prefix.toLocaleLowerCase("de") === city.toLocaleLowerCase("de")) return city;
   return `${prefix} ${city}`;
+}
+
+/** "Mad Infection in München" → "Mad Infection München" */
+function stripInBeforeCity(name: string): string {
+  return name.replace(/\s+in\s+/giu, " ").replace(/\s+/g, " ").trim();
 }
