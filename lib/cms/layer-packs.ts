@@ -21,6 +21,8 @@ import { randomStationAccessCode } from "@/lib/tells/stations";
 export const PACK_SLOT_MAX = 30;
 export const PACK_SEARCH_LIMIT = 40;
 export const COMPOSE_GAMES_MAX = 500;
+/** Client-side batch size for compose modal progress (avoids one huge request). */
+export const COMPOSE_CLIENT_BATCH = 40;
 export const COMPOSE_L1_LIST_MAX = 2000;
 export type PackListSort = "updated" | "stale" | "name" | "name-desc";
 export const DUPLICATE_PACKS_MAX = 100;

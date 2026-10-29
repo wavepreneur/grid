@@ -25,7 +25,8 @@ import {
   IconUsers,
 } from "@/components/cms/studio-icons";
 import {
-  COMPOSE_GAMES_MAX,
+  COMPOSE_CLIENT_BATCH,
+  COMPOSE_L1_LIST_MAX,
   dedupeLayer1PacksForCompose,
   type StudioComposeRecipe,
   type StudioLayerPack,
@@ -607,18 +608,19 @@ function CityComposeModal({
     recipe: StudioComposeRecipe | undefined,
   ) => void;
 }) {
-  const [pending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
   const [cities, setCities] = useState<StudioLayerPack[]>([]);
   const [existing, setExisting] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setLoading(true);
     void Promise.all([
-      listLayerPacks({ layer: 1, search: query, limit: COMPOSE_GAMES_MAX }),
+      listLayerPacks({ layer: 1, search: query, limit: COMPOSE_L1_LIST_MAX }),
       listExistingComposeCities({ layer2_pack_id: layer2Id, layer3_pack_id: layer3Id }),
     ]).then(([cityResult, existingResult]) => {
       setLoading(false);
@@ -636,11 +638,17 @@ function CityComposeModal({
     [cityRows, existing],
   );
   const createCount = selected.filter((id) => !existing.has(id)).length;
+  const progressPct =
+    progress && progress.total > 0 ? Math.min(100, Math.round((progress.done / progress.total) * 100)) : 0;
 
   return (
     <StudioModal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (creating) return;
+        onClose();
+      }}
+      closeOnEscape={!creating}
       size="lg"
       title={surface === "indoor" ? "Stationen wählen" : "Städte wählen"}
       subtitle={
@@ -649,45 +657,101 @@ function CityComposeModal({
           : `Dieselbe Mission und dasselbe Team für mehrere Städte. ${layer2Name} · ${layer3Name}`
       }
       footer={
-        <div className="flex w-full flex-wrap justify-end gap-2">
-          <StudioButton type="button" variant="ghost" onClick={onClose}>
-            Abbrechen
-          </StudioButton>
-          <StudioButton
-            type="button"
-            disabled={pending || createCount === 0 || recipeName.trim().length < 2}
-            onClick={() => {
-              const cityIds = selected.filter((id) => !existing.has(id));
-              startTransition(async () => {
-                onError(null);
-                const saved = await saveComposeRecipe({
-                  id: recipeId ?? undefined,
-                  name: recipeName.trim(),
-                  layer2_pack_id: layer2Id,
-                  layer3_pack_id: layer3Id,
-                  surface,
-                  collection_id: collectionId,
-                });
-                if (!saved.success) {
-                  onError(saved.error);
-                  return;
-                }
-                const run = await runCompose(cityIds, saved.data.id, surface, layer2Id, layer3Id);
-                if (!run.success) {
-                  onError(run.error);
-                  return;
-                }
-                onCreated(run.data?.createdCount ?? 0, run.data?.skippedCount ?? 0, saved.data);
-              });
-            }}
-          >
-            {createCount} neue Spiele erstellen
-          </StudioButton>
+        <div className="flex w-full flex-col gap-3">
+          {progress ? (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2 text-xs font-semibold tabular-nums text-muted-foreground">
+                <span>
+                  {creating
+                    ? `Lege Spiele an… ${progress.done} / ${progress.total}`
+                    : `Fertig: ${progress.done} / ${progress.total}`}
+                </span>
+                <span>{progressPct}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+            </div>
+          ) : null}
+          <div className="flex w-full flex-wrap justify-end gap-2">
+            <StudioButton type="button" variant="ghost" disabled={creating} onClick={onClose}>
+              Abbrechen
+            </StudioButton>
+            <StudioButton
+              type="button"
+              disabled={creating || createCount === 0 || recipeName.trim().length < 2}
+              onClick={() => {
+                const cityIds = selected.filter((id) => !existing.has(id));
+                if (cityIds.length === 0) return;
+                void (async () => {
+                  setCreating(true);
+                  setProgress({ done: 0, total: cityIds.length });
+                  onError(null);
+                  try {
+                    const saved = await saveComposeRecipe({
+                      id: recipeId ?? undefined,
+                      name: recipeName.trim(),
+                      layer2_pack_id: layer2Id,
+                      layer3_pack_id: layer3Id,
+                      surface,
+                      collection_id: collectionId,
+                    });
+                    if (!saved.success) {
+                      onError(saved.error);
+                      setCreating(false);
+                      setProgress(null);
+                      return;
+                    }
+
+                    let created = 0;
+                    let skipped = 0;
+                    for (let index = 0; index < cityIds.length; index += COMPOSE_CLIENT_BATCH) {
+                      const chunk = cityIds.slice(index, index + COMPOSE_CLIENT_BATCH);
+                      const run = await runCompose(chunk, saved.data.id, surface, layer2Id, layer3Id);
+                      if (!run.success) {
+                        onError(
+                          created > 0
+                            ? `${created} Spiele angelegt, dann Fehler: ${run.error}`
+                            : run.error,
+                        );
+                        setCreating(false);
+                        return;
+                      }
+                      created += run.data?.createdCount ?? 0;
+                      skipped += run.data?.skippedCount ?? 0;
+                      setProgress({
+                        done: Math.min(index + chunk.length, cityIds.length),
+                        total: cityIds.length,
+                      });
+                    }
+                    setCreating(false);
+                    onCreated(created, skipped, saved.data);
+                  } catch (error) {
+                    onError(error instanceof Error ? error.message : "Spiele konnten nicht angelegt werden.");
+                    setCreating(false);
+                  }
+                })();
+              }}
+            >
+              {creating && progress
+                ? `Erstelle ${progress.done}/${progress.total}…`
+                : `${createCount} neue Spiele erstellen`}
+            </StudioButton>
+          </div>
         </div>
       }
     >
       {!layer2Id && !layer3Id ? (
         <p className="text-sm text-muted-foreground">Zuerst Mission oder Team wählen.</p>
+      ) : null}
+
+      {creating ? (
+        <p className="mb-3 rounded-2xl bg-primary/10 px-3 py-2 text-sm font-semibold text-foreground">
+          Bitte warten — die Spiele werden in Paketen angelegt. Das Fenster nicht schließen.
+        </p>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -698,12 +762,14 @@ function CityComposeModal({
             onChange={(e) => setQuery(e.target.value)}
             placeholder={surface === "indoor" ? "Quiz-Pack suchen…" : "Suche nach Stadt…"}
             className="pl-10"
+            disabled={creating}
           />
         </div>
         <StudioButton
           type="button"
           variant="secondary"
           size="sm"
+          disabled={creating || available.length === 0}
           onClick={() => setSelected(available.map((city) => city.id))}
         >
           Alle verfügbaren
@@ -729,10 +795,10 @@ function CityComposeModal({
               <input
                 type="checkbox"
                 className="mt-1"
-                disabled={taken}
+                disabled={taken || creating}
                 checked={taken || checked}
                 onChange={() => {
-                  if (taken) return;
+                  if (taken || creating) return;
                   setSelected((current) =>
                     checked ? current.filter((id) => id !== city.id) : [...current, city.id],
                   );
