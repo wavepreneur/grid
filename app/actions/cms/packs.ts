@@ -2858,25 +2858,29 @@ export async function saveGameAsLayerPacks(
     if (!gameRow) return { success: false, error: "Spiel nicht gefunden." };
 
     const game = asStudioGame(gameRow as Record<string, unknown>);
-    if (gameUsesLayerPacks(game)) {
-      const rename = async (packId: string | null, name: string | undefined) => {
-        const next = name?.trim();
-        if (!packId || !next) return;
-        const pack = await getOwnedPack(supabase, orgId, packId);
-        if (!pack) return;
-        const { error } = await supabase
-          .from("studio_layer_packs")
-          .update({ name: next, updated_at: new Date().toISOString() })
-          .eq("id", packId)
-          .eq("organization_id", orgId);
-        if (error) throw new Error(error.message);
-      };
-      await rename(game.layer1_pack_id, names?.layer1);
-      await rename(game.layer2_pack_id, names?.layer2);
-      await rename(game.layer3_pack_id, names?.layer3);
-      revalidatePacks();
-      return { success: true, data: game };
-    }
+
+    const resolveExisting = async (packId: string | null) => {
+      if (!packId) return null;
+      return getOwnedPack(supabase, orgId, packId);
+    };
+    let existingL1 = await resolveExisting(game.layer1_pack_id);
+    let existingL2 = await resolveExisting(game.layer2_pack_id);
+    let existingL3 = await resolveExisting(game.layer3_pack_id);
+
+    const renamePack = async (pack: StudioLayerPack | null, name: string | undefined) => {
+      const next = name?.trim();
+      if (!pack || !next || pack.name === next) return pack;
+      const { error } = await supabase
+        .from("studio_layer_packs")
+        .update({ name: next, updated_at: new Date().toISOString() })
+        .eq("id", pack.id)
+        .eq("organization_id", orgId);
+      if (error) throw new Error(error.message);
+      return { ...pack, name: next };
+    };
+    existingL1 = (await renamePack(existingL1, names?.layer1)) ?? existingL1;
+    existingL2 = (await renamePack(existingL2, names?.layer2)) ?? existingL2;
+    existingL3 = (await renamePack(existingL3, names?.layer3)) ?? existingL3;
 
     const { data: linkRows, error: linksError } = await supabase
       .from("studio_game_tasks")
@@ -2889,8 +2893,48 @@ export async function saveGameAsLayerPacks(
       const link = mapLegacyLinkRow(row as Record<string, unknown>, gameId);
       return link ? [link] : [];
     });
+
+    // Fully packed (Mission + Team): rename-only. Ort alone after deletes must re-extract.
+    if (existingL2 && existingL3 && (existingL1 || links.length === 0)) {
+      const clearedDangling =
+        (game.layer1_pack_id && !existingL1) ||
+        (game.layer2_pack_id && !existingL2) ||
+        (game.layer3_pack_id && !existingL3);
+      if (clearedDangling) {
+        const { data: patched, error: patchError } = await supabase
+          .from("studio_games")
+          .update({
+            layer1_pack_id: existingL1?.id ?? null,
+            layer2_pack_id: existingL2.id,
+            layer3_pack_id: existingL3.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", gameId)
+          .select("*")
+          .single();
+        if (patchError) throw new Error(patchError.message);
+        revalidatePacks();
+        return { success: true, data: asStudioGame(patched as Record<string, unknown>) };
+      }
+      revalidatePacks();
+      return {
+        success: true,
+        data: {
+          ...game,
+          layer1_pack_id: existingL1?.id ?? game.layer1_pack_id,
+          layer2_pack_id: existingL2.id,
+          layer3_pack_id: existingL3.id,
+        },
+      };
+    }
+
     if (links.length === 0) {
-      return { success: false, error: "Keine Aufgaben in diesem Spiel — zuerst spielbar machen." };
+      return {
+        success: false,
+        error: existingL1 && !existingL2
+          ? "Mission und Team fehlen — dieses Spiel hat keine Aufgaben mehr zum Aufteilen. Nimm das Originalspiel."
+          : "Keine Aufgaben in diesem Spiel — zuerst spielbar machen.",
+      };
     }
 
     const layer1 = links.filter((link) => parseLinkLayer(link) === 1);
@@ -2932,7 +2976,8 @@ export async function saveGameAsLayerPacks(
     }
 
     const l1Pack =
-      l1Items.length > 0
+      existingL1 ??
+      (l1Items.length > 0
         ? await createPackWithItems(supabase, orgId, {
             layer: 1,
             name: names?.layer1?.trim() || (typeof city?.name === "string" && city.name.trim()) || citySlug || game.name,
@@ -2941,9 +2986,10 @@ export async function saveGameAsLayerPacks(
             language,
             items: l1Items,
           })
-        : null;
+        : null);
     const l2Pack =
-      layer2.length > 0
+      existingL2 ??
+      (layer2.length > 0
         ? await createPackWithItems(supabase, orgId, {
             layer: 2,
             name: names?.layer2?.trim() || `${game.name} · Mission`,
@@ -2954,9 +3000,10 @@ export async function saveGameAsLayerPacks(
               overrides: stripGeoFromMissionOverrides({ ...(item.overrides as Record<string, unknown>) }),
             })),
           })
-        : null;
+        : null);
     const l3Pack =
-      layer3.length > 0
+      existingL3 ??
+      (layer3.length > 0
         ? await createPackWithItems(supabase, orgId, {
             layer: 3,
             name: names?.layer3?.trim() || `${game.name} · Team`,
@@ -2974,7 +3021,11 @@ export async function saveGameAsLayerPacks(
               };
             }),
           })
-        : null;
+        : null);
+
+    if (!l2Pack && layer2.length > 0) {
+      return { success: false, error: "Missions-Pack konnte nicht erzeugt werden." };
+    }
 
     const { data: updated, error: updateError } = await supabase
       .from("studio_games")
@@ -2987,7 +3038,16 @@ export async function saveGameAsLayerPacks(
       .eq("id", gameId)
       .select("*")
       .single();
-    if (updateError) throw new Error(updateError.message);
+    if (updateError) {
+      if (/studio_games_layer_combo_key|duplicate key/i.test(updateError.message)) {
+        return {
+          success: false,
+          error:
+            "Diese Pack-Kombination gibt es schon an einem anderen Spiel. Mission/Team anders benennen oder Ort lösen.",
+        };
+      }
+      throw new Error(updateError.message);
+    }
 
     revalidatePacks();
     return { success: true, data: asStudioGame(updated as Record<string, unknown>) };

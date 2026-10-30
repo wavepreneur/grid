@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { getLayerPack, saveGameAsLayerPacks } from "@/app/actions/cms/packs";
 import { GameSearchSelect } from "@/components/cms/games/game-search-select";
 import { StudioButton, StudioError, StudioInput, StudioLabel, StudioSuccess } from "@/components/cms/studio-ui";
-import { gameUsesLayerPacks, layerPackLabelDe } from "@/lib/cms/layer-packs";
+import { gameHasComposePacks, gameUsesLayerPacks, layerPackLabelDe } from "@/lib/cms/layer-packs";
 import type { StudioGamePickerItem } from "@/lib/cms/types";
 import { useInvalidateStudioGames } from "@/lib/hooks/use-studio-games";
 import { useInvalidateStudioPacks } from "@/lib/hooks/use-studio-packs";
@@ -34,7 +34,7 @@ export function SplitGamePanel() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const alreadySplit = selected ? gameUsesLayerPacks(selected) : false;
+  const alreadySplit = selected ? gameHasComposePacks(selected) : false;
 
   useEffect(() => {
     if (!selected) return;
@@ -42,7 +42,7 @@ export function SplitGamePanel() {
     setLayer1(defaults.layer1);
     setLayer2(defaults.layer2);
     setLayer3(defaults.layer3);
-    if (!gameUsesLayerPacks(selected)) return;
+    if (!gameHasComposePacks(selected)) return;
     let cancelled = false;
     void Promise.all([
       selected.layer1_pack_id ? getLayerPack(selected.layer1_pack_id) : null,
@@ -112,7 +112,11 @@ export function SplitGamePanel() {
           excludeCompose
           placeholder="Spiel suchen…"
           hintFor={(game) =>
-            gameUsesLayerPacks(game) ? "schon geteilt" : "komplett · bereit zum Teilen"
+            gameHasComposePacks(game)
+              ? "schon geteilt"
+              : gameUsesLayerPacks(game)
+                ? "unvollständig · erneut teilen"
+                : "komplett · bereit zum Teilen"
           }
         />
       </div>

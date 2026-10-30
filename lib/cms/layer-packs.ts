@@ -77,6 +77,13 @@ export function gameUsesLayerPacks(game: Pick<StudioGame, "layer1_pack_id" | "la
   return Boolean(game.layer1_pack_id || game.layer2_pack_id || game.layer3_pack_id);
 }
 
+/** Mission + Team extracted — rename-only in split UI. Ort alone (after pack delete) is incomplete. */
+export function gameHasComposePacks(
+  game: Pick<StudioGame, "layer2_pack_id" | "layer3_pack_id">,
+): boolean {
+  return Boolean(game.layer2_pack_id && game.layer3_pack_id);
+}
+
 /** One Ort-Pack pro Stadt im Compose-Picker — Duplikate (z. B. nach Split) ausblenden. */
 export function dedupeLayer1PacksForCompose(
   packs: StudioLayerPack[],
