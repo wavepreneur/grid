@@ -11,6 +11,15 @@
 Bonuses do **not** block the mission path for players who are not the audience.
 They appear with a **fanfare** (sound + animation) so the team clearly notices: extra points are available.
 
+## Team pack (`layer3`) + `bind_slot`
+
+When a game uses a Team pack (e.g. Team Basic), each pack item’s **`bind_slot`** is the **mission `sort_order`** it attaches to.
+
+- Pack **`sort_order`** = stable list order inside the Team pack (do not reshuffle on compose).
+- **`bind_slot`** = which mission slot receives that bonus (must match First Profiler / recipe truth).
+- Never map Team items by array index or by `sort_order === mission sort_order` unless `bind_slot` is intentionally set that way.
+- Empty `bonus_bindings: []` on a mission must not block Team-pack attach; non-empty mission bindings stay local overrides.
+
 ## Studio authoring (per Mission-Slot)
 
 A mission may bind **0…N** bonuses. Each binding has:

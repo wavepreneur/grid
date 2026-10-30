@@ -456,32 +456,33 @@ export function mergePackLinksOntoGame(input: {
       if (geoRaw.unlock) overrides.unlock = geoRaw.unlock;
     }
 
-    // Team pack bind_slots win when mission has no real bindings.
-    // Empty bonus_bindings: [] (e.g. after deleting Team, then re-attaching Team Basic)
-    // must not block the pack — only non-empty authored lists are local overrides.
+    // Team pack → mission slot only via bind_slot (never pack sort_order / array index).
+    // Empty bonus_bindings: [] must not block re-attach after deleting/re-adding Team.
+    // Non-empty authored lists stay local overrides (e.g. First Profiler mission pack).
     const authoredBonusCount = Array.isArray(overrides.bonus_bindings)
       ? overrides.bonus_bindings.length
       : -1;
-    if (authoredBonusCount <= 0) {
-      const bound = layer3.filter((bonus) => {
-        const parsed = parsePackItemOverrides(bonus.overrides);
-        const slot = parsed.bind_slot ?? bonus.sort_order;
-        return slot === (geo?.sort_order ?? link.sort_order ?? index);
-      });
-      if (pack3 && bound.length > 0) {
+    const missionSlot = link.sort_order;
+    if (authoredBonusCount <= 0 && pack3) {
+      const bound = layer3
+        .filter((bonus) => {
+          const parsed = parsePackItemOverrides(bonus.overrides);
+          // Require explicit bind_slot — falling back to sort_order scrambled Team Basic vs FP.
+          return typeof parsed.bind_slot === "number" && parsed.bind_slot === missionSlot;
+        })
+        .sort((a, b) => a.sort_order - b.sort_order);
+      if (bound.length > 0) {
         overrides.bonus_bindings = bound.map((bonus) => {
           const parsed = parsePackItemOverrides(bonus.overrides);
           const role = bonusAudience(parsed.role);
           return {
             task_id: bonus.task_id,
             role,
-            scope: "one" as const,
+            scope: role === "team" ? ("all" as const) : ("one" as const),
             when: parsed.when ?? { type: "immediate" as const },
           };
         });
-      } else if (authoredBonusCount === 0 && !pack3) {
-        // Keep explicit empty list when no Team pack is linked.
-      } else if (authoredBonusCount === 0 && pack3) {
+      } else if (authoredBonusCount === 0) {
         delete overrides.bonus_bindings;
       }
     }

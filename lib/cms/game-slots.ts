@@ -487,55 +487,41 @@ export function buildGameSlots(
       if (found) bonusLinks.push(found);
     }
 
-    // Legacy fallbacks when Studio never wrote bonus_bindings, or wrote [] but a
-    // Team pack still supplies layer-3 links (compose: empty list + Team Basic).
+    // Legacy / pack fallbacks when mission has no resolved bindings.
+    // Never use bonuses[index] — that scrambles Team pack order across missions.
     if (
       bonusLinks.length === 0 &&
       (!hasAuthoredBonusBindings(overrides) || bindings.length === 0)
     ) {
       const bonusTaskId = overrides.bonus_task_id;
-      let bonusLink =
+      const byId =
         (bonusTaskId
           ? bonuses.find((b) => b.task_id === bonusTaskId || b.id === bonusTaskId)
           : null) ?? null;
 
-      if (!bonusLink) {
-        bonusLink =
-          bonuses.find((b) => {
-            const t = parseLinkOverrides(b.overrides).trigger;
-            return t?.type === "after_task_solved" && t.source_task_id === levelLink.task_id;
-          }) ?? null;
-      }
+      const byBindSlot = bonuses
+        .filter((b) => {
+          const raw =
+            b.overrides && typeof b.overrides === "object"
+              ? (b.overrides as Record<string, unknown>)
+              : {};
+          return (
+            typeof raw.bind_slot === "number" &&
+            Number.isInteger(raw.bind_slot) &&
+            raw.bind_slot === levelLink.sort_order
+          );
+        })
+        .sort((a, b) => a.sort_order - b.sort_order);
 
-      // Prefer bind_slot / sort_order when Team pack is shared across missions
-      // (triggers still point at First Profiler task ids).
-      if (!bonusLink) {
-        bonusLink =
-          bonuses.find((b) => {
-            const raw =
-              b.overrides && typeof b.overrides === "object"
-                ? (b.overrides as Record<string, unknown>)
-                : {};
-            const bindRaw = raw.bind_slot;
-            const slot =
-              typeof bindRaw === "number" && Number.isInteger(bindRaw) && bindRaw >= 0
-                ? bindRaw
-                : b.sort_order;
-            return slot === levelLink.sort_order;
-          }) ?? null;
-      }
+      const byTrigger =
+        bonuses.find((b) => {
+          const t = parseLinkOverrides(b.overrides).trigger;
+          return t?.type === "after_task_solved" && t.source_task_id === levelLink.task_id;
+        }) ?? null;
 
-      if (!bonusLink && bonuses[index] && !bonusTaskId) {
-        const candidate = bonuses[index]!;
-        const t = parseLinkOverrides(candidate.overrides).trigger;
-        if (!t || t.type === "game_start" || t.source_task_id === levelLink.task_id) {
-          bonusLink = candidate;
-        }
-      }
-
-      if (bonusLink) {
-        bonusLinks.push(bonusLink);
-      }
+      if (byId) bonusLinks.push(byId);
+      else if (byBindSlot.length > 0) bonusLinks.push(...byBindSlot);
+      else if (byTrigger) bonusLinks.push(byTrigger);
     }
 
     const resolvedBindings =
