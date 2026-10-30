@@ -29,10 +29,23 @@ type ContentMediaSheetProps = {
   language?: string | null;
 };
 
+function isEmbeddedVideoPlayer(mediaType: string | undefined, mediaUrl?: string | null): boolean {
+  if (mediaType === "video") return true;
+  const url = mediaUrl?.trim() ?? "";
+  if (!url) return false;
+  // Stream / YouTube embeds fill the sheet; tip must overlay or it falls off-screen.
+  return (
+    /cloudflarestream\.com\//i.test(url) ||
+    /youtube\.com\/embed\//i.test(url) ||
+    /youtube-nocookie\.com\/embed\//i.test(url) ||
+    /youtu\.be\//i.test(url)
+  );
+}
+
 /**
- * Near-fullscreen content sheet — media fills remaining space.
- * Tip / CTA sits above the media so it never falls under the iPhone home bar
- * or Stream player chrome (100dvh alone is taller than the visible viewport).
+ * Near-fullscreen content sheet — iframe/image take almost the whole display.
+ * Tip stays at the bottom. For video embeds only, tip overlays the player so
+ * Stream chrome cannot push it out of the iPhone viewport.
  */
 export function ContentMediaSheet({
   open,
@@ -66,8 +79,21 @@ export function ContentMediaSheet({
   if (!open) return null;
 
   const isImage = mediaType === "image";
+  const overlayTip = Boolean(tipSlot) && isEmbeddedVideoPlayer(mediaType, mediaUrl);
   const sheetHeight =
     "h-[var(--vv-height,100svh)] max-h-[var(--vv-height,100svh)] sm:h-[min(96dvh,900px)] sm:max-h-[min(96dvh,900px)]";
+
+  const tipChrome = tipSlot ? (
+    <div
+      className={
+        overlayTip
+          ? "pointer-events-auto absolute inset-x-0 bottom-0 z-30 border-t border-[var(--cg-border)] bg-[var(--cg-card)]/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.18)] backdrop-blur-sm"
+          : "relative z-20 shrink-0 border-t border-[var(--cg-border)] bg-[var(--cg-card)] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      }
+    >
+      {tipSlot}
+    </div>
+  ) : null;
 
   return (
     <div
@@ -85,7 +111,7 @@ export function ContentMediaSheet({
           type="button"
           onClick={onClose}
           aria-label={t.media.close}
-          className="cg-tap-lift absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--cg-ink)]/70 text-white shadow-[var(--cg-shadow-lift)] backdrop-blur-sm ring-1 ring-white/25"
+          className="cg-tap-lift absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-40 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--cg-ink)]/70 text-white shadow-[var(--cg-shadow-lift)] backdrop-blur-sm ring-1 ring-white/25"
         >
           <X className="h-5 w-5" strokeWidth={2.5} />
         </button>
@@ -101,14 +127,6 @@ export function ContentMediaSheet({
                 language={language}
               />
             ) : null}
-          </div>
-        ) : (
-          <div className="shrink-0 pt-[max(0.5rem,env(safe-area-inset-top))]" aria-hidden />
-        )}
-
-        {tipSlot ? (
-          <div className="relative z-20 shrink-0 border-b border-[var(--cg-border)] bg-[var(--cg-card)] px-4 py-3">
-            {tipSlot}
           </div>
         ) : null}
 
@@ -129,7 +147,7 @@ export function ContentMediaSheet({
                 key={mediaUrl}
                 src={mediaUrl}
                 title={title}
-                className="absolute inset-0 h-full w-full border-0"
+                className="absolute inset-0 z-0 h-full w-full border-0"
                 allow="autoplay; fullscreen; encrypted-media; gyroscope; accelerometer; picture-in-picture"
                 allowFullScreen
               />
@@ -146,7 +164,10 @@ export function ContentMediaSheet({
               ) : null}
             </div>
           )}
+          {overlayTip ? tipChrome : null}
         </div>
+
+        {!overlayTip ? tipChrome : null}
       </div>
     </div>
   );

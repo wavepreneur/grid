@@ -103,7 +103,7 @@ export function MediaModal({
       <ContentMediaSheet
         open
         title={title}
-        mediaType={tile.type === "image" ? "image" : "iframe"}
+        mediaType={tile.type}
         mediaUrl={tile.url}
         onClose={onClose}
         tipSlot={tipSlot}
