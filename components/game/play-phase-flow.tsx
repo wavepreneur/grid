@@ -70,6 +70,7 @@ type Props = {
   score: number;
   disabled: boolean;
   isPending: boolean;
+  hintPending?: boolean;
   canUnlockGps: boolean;
   effectiveBeta: boolean;
   soloAlpha?: boolean;
@@ -150,6 +151,7 @@ export function PlayPhaseFlow({
   score,
   disabled,
   isPending,
+  hintPending = false,
   canUnlockGps,
   effectiveBeta,
   soloAlpha,
@@ -668,6 +670,7 @@ export function PlayPhaseFlow({
         score={score}
         disabled={disabled || paused}
         isPending={isPending}
+        hintPending={hintPending}
         canUnlockGps={canUnlockGps}
         effectiveBeta={effectiveBeta}
         soloAlpha={soloAlpha}

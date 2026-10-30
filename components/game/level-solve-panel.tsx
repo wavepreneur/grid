@@ -486,7 +486,7 @@ export function LevelSolvePanel({
                     <button
                       key={option.id}
                       type="button"
-                      disabled={disabled || isPending}
+                      disabled={disabled}
                       onClick={() => {
                         if (isMultiQuiz) {
                           setSelectedOptionIds((prev) =>
@@ -500,7 +500,7 @@ export function LevelSolvePanel({
                       }}
                       className={`w-full rounded-2xl border-2 px-4 py-3 text-left text-sm font-semibold transition disabled:opacity-50 ${
                         selected
-                          ? "border-[var(--cg-primary)] bg-[var(--cg-primary)]/15 text-[var(--cg-fg)]"
+                          ? "border-[var(--cg-primary)] bg-[var(--cg-primary)]/18 text-[var(--cg-fg)] ring-2 ring-[var(--cg-primary)]/35"
                           : "border-[var(--cg-border)] bg-[var(--cg-bg)] text-[var(--cg-fg)]"
                       }`}
                     >
@@ -633,7 +633,7 @@ export function LevelSolvePanel({
                   <button
                     key={option.id}
                     type="button"
-                    disabled={disabled || isPending}
+                    disabled={disabled}
                     onClick={() => {
                       if (isMultiQuiz) {
                         setSelectedOptionIds((prev) =>
@@ -645,9 +645,9 @@ export function LevelSolvePanel({
                         setSelectedOptionId(option.id);
                       }
                     }}
-                    className={`rounded-xl border px-4 py-3 text-left text-sm transition ${
+                    className={`rounded-xl border px-4 py-3 text-left text-sm transition disabled:opacity-50 ${
                       selected
-                        ? "border-teal-500 bg-teal-50 font-medium text-teal-900"
+                        ? "border-teal-500 bg-teal-50 font-medium text-teal-900 ring-2 ring-teal-500/30"
                         : "border-slate-200 bg-white text-slate-700 hover:border-teal-200 hover:bg-slate-50"
                     }`}
                   >

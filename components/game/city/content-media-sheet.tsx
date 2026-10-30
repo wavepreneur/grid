@@ -75,7 +75,7 @@ export function ContentMediaSheet({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="cg-animate-rise-in relative flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden bg-[var(--cg-card)] shadow-[var(--cg-shadow-lift)] sm:h-[min(96dvh,900px)] sm:rounded-[1.5rem]"
+        className="cg-animate-rise-in relative isolate flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden bg-[var(--cg-card)] shadow-[var(--cg-shadow-lift)] sm:h-[min(96dvh,900px)] sm:rounded-[1.5rem]"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -101,7 +101,9 @@ export function ContentMediaSheet({
           </div>
         ) : null}
 
-        <div className={`relative min-h-0 flex-1 ${isImage ? "bg-black" : "bg-[#f7f6f0]"}`}>
+        <div
+          className={`relative z-0 min-h-0 flex-1 overflow-hidden ${isImage ? "bg-black" : "bg-[#f7f6f0]"}`}
+        >
           {mediaUrl?.trim() ? (
             isImage ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -116,8 +118,8 @@ export function ContentMediaSheet({
                 key={mediaUrl}
                 src={mediaUrl}
                 title={title}
-                className="h-full w-full border-0"
-                allow="autoplay; fullscreen; encrypted-media; gyroscope; accelerometer"
+                className="absolute inset-0 h-full w-full border-0"
+                allow="autoplay; fullscreen; encrypted-media; gyroscope; accelerometer; picture-in-picture"
                 allowFullScreen
               />
             )
@@ -136,7 +138,7 @@ export function ContentMediaSheet({
         </div>
 
         {tipSlot ? (
-          <div className="shrink-0 border-t border-[var(--cg-border)] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="relative z-20 shrink-0 border-t border-[var(--cg-border)] bg-[var(--cg-card)] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {tipSlot}
           </div>
         ) : null}

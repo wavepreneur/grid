@@ -1020,6 +1020,7 @@ export function GameRoom({
         score={teamState.gameState.score ?? 0}
         disabled={solveDisabled && !bonusPlayable}
         isPending={isSolvePending || isHintPending}
+        hintPending={isHintPending}
         canUnlockGps={isNavigator}
         effectiveBeta={session.effectiveBeta}
         soloAlpha={soloAlpha}
@@ -1120,6 +1121,7 @@ export function GameRoom({
         score={teamState.gameState.score ?? 0}
         disabled={solveDisabled}
         isPending={isSolvePending || isHintPending}
+        hintPending={isHintPending}
         canUnlockGps={isNavigator}
         effectiveBeta={session.effectiveBeta}
         soloAlpha={soloAlpha}

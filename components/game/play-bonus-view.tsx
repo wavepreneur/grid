@@ -488,7 +488,9 @@ export function PlayBonusView({
                       ? "border-[var(--cg-success)] bg-[var(--cg-success)]/20"
                       : show && isPicked
                         ? "border-[var(--cg-destructive)] bg-[var(--cg-destructive)]/10"
-                        : "border-[var(--cg-border)] bg-[var(--cg-card)]"
+                        : isPicked
+                          ? "border-[var(--cg-primary)] bg-[var(--cg-primary)]/18 text-[var(--cg-fg)] ring-2 ring-[var(--cg-primary)]/35"
+                          : "border-[var(--cg-border)] bg-[var(--cg-card)]"
                   }`}
                 >
                   {opt.label}

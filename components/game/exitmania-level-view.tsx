@@ -21,6 +21,8 @@ type ExitmaniaLevelViewProps = {
   score: number;
   disabled: boolean;
   isPending: boolean;
+  /** Only tip purchase — must not include solve pending (iPhone sheet stays tappable). */
+  hintPending?: boolean;
   canUnlockGps: boolean;
   effectiveBeta: boolean;
   soloAlpha?: boolean;
@@ -54,6 +56,7 @@ export function ExitmaniaLevelView({
   score,
   disabled,
   isPending,
+  hintPending = false,
   canUnlockGps,
   effectiveBeta: _effectiveBeta,
   soloAlpha = false,
@@ -150,7 +153,7 @@ export function ExitmaniaLevelView({
         onClose={() => setActiveTile(null)}
         purchasedHints={purchasedHints}
         score={score}
-        isPending={isPending}
+        isPending={hintPending}
         onPurchaseHint={onPurchaseHint}
         language={language}
         scoring={level.scoring}
