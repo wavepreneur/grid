@@ -1886,45 +1886,82 @@ async function hydrateComposeRecipes(
   );
 }
 
+function gameMatchesRecipeCombo(
+  game: Pick<StudioGame, "layer2_pack_id" | "layer3_pack_id">,
+  recipe: Pick<StudioComposeRecipe, "layer2_pack_id" | "layer3_pack_id">,
+): boolean {
+  return (
+    (game.layer2_pack_id ?? null) === (recipe.layer2_pack_id ?? null) &&
+    (game.layer3_pack_id ?? null) === (recipe.layer3_pack_id ?? null)
+  );
+}
+
+function recipeCityGameName(input: {
+  cityLabel: string | null | undefined;
+  missionName: string | null | undefined;
+  shellName: string | null | undefined;
+}): string {
+  // Prefer short pack title: "KIRA" + "München" → "KIRA München"
+  return (
+    composeGameName(input.cityLabel, input.missionName) ||
+    composeCityGameName(input.shellName, input.cityLabel) ||
+    (input.cityLabel ?? "").trim() ||
+    "Neues Spiel"
+  );
+}
+
 async function backfillEmptyRecipeShells(
   supabase: AdminClient,
   orgId: string,
-  recipeId: string,
-  origin: StudioGame,
+  recipe: StudioComposeRecipe,
+  shellDonor: StudioGame,
 ): Promise<number> {
+  const missionName = recipe.layer2_pack_id
+    ? (await getOwnedPack(supabase, orgId, recipe.layer2_pack_id))?.name ?? null
+    : null;
   const { data: rows, error } = await supabase
     .from("studio_games")
     .select("*")
     .eq("organization_id", orgId)
-    .eq("compose_recipe_id", recipeId);
+    .eq("compose_recipe_id", recipe.id);
   if (error) throw new Error(error.message);
 
   let updated = 0;
   for (const row of rows ?? []) {
     const game = asStudioGame(row as Record<string, unknown>);
-    if (game.id === origin.id || composeShellHasContent(game)) continue;
-
     let cityLabel: string | null = game.city_slug;
     if (game.layer1_pack_id) {
       const pack = await getOwnedPack(supabase, orgId, game.layer1_pack_id);
       cityLabel = pack?.name ?? pack?.city_slug ?? cityLabel;
     }
-    const name = composeCityGameName(origin.name, cityLabel) || game.name;
+    const name = recipeCityGameName({
+      cityLabel,
+      missionName,
+      shellName: shellDonor.name,
+    });
+    const needsShell = !composeShellHasContent(game);
+    const needsRename = Boolean(name && name !== game.name);
+    if (!needsShell && !needsRename) continue;
+
     const runtime_profiles = parseRuntimeProfiles(game.runtime_profiles);
-    const shell = composeShellPayload(origin, runtime_profiles);
+    const shell = needsShell ? composeShellPayload(shellDonor, runtime_profiles) : null;
     const { error: updateError } = await supabase
       .from("studio_games")
       .update({
         name,
-        logo_url: shell.logo_url ?? null,
-        description: typeof shell.description === "string" ? shell.description : "",
-        farewell_text: typeof shell.farewell_text === "string" ? shell.farewell_text : "",
-        duration_minutes: typeof shell.duration_minutes === "number" ? shell.duration_minutes : null,
-        feature_flags: (shell.feature_flags as Record<string, unknown>) ?? {},
-        translations: (shell.translations as Record<string, unknown>) ?? {},
-        logic_rules: Array.isArray(shell.logic_rules) ? shell.logic_rules : [],
-        runtime_profiles: (shell.runtime_profiles as StudioGame["runtime_profiles"]) ?? runtime_profiles,
-        blueprint_id: origin.blueprint_id ?? null,
+        ...(shell
+          ? {
+              logo_url: shell.logo_url ?? null,
+              description: typeof shell.description === "string" ? shell.description : "",
+              farewell_text: typeof shell.farewell_text === "string" ? shell.farewell_text : "",
+              duration_minutes: typeof shell.duration_minutes === "number" ? shell.duration_minutes : null,
+              feature_flags: (shell.feature_flags as Record<string, unknown>) ?? {},
+              translations: (shell.translations as Record<string, unknown>) ?? {},
+              logic_rules: Array.isArray(shell.logic_rules) ? shell.logic_rules : [],
+              runtime_profiles: (shell.runtime_profiles as StudioGame["runtime_profiles"]) ?? runtime_profiles,
+              blueprint_id: shellDonor.blueprint_id ?? null,
+            }
+          : {}),
         updated_at: new Date().toISOString(),
       })
       .eq("id", game.id)
@@ -1935,6 +1972,53 @@ async function backfillEmptyRecipeShells(
   return updated;
 }
 
+async function findRecipeHauptspielCandidate(
+  supabase: AdminClient,
+  orgId: string,
+  recipe: StudioComposeRecipe,
+): Promise<StudioGame | null> {
+  if (!recipe.layer2_pack_id && !recipe.layer3_pack_id) return null;
+  let query = supabase
+    .from("studio_games")
+    .select("*")
+    .eq("organization_id", orgId)
+    .neq("is_template", true)
+    .order("created_at", { ascending: true });
+  if (recipe.layer2_pack_id) query = query.eq("layer2_pack_id", recipe.layer2_pack_id);
+  else query = query.is("layer2_pack_id", null);
+  if (recipe.layer3_pack_id) query = query.eq("layer3_pack_id", recipe.layer3_pack_id);
+  else query = query.is("layer3_pack_id", null);
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []).map((row) => asStudioGame(row as Record<string, unknown>));
+  if (rows.length === 0) return null;
+
+  const ofRecipe = rows.filter((game) => game.compose_recipe_id === recipe.id);
+  const pool = ofRecipe.length > 0 ? ofRecipe : rows;
+  const munich = pool.find((game) => {
+    const slug = (game.city_slug ?? "").trim().toLowerCase();
+    const name = game.name.trim().toLowerCase();
+    return (
+      slug === "muenchen" ||
+      slug === "munich" ||
+      name.includes("münchen") ||
+      name.includes("muenchen") ||
+      name.includes("munich")
+    );
+  });
+  return (
+    (munich && composeShellHasContent(munich) ? munich : null) ??
+    pool.find((game) => composeShellHasContent(game)) ??
+    munich ??
+    pool[0] ??
+    null
+  );
+}
+
+/**
+ * Hauptspiel = city game with the recipe’s Mission+Team combo.
+ * Shell donor (logo/texts) may be the mission source even if it has no Team pack.
+ */
 async function persistRecipeOrigin(
   supabase: AdminClient,
   orgId: string,
@@ -1942,6 +2026,15 @@ async function persistRecipeOrigin(
   preferred?: StudioGame | null,
 ): Promise<StudioComposeRecipe> {
   if (recipe.archived_at) return recipe;
+
+  const shellDonor =
+    (await findComposeShellSource(
+      supabase,
+      orgId,
+      recipe.layer2_pack_id,
+      recipe.layer3_pack_id,
+    )) ??
+    (preferred && composeShellHasContent(preferred) ? preferred : null);
 
   let currentOrigin: StudioGame | null = null;
   if (recipe.origin_game_id) {
@@ -1953,43 +2046,38 @@ async function persistRecipeOrigin(
       .maybeSingle();
     if (error) throw new Error(error.message);
     currentOrigin = data ? asStudioGame(data as Record<string, unknown>) : null;
-    if (currentOrigin && composeShellHasContent(currentOrigin)) {
-      await backfillEmptyRecipeShells(supabase, orgId, recipe.id, currentOrigin);
-      return recipe;
-    }
   }
 
-  let origin = await findComposeShellSource(
-    supabase,
-    orgId,
-    recipe.layer2_pack_id,
-    recipe.layer3_pack_id,
-    currentOrigin?.id,
-  );
-  if (!origin && preferred && composeShellHasContent(preferred)) {
-    origin = preferred;
-  }
-  if (!origin) return recipe;
+  const originOk = currentOrigin && gameMatchesRecipeCombo(currentOrigin, recipe);
+  let nextOrigin =
+    originOk
+      ? currentOrigin
+      : preferred && gameMatchesRecipeCombo(preferred, recipe)
+        ? preferred
+        : await findRecipeHauptspielCandidate(supabase, orgId, recipe);
 
-  if (origin.id !== recipe.origin_game_id) {
+  if (nextOrigin && nextOrigin.id !== recipe.origin_game_id) {
     const { data, error } = await supabase
       .from("studio_compose_recipes")
-      .update({ origin_game_id: origin.id, updated_at: new Date().toISOString() })
+      .update({ origin_game_id: nextOrigin.id, updated_at: new Date().toISOString() })
       .eq("id", recipe.id)
       .eq("organization_id", orgId)
       .select("*")
       .single();
     if (error) {
       if (/origin_game_id|archived_at|schema cache/i.test(error.message)) {
-        await backfillEmptyRecipeShells(supabase, orgId, recipe.id, origin);
-        return { ...recipe, origin_game_id: origin.id, origin_game_name: origin.name };
+        recipe = { ...recipe, origin_game_id: nextOrigin.id, origin_game_name: nextOrigin.name };
+      } else {
+        throw new Error(error.message);
       }
-      throw new Error(error.message);
+    } else {
+      recipe = normalizeComposeRecipeRow(data as Record<string, unknown>, nextOrigin.name);
     }
-    recipe = normalizeComposeRecipeRow(data as Record<string, unknown>, origin.name);
   }
 
-  await backfillEmptyRecipeShells(supabase, orgId, recipe.id, origin);
+  const donor =
+    (nextOrigin && composeShellHasContent(nextOrigin) ? nextOrigin : null) ?? shellDonor;
+  if (donor) await backfillEmptyRecipeShells(supabase, orgId, recipe, donor);
   return recipe;
 }
 
@@ -2251,8 +2339,11 @@ export async function composeGamesFromPacks(input: {
       const name =
         input.name?.trim() && cityPacks.length <= 1
           ? input.name.trim()
-          : composeCityGameName(origin?.name, city?.name ?? city?.city_slug) ||
-            composeGameName(city?.name ?? city?.city_slug, mission?.name) ||
+          : recipeCityGameName({
+              cityLabel: city?.name ?? city?.city_slug,
+              missionName: mission?.name,
+              shellName: origin?.name,
+            }) ||
             input.name?.trim() ||
             "Neues Spiel";
       const draft = composeDraftGame({
@@ -2323,23 +2414,15 @@ export async function composeGamesFromPacks(input: {
       });
     }
 
-    // Prefer contentful shell source (e.g. mission origin) over empty city drafts.
-    if (recipeId && recipe && !recipe.origin_game_id) {
-      if (origin && composeShellHasContent(origin)) {
+    // Hauptspiel = city game from this compose run (not the mission-only source).
+    if (recipeId && recipe && !recipe.origin_game_id && createdMeta.length > 0) {
+      const originId = pickRecipeOriginGameId(createdMeta);
+      if (originId) {
         await supabase
           .from("studio_compose_recipes")
-          .update({ origin_game_id: origin.id, updated_at: new Date().toISOString() })
+          .update({ origin_game_id: originId, updated_at: new Date().toISOString() })
           .eq("id", recipeId)
           .eq("organization_id", orgId);
-      } else if (createdMeta.length > 0) {
-        const originId = pickRecipeOriginGameId(createdMeta);
-        if (originId) {
-          await supabase
-            .from("studio_compose_recipes")
-            .update({ origin_game_id: originId, updated_at: new Date().toISOString() })
-            .eq("id", recipeId)
-            .eq("organization_id", orgId);
-        }
       }
     }
 
@@ -2487,7 +2570,11 @@ export async function seedComposeGamesForRecipe(recipeId: string): Promise<
     const slugs = await loadGameSlugs(supabase, orgId);
     const now = new Date().toISOString();
     const rows = chunk.map((city) => {
-      const name = composeCityGameName(origin!.name, city.name);
+      const name = recipeCityGameName({
+        cityLabel: city.name,
+        missionName: mission?.name,
+        shellName: origin!.name,
+      });
       return {
         id: crypto.randomUUID(),
         organization_id: orgId,
