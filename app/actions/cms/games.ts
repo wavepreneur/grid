@@ -1741,7 +1741,10 @@ async function copyGameWithLinks(
   collectionId?: string | null,
 ): Promise<StudioGame> {
   const slug = await ensureUniqueGameSlug(supabase, orgId);
+  const packed = gameUsesLayerPacks(source);
 
+  // Pack-backed / recipe games share a unique (L1,L2,L3) combo. A duplicate must
+  // become a standalone draft: same task links materialized, no pack FKs, no recipe.
   const { data, error } = await supabase
     .from("studio_games")
     .insert({
@@ -1761,13 +1764,10 @@ async function copyGameWithLinks(
       logic_rules: source.logic_rules,
       active_layers: source.active_layers,
       runtime_profiles: source.runtime_profiles,
-      ...(gameUsesLayerPacks(source)
-        ? {
-            layer1_pack_id: source.layer1_pack_id ?? null,
-            layer2_pack_id: source.layer2_pack_id ?? null,
-            layer3_pack_id: source.layer3_pack_id ?? null,
-          }
-        : {}),
+      layer1_pack_id: null,
+      layer2_pack_id: null,
+      layer3_pack_id: null,
+      compose_recipe_id: null,
       is_template: false,
       status: "draft",
       published_version_number: 0,
@@ -1777,9 +1777,31 @@ async function copyGameWithLinks(
     .select("*")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (/studio_games_layer_combo_key|duplicate key/i.test(error.message)) {
+      throw new Error(
+        "Dieses Spiel teilt Ort/Mission/Team mit einem anderen Eintrag und konnte so nicht kopiert werden. Bitte erneut versuchen.",
+      );
+    }
+    throw new Error(error.message);
+  }
 
-  if (gameUsesLayerPacks(source)) {
+  const gameId = data.id as string;
+
+  if (packed) {
+    const merged = await loadMergedGameTaskLinksForGame(supabase, source);
+    if (merged.length > 0) {
+      const { error: linksError } = await supabase.from("studio_game_tasks").insert(
+        merged.map((link) => ({
+          game_id: gameId,
+          task_id: link.task_id,
+          layer: link.layer ?? 2,
+          sort_order: link.sort_order,
+          overrides: link.overrides ?? {},
+        })),
+      );
+      if (linksError) throw new Error(linksError.message);
+    }
     return normalizeGameRow(data as StudioGame);
   }
 
@@ -1792,7 +1814,7 @@ async function copyGameWithLinks(
   if (sourceLinks?.length) {
     const { error: linksError } = await supabase.from("studio_game_tasks").insert(
       sourceLinks.map((link) => ({
-        game_id: data.id,
+        game_id: gameId,
         task_id: link.task_id,
         layer: (link as { layer?: number }).layer ?? 2,
         sort_order: link.sort_order,
