@@ -355,7 +355,7 @@ export function studioTilesToLevelTiles(
       label: tile.label?.trim() || undefined,
       cover_image_url: tile.cover_image_url?.trim() || undefined,
     };
-    if (tile.hint_text?.trim()) {
+    if (tile.media_type !== "video" && tile.hint_text?.trim()) {
       next.hint = {
         text: tile.hint_text.trim(),
         point_cost: tile.hint_point_cost ?? HINT_POINT_COST,

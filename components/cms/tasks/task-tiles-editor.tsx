@@ -78,11 +78,16 @@ export function TaskTilesEditor({ tiles, onChange }: Props) {
               <StudioLabel>Beim Klick öffnen</StudioLabel>
               <StudioSelect
                 value={tile.media_type}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const media_type = e.target.value as TaskContentTile["media_type"];
                   patchTile(tile.id, {
-                    media_type: e.target.value as TaskContentTile["media_type"],
-                  })
-                }
+                    media_type,
+                    // Video embeds on iPhone swallow taps — no purchasable tip.
+                    ...(media_type === "video"
+                      ? { hint_text: undefined, hint_point_cost: undefined }
+                      : {}),
+                  });
+                }}
               >
                 {MEDIA_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -110,44 +115,51 @@ export function TaskTilesEditor({ tiles, onChange }: Props) {
               />
             </div>
 
-            <div className="rounded-xl border border-sky-100 bg-white p-3 space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">
-                Hinweis zu dieser Kachel
-              </p>
-              <div>
-                <StudioLabel hint="Optional — bezieht sich auf den Inhalt dieser Kachel">
-                  Hinweis-Text
-                </StudioLabel>
-                <StudioTextarea
-                  className="min-h-20"
-                  value={tile.hint_text ?? ""}
-                  onChange={(e) =>
-                    patchTile(tile.id, {
-                      hint_text: e.target.value || undefined,
-                      hint_point_cost: tile.hint_point_cost ?? HINT_POINT_COST,
-                    })
-                  }
-                  placeholder="Was der Spieler nach dem Freischalten sieht…"
-                />
-              </div>
-              {tile.hint_text?.trim() ? (
+            {tile.media_type !== "video" ? (
+              <div className="rounded-xl border border-sky-100 bg-white p-3 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">
+                  Hinweis zu dieser Kachel
+                </p>
                 <div>
-                  <StudioLabel hint="Punkte werden beim Freischalten abgezogen">
-                    Kosten (Punkte)
+                  <StudioLabel hint="Optional — bezieht sich auf den Inhalt dieser Kachel">
+                    Hinweis-Text
                   </StudioLabel>
-                  <StudioInput
-                    type="number"
-                    min={0}
-                    value={tile.hint_point_cost ?? HINT_POINT_COST}
+                  <StudioTextarea
+                    className="min-h-20"
+                    value={tile.hint_text ?? ""}
                     onChange={(e) =>
                       patchTile(tile.id, {
-                        hint_point_cost: Math.max(0, Number(e.target.value) || 0),
+                        hint_text: e.target.value || undefined,
+                        hint_point_cost: tile.hint_point_cost ?? HINT_POINT_COST,
                       })
                     }
+                    placeholder="Was der Spieler nach dem Freischalten sieht…"
                   />
                 </div>
-              ) : null}
-            </div>
+                {tile.hint_text?.trim() ? (
+                  <div>
+                    <StudioLabel hint="Punkte werden beim Freischalten abgezogen">
+                      Kosten (Punkte)
+                    </StudioLabel>
+                    <StudioInput
+                      type="number"
+                      min={0}
+                      value={tile.hint_point_cost ?? HINT_POINT_COST}
+                      onChange={(e) =>
+                        patchTile(tile.id, {
+                          hint_point_cost: Math.max(0, Number(e.target.value) || 0),
+                        })
+                      }
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-500">
+                Bei Video-Kacheln gibt es keinen kaufbaren Hinweis — der Player blockiert Tippen auf
+                dem Handy.
+              </p>
+            )}
           </div>
         ))
       )}

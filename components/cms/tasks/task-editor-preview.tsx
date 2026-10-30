@@ -55,7 +55,7 @@ export function TaskEditorPreview({ title, description, content }: Props) {
   const viewHintTile = tiles.find((t) => t.id === viewHintId) ?? null;
 
   const tileModels = tiles.map((tile: TaskContentTile, index) => {
-    const hasHint = Boolean(tile.hint_text?.trim());
+    const hasHint = tile.media_type !== "video" && Boolean(tile.hint_text?.trim());
     const unlocked = Boolean(unlockedHints[tile.id]);
     return {
       id: tile.id,
@@ -240,7 +240,7 @@ export function TaskEditorPreview({ title, description, content }: Props) {
           ) : null
         }
         tipSlot={
-          openTile?.hint_text?.trim() ? (
+          openTile?.media_type !== "video" && openTile?.hint_text?.trim() ? (
             unlockedHints[openTile.id] ? (
               <div className="space-y-2">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--cg-success)]">

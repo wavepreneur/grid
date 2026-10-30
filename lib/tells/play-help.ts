@@ -34,7 +34,10 @@ export function levelHasUnusedTileHint(
   purchasedHints: Record<string, PurchasedTileHint>,
 ): boolean {
   return (level.tiles ?? []).some(
-    (tile) => Boolean(tile.hint?.text?.trim()) && !purchasedHints[tile.id],
+    (tile) =>
+      tile.type !== "video" &&
+      Boolean(tile.hint?.text?.trim()) &&
+      !purchasedHints[tile.id],
   );
 }
 

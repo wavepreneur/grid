@@ -63,7 +63,8 @@ export function MediaModal({
   if (!tile) return null;
 
   const purchased = purchasedHints[tile.id];
-  const hasHint = Boolean(tile.hint?.text?.trim());
+  // Video embeds swallow taps on iPhone — never offer a tip CTA on video tiles.
+  const hasHint = tile.type !== "video" && Boolean(tile.hint?.text?.trim());
   const hintCost = tile.hint?.point_cost ?? HINT_POINT_COST;
   const title = tile.label ?? playTileTypeLabel(tile.type, language);
 
