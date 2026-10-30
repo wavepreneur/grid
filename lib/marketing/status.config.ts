@@ -45,7 +45,7 @@ export const STATUS_SECTIONS: { id: StatusSectionId; letter: string; title: stri
 export const STATUS_ENTRIES: StatusEntry[] = [
   // P0 · Go-live
   { section: "golive", label: "Remaining Loquiz games rebuilt in Tells and published", status: "pilot", note: "In progress" },
-  { section: "golive", label: "Content pack slug on every Exitmania game (games.grid_content_pack_slug)", status: "pilot", note: "1,910 games set" },
+  { section: "golive", label: "Content pack slug on every Exitmania game (games.tells_content_pack_slug)", status: "pilot", note: "1,911 FP set; IT twins via alias; Mad/AI/KIRA storefront TBD" },
   { section: "golive", label: "Route points per city set and played once on site per game type", status: "roadmap" },
   { section: "golive", label: "Decide: cities on global_levels at launch, or migrated to Studio snapshots first", status: "roadmap" },
   { section: "golive", label: "Rename grid → tells in the Exitmania integration (tables, routes, env, mails)", status: "roadmap", note: "Before any city switches" },
