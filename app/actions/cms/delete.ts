@@ -58,7 +58,7 @@ async function fetchTasksGameLinks(taskIds: string[]): Promise<{
 
   if (linksError) throw new Error(linksError.message);
 
-  // Einstiegsfragen: overrides.opener_task_id — org-scoped scan
+  // Einstiegsfragen via JSON contains — never `.in(game_id, allOrgGames)` (Bad Request at scale).
   const openerRows: Array<{
     id: string;
     game_id: string;
@@ -66,37 +66,21 @@ async function fetchTasksGameLinks(taskIds: string[]): Promise<{
     openerTaskId: string;
   }> = [];
 
-  if (taskIds.length > 0) {
-    const orgId = await getStudioOrganizationId();
-    const { data: orgGames, error: orgGamesError } = await supabase
-      .from("studio_games")
-      .select("id")
-      .eq("organization_id", orgId);
-    if (orgGamesError) throw new Error(orgGamesError.message);
-
-    const orgGameIds = (orgGames ?? []).map((g) => g.id as string);
-    if (orgGameIds.length > 0) {
-      const { data: overrideLinks, error: overrideError } = await supabase
-        .from("studio_game_tasks")
-        .select(
-          "id, game_id, overrides, studio_games(id, name, status, published_version_number, organization_id)",
-        )
-        .in("game_id", orgGameIds);
-      if (overrideError) throw new Error(overrideError.message);
-
-      const wanted = new Set(taskIds);
-      for (const row of overrideLinks ?? []) {
-        const overrides = row.overrides as { opener_task_id?: unknown } | null;
-        const openerId =
-          typeof overrides?.opener_task_id === "string" ? overrides.opener_task_id : null;
-        if (!openerId || !wanted.has(openerId)) continue;
-        openerRows.push({
-          id: row.id as string,
-          game_id: row.game_id as string,
-          studio_games: row.studio_games,
-          openerTaskId: openerId,
-        });
-      }
+  const openerSelect =
+    "id, game_id, studio_games(id, name, status, published_version_number, organization_id)";
+  for (const taskId of taskIds) {
+    const { data: openerLinks, error: openerError } = await supabase
+      .from("studio_game_tasks")
+      .select(openerSelect)
+      .contains("overrides", { opener_task_id: taskId });
+    if (openerError) throw new Error(openerError.message);
+    for (const row of openerLinks ?? []) {
+      openerRows.push({
+        id: row.id as string,
+        game_id: row.game_id as string,
+        studio_games: row.studio_games,
+        openerTaskId: taskId,
+      });
     }
   }
 
