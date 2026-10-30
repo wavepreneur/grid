@@ -1777,6 +1777,23 @@ function composeShellPayload(
   );
 }
 
+function pickComposeShellFromRows(
+  rows: StudioGame[],
+  excludeId?: string,
+): StudioGame | null {
+  const candidates = rows.filter((game) => game.id !== excludeId && composeShellHasContent(game));
+  return (
+    candidates.find((game) => !game.compose_recipe_id) ??
+    candidates[0] ??
+    null
+  );
+}
+
+/**
+ * Shell source for logo/name/briefing when composing city games.
+ * Prefer exact Mission+Team match; if the mission origin only has L2 (Team from catalog),
+ * fall back to any contentful game on that Mission pack.
+ */
 async function findComposeShellSource(
   supabase: AdminClient,
   orgId: string,
@@ -1785,24 +1802,55 @@ async function findComposeShellSource(
   excludeId?: string,
 ): Promise<StudioGame | null> {
   if (!layer2Id && !layer3Id) return null;
-  let query = supabase
-    .from("studio_games")
-    .select("*")
-    .eq("organization_id", orgId)
-    .neq("is_template", true)
-    .order("created_at", { ascending: true });
-  if (layer2Id) query = query.eq("layer2_pack_id", layer2Id);
-  else query = query.is("layer2_pack_id", null);
-  if (layer3Id) query = query.eq("layer3_pack_id", layer3Id);
-  else query = query.is("layer3_pack_id", null);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  const rows = (data ?? [])
-    .map((row) => asStudioGame(row as Record<string, unknown>))
-    .filter((game) => game.id !== excludeId);
-  const original = rows.find((game) => !game.compose_recipe_id && composeShellHasContent(game));
-  if (original) return original;
-  return rows.find((game) => composeShellHasContent(game)) ?? null;
+
+  const load = async (opts: {
+    layer2: string | null | undefined;
+    layer3: string | null | undefined;
+  }): Promise<StudioGame[]> => {
+    let query = supabase
+      .from("studio_games")
+      .select("*")
+      .eq("organization_id", orgId)
+      .neq("is_template", true)
+      .order("created_at", { ascending: true });
+    if (opts.layer2 === undefined) {
+      /* no L2 filter */
+    } else if (opts.layer2) query = query.eq("layer2_pack_id", opts.layer2);
+    else query = query.is("layer2_pack_id", null);
+    if (opts.layer3 === undefined) {
+      /* no L3 filter */
+    } else if (opts.layer3) query = query.eq("layer3_pack_id", opts.layer3);
+    else query = query.is("layer3_pack_id", null);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row) => asStudioGame(row as Record<string, unknown>));
+  };
+
+  // 1) Exact L2+L3 combo (same recipe shape)
+  const exact = pickComposeShellFromRows(
+    await load({ layer2: layer2Id, layer3: layer3Id }),
+    excludeId,
+  );
+  if (exact) return exact;
+
+  // 2) Mission origin may lack Team pack (Team chosen from catalog) — still use its shell
+  if (layer2Id) {
+    const byMission = pickComposeShellFromRows(
+      await load({ layer2: layer2Id, layer3: undefined }),
+      excludeId,
+    );
+    if (byMission) return byMission;
+  }
+
+  // 3) Team-only recipes
+  if (layer3Id && !layer2Id) {
+    return pickComposeShellFromRows(
+      await load({ layer2: undefined, layer3: layer3Id }),
+      excludeId,
+    );
+  }
+
+  return null;
 }
 
 export type RecipeOriginContext = {
@@ -1838,37 +1886,111 @@ async function hydrateComposeRecipes(
   );
 }
 
+async function backfillEmptyRecipeShells(
+  supabase: AdminClient,
+  orgId: string,
+  recipeId: string,
+  origin: StudioGame,
+): Promise<number> {
+  const { data: rows, error } = await supabase
+    .from("studio_games")
+    .select("*")
+    .eq("organization_id", orgId)
+    .eq("compose_recipe_id", recipeId);
+  if (error) throw new Error(error.message);
+
+  let updated = 0;
+  for (const row of rows ?? []) {
+    const game = asStudioGame(row as Record<string, unknown>);
+    if (game.id === origin.id || composeShellHasContent(game)) continue;
+
+    let cityLabel: string | null = game.city_slug;
+    if (game.layer1_pack_id) {
+      const pack = await getOwnedPack(supabase, orgId, game.layer1_pack_id);
+      cityLabel = pack?.name ?? pack?.city_slug ?? cityLabel;
+    }
+    const name = composeCityGameName(origin.name, cityLabel) || game.name;
+    const runtime_profiles = parseRuntimeProfiles(game.runtime_profiles);
+    const shell = composeShellPayload(origin, runtime_profiles);
+    const { error: updateError } = await supabase
+      .from("studio_games")
+      .update({
+        name,
+        logo_url: shell.logo_url ?? null,
+        description: typeof shell.description === "string" ? shell.description : "",
+        farewell_text: typeof shell.farewell_text === "string" ? shell.farewell_text : "",
+        duration_minutes: typeof shell.duration_minutes === "number" ? shell.duration_minutes : null,
+        feature_flags: (shell.feature_flags as Record<string, unknown>) ?? {},
+        translations: (shell.translations as Record<string, unknown>) ?? {},
+        logic_rules: Array.isArray(shell.logic_rules) ? shell.logic_rules : [],
+        runtime_profiles: (shell.runtime_profiles as StudioGame["runtime_profiles"]) ?? runtime_profiles,
+        blueprint_id: origin.blueprint_id ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", game.id)
+      .eq("organization_id", orgId);
+    if (updateError) throw new Error(updateError.message);
+    updated += 1;
+  }
+  return updated;
+}
+
 async function persistRecipeOrigin(
   supabase: AdminClient,
   orgId: string,
   recipe: StudioComposeRecipe,
   preferred?: StudioGame | null,
 ): Promise<StudioComposeRecipe> {
-  if (recipe.origin_game_id || recipe.archived_at) return recipe;
+  if (recipe.archived_at) return recipe;
+
+  let currentOrigin: StudioGame | null = null;
+  if (recipe.origin_game_id) {
+    const { data, error } = await supabase
+      .from("studio_games")
+      .select("*")
+      .eq("id", recipe.origin_game_id)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    currentOrigin = data ? asStudioGame(data as Record<string, unknown>) : null;
+    if (currentOrigin && composeShellHasContent(currentOrigin)) {
+      await backfillEmptyRecipeShells(supabase, orgId, recipe.id, currentOrigin);
+      return recipe;
+    }
+  }
+
   let origin = await findComposeShellSource(
     supabase,
     orgId,
     recipe.layer2_pack_id,
     recipe.layer3_pack_id,
+    currentOrigin?.id,
   );
   if (!origin && preferred && composeShellHasContent(preferred)) {
     origin = preferred;
   }
   if (!origin) return recipe;
-  const { data, error } = await supabase
-    .from("studio_compose_recipes")
-    .update({ origin_game_id: origin.id, updated_at: new Date().toISOString() })
-    .eq("id", recipe.id)
-    .eq("organization_id", orgId)
-    .select("*")
-    .single();
-  if (error) {
-    if (/origin_game_id|archived_at|schema cache/i.test(error.message)) {
-      return { ...recipe, origin_game_id: origin.id, origin_game_name: origin.name };
+
+  if (origin.id !== recipe.origin_game_id) {
+    const { data, error } = await supabase
+      .from("studio_compose_recipes")
+      .update({ origin_game_id: origin.id, updated_at: new Date().toISOString() })
+      .eq("id", recipe.id)
+      .eq("organization_id", orgId)
+      .select("*")
+      .single();
+    if (error) {
+      if (/origin_game_id|archived_at|schema cache/i.test(error.message)) {
+        await backfillEmptyRecipeShells(supabase, orgId, recipe.id, origin);
+        return { ...recipe, origin_game_id: origin.id, origin_game_name: origin.name };
+      }
+      throw new Error(error.message);
     }
-    throw new Error(error.message);
+    recipe = normalizeComposeRecipeRow(data as Record<string, unknown>, origin.name);
   }
-  return normalizeComposeRecipeRow(data as Record<string, unknown>, origin.name);
+
+  await backfillEmptyRecipeShells(supabase, orgId, recipe.id, origin);
+  return recipe;
 }
 
 export async function loadRecipeOriginContext(
@@ -2201,14 +2323,23 @@ export async function composeGamesFromPacks(input: {
       });
     }
 
-    if (recipeId && recipe && !recipe.origin_game_id && createdMeta.length > 0) {
-      const originId = pickRecipeOriginGameId(createdMeta);
-      if (originId) {
+    // Prefer contentful shell source (e.g. mission origin) over empty city drafts.
+    if (recipeId && recipe && !recipe.origin_game_id) {
+      if (origin && composeShellHasContent(origin)) {
         await supabase
           .from("studio_compose_recipes")
-          .update({ origin_game_id: originId, updated_at: new Date().toISOString() })
+          .update({ origin_game_id: origin.id, updated_at: new Date().toISOString() })
           .eq("id", recipeId)
           .eq("organization_id", orgId);
+      } else if (createdMeta.length > 0) {
+        const originId = pickRecipeOriginGameId(createdMeta);
+        if (originId) {
+          await supabase
+            .from("studio_compose_recipes")
+            .update({ origin_game_id: originId, updated_at: new Date().toISOString() })
+            .eq("id", recipeId)
+            .eq("organization_id", orgId);
+        }
       }
     }
 
@@ -2270,14 +2401,20 @@ export async function seedComposeGamesForRecipe(recipeId: string): Promise<
       if (error) throw new Error(error.message);
       origin = data ? asStudioGame(data as Record<string, unknown>) : null;
     }
-    if (!origin) {
-      origin = await findComposeShellSource(supabase, orgId, mission?.id ?? null, team?.id ?? null);
+    if (!origin || !composeShellHasContent(origin)) {
+      origin =
+        (await findComposeShellSource(supabase, orgId, mission?.id ?? null, team?.id ?? null, origin?.id)) ??
+        origin;
     }
     if (!origin) {
       return { success: false, error: "Hauptspiel First Profiler München nicht gefunden." };
     }
     const ensured = await persistRecipeOrigin(supabase, orgId, recipe, origin);
-    if (!origin.compose_recipe_id) {
+    // Only mark city shells as recipe-owned — never stamp the mission source game.
+    const originMatchesRecipeCombo =
+      (origin.layer2_pack_id ?? null) === (mission?.id ?? null) &&
+      (origin.layer3_pack_id ?? null) === (team?.id ?? null);
+    if (!origin.compose_recipe_id && originMatchesRecipeCombo) {
       await supabase
         .from("studio_games")
         .update({ compose_recipe_id: ensured.id, updated_at: new Date().toISOString() })
