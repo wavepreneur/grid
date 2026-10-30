@@ -83,17 +83,18 @@ export function MediaModal({
             {purchased?.text ?? tile.hint?.text}
           </p>
         </>
-      ) : onPurchaseHint ? (
+      ) : (
         <BigButton
           variant="accent"
           icon={<Lightbulb className="h-5 w-5" />}
-          disabled={isPending}
-          onClick={() => setConfirmOpen(true)}
+          disabled={isPending || !onPurchaseHint}
+          onClick={() => {
+            if (!onPurchaseHint) return;
+            setConfirmOpen(true);
+          }}
         >
           {t.hint.unlockPts(hintCost)}
         </BigButton>
-      ) : (
-        <p className="text-sm font-semibold text-[var(--cg-muted)]">{t.hint.unlockPts(hintCost)}</p>
       )}
     </div>
   ) : undefined;

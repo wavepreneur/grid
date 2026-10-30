@@ -33,7 +33,6 @@ function isEmbeddedVideoPlayer(mediaType: string | undefined, mediaUrl?: string 
   if (mediaType === "video") return true;
   const url = mediaUrl?.trim() ?? "";
   if (!url) return false;
-  // Stream / YouTube embeds fill the sheet; tip must overlay or it falls off-screen.
   return (
     /cloudflarestream\.com\//i.test(url) ||
     /youtube\.com\/embed\//i.test(url) ||
@@ -43,9 +42,9 @@ function isEmbeddedVideoPlayer(mediaType: string | undefined, mediaUrl?: string 
 }
 
 /**
- * Near-fullscreen content sheet — iframe/image take almost the whole display.
- * Tip stays at the bottom. For video embeds only, tip overlays the player so
- * Stream chrome cannot push it out of the iPhone viewport.
+ * Near-fullscreen content sheet.
+ * Tip stays at the bottom for image/audio/website. Video embeds on iOS paint over
+ * sibling DOM — tip is pinned to the fixed overlay (not inside the iframe stack).
  */
 export function ContentMediaSheet({
   open,
@@ -79,21 +78,7 @@ export function ContentMediaSheet({
   if (!open) return null;
 
   const isImage = mediaType === "image";
-  const overlayTip = Boolean(tipSlot) && isEmbeddedVideoPlayer(mediaType, mediaUrl);
-  const sheetHeight =
-    "h-[var(--vv-height,100svh)] max-h-[var(--vv-height,100svh)] sm:h-[min(96dvh,900px)] sm:max-h-[min(96dvh,900px)]";
-
-  const tipChrome = tipSlot ? (
-    <div
-      className={
-        overlayTip
-          ? "pointer-events-auto absolute inset-x-0 bottom-0 z-30 border-t border-[var(--cg-border)] bg-[var(--cg-card)]/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.18)] backdrop-blur-sm"
-          : "relative z-20 shrink-0 border-t border-[var(--cg-border)] bg-[var(--cg-card)] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
-      }
-    >
-      {tipSlot}
-    </div>
-  ) : null;
+  const videoTip = Boolean(tipSlot) && isEmbeddedVideoPlayer(mediaType, mediaUrl);
 
   return (
     <div
@@ -104,7 +89,9 @@ export function ContentMediaSheet({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`cg-animate-rise-in relative isolate flex w-full max-w-3xl flex-col overflow-hidden bg-[var(--cg-card)] shadow-[var(--cg-shadow-lift)] sm:rounded-[1.5rem] ${sheetHeight}`}
+        className={`cg-animate-rise-in relative isolate flex h-full max-h-full w-full max-w-3xl flex-col overflow-hidden bg-[var(--cg-card)] shadow-[var(--cg-shadow-lift)] sm:h-[min(96dvh,900px)] sm:max-h-[min(96dvh,900px)] sm:rounded-[1.5rem] ${
+          videoTip ? "pb-[7.5rem]" : ""
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -148,8 +135,7 @@ export function ContentMediaSheet({
                 src={mediaUrl}
                 title={title}
                 className="absolute inset-0 z-0 h-full w-full border-0"
-                allow="autoplay; fullscreen; encrypted-media; gyroscope; accelerometer; picture-in-picture"
-                allowFullScreen
+                allow="autoplay; encrypted-media; gyroscope; accelerometer; picture-in-picture"
               />
             )
           ) : (
@@ -164,11 +150,23 @@ export function ContentMediaSheet({
               ) : null}
             </div>
           )}
-          {overlayTip ? tipChrome : null}
         </div>
 
-        {!overlayTip ? tipChrome : null}
+        {tipSlot && !videoTip ? (
+          <div className="relative z-20 shrink-0 border-t border-[var(--cg-border)] bg-[var(--cg-card)] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {tipSlot}
+          </div>
+        ) : null}
       </div>
+
+      {tipSlot && videoTip ? (
+        <div
+          className="pointer-events-auto absolute inset-x-0 bottom-0 z-[70] mx-auto w-full max-w-3xl border-t border-[var(--cg-border)] bg-[var(--cg-card)] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-10px_28px_rgba(0,0,0,0.22)] sm:bottom-3 sm:rounded-b-[1.5rem]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {tipSlot}
+        </div>
+      ) : null}
     </div>
   );
 }
