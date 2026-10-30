@@ -30,8 +30,9 @@ type ContentMediaSheetProps = {
 };
 
 /**
- * Near-fullscreen content sheet — iframe/image take almost the whole display.
- * Only a floating X closes (Escape / backdrop also work). No title chrome, no footer CTA.
+ * Near-fullscreen content sheet — media fills remaining space.
+ * Tip / CTA sits above the media so it never falls under the iPhone home bar
+ * or Stream player chrome (100dvh alone is taller than the visible viewport).
  */
 export function ContentMediaSheet({
   open,
@@ -65,6 +66,8 @@ export function ContentMediaSheet({
   if (!open) return null;
 
   const isImage = mediaType === "image";
+  const sheetHeight =
+    "h-[var(--vv-height,100svh)] max-h-[var(--vv-height,100svh)] sm:h-[min(96dvh,900px)] sm:max-h-[min(96dvh,900px)]";
 
   return (
     <div
@@ -75,20 +78,20 @@ export function ContentMediaSheet({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="cg-animate-rise-in relative isolate flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden bg-[var(--cg-card)] shadow-[var(--cg-shadow-lift)] sm:h-[min(96dvh,900px)] sm:rounded-[1.5rem]"
+        className={`cg-animate-rise-in relative isolate flex w-full max-w-3xl flex-col overflow-hidden bg-[var(--cg-card)] shadow-[var(--cg-shadow-lift)] sm:rounded-[1.5rem] ${sheetHeight}`}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
           onClick={onClose}
           aria-label={t.media.close}
-          className="cg-tap-lift absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-20 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--cg-ink)]/70 text-white shadow-[var(--cg-shadow-lift)] backdrop-blur-sm ring-1 ring-white/25"
+          className="cg-tap-lift absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--cg-ink)]/70 text-white shadow-[var(--cg-shadow-lift)] backdrop-blur-sm ring-1 ring-white/25"
         >
           <X className="h-5 w-5" strokeWidth={2.5} />
         </button>
 
         {headerSlot || tabs.length > 1 ? (
-          <div className="shrink-0 space-y-2 border-b border-[var(--cg-border)] bg-[var(--cg-bg)] px-3 pb-2.5 pt-[max(0.75rem,env(safe-area-inset-top))] pr-[max(3.75rem,calc(env(safe-area-inset-right)+3.25rem))]">
+          <div className="relative z-20 shrink-0 space-y-2 border-b border-[var(--cg-border)] bg-[var(--cg-bg)] px-3 pb-2.5 pt-[max(0.75rem,env(safe-area-inset-top))] pr-[max(3.75rem,calc(env(safe-area-inset-right)+3.25rem))]">
             {headerSlot}
             {tabs.length > 1 && onSelectTab ? (
               <MediaSheetTabs
@@ -98,6 +101,14 @@ export function ContentMediaSheet({
                 language={language}
               />
             ) : null}
+          </div>
+        ) : (
+          <div className="shrink-0 pt-[max(0.5rem,env(safe-area-inset-top))]" aria-hidden />
+        )}
+
+        {tipSlot ? (
+          <div className="relative z-20 shrink-0 border-b border-[var(--cg-border)] bg-[var(--cg-card)] px-4 py-3">
+            {tipSlot}
           </div>
         ) : null}
 
@@ -136,12 +147,6 @@ export function ContentMediaSheet({
             </div>
           )}
         </div>
-
-        {tipSlot ? (
-          <div className="relative z-20 shrink-0 border-t border-[var(--cg-border)] bg-[var(--cg-card)] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            {tipSlot}
-          </div>
-        ) : null}
       </div>
     </div>
   );
