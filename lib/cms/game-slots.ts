@@ -487,9 +487,12 @@ export function buildGameSlots(
       if (found) bonusLinks.push(found);
     }
 
-    // Legacy fallbacks only when Studio never wrote bonus_bindings.
-    // An empty array means the author removed every bonus — do not reattach.
-    if (bonusLinks.length === 0 && !hasAuthoredBonusBindings(overrides)) {
+    // Legacy fallbacks when Studio never wrote bonus_bindings, or wrote [] but a
+    // Team pack still supplies layer-3 links (compose: empty list + Team Basic).
+    if (
+      bonusLinks.length === 0 &&
+      (!hasAuthoredBonusBindings(overrides) || bindings.length === 0)
+    ) {
       const bonusTaskId = overrides.bonus_task_id;
       let bonusLink =
         (bonusTaskId
@@ -501,6 +504,24 @@ export function buildGameSlots(
           bonuses.find((b) => {
             const t = parseLinkOverrides(b.overrides).trigger;
             return t?.type === "after_task_solved" && t.source_task_id === levelLink.task_id;
+          }) ?? null;
+      }
+
+      // Prefer bind_slot / sort_order when Team pack is shared across missions
+      // (triggers still point at First Profiler task ids).
+      if (!bonusLink) {
+        bonusLink =
+          bonuses.find((b) => {
+            const raw =
+              b.overrides && typeof b.overrides === "object"
+                ? (b.overrides as Record<string, unknown>)
+                : {};
+            const bindRaw = raw.bind_slot;
+            const slot =
+              typeof bindRaw === "number" && Number.isInteger(bindRaw) && bindRaw >= 0
+                ? bindRaw
+                : b.sort_order;
+            return slot === levelLink.sort_order;
           }) ?? null;
       }
 

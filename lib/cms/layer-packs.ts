@@ -4,7 +4,6 @@
  */
 
 import {
-  hasAuthoredBonusBindings,
   parseBonusWhen,
   type BonusAudience,
   type BonusWhen,
@@ -457,11 +456,17 @@ export function mergePackLinksOntoGame(input: {
       if (geoRaw.unlock) overrides.unlock = geoRaw.unlock;
     }
 
-    if (!hasAuthoredBonusBindings(overrides)) {
+    // Team pack bind_slots win when mission has no real bindings.
+    // Empty bonus_bindings: [] (e.g. after deleting Team, then re-attaching Team Basic)
+    // must not block the pack — only non-empty authored lists are local overrides.
+    const authoredBonusCount = Array.isArray(overrides.bonus_bindings)
+      ? overrides.bonus_bindings.length
+      : -1;
+    if (authoredBonusCount <= 0) {
       const bound = layer3.filter((bonus) => {
         const parsed = parsePackItemOverrides(bonus.overrides);
         const slot = parsed.bind_slot ?? bonus.sort_order;
-        return slot === (geo?.sort_order ?? index);
+        return slot === (geo?.sort_order ?? link.sort_order ?? index);
       });
       if (pack3 && bound.length > 0) {
         overrides.bonus_bindings = bound.map((bonus) => {
@@ -474,6 +479,10 @@ export function mergePackLinksOntoGame(input: {
             when: parsed.when ?? { type: "immediate" as const },
           };
         });
+      } else if (authoredBonusCount === 0 && !pack3) {
+        // Keep explicit empty list when no Team pack is linked.
+      } else if (authoredBonusCount === 0 && pack3) {
+        delete overrides.bonus_bindings;
       }
     }
 
